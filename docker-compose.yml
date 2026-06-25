@@ -45,7 +45,7 @@ services:
     expose:
       - '3000'
     volumes:
-      - ${GOOGLE_SERVICE_ACCOUNT_HOST_PATH:-./secrets/google-sa.json}:/run/secrets/google-sa.json:ro
+      - ${GOOGLE_SECRETS_DIR:-./secrets}:/run/secrets:ro
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
       interval: 15s

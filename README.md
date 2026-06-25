@@ -42,7 +42,9 @@ cp .env.example .env
 # Configura producción (ver sección NPM)
 
 mkdir -p secrets
-# Coloca google-sa.json en secrets/google-sa.json
+# Copia tu JSON de GCP con nombre fijo (o ajusta GOOGLE_SERVICE_ACCOUNT_JSON_PATH):
+cp /ruta/a/tu-service-account.json secrets/google-sa.json
+chmod 600 secrets/google-sa.json
 
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
@@ -107,6 +109,13 @@ docker compose up -d --build
      https://www.googleapis.com/auth/admin.directory.user.security
      ```
 4. Configura `GOOGLE_ADMIN_IMPERSONATE` con un super admin `@mali.pe`
+
+**Importante:** el archivo debe existir en el host **antes** de `docker compose up`. Si montas un archivo que no existe, Docker crea un directorio vacío y verás `EISDIR`. Solución:
+
+```bash
+cp secrets/mali-one-XXXX.json secrets/google-sa.json
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate api
+```
 
 Verifica: `GET https://dev.mali.pe/api/health/google-admin`
 

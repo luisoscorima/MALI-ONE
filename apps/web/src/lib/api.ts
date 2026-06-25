@@ -19,7 +19,13 @@ async function request<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(error.message || 'Error de solicitud');
+    const message = error.message;
+    const text = Array.isArray(message)
+      ? message.join(', ')
+      : typeof message === 'string'
+        ? message
+        : res.statusText;
+    throw new Error(text || 'Error de solicitud');
   }
 
   if (res.status === 204) {
