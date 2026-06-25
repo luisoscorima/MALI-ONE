@@ -1,3 +1,6 @@
+# Producción en EC2: web accesible desde Nginx Proxy Manager por red Docker compartida.
+# NPM Forward Hostname: mali-one-web | Forward Port: 80
+
 services:
   api:
     environment:
@@ -5,5 +8,13 @@ services:
       TRUST_PROXY: 'true'
 
   web:
-    ports:
-      - '8080:80'
+    container_name: mali-one-web
+    ports: !override []
+    networks:
+      - internal
+      - npm
+
+networks:
+  npm:
+    external: true
+    name: nginx-proxy-manager_default

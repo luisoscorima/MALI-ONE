@@ -1,3 +1,5 @@
+name: mali-one
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -8,6 +10,8 @@ services:
       POSTGRES_DB: mali_one
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U mali -d mali_one']
       interval: 5s
@@ -17,6 +21,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    networks:
+      - internal
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -34,6 +40,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - internal
     expose:
       - '3000'
     volumes:
@@ -52,8 +60,14 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - internal
     ports:
       - '${WEB_PORT:-8080}:80'
+
+networks:
+  internal:
+    name: mali-one_internal
 
 volumes:
   pgdata:

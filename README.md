@@ -47,18 +47,18 @@ mkdir -p secrets
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-El contenedor `web` expone el puerto **8080** del host. NPM debe apuntar `dev.mali.pe` → `EC2:8080`.
+El contenedor `mali-one-web` se une a la red **`nginx-proxy-manager_default`**. NPM debe apuntar por nombre de contenedor, no por puerto del host.
 
 ## Nginx Proxy Manager (`dev.mali.pe`)
 
 1. Crear **Proxy Host**
    - Domain: `dev.mali.pe`
    - Scheme: `http`
-   - Forward Hostname/IP: IP interna del EC2 (o `host.docker.internal` si NPM comparte red)
-   - Forward Port: `8080`
+   - Forward Hostname / IP: `mali-one-web` (nombre del contenedor en la red NPM)
+   - Forward Port: `80`
    - SSL: Let's Encrypt activado en NPM
 
-2. No necesitas locations extra: el Nginx del contenedor `web` ya reenvía `/api/` y `/r/` al servicio `api`.
+2. No necesitas locations extra: el Nginx del contenedor `web` ya reenvía `/api/` y `/r/` al servicio `api` por la red interna `mali-one_internal`.
 
 3. Asegúrate de que NPM envíe headers:
    - `X-Forwarded-Proto: https`
@@ -69,6 +69,22 @@ El contenedor `web` expone el puerto **8080** del host. NPM debe apuntar `dev.ma
    - `GOOGLE_CALLBACK_URL=https://dev.mali.pe/api/auth/google/callback`
    - `COOKIE_DOMAIN=dev.mali.pe`
    - `TRUST_PROXY=true`
+
+### Verificar red Docker
+
+```bash
+docker network inspect nginx-proxy-manager_default --format '{{range .Containers}}{{.Name}} {{end}}'
+# Debe listar ... mali-one-web ... junto a los contenedores de NPM
+```
+
+### Desarrollo local con Docker (sin NPM)
+
+Solo el archivo base publica el puerto **8080** en el host:
+
+```bash
+docker compose up -d --build
+# http://localhost:8080
+```
 
 ## Google OAuth (sin facturación GCP)
 
