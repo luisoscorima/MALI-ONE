@@ -136,13 +136,14 @@ BOOTSTRAP_ADMIN_EMAIL=loscorima@mali.pe
 AWS_S3_MANAGER_BUCKETS=mali-assets,mali-backups,mali-one-files,tmsaws
 ```
 
-Ejemplo de política IAM (mismas keys, permisos ampliados):
+Ejemplo de política IAM (mismas keys). **Importante:** `s3:PutObject` (subir en Enlaces) y `s3:ListBucket` (listar en Gestor S3) son permisos distintos:
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ListBucketsForManager",
       "Effect": "Allow",
       "Action": ["s3:ListBucket"],
       "Resource": [
@@ -153,6 +154,7 @@ Ejemplo de política IAM (mismas keys, permisos ampliados):
       ]
     },
     {
+      "Sid": "ObjectsInBuckets",
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
       "Resource": [
