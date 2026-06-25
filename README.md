@@ -122,10 +122,51 @@ Verifica: `GET https://dev.mali.pe/api/health/google-admin`
 ## AWS S3
 
 1. Bucket en `us-east-1` (ej. `mali-one-files`)
-2. IAM user con permisos `s3:PutObject`, `s3:GetObject`, `s3:DeleteObject` sobre el bucket
+2. IAM user con permisos sobre los buckets que uses
 3. Variables en `.env`: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`
 
 Con `S3_PUBLIC_READ=false` (recomendado), los archivos se sirven con URL presignada al seguir el enlace corto `/r/{slug}`.
+
+### Gestor S3 (solo super admin)
+
+Mismas `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`, pero la política IAM debe incluir **todos los buckets** del gestor:
+
+```env
+BOOTSTRAP_ADMIN_EMAIL=loscorima@mali.pe
+AWS_S3_MANAGER_BUCKETS=mali-assets,mali-backups,mali-one-files,tmsaws
+```
+
+Ejemplo de política IAM (mismas keys, permisos ampliados):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::mali-assets",
+        "arn:aws:s3:::mali-backups",
+        "arn:aws:s3:::mali-one-files",
+        "arn:aws:s3:::tmsaws"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::mali-assets/*",
+        "arn:aws:s3:::mali-backups/*",
+        "arn:aws:s3:::mali-one-files/*",
+        "arn:aws:s3:::tmsaws/*"
+      ]
+    }
+  ]
+}
+```
+
+Ruta del panel: `/admin/s3` (solo visible si tu email coincide con `BOOTSTRAP_ADMIN_EMAIL`).
 
 ## Migración futura a RDS
 
@@ -134,6 +175,42 @@ Con `S3_PUBLIC_READ=false` (recomendado), los archivos se sirven con URL presign
 3. Cambiar `DATABASE_URL` en `.env`
 4. Reiniciar solo el servicio `api`
 
-## Primer administrador
+## Roles y permisos por módulo
 
-El email configurado en `BOOTSTRAP_ADMIN_EMAIL` recibe rol `admin` al **primer login**. Para promover usuarios existentes, actualiza el campo `role` en la tabla `User` de PostgreSQL.
+### Quién puede entrar
+
+Cualquier cuenta `@mali.pe` puede iniciar sesión con Google. Al primer login se crea como **operador** sin módulos asignados.
+
+### Administrador del sistema
+
+El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único super administrador**:
+
+- Tiene acceso a todos los módulos automáticamente
+- Gestiona accesos en **Accesos MALI ONE** (`/admin/app-users`)
+- No se pueden modificar sus permisos desde la UI
+
+### Módulos asignables
+
+| Módulo | Ruta | Descripción |
+|--------|------|-------------|
+| `links` | `/links` | Enlaces cortos, QR y subida de archivos |
+| `workspace_users` | `/admin/users` | Gestión de cuentas Google Workspace |
+| `s3_manager` | `/admin/s3` | Explorador de buckets y archivos en AWS |
+
+Los operadores solo ven en el menú los módulos que el super admin les habilita. La API también valida el acceso por módulo.
+
+### Flujo típico
+
+1. Un compañero entra con Google → aparece en **Accesos MALI ONE** tras su primer login
+2. Tú (super admin) marcas los módulos que necesita y guardas
+3. El usuario recarga la página y ya ve esos módulos en el menú
+
+### Migración de base de datos
+
+Tras desplegar, aplica la migración:
+
+```bash
+pnpm --filter @mali-one/api prisma:migrate
+```
+
+O reinicia el contenedor `api` en Docker (ejecuta `prisma migrate deploy` al arrancar).

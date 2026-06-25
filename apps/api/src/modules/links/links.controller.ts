@@ -11,12 +11,14 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { User } from '@prisma/client';
+import { AppModule, User } from '@prisma/client';
 import { Request, Response } from 'express';
+import { RequireModule } from '../../core/guards/module.decorator';
 import { ShortenUrlDto } from './dto/shorten-url.dto';
 import { LinksService } from './links.service';
 
 @Controller('links')
+@RequireModule(AppModule.links)
 export class LinksController {
   constructor(private readonly links: LinksService) {}
 

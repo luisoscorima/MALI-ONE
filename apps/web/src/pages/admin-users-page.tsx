@@ -1,14 +1,19 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { useToast } from '@/contexts/toast-context';
+import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
+import { PageHeader } from '@/components/page-header';
 import { Button, Card, Input } from '@/components/ui';
 
 export function AdminUsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -21,19 +26,24 @@ export function AdminUsersPage() {
     orgUnitPath: '/',
   });
 
-  const loadUsers = useCallback(async (q?: string, pageToken?: string) => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api.listWorkspaceUsers(q, pageToken);
-      setUsers((prev) => (pageToken ? [...prev, ...data.users] : data.users));
-      setNextPageToken(data.nextPageToken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar usuarios');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadUsers = useCallback(
+    async (q?: string, pageToken?: string) => {
+      setLoading(true);
+      if (!pageToken) setError('');
+      try {
+        const data = await api.listWorkspaceUsers(q, pageToken);
+        setUsers((prev) => (pageToken ? [...prev, ...data.users] : data.users));
+        setNextPageToken(data.nextPageToken);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Error al cargar usuarios';
+        setError(msg);
+        if (!pageToken) toast.error(msg);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [toast],
+  );
 
   useEffect(() => {
     void loadUsers(search);
@@ -41,6 +51,7 @@ export function AdminUsersPage() {
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
+    setSubmitting(true);
     setError('');
     try {
       await api.createWorkspaceUser(form);
@@ -52,9 +63,14 @@ export function AdminUsersPage() {
         password: '',
         orgUnitPath: '/',
       });
+      toast.success('Usuario creado en Workspace');
       await loadUsers(search);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al crear usuario');
+      const msg = e instanceof Error ? e.message : 'Error al crear usuario';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -63,8 +79,21 @@ export function AdminUsersPage() {
     try {
       const result = await api.resetWorkspacePassword(email);
       setTempPassword(result.temporaryPassword);
+      toast.success('Contraseña temporal generada');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al resetear');
+      const msg = e instanceof Error ? e.message : 'Error al resetear';
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function copyPassword() {
+    if (!tempPassword) return;
+    try {
+      await navigator.clipboard.writeText(tempPassword);
+      toast.success('Contraseña copiada al portapapeles');
+    } catch {
+      toast.error('No se pudo copiar');
     }
   }
 
@@ -72,44 +101,48 @@ export function AdminUsersPage() {
     if (!confirm(`¿Suspender ${email}?`)) return;
     try {
       await api.suspendWorkspaceUser(email);
+      toast.success('Usuario suspendido');
       await loadUsers(search);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al suspender');
+      const msg = e instanceof Error ? e.message : 'Error al suspender';
+      setError(msg);
+      toast.error(msg);
     }
   }
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Usuarios Workspace</h2>
-          <p className="text-sm text-muted">Gestión manual vía Google Admin SDK</p>
-        </div>
-        <Button onClick={() => setShowCreate(true)}>Crear usuario</Button>
-      </div>
+      <PageHeader
+        title="Usuarios Workspace"
+        description="Gestión manual vía Google Admin SDK"
+        actions={
+          <Button onClick={() => setShowCreate((v) => !v)}>
+            {showCreate ? 'Cancelar' : 'Crear usuario'}
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="mb-4 rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm text-danger">
-          {error}
-        </div>
+        <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
 
       {tempPassword && (
-        <div className="mb-4 rounded-lg border border-success/50 bg-success/10 px-4 py-3 text-sm">
-          Contraseña temporal: <strong>{tempPassword}</strong>
-          <button
-            type="button"
-            className="ml-4 underline"
-            onClick={() => setTempPassword(null)}
-          >
-            Cerrar
-          </button>
-        </div>
+        <AlertBanner variant="success" onDismiss={() => setTempPassword(null)}>
+          <div className="flex flex-wrap items-center gap-3">
+            <span>
+              Contraseña temporal:{' '}
+              <strong className="font-mono">{tempPassword}</strong>
+            </span>
+            <Button variant="outline" onClick={() => void copyPassword()}>
+              Copiar
+            </Button>
+          </div>
+        </AlertBanner>
       )}
 
       <Card className="mb-6">
         <form
-          className="flex gap-2"
+          className="flex flex-col gap-2 sm:flex-row"
           onSubmit={(e) => {
             e.preventDefault();
             setSearch(query);
@@ -120,7 +153,9 @@ export function AdminUsersPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <Button type="submit">Buscar</Button>
+          <Button type="submit" className="shrink-0">
+            Buscar
+          </Button>
         </form>
       </Card>
 
@@ -167,7 +202,15 @@ export function AdminUsersPage() {
               minLength={8}
             />
             <div className="flex gap-2 md:col-span-2">
-              <Button type="submit">Guardar</Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner className="h-4 w-4" /> Guardando...
+                  </span>
+                ) : (
+                  'Guardar'
+                )}
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -180,57 +223,82 @@ export function AdminUsersPage() {
         </Card>
       )}
 
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-border text-muted">
-            <tr>
-              <th className="p-4">Email</th>
-              <th className="p-4">Nombre</th>
-              <th className="p-4">OU</th>
-              <th className="p-4">Estado</th>
-              <th className="p-4">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b border-border/60">
-                <td className="p-4">{u.primaryEmail}</td>
-                <td className="p-4">
-                  {u.name.givenName} {u.name.familyName}
-                </td>
-                <td className="p-4">{u.orgUnitPath}</td>
-                <td className="p-4">
-                  {u.suspended ? (
-                    <span className="text-danger">Suspendido</span>
-                  ) : (
-                    <span className="text-success">Activo</span>
-                  )}
-                </td>
-                <td className="p-4">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => void handleReset(u.primaryEmail)}
-                    >
-                      Reset pass
-                    </Button>
-                    {!u.suspended && (
-                      <Button
-                        variant="danger"
-                        onClick={() => void handleSuspend(u.primaryEmail)}
-                      >
-                        Suspender
-                      </Button>
-                    )}
-                  </div>
-                </td>
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="border-b border-border text-muted">
+              <tr>
+                <th className="p-4">Email</th>
+                <th className="p-4">Nombre</th>
+                <th className="p-4">OU</th>
+                <th className="p-4">Estado</th>
+                <th className="p-4">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {loading && <p className="p-4 text-muted">Cargando...</p>}
+            </thead>
+            {loading && users.length === 0 ? (
+              <TableSkeleton rows={6} cols={5} />
+            ) : users.length === 0 ? (
+              <tbody>
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState
+                      title="No se encontraron usuarios"
+                      description="Prueba otra búsqueda o crea un usuario nuevo."
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            ) : (
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-border/60">
+                    <td className="p-4">{u.primaryEmail}</td>
+                    <td className="p-4">
+                      {u.name.givenName} {u.name.familyName}
+                    </td>
+                    <td className="p-4 text-muted">{u.orgUnitPath}</td>
+                    <td className="p-4">
+                      {u.suspended ? (
+                        <span className="rounded bg-danger/15 px-2 py-0.5 text-xs text-danger">
+                          Suspendido
+                        </span>
+                      ) : (
+                        <span className="rounded bg-success/15 px-2 py-0.5 text-xs text-success">
+                          Activo
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleReset(u.primaryEmail)}
+                        >
+                          Reset pass
+                        </Button>
+                        {!u.suspended && (
+                          <Button
+                            variant="danger"
+                            onClick={() => void handleSuspend(u.primaryEmail)}
+                          >
+                            Suspender
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            )}
+          </table>
+        </div>
+        {loading && users.length > 0 && (
+          <div className="flex items-center gap-2 border-t border-border p-4 text-sm text-muted">
+            <Spinner className="h-4 w-4" /> Cargando...
+          </div>
+        )}
         {nextPageToken && !loading && (
-          <div className="p-4">
+          <div className="border-t border-border p-4">
             <Button
               variant="outline"
               onClick={() => void loadUsers(search, nextPageToken)}

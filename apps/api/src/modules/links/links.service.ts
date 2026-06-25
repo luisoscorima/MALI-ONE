@@ -186,6 +186,7 @@ export class LinksService {
       slug: string;
       targetUrl: string;
       type: LinkType;
+      s3Key: string | null;
       fileName: string | null;
       mimeType: string | null;
       clickCount: number;
@@ -206,6 +207,7 @@ export class LinksService {
       type: link.type,
       fileName: link.fileName,
       mimeType: link.mimeType,
+      s3Key: link.s3Key,
       clickCount: link.clickCount,
       createdAt: link.createdAt.toISOString(),
       qrBase64,

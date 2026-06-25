@@ -1,4 +1,4 @@
-import type { AuthUser } from '@mali-one/shared';
+import type { AppModule, AppUserDto, AuthUser } from '@mali-one/shared';
 
 const API_BASE = '';
 
@@ -78,6 +78,14 @@ export const api = {
       method: 'DELETE',
     }),
 
+  listAppUsers: () => request<AppUserDto[]>('/api/admin/app-users'),
+
+  updateAppUserModules: (id: string, modules: AppModule[]) =>
+    request<AppUserDto>(`/api/admin/app-users/${id}/modules`, {
+      method: 'PATCH',
+      body: JSON.stringify({ modules }),
+    }),
+
   shortenUrl: (url: string, customSlug?: string) =>
     request<import('@mali-one/shared').ShortLinkDto>('/api/links/shorten', {
       method: 'POST',
@@ -115,4 +123,32 @@ export const api = {
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   },
+
+  listS3Buckets: () =>
+    request<import('@mali-one/shared').S3BucketInfo[]>('/api/s3-manager/buckets'),
+
+  listS3Objects: (
+    bucket: string,
+    prefix?: string,
+    continuationToken?: string,
+  ) => {
+    const params = new URLSearchParams();
+    if (prefix) params.set('prefix', prefix);
+    if (continuationToken) params.set('continuationToken', continuationToken);
+    const qs = params.toString();
+    return request<import('@mali-one/shared').S3ListObjectsResult>(
+      `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/objects${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getS3DownloadUrl: (bucket: string, key: string) =>
+    request<{ url: string; expiresIn: number }>(
+      `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/download?key=${encodeURIComponent(key)}`,
+    ),
+
+  deleteS3Object: (bucket: string, key: string) =>
+    request<{ ok: boolean }>(
+      `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/objects?key=${encodeURIComponent(key)}`,
+      { method: 'DELETE' },
+    ),
 };

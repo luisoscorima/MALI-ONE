@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User, UserRole } from '@prisma/client';
+import { User, UserRole, AppModule } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { resolveUserModules } from '../../core/permissions/user-modules';
 import { JwtPayload } from './jwt.strategy';
 
 @Injectable()
@@ -43,7 +44,7 @@ export class AuthService {
           googleId: profile.id,
           name: profile.displayName ?? email,
           picture: profile.photos?.[0]?.value ?? null,
-          ...(shouldBeAdmin ? { role: 'admin' as UserRole } : {}),
+          role: shouldBeAdmin ? UserRole.admin : UserRole.operator,
         },
       });
     }
@@ -70,18 +71,24 @@ export class AuthService {
     return this.jwt.sign(payload);
   }
 
-  toAuthUser(user: User) {
+  toAuthUser(user: User & { moduleAccess?: { module: AppModule }[] }) {
+    const bootstrap = this.config.get<string>('BOOTSTRAP_ADMIN_EMAIL');
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       picture: user.picture,
       role: user.role,
+      isSuperAdmin: !!bootstrap && user.email === bootstrap,
+      modules: resolveUserModules(user),
     };
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { moduleAccess: true },
+    });
     if (!user) {
       throw new UnauthorizedException();
     }

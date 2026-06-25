@@ -12,6 +12,12 @@ enum UserRole {
   operator
 }
 
+enum AppModule {
+  links
+  workspace_users
+  s3_manager
+}
+
 enum LinkType {
   URL
   FILE
@@ -23,10 +29,19 @@ model User {
   email      String      @unique
   name       String
   picture    String?
-  role       UserRole    @default(operator)
-  createdAt  DateTime    @default(now())
-  shortLinks ShortLink[]
-  auditLogs  AdminAuditLog[] @relation("ActorAuditLogs")
+  role         UserRole           @default(operator)
+  createdAt    DateTime           @default(now())
+  shortLinks   ShortLink[]
+  auditLogs    AdminAuditLog[]    @relation("ActorAuditLogs")
+  moduleAccess UserModuleAccess[]
+}
+
+model UserModuleAccess {
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module AppModule
+
+  @@id([userId, module])
 }
 
 model AdminAuditLog {

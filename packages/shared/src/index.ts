@@ -1,11 +1,44 @@
 export type UserRole = 'admin' | 'operator';
 
+export type AppModule = 'links' | 'workspace_users' | 's3_manager';
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
   picture: string | null;
   role: UserRole;
+  isSuperAdmin: boolean;
+  modules: AppModule[];
+}
+
+export interface AppUserDto {
+  id: string;
+  email: string;
+  name: string;
+  picture: string | null;
+  role: UserRole;
+  modules: AppModule[];
+  createdAt: string;
+}
+
+export interface S3BucketInfo {
+  name: string;
+  creationDate?: string;
+}
+
+export interface S3ObjectItem {
+  key: string;
+  name: string;
+  isFolder: boolean;
+  size: number | null;
+  lastModified: string | null;
+}
+
+export interface S3ListObjectsResult {
+  items: S3ObjectItem[];
+  prefix: string;
+  nextContinuationToken: string | null;
 }
 
 export interface ShortLinkDto {
@@ -16,6 +49,7 @@ export interface ShortLinkDto {
   type: 'URL' | 'FILE';
   fileName: string | null;
   mimeType: string | null;
+  s3Key: string | null;
   clickCount: number;
   createdAt: string;
   qrBase64?: string;

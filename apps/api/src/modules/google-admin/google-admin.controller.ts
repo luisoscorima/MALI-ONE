@@ -9,15 +9,15 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { User, UserRole } from '@prisma/client';
+import { User, AppModule } from '@prisma/client';
 import { Request } from 'express';
-import { Roles } from '../../core/guards/roles.decorator';
+import { RequireModule } from '../../core/guards/module.decorator';
 import { GoogleAdminService } from './google-admin.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin/users')
-@Roles(UserRole.admin)
+@RequireModule(AppModule.workspace_users)
 export class GoogleAdminController {
   constructor(private readonly googleAdmin: GoogleAdminService) {}
 
