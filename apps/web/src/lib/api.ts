@@ -101,4 +101,18 @@ export const api = {
     request(`/api/links/${id}`, { method: 'DELETE' }),
 
   qrUrl: (id: string) => `/api/links/${id}/qr`,
+
+  async fetchLinkQrObjectUrl(id: string): Promise<string> {
+    const res = await fetch(`${API_BASE}/api/links/${id}/qr`, {
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(
+        typeof error.message === 'string' ? error.message : 'No se pudo generar el QR',
+      );
+    }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  },
 };

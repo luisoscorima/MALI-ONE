@@ -5,6 +5,12 @@ import { Button, Card, Input } from '@/components/ui';
 
 type Tab = 'url' | 'file';
 
+interface QrPreview {
+  link: ShortLinkDto;
+  objectUrl: string;
+  loading?: boolean;
+}
+
 export function LinksPage() {
   const [tab, setTab] = useState<Tab>('url');
   const [url, setUrl] = useState('');
@@ -14,6 +20,7 @@ export function LinksPage() {
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [qrPreview, setQrPreview] = useState<QrPreview | null>(null);
 
   const loadLinks = useCallback(async () => {
     try {
@@ -76,6 +83,38 @@ export function LinksPage() {
   function copyText(text: string) {
     void navigator.clipboard.writeText(text);
   }
+
+  function closeQrPreview() {
+    setQrPreview((current) => {
+      if (current?.objectUrl) {
+        URL.revokeObjectURL(current.objectUrl);
+      }
+      return null;
+    });
+  }
+
+  async function handleRegenerateQr(link: ShortLinkDto) {
+    setError('');
+    if (qrPreview?.objectUrl) {
+      URL.revokeObjectURL(qrPreview.objectUrl);
+    }
+    setQrPreview({ link, objectUrl: '', loading: true });
+    try {
+      const objectUrl = await api.fetchLinkQrObjectUrl(link.id);
+      setQrPreview({ link, objectUrl });
+    } catch (e) {
+      setQrPreview(null);
+      setError(e instanceof Error ? e.message : 'Error al generar el QR');
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (qrPreview?.objectUrl) {
+        URL.revokeObjectURL(qrPreview.objectUrl);
+      }
+    };
+  }, [qrPreview?.objectUrl]);
 
   return (
     <div>
@@ -219,7 +258,13 @@ export function LinksPage() {
                 </td>
                 <td className="p-4">{link.clickCount}</td>
                 <td className="p-4">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleRegenerateQr(link)}
+                    >
+                      Ver QR
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => copyText(link.shortUrl)}
@@ -239,6 +284,66 @@ export function LinksPage() {
           </tbody>
         </table>
       </Card>
+
+      {qrPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={closeQrPreview}
+          onKeyDown={(e) => e.key === 'Escape' && closeQrPreview()}
+          role="presentation"
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <Card className="w-full max-w-md">
+            <h3 className="mb-1 font-semibold">Código QR</h3>
+            <p className="mb-4 break-all text-sm text-muted">
+              {qrPreview.link.shortUrl}
+            </p>
+
+            <div className="mb-4 flex justify-center">
+              {qrPreview.loading ? (
+                <div className="flex h-48 w-48 items-center justify-center text-sm text-muted">
+                  Generando...
+                </div>
+              ) : (
+                <img
+                  src={qrPreview.objectUrl}
+                  alt={`QR ${qrPreview.link.slug}`}
+                  className="h-48 w-48 rounded-lg bg-white p-2"
+                />
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={qrPreview.loading}
+                onClick={() => void handleRegenerateQr(qrPreview.link)}
+              >
+                Regenerar QR
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => copyText(qrPreview.link.shortUrl)}
+              >
+                Copiar enlace
+              </Button>
+              {!qrPreview.loading && (
+                <a
+                  href={qrPreview.objectUrl}
+                  download={`qr-${qrPreview.link.slug}.png`}
+                  className="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-border/40"
+                >
+                  Descargar PNG
+                </a>
+              )}
+              <Button variant="outline" onClick={closeQrPreview}>
+                Cerrar
+              </Button>
+            </div>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
