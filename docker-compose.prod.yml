@@ -1,0 +1,9 @@
+services:
+  api:
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: 'true'
+
+  web:
+    ports:
+      - '8080:80'

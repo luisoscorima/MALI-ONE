@@ -1,0 +1,15 @@
+{
+  "name": "mali-one",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @mali-one/api dev",
+    "dev:web": "pnpm --filter @mali-one/web dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @mali-one/api build",
+    "build:web": "pnpm --filter @mali-one/web build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
