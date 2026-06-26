@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selector de Sedes MALI</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <script src="../shared/widget-api.js"></script>
+    <style>
+        /* Fuentes BentonSansFB */
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('./fonts/BentonSansFB-Book.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('./fonts/BentonSansFB-BookOblique.woff2') format('woff2');
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('./fonts/BentonSansFB-Bold.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('./fonts/BentonSansFB-BoldOblique.woff2') format('woff2');
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        /* Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Body */
+        body {
+            background: #F5F5F5;
+            min-height: 100vh;
+            color: rgba(0, 0, 0, 0.87);
+            font-family: 'BentonSansFB', sans-serif;
+            line-height: 1.5em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            display: flex;
+            align-items:end;
+            justify-content: center;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            margin: 0 auto;
+        }
+
+        .btn {
+            position: relative;
+            outline: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #702082;
+            width: 100%;
+            border: 0;
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 16px 20px;
+            color: #FFFFFF;
+            font-family: 'BentonSansFB', sans-serif;
+            font-size: 14px;
+            letter-spacing: 1.2px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            overflow: visible;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* Variante circular */
+        .btn-circle {
+            width: 56px;
+            height: 56px;
+            padding: 0;
+            border-radius: 50%;
+            justify-content: center;
+        }
+        .btn-circle .material-icons { font-size: 24px; }
+        /* Ocultar visualmente el texto pero mantener accesibilidad */
+        .btn-circle .btn-text {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        /* Tooltip globo lateral */
+        .tooltip-sede {
+            position: absolute;
+            top: 50%;
+            left: 0; /* anclar al inicio del wrapper */
+            transform: translate(-110%, -50%); /* mover completamente a la izquierda del botón */
+            background: #FFFFFF;
+            color: #702082;
+            border: 0px solid #d9d9d9;
+            padding: 8px 14px;
+            font-size: 14px;
+            line-height: 1.2;
+            border-radius: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            font-family: 'BentonSansFB', sans-serif;
+            white-space: nowrap;
+            transition: opacity .25s ease, transform .25s ease;
+            z-index: 500;
+        }
+        .tooltip-sede::after {
+            content: '';
+            position: absolute;
+            right: -3px; /* flecha apuntando al botón desde la derecha del tooltip */
+            top: 50%;
+            width: 12px;
+            height: 12px;
+            background: #FFFFFF;
+            border: 0px solid #d9d9d9;
+            border-left: none;
+            border-bottom: none;
+            transform: translateY(-50%) rotate(225deg);
+            box-shadow: 0 0px 4px rgba(0,0,0,0.06);
+        }
+        .tooltip-sede.hidden {
+            opacity: 0;
+            transform: translate(-110%, -50%) scale(.95); /* conservar posición base al ocultar */
+            pointer-events: none;
+        }
+        /* Dropdown específico para botón circular (fuera del botón por compatibilidad Safari) */
+        .sede-wrapper .dropdown {
+            width: 280px;
+            left: 50%;
+            top: auto;
+            bottom: calc(100% + 10px); /* desplegar hacia arriba */
+            transform: translate(-50%, 10px); /* animación inversa */
+        }
+        .sede-wrapper .btn.active + .dropdown {
+            transform: translate(-50%, 0);
+        }
+
+        .btn:hover {
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.active .dropdown {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .btn-text {
+            flex: 1;
+            text-align: left;
+        }
+
+        .material-icons {
+            border-radius: 100%;
+            animation: ripple 0.6s linear infinite;
+            font-size: 20px;
+        }
+
+        .dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            background: #FFFFFF;
+            width: 100%;
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: left;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+            z-index: 1000;
+        }
+
+        .dropdown::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .dropdown::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+
+        .dropdown::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        .dropdown::before {
+            content: '';
+            position: absolute;
+            bottom: -6px; /* flecha abajo porque el menú está arriba */
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            background: #FFFFFF;
+            transform: translateX(-50%) rotate(45deg);
+            box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .dropdown ul {
+            list-style: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .dropdown li {
+            position: relative;
+            background: #FFFFFF;
+            transition: background 0.2s ease;
+            padding: 0;
+            list-style: none;
+        }
+
+        .dropdown li:hover {
+            background: #F5F5F5;
+        }
+
+        .dropdown li.active {
+            background: rgba(83, 128, 247, 0.08);
+        }
+
+        .dropdown li.active a {
+            color: #702082;
+        }
+
+        .dropdown li:first-child {
+            border-radius: 4px 4px 0 0;
+        }
+
+        .dropdown li:last-child {
+            border-radius: 0 0 4px 4px;
+        }
+
+        .dropdown li:last-child a {
+            border-bottom: 0;
+        }
+
+        .dropdown a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            padding: 16px 20px;
+            color: #666;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+
+        .dropdown a:hover {
+            color: #702082;
+        }
+
+        .sede-icon {
+            font-size: 18px;
+            color: inherit;
+        }
+
+        @keyframes ripple {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1),
+                            0 0 0 20px rgba(255, 255, 255, 0.1),
+                            0 0 0 40px rgba(255, 255, 255, 0.1),
+                            0 0 0 60px rgba(255, 255, 255, 0.1);
+            }
+            100% {
+                box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.1),
+                            0 0 0 40px rgba(255, 255, 255, 0.1),
+                            0 0 0 60px rgba(255, 255, 255, 0.1),
+                            0 0 0 80px rgba(255, 255, 255, 0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            body {
+                padding: 10px;
+                align-items: flex-start;
+                padding-top: 40px;
+            }
+
+            .container {
+                max-width: 100%;
+                padding: 10px;
+            }
+
+            .btn {
+                font-size: 13px;
+                padding: 14px 16px;
+                letter-spacing: 0.8px;
+            }
+
+            .btn-text {
+                font-size: 13px;
+            }
+
+            .material-icons {
+                font-size: 18px;
+            }
+
+            .dropdown {
+                max-height: 60vh;
+                left: 0;
+                right: 0;
+                width: 100%;
+            }
+
+            .dropdown a {
+                padding: 14px 16px;
+                font-size: 13px;
+            }
+
+            .sede-icon {
+                font-size: 16px;
+            }
+
+            .dropdown::before {
+                left: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 8px;
+            }
+
+            .btn {
+                font-size: 12px;
+                padding: 12px 14px;
+            }
+
+            .dropdown {
+                max-height: 50vh;
+            }
+
+            .dropdown a {
+                padding: 12px 14px;
+                font-size: 12px;
+            }
+        }
+
+        /* Mejoras táctiles para dispositivos móviles */
+        @media (hover: none) and (pointer: coarse) {
+            .btn:active {
+                background: #5a1a6a;
+            }
+
+            .dropdown li:active {
+                background: #e8e8e8;
+            }
+
+            .dropdown a:active {
+                background: #f0f0f0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sede-wrapper" style="position:relative; display:inline-block;">
+            <button class="btn btn-circle" id="sede-selector" aria-expanded="false" aria-haspopup="true" aria-label="Elige tu sede">
+                <span class="btn-text">Elige tu sede</span>
+                <i class="material-icons">place</i>
+            </button>
+            <div class="dropdown" role="menu">
+                <ul id="sedes-list">
+                    <!-- Las sedes se cargarán dinámicamente aquí -->
+                </ul>
+            </div>
+            <div id="sede-tooltip" class="tooltip-sede" role="tooltip">Elige tu sede</div>
+        </div>
+    </div>
+
+    <script>
+        // Esperar a que se cargue mapa_conf.js
+        document.addEventListener('DOMContentLoaded', function() {
+            const btn = document.getElementById('sede-selector');
+            const sedesList = document.getElementById('sedes-list');
+            const btnText = btn.querySelector('.btn-text');
+            const tooltip = document.getElementById('sede-tooltip');
+            const dropdown = document.querySelector('.sede-wrapper .dropdown');
+            
+            // Cargar sedes desde API MALI ONE
+            maliWidgetFetch('/educacion/config').then(function(config) {
+            var sedes = (config.sedes || []).filter(function(s) { return s.showOnSelector; }).sort(function(a,b) { return a.sortOrder - b.sortOrder; });
+            sedes.forEach(function(sede) {
+                    const li = document.createElement('li');
+                    
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.setAttribute('role', 'menuitem');
+                    link.setAttribute('data-sede', sede.slug);
+                    
+                    // Icono según tipo de sede
+                    const icon = document.createElement('i');
+                    icon.className = 'material-icons sede-icon';
+                    icon.textContent = sede.slug.indexOf('virtual') >= 0 ? 'language' : (sede.slug === 'principal' ? 'museum' : 'location_on');
+                    
+                    const text = document.createTextNode(sede.nombre);
+                    
+                    link.appendChild(icon);
+                    link.appendChild(text);
+                    li.appendChild(link);
+                    sedesList.appendChild(li);
+                    
+                    // Evento click en cada sede
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Actualizar sede activa
+                        sedesList.querySelectorAll('li').forEach(item => item.classList.remove('active'));
+                        li.classList.add('active');
+                        
+                        // Actualizar texto del botón
+                        btnText.textContent = sede.nombre;
+                        
+                        // Cerrar dropdown
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-expanded', 'false');
+                        // Mostrar siempre el tooltip al cerrar, incluso tras seleccionar sede
+                        tooltip.classList.remove('hidden');
+                        
+                        console.log('Sede seleccionada:', sede);
+                        
+                        if (sede.brochureUrl) {
+                            window.open(sede.brochureUrl, '_blank');
+                        }
+                    });
+                });
+            }).catch(function(err) {
+                console.error('Error cargando sedes', err);
+            });
+            
+            // Toggle dropdown
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const isActive = btn.classList.toggle('active');
+                btn.setAttribute('aria-expanded', isActive);
+                if (isActive) {
+                    tooltip.classList.add('hidden');
+                    // asegurar que el dropdown se muestre en Safari
+                    dropdown.style.opacity = '1';
+                    dropdown.style.visibility = 'visible';
+                    dropdown.style.pointerEvents = 'auto';
+                } else {
+                    tooltip.classList.remove('hidden');
+                    dropdown.style.opacity = '';
+                    dropdown.style.visibility = '';
+                    dropdown.style.pointerEvents = '';
+                }
+            });
+
+            // También agregar soporte para touch en dispositivos móviles
+            btn.addEventListener('touchstart', function(e) {
+                e.stopPropagation();
+            }, { passive: true });
+            
+            // Cerrar dropdown al hacer click/touch fuera
+            document.addEventListener('click', function(e) {
+                if (!btn.contains(e.target)) {
+                    if (btn.classList.contains('active')) {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-expanded', 'false');
+                        tooltip.classList.remove('hidden');
+                        dropdown.style.opacity = '';
+                        dropdown.style.visibility = '';
+                        dropdown.style.pointerEvents = '';
+                    } else {
+                        // Asegurar que el tooltip se mantenga visible fuera de apertura
+                        tooltip.classList.remove('hidden');
+                    }
+                }
+            });
+
+            document.addEventListener('touchstart', function(e) {
+                if (!btn.contains(e.target)) {
+                    if (btn.classList.contains('active')) {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-expanded', 'false');
+                        tooltip.classList.remove('hidden');
+                        dropdown.style.opacity = '';
+                        dropdown.style.visibility = '';
+                        dropdown.style.pointerEvents = '';
+                    } else {
+                        tooltip.classList.remove('hidden');
+                    }
+                }
+            }, { passive: true });
+            
+            // Cerrar con tecla Escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && btn.classList.contains('active')) {
+                    btn.classList.remove('active');
+                    btn.setAttribute('aria-expanded', 'false');
+                    btn.focus();
+                    tooltip.classList.remove('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

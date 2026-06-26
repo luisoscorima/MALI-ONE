@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Carrusel MALI</title>
+	<link rel="icon" href="https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Cuadrado_Texto.png" type="image/png">
+	<style>
+		/* BentonSansFB desde mali/educacion/fonts, respaldo Arial y Helvetica */
+		@font-face {
+			font-family: 'BentonSansFB';
+			src: url('../educacion/fonts/BentonSansFB-Book.woff2') format('woff2');
+			font-weight: normal;
+			font-style: normal;
+		}
+		@font-face {
+			font-family: 'BentonSansFB';
+			src: url('../educacion/fonts/BentonSansFB-BookOblique.woff2') format('woff2');
+			font-weight: normal;
+			font-style: italic;
+		}
+		@font-face {
+			font-family: 'BentonSansFB';
+			src: url('../educacion/fonts/BentonSansFB-Bold.woff2') format('woff2');
+			font-weight: bold;
+			font-style: normal;
+		}
+		@font-face {
+			font-family: 'BentonSansFB';
+			src: url('../educacion/fonts/BentonSansFB-BoldOblique.woff2') format('woff2');
+			font-weight: bold;
+			font-style: italic;
+		}
+
+		:root {
+			/* Base y escala del contenido (no afecta al fondo) */
+			--slide-width-base: min(30vw, 300px);
+			--content-scale: 0.7;
+			/* reduce solo el contenido ~70% */
+			--slide-width: calc(var(--slide-width-base) * var(--content-scale));
+			--slide-aspect: 9/16;
+			--slide-transition-duration: 800ms;
+			--slide-transition-easing: ease;
+
+			/* Separación para que header/footer no se superpongan al carrusel */
+			--header-gap: 40px;
+			--footer-gap: 36px;
+
+			--font-primary: "BentonSansFB", Arial, Helvetica, sans-serif;
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		html,
+		body {
+			width: 100%;
+			height: auto;
+		}
+
+		body {
+			display: block;
+			/* evitar centrado vertical en iframes cuadrados */
+			/* No permitir scroll: todo debe quedar en pantalla */
+			overflow: hidden;
+			min-height: 100vh;
+			-webkit-overflow-scrolling: touch;
+			background: #f5f5f5;
+		}
+
+		button {
+			border: none;
+			background: none;
+			cursor: pointer;
+
+			&:focus {
+				outline: none;
+				border: none;
+			}
+		}
+
+		/* -------------------- SLIDER -------------------- */
+		.slider {
+			width: calc(3 * var(--slide-width));
+			height: auto;
+			/* Altura flexible: imágenes de distintos tamaños */
+			display: flex;
+			align-items: center;
+			max-width: 100vw;
+			/* Nunca exceder el ancho del viewport */
+			margin-inline: auto;
+			/* centrar horizontalmente */
+			margin-top: var(--header-gap);
+			margin-bottom: var(--footer-gap);
+		}
+
+		.slider--btn {
+			--size: 80px;
+
+			display: inline-flex;
+			justify-content: center;
+			align-items: center;
+			opacity: 0.7;
+			transition: opacity 250ms cubic-bezier(0.215, 0.61, 0.355, 1);
+			z-index: 999;
+
+			& svg {
+				width: var(--size);
+				height: var(--size);
+				stroke: #ffffff;
+			}
+
+			&:hover {
+				opacity: 1;
+			}
+		}
+
+		.slides__wrapper {
+			margin-top: 0;
+			/* No empujamos hacia el header */
+			width: 100%;
+			height: 100%;
+
+			display: grid;
+			place-items: center;
+
+			&>* {
+				grid-area: 1 / -1;
+			}
+		}
+
+		/* -------------------- HEADER/TÍTULO -------------------- */
+		.header-title {
+			position: fixed;
+			top: 6px;
+			/* On devices with notches, respect safe-area at the top */
+			top: 6px;
+			/* fallback */
+			top: calc(6px + env(safe-area-inset-top));
+			left: 50%;
+			transform: translateX(-50%);
+			z-index: 500;
+			pointer-events: none;
+			/* el título no intercepta clics */
+			color: #e82323;
+			font-family: var(--font-primary);
+			font-weight: 800;
+			letter-spacing: 0.06em;
+			text-align: center;
+			text-shadow: 0 2px 4px rgba(255, 255, 255, 0);
+			font-size: clamp(1rem, 2.4vw, 2rem);
+			padding: 4px 10px;
+		}
+
+		/* -------------------- FOOTER/ENLACES -------------------- */
+		.footer-links {
+			position: fixed;
+			/* siempre visible pegado abajo */
+			left: 50%;
+			bottom: calc(4px + env(safe-area-inset-bottom));
+			transform: translateX(-50%);
+			z-index: 600;
+			color: #444;
+			font-family: var(--font-primary);
+			font-size: clamp(0.75rem, 1.2vw, 0.95rem);
+			text-align: center;
+			max-width: min(90vw, 920px);
+			width: fit-content;
+			line-height: 1.35;
+			padding: 6px 10px;
+			background: rgba(255, 255, 255, 0.9);
+			box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+			border-radius: 8px;
+		}
+
+		@media (max-width: 768px) {
+			.footer-links {
+				width: max-content;
+				position: fixed;
+				left: 50%;
+				bottom: calc(4px + env(safe-area-inset-bottom));
+				transform: translateX(-50%);
+				font-size: clamp(1rem, 1.2vw, 0.95rem);
+				line-height: 1.5;
+			}
+
+			.header-title {
+				width: inherit;
+				font-size: clamp(1.3rem, 2.4vw, 2rem);
+
+			}
+
+			.slides--infos {
+				max-width: 50vw;
+			}
+		}
+
+		.footer-links a {
+			color: #1a5fb4;
+			text-decoration: underline;
+			text-underline-offset: 3px;
+		}
+
+		.footer-links a:hover {
+			text-decoration-thickness: 2px;
+		}
+
+		/* -------------------- CRÉDITOS VERTICALES -------------------- */
+		.credits-vertical {
+			position: fixed;
+			right: 8px;
+			top: 50%;
+			transform: translateY(-50%);
+			writing-mode: vertical-rl;
+			text-orientation: mixed;
+			font-family: var(--font-primary);
+			font-size: 12px;
+			letter-spacing: 0.08em;
+			color: rgba(0, 0, 0, 0.35);
+			opacity: 0.7;
+			user-select: none;
+			pointer-events: none;
+			z-index: 650;
+		}
+
+		.slides,
+		.slides--infos,
+		.slides__backgrounds {
+			width: 100%;
+			height: 100%;
+
+			pointer-events: none;
+
+			display: grid;
+			place-items: center;
+
+			&>* {
+				grid-area: 1 / -1;
+			}
+		}
+
+		/* -------------------- SLIDE --------------------- */
+
+		.slide {
+			--slide-tx: 0px;
+			--slide-ty: 0vh;
+			--padding: 0px;
+			--offset: 0;
+
+			width: var(--slide-width);
+			height: auto;
+			aspect-ratio: var(--slide-aspect);
+			user-select: none;
+			perspective: 800px;
+
+			transform: perspective(1000px) translate3d(var(--slide-tx), var(--slide-ty), var(--slide-tz, 0)) rotateY(var(--slide-rotY)) scale(var(--slide-scale));
+			transition: transform var(--slide-transition-duration) var(--slide-transition-easing);
+		}
+
+		.slide[data-current] {
+			--slide-scale: 1.2;
+			--slide-tz: 0px;
+			--slide-tx: 0px;
+			--slide-rotY: 0;
+			z-index: 30;
+
+			pointer-events: auto;
+		}
+
+		.slide[data-next] {
+			--slide-tx: calc(1 * var(--slide-width) * 1.3);
+			--slide-rotY: -45deg;
+			z-index: 10;
+
+		}
+
+		.slide[data-previous] {
+			--slide-tx: calc(-1 * var(--slide-width) * 1.3);
+			--slide-rotY: 45deg;
+			z-index: 10;
+
+		}
+
+		.slide:not([data-current]) {
+			--slide-scale: 1;
+			--slide-tz: 0;
+			/* --slide-tx: calc(var(--offset) * var(--slide-width) * 1.05); */
+			/* --slide-rotY: calc(var(--dir) * -45deg); */
+
+			pointer-events: none;
+		}
+
+		.slide[data-current] {
+			& .slide--image {
+				filter: brightness(1);
+				overflow: visible;
+			}
+		}
+
+		.slide:not([data-current]) {
+			& .slide--image {
+				filter: brightness(0.88);
+				overflow: hidden;
+			}
+		}
+
+		.slide:not([data-current]):not([data-next]):not([data-previous]) {
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.slide__inner {
+			--rotX: 0;
+			--rotY: 0;
+			--bgPosX: 0%;
+			--bgPosY: 0%;
+
+			position: relative;
+			left: calc(var(--padding) / 2);
+			top: calc(var(--padding) / 2);
+			width: calc(100% - var(--padding));
+			height: calc(100% - var(--padding));
+			transform-style: preserve-3d;
+			transform: rotateX(var(--rotX)) rotateY(var(--rotY));
+		}
+
+		.slide--image__wrapper {
+			position: relative;
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+		}
+
+		.slide--image {
+			width: 100%;
+			height: 100%;
+			object-fit: contain;
+			/* Asegura que la imagen se muestra completa sin recortes */
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%) scale(1.25) translate3d(var(--bgPosX), var(--bgPosY), 0);
+			transition: filter var(--slide-transition-duration) var(--slide-transition-easing);
+		}
+
+		.slide__bg {
+			position: fixed;
+			inset: -20%;
+			background-color: #e8e8e8;
+			background-image: var(--bg);
+			background-size: cover;
+			background-position: center center;
+
+			z-index: -1;
+			pointer-events: none;
+
+			transition: opacity var(--slide-transition-duration) ease,
+				transform var(--slide-transition-duration) ease;
+
+			&::before {
+				content: "";
+				position: absolute;
+				inset: 0;
+			}
+
+			&::before {
+				background: rgba(255, 255, 255, 0.75);
+				backdrop-filter: blur(10px);
+			}
+
+			&:not([data-current]) {
+				opacity: 0;
+			}
+
+			&[data-previous] {
+				transform: translateX(-10%);
+			}
+
+			&[data-next] {
+				transform: translateX(10%);
+			}
+		}
+
+		/* ------------ SLIDE INFO ---------------- */
+
+		.slide-info {
+			--padding: 0px;
+			position: relative;
+			width: calc(500px * var(--content-scale));
+			height: 100%;
+			aspect-ratio: var(--slide-aspect);
+			user-select: none;
+			perspective: 800px;
+			z-index: 100;
+		}
+
+		.slide-info[data-current] {
+			& .slide-info--text span {
+				opacity: 1;
+				transform: translate3d(0, 0, 0);
+				transition-delay: 250ms;
+				display: block;
+				/* En lugar de inline-block */
+			}
+		}
+
+		.slide-info:not([data-current]) {
+			& .slide-info--text span {
+				opacity: 0;
+				transform: translate3d(0, 100%, 0);
+				transition-delay: 0ms;
+			}
+		}
+
+		.slide-info__inner {
+			position: relative;
+			left: calc(var(--padding) / 2);
+			top: calc(var(--padding) / 2);
+			width: calc(100% - var(--padding));
+			height: calc(100% - var(--padding));
+			transform-style: preserve-3d;
+			transform: rotateX(var(--rotX)) rotateY(var(--rotY));
+		}
+
+		.slide-info--text__wrapper {
+			--z-offset: 45px;
+			position: absolute;
+			width: 200%;
+			bottom: 14%;
+			left: 50%;
+			transform: translate(-50%, 0) translateZ(var(--z-offset));
+			text-align: center;
+			z-index: 2;
+			pointer-events: none;
+		}
+
+		/* Ajustes para aspect ratios más cuadrados (<= 4:3) */
+		@media (max-aspect-ratio: 4/3) {
+			:root {
+				--header-gap: clamp(0px, 0vh, 0px);
+				--footer-gap: clamp(0px, 0vh, 0px);
+			}
+
+			.slide-info--text__wrapper {
+				bottom: 12%;
+			}
+		}
+
+		/* Ajustes adicionales para retrato muy alto (<= 9:16) */
+		@media (max-aspect-ratio: 9/16) {
+			:root {
+				/* Mantén el contenido legible pero compacta los espacios */
+				--content-scale: 0.68;
+				--slide-width-base: 32vw;
+				--header-gap: clamp(2px, 1vh, 8px);
+				--footer-gap: clamp(2px, 1vh, 10px);
+			}
+
+			/* Acerca ligeramente el bloque de textos de la imagen */
+			.slide-info--text__wrapper {
+				bottom: 10.5%;
+			}
+		}
+
+		.slide-info--text {
+			font-family: var(--font-primary);
+			color: #ffffff;
+			overflow: hidden;
+			/* Esconde el texto sobrante */
+			text-align: center;
+			width: 100%;
+			/* Ajusta según el diseño */
+			max-width: 100%;
+			/* Asegura un ancho controlado */
+
+			& span {
+				transition: var(--slide-transition-duration) var(--slide-transition-easing);
+				transition-property: opacity, transform;
+			}
+
+			&[data-title],
+			&[data-subtitle] {
+				font-size: min(3cqw, 2.4rem);
+				font-weight: 800;
+				letter-spacing: 0.2cqw;
+				overflow: hidden;
+				white-space: normal;
+				max-width: 100%;
+				/* Ajusta según el diseño */
+				display: block;
+				color: rgba(255, 255, 255, 0);
+			}
+
+			&[data-subtitle] {
+				margin-left: 2cqw;
+				/* Ajusta el margen izquierdo */
+				font-size: min(2.2cqw, 1.8rem);
+				font-weight: 600;
+			}
+
+			&[data-description] {
+				text-shadow: 0 2px 4px rgb(0, 0, 0);
+				font-size: min(2.2cqw, 1.4rem);
+				font-family: var(--font-primary);
+				font-weight: 400;
+				line-height: 1.5;
+				letter-spacing: 0.03em;
+			}
+		}
+
+		/* ------------------------------------------- */
+
+		.explora-text {
+			font-size: min(4cqw, 3rem);
+			/* Ajusta el tamaño sin afectar otros textos */
+			font-weight: 800;
+			text-align: center;
+			color: #1a1a1a;
+			display: block;
+			max-width: 100%;
+			white-space: normal;
+			margin-top: 200%;
+			line-height: 1000%;
+			/* Ajusta la altura de línea para evitar cortes */
+			padding-top: 20px;
+			/* Ajusta este valor si sigue cortado */
+		}
+
+		@media (max-width: 768px) {
+
+			/* En móviles: escala de contenido 0.7 y base más compacta por viewport */
+			:root {
+				--content-scale: 0.8;
+				--slide-width-base: 30vw;
+				/* Gaps algo más pequeños en móviles */
+				/*Calcular el alto de la pantalla y sacar la mitad del alto*/
+				--header-gap: calc(40vw);
+				--footer-gap: calc(50vh - 25vw);
+			}
+
+			/* Oculta créditos verticales en móviles para no estorbar */
+			.credits-vertical {
+				display: none;
+			}
+
+			.slide-info {
+				width: 90%;
+				font-size: 0.9rem;
+			}
+
+			.slide-info--text[data-description] {
+				font-size: clamp(1rem, 3.5vw, 1.6rem);
+				line-height: 1.6;
+				margin-top: 8px;
+			}
+
+			.slider--btn {
+				--size: 30px;
+			}
+
+			p {
+				margin-bottom: 1rem;
+			}
+		}
+
+		@media (max-width: 480px) {
+			:root {
+				--content-scale: 0.85;
+				--slide-width-base: 28vw;
+				--header-gap: calc(35vw);
+				--footer-gap: calc(48vh - 22vw);
+			}
+
+			.slide-info {
+				width: 95%;
+			}
+
+			.slide-info--text[data-description] {
+				font-size: clamp(0.95rem, 4vw, 1.4rem);
+				line-height: 1.7;
+				margin-top: 10px;
+				padding: 0 10px;
+			}
+
+			.slider--btn {
+				--size: 28px;
+			}
+
+			.footer-links {
+				font-size: clamp(0.7rem, 2vw, 0.85rem);
+				line-height: 1.4;
+			}
+
+			.header-title {
+				font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="header-title">CONOCE NUESTRAS NUEVAS ADQUISICIONES</div>
+	<div class="credits-vertical">Powered by: <strong>Luis G. Oscorima P.</strong></div>
+	<div class="slider">
+		<button class="slider--btn slider--btn__prev">
+			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+				stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="m15 18-6-6 6-6" />
+			</svg>
+		</button>
+
+		<div class="slides__wrapper">
+			<div class="slides" id="slidesContainer" aria-live="polite"></div>
+			<div class="slides__backgrounds" id="slidesBackgrounds" aria-hidden="true"></div>
+			<div class="slides--infos" id="slidesInfoContainer"></div>
+		</div>
+		<button class="slider--btn slider--btn__next">
+			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+				stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="m9 18 6-6-6-6" />
+			</svg>
+		</button>
+	</div>
+
+	<div class="footer-links">
+		<p>
+			Para ver los registros de la Hemeroteca puede hacer clic
+			<a href="https://biblioteca.mali.pe/cgi-bin/koha/opac-search.pl?advsearch=1&amp;idx=kw&amp;idx=kw&amp;idx=kw&amp;do=Buscar&amp;limit=mc-itype%2Cphr%3AREVISTA&amp;sort_by=relevance" target="_top" rel="noopener">aquí</a>.
+		</p>
+		<p>
+			Para ver los registros de la Documentación de Arte Peruano puede hacer clic
+			<a href="https://biblioteca.mali.pe/cgi-bin/koha/opac-search.pl?advsearch=1&amp;idx=kw&amp;idx=kw&amp;idx=kw&amp;do=Buscar&amp;limit=mc-itype%2Cphr%3AARCHIVO&amp;sort_by=relevance" target="_top" rel="noopener">aquí</a>.
+		</p>
+	</div>
+
+</body>
+
+<script src="../shared/widget-api.js"></script>
+
+<script>
+	document.addEventListener("DOMContentLoaded", function () {
+		console.log("El DOM está listo");
+		console.log("%c Powered with ❤️ by: Luis Gustavo O. P.", "color: #00bfff; font-weight: bold; font-size: 14px; font-family: 'BentonSansFB', Arial, Helvetica, sans-serif; background-color: #000; padding: 5px; border-radius: 5px;");
+
+		maliWidgetFetch('/biblioteca/carousel').then(function (carouselData) {
+			buildCarouselFromData(Array.isArray(carouselData) ? carouselData : []);
+			if (!carouselData.length) {
+				console.warn("No hay ítems en el carrusel.");
+			}
+		}).catch(function (err) {
+			console.error('Error cargando carrusel', err);
+		});
+
+		function buildCarouselFromData(items) {
+			const slidesRoot = document.getElementById("slidesContainer");
+			const infoRoot = document.getElementById("slidesInfoContainer");
+			const bgRoot = document.getElementById("slidesBackgrounds");
+
+			if (!slidesRoot || !infoRoot || !bgRoot) {
+				console.error("No se encontraron los contenedores del carrusel en el DOM.");
+				return;
+			}
+
+			slidesRoot.textContent = "";
+			infoRoot.textContent = "";
+			bgRoot.textContent = "";
+
+			const slideFragment = document.createDocumentFragment();
+			const infoFragment = document.createDocumentFragment();
+			const backgroundFragment = document.createDocumentFragment();
+
+			items.forEach((item, index) => {
+				if (!isValidItem(item)) {
+					console.warn(`Ítem ${index + 1} omitido por datos incompletos.`, item);
+					return;
+				}
+
+				slideFragment.appendChild(createSlide(item));
+				infoFragment.appendChild(createSlideInfo(item));
+				backgroundFragment.appendChild(createBackground(item));
+			});
+
+			slidesRoot.appendChild(slideFragment);
+			infoRoot.appendChild(infoFragment);
+			bgRoot.appendChild(backgroundFragment);
+		}
+
+		function isValidItem(item) {
+			return Boolean(item && item.title && item.imageSrc);
+		}
+
+		function createSlide(item) {
+			const slide = document.createElement("div");
+			slide.className = "slide";
+
+			const slideInner = document.createElement("div");
+			slideInner.className = "slide__inner";
+
+			const imageWrapper = document.createElement("div");
+			imageWrapper.className = "slide--image__wrapper";
+
+			const img = document.createElement("img");
+			img.className = "slide--image";
+			/* Carga diferida: no asignar src aquí; init/change activan solo prev|current|next */
+			img.dataset.src = item.imageSrc;
+			img.alt = item.imageAlt || item.title || "Nueva adquisición MALI";
+			img.decoding = "async";
+
+			if (item.link) {
+				const anchor = document.createElement("a");
+				anchor.href = item.link;
+				anchor.setAttribute("target", "_top");
+				anchor.setAttribute("rel", "noopener");
+				anchor.appendChild(img);
+				imageWrapper.appendChild(anchor);
+			} else {
+				imageWrapper.appendChild(img);
+			}
+
+			slideInner.appendChild(imageWrapper);
+			slide.appendChild(slideInner);
+			return slide;
+		}
+
+		function createSlideInfo(item) {
+			const info = document.createElement("div");
+			info.className = "slide-info";
+
+			const infoInner = document.createElement("div");
+			infoInner.className = "slide-info__inner";
+
+			const textWrapper = document.createElement("div");
+			textWrapper.className = "slide-info--text__wrapper";
+
+			const titleBlock = createInfoText("data-title", item.title);
+			const subtitleBlock = createInfoText("data-subtitle", item.subtitle);
+			const descriptionBlock = createInfoText("data-description", item.descriptionHtml, true);
+
+			[titleBlock, subtitleBlock, descriptionBlock].forEach((block) => {
+				if (block) {
+					textWrapper.appendChild(block);
+				}
+			});
+
+			infoInner.appendChild(textWrapper);
+			info.appendChild(infoInner);
+			return info;
+		}
+
+		function createInfoText(attribute, content, allowHtml = false) {
+			if (!content) return null;
+			const block = document.createElement("div");
+			block.className = "slide-info--text";
+			block.setAttribute(attribute, "");
+			const span = document.createElement("span");
+			if (allowHtml) {
+				span.innerHTML = content;
+			} else {
+				span.textContent = content;
+			}
+			block.appendChild(span);
+			return block;
+		}
+
+		/** Fondo difuminado: miniatura Koha (menos peso que la imagen completa). */
+		function opacImageThumbnailUrl(imageUrl) {
+			try {
+				const u = new URL(imageUrl, window.location.href);
+				if (!u.pathname.includes("opac-image.pl")) return imageUrl;
+				u.searchParams.set("thumbnail", "1");
+				return u.toString();
+			} catch {
+				return imageUrl;
+			}
+		}
+
+		function createBackground(item) {
+			const bg = document.createElement("div");
+			bg.className = "slide__bg";
+			const bgUrl = item.backgroundSrc || item.imageSrc;
+			if (bgUrl) {
+				bg.dataset.bgUrl = opacImageThumbnailUrl(bgUrl);
+			}
+			bg.style.setProperty("--dir", "0");
+			return bg;
+		}
+
+		/** Solo pide imagen + fondo para los slides en uso (prev | current | next). Evita abrumar opac-image.pl. */
+		function loadSlideMedia(index) {
+			if (typeof totalSlides !== "number" || index < 0 || index >= totalSlides) return;
+			const slide = allSlides[index];
+			const bg = allSlideBgs[index];
+			if (!slide || !bg) return;
+			const img = slide.querySelector(".slide--image");
+			if (!img) return;
+
+			const pendingSrc = img.dataset.src;
+			if (pendingSrc) {
+				img.src = pendingSrc;
+				delete img.dataset.src;
+			}
+
+			const bgUrl = bg.dataset.bgUrl;
+			if (bgUrl && !bg.dataset.bgApplied) {
+				bg.style.setProperty("--bg", `url(${bgUrl})`);
+				bg.dataset.bgApplied = "1";
+			}
+		}
+
+		function loadSlideMediaForIndices(a, b, c) {
+			loadSlideMedia(a);
+			loadSlideMedia(b);
+			loadSlideMedia(c);
+		}
+
+		// -------------------------------------------------
+		// ------------------ Utilities --------------------
+		// -------------------------------------------------
+
+		// Math utilities
+		const wrap = (n, max) => (n + max) % max;
+		const lerp = (a, b, t) => a + (b - a) * t;
+
+		// DOM utilities
+		const isHTMLElement = (el) => el instanceof HTMLElement;
+
+		const genId = (() => {
+			let count = 0;
+			return () => (count++).toString();
+		})();
+
+		class Raf {
+			constructor() {
+				this.rafId = 0;
+				this.raf = this.raf.bind(this);
+				this.callbacks = [];
+				this.start();
+			}
+
+			start() {
+				this.raf();
+			}
+
+			stop() {
+				cancelAnimationFrame(this.rafId);
+			}
+
+			raf() {
+				this.callbacks.forEach(({ callback, id }) => callback({ id }));
+				this.rafId = requestAnimationFrame(this.raf);
+			}
+
+			add(callback, id) {
+				this.callbacks.push({ callback, id: id || genId() });
+			}
+
+			remove(id) {
+				this.callbacks = this.callbacks.filter((callback) => callback.id !== id);
+			}
+		}
+
+		class Vec2 {
+			constructor(x = 0, y = 0) {
+				this.x = x;
+				this.y = y;
+			}
+
+			set(x, y) {
+				this.x = x;
+				this.y = y;
+			}
+
+			lerp(v, t) {
+				this.x = lerp(this.x, v.x, t);
+				this.y = lerp(this.y, v.y, t);
+			}
+		}
+
+		const vec2 = (x = 0, y = 0) => new Vec2(x, y);
+
+		function tilt(node, options) {
+			let { trigger, target } = resolveOptions(node, options);
+			let lerpAmount = 0.06;
+			const rotDeg = { current: vec2(), target: vec2() };
+			const bgPos = { current: vec2(), target: vec2() };
+
+			let rafId;
+			function ticker({ id }) {
+				rafId = id;
+				rotDeg.current.lerp(rotDeg.target, lerpAmount);
+				bgPos.current.lerp(bgPos.target, lerpAmount);
+
+				for (const el of target) {
+					el.style.setProperty("--rotX", rotDeg.current.y.toFixed(2) + "deg");
+					el.style.setProperty("--rotY", rotDeg.current.x.toFixed(2) + "deg");
+					el.style.setProperty("--bgPosX", bgPos.current.x.toFixed(2) + "%");
+					el.style.setProperty("--bgPosY", bgPos.current.y.toFixed(2) + "%");
+				}
+			}
+
+			const onMouseMove = ({ offsetX, offsetY }) => {
+				lerpAmount = 0.1;
+				for (const el of target) {
+					const ox = (offsetX - el.clientWidth * 0.5) / (Math.PI * 3);
+					const oy = -(offsetY - el.clientHeight * 0.5) / (Math.PI * 4);
+					rotDeg.target.set(ox, oy);
+					bgPos.target.set(-ox * 0.3, oy * 0.3);
+				}
+			};
+
+			const onMouseLeave = () => {
+				lerpAmount = 0.06;
+				rotDeg.target.set(0, 0);
+				bgPos.target.set(0, 0);
+			};
+
+			const addListeners = () => {
+				trigger.addEventListener("mousemove", onMouseMove);
+				trigger.addEventListener("mouseleave", onMouseLeave);
+			};
+
+			const removeListeners = () => {
+				trigger.removeEventListener("mousemove", onMouseMove);
+				trigger.removeEventListener("mouseleave", onMouseLeave);
+			};
+
+			const initTilt = () => {
+				addListeners();
+				raf.add(ticker);
+			};
+
+			const destroy = () => {
+				removeListeners();
+				raf.remove(rafId);
+			};
+
+			initTilt();
+			return { destroy, update: initTilt };
+		}
+
+		function resolveOptions(node, options) {
+			return {
+				trigger: options?.trigger ?? node,
+				target: options?.target
+					? Array.isArray(options.target)
+						? options.target
+						: [options.target]
+					: [node]
+			};
+		}
+
+		// -----------------------------------------------------
+		// Global Raf Instance
+		const raf = new Raf();
+
+		// Variables globales para gestionar los slides
+		let currentIndex = 0;
+		let allSlides = [];
+		let allSlidesInfo = [];
+		let allSlideBgs = [];
+		let totalSlides = 0;
+		let isTransitioning = false;
+		let transitionMs = 800; // fallback
+
+		function init() {
+			// Capturamos todos los elementos de slide, info y fondo (sin atributos fijos en el HTML)
+			allSlides = [...document.querySelectorAll(".slide")];
+			allSlidesInfo = [...document.querySelectorAll(".slide-info")];
+			allSlideBgs = [...document.querySelectorAll(".slide__bg")];
+
+			// Aseguramos que los tres arrays tengan el mismo tamaño mínimo
+			const minLen = Math.min(allSlides.length, allSlidesInfo.length, allSlideBgs.length);
+			allSlides = allSlides.slice(0, minLen);
+			allSlidesInfo = allSlidesInfo.slice(0, minLen);
+			allSlideBgs = allSlideBgs.slice(0, minLen);
+			totalSlides = minLen;
+
+			if (minLen === 0) {
+				console.warn("No hay elementos suficientes para iniciar el carrusel.");
+				return;
+			}
+
+			// Leer la duración de transición desde CSS para bloquear correctamente
+			const root = document.documentElement;
+			const durVar = getComputedStyle(root).getPropertyValue("--slide-transition-duration").trim();
+			if (durVar.endsWith("ms")) {
+				transitionMs = parseFloat(durVar);
+			} else if (durVar.endsWith("s")) {
+				transitionMs = parseFloat(durVar) * 1000;
+			}
+			totalSlides = allSlides.length;
+
+			const buttons = {
+				prev: document.querySelector(".slider--btn__prev"),
+				next: document.querySelector(".slider--btn__next")
+			};
+
+			// Inicializamos tilt para cada slide e info
+			allSlides.forEach((slide, i) => {
+				const slideInner = slide.querySelector(".slide__inner");
+				const slideInfoInner = allSlidesInfo[i]?.querySelector(".slide-info__inner");
+				if (slideInner && slideInfoInner) {
+					tilt(slide, { target: [slideInner, slideInfoInner] });
+				}
+			});
+
+			// Limpiamos cualquier estado previo
+			allSlides.forEach((slide) => {
+				slide.removeAttribute("data-current");
+				slide.removeAttribute("data-next");
+				slide.removeAttribute("data-previous");
+			});
+			allSlidesInfo.forEach((info) => {
+				info.removeAttribute("data-current");
+				info.removeAttribute("data-next");
+				info.removeAttribute("data-previous");
+			});
+			allSlideBgs.forEach((bg) => {
+				bg.removeAttribute("data-current");
+				bg.removeAttribute("data-next");
+				bg.removeAttribute("data-previous");
+			});
+
+			// Asignamos el estado inicial correcto:
+			// current: index 0, previous: último slide, next: index 1.
+			currentIndex = 0;
+			const prevIndex = wrap(currentIndex - 1, totalSlides);
+			const nextIndex = wrap(currentIndex + 1, totalSlides);
+
+			allSlides[currentIndex].setAttribute("data-current", "");
+			allSlidesInfo[currentIndex].setAttribute("data-current", "");
+			allSlideBgs[currentIndex].setAttribute("data-current", "");
+
+			allSlides[prevIndex].setAttribute("data-previous", "");
+			allSlidesInfo[prevIndex].setAttribute("data-previous", "");
+			allSlideBgs[prevIndex].setAttribute("data-previous", "");
+
+			allSlides[nextIndex].setAttribute("data-next", "");
+			allSlidesInfo[nextIndex].setAttribute("data-next", "");
+			allSlideBgs[nextIndex].setAttribute("data-next", "");
+
+			loadSlideMediaForIndices(prevIndex, currentIndex, nextIndex);
+
+			// Asignamos los eventos a los botones
+			buttons.prev.addEventListener("click", change(-1));
+			buttons.next.addEventListener("click", change(1));
+
+			// --- AUTO-PLAY CADA 5 SEGUNDOS ---
+			const autoNext = change(1);
+			setInterval(() => {
+				autoNext();
+			}, 5000);
+		}
+
+		function setup() {
+			// Las imágenes se piden solo para prev | current | next (ver loadSlideMedia).
+			init();
+		}
+
+		function change(direction) {
+			return () => {
+				if (isTransitioning || totalSlides < 2) return;
+				isTransitioning = true;
+
+				// Índices actuales
+				const oldCurr = currentIndex;
+				const oldPrev = wrap(oldCurr - 1, totalSlides);
+				const oldNext = wrap(oldCurr + 1, totalSlides);
+
+				// Nuevos índices según dirección
+				let newCurr, newPrev, newNext;
+				if (direction > 0) {
+					newCurr = oldNext;
+					newPrev = oldCurr;
+					newNext = wrap(oldNext + 1, totalSlides);
+				} else {
+					newCurr = oldPrev;
+					newNext = oldCurr;
+					newPrev = wrap(oldPrev - 1, totalSlides);
+				}
+
+				// Helper para limpiar atributos de un índice específico
+				const clearAt = (i) => {
+					const slide = allSlides[i];
+					const info = allSlidesInfo[i];
+					const bg = allSlideBgs[i];
+					if (slide) {
+						slide.removeAttribute("data-current");
+						slide.removeAttribute("data-next");
+						slide.removeAttribute("data-previous");
+					}
+					if (info) {
+						info.removeAttribute("data-current");
+						info.removeAttribute("data-next");
+						info.removeAttribute("data-previous");
+					}
+					if (bg) {
+						bg.removeAttribute("data-current");
+						bg.removeAttribute("data-next");
+						bg.removeAttribute("data-previous");
+					}
+				};
+
+				// Limpiar solamente los implicados en el cambio
+				clearAt(oldPrev);
+				clearAt(oldCurr);
+				clearAt(oldNext);
+				// También limpiar el nuevo próximo (antes era neutral)
+				clearAt(newNext);
+
+				// Asignar roles nuevos de forma atómica (mismo ciclo de render)
+				const setRole = (i, role) => {
+					const slide = allSlides[i];
+					const info = allSlidesInfo[i];
+					const bg = allSlideBgs[i];
+					if (slide) {
+						slide.setAttribute(role, "");
+					}
+					if (info) {
+						info.setAttribute(role, "");
+					}
+					if (bg) {
+						bg.setAttribute(role, "");
+					}
+				};
+
+				setRole(newCurr, "data-current");
+				setRole(newPrev, "data-previous");
+				setRole(newNext, "data-next");
+
+				currentIndex = newCurr;
+
+				loadSlideMediaForIndices(newPrev, newCurr, newNext);
+
+				// Desbloquear tras finalizar la transición
+				setTimeout(() => {
+					isTransitioning = false;
+				}, transitionMs + 50);
+			};
+		}
+
+		setup();
+	});
+</script>
+
+
+</html>

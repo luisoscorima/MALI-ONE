@@ -4,7 +4,10 @@ export type AppModule =
   | 'links'
   | 'workspace_users'
   | 's3_manager'
-  | 'password_vault';
+  | 'password_vault'
+  | 'widget_educacion'
+  | 'widget_biblioteca'
+  | 'widget_pam';
 
 export interface AuthUser {
   id: string;
@@ -90,4 +93,100 @@ export interface UpdateWorkspaceUserDto {
   familyName?: string;
   suspended?: boolean;
   orgUnitPath?: string;
+}
+
+export interface EducacionWidgetSettingsDto {
+  id: string;
+  whatsapp: string;
+  telefono: string;
+  email: string;
+  emailVirtual: string;
+  soporteVirtual: string;
+  imageRectangulo: string;
+  imageWhatsapp: string;
+  imageCorreo: string;
+  mapsApiKey: string | null;
+}
+
+export interface EducacionDistrictDto {
+  id: string;
+  name: string;
+  slug: string;
+  sortOrder: number;
+}
+
+export interface EducacionSedeDto {
+  id: string;
+  slug: string;
+  nombre: string;
+  direccion: string | null;
+  lat: number | null;
+  lng: number | null;
+  horarioHtml: string | null;
+  brochureUrl: string;
+  districtId: string | null;
+  showOnMap: boolean;
+  showOnSelector: boolean;
+  sortOrder: number;
+  activo: boolean;
+  district?: EducacionDistrictDto | null;
+}
+
+export interface EducacionAdminStateDto {
+  settings: EducacionWidgetSettingsDto;
+  districts: (EducacionDistrictDto & { sedes?: EducacionSedeDto[] })[];
+  sedes: EducacionSedeDto[];
+}
+
+export interface BibliotecaCarouselItemDto {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  descriptionHtml: string;
+  link: string;
+  imageSrc: string;
+  imageAlt: string;
+  backgroundSrc: string;
+  sortOrder: number;
+  activo: boolean;
+}
+
+export interface PamPlanDto {
+  id: string;
+  slug: string;
+  name: string;
+  color: string;
+  exclusive: boolean;
+  sortOrder: number;
+  monthlyPrice: string;
+  monthlyDuration: string;
+  monthlyCheckout: string;
+  monthlyValues: string[];
+  yearlyPrice: string;
+  yearlyDuration: string;
+  yearlyCheckout: string;
+  yearlyValues: string[];
+  activo: boolean;
+}
+
+export interface PamRegistrationDto {
+  id: string;
+  createdAt: string;
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  celular: string;
+  correo: string;
+  plan: string;
+  frecuencia: string;
+  mpStatus: string | null;
+  welcomeEmail: string;
+  expiryNotice: string;
+  expiryDate: string | null;
+}
+
+export interface PamAdminStateDto {
+  settings: { id: string; benefits: string[]; notes: string[] };
+  plans: PamPlanDto[];
+  registrations: PamRegistrationDto[];
 }

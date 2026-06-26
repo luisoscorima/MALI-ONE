@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import {
+  BookOpen,
+  GraduationCap,
   HardDrive,
+  Heart,
   KeyRound,
   Link2,
   LayoutDashboard,
@@ -50,6 +53,24 @@ const navItems: {
     label: 'Bóveda de Contraseñas',
     icon: KeyRound,
     module: 'password_vault',
+  },
+  {
+    to: '/widgets/educacion',
+    label: 'Widgets Educación',
+    icon: GraduationCap,
+    module: 'widget_educacion',
+  },
+  {
+    to: '/widgets/biblioteca',
+    label: 'Widgets Biblioteca',
+    icon: BookOpen,
+    module: 'widget_biblioteca',
+  },
+  {
+    to: '/widgets/pam',
+    label: 'PAM Membresías',
+    icon: Heart,
+    module: 'widget_pam',
   },
 ];
 

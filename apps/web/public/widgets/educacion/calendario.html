@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario MALI Educación</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    /* Capado global y variables de densidad */
+    :root {
+      --cap-height: 800px;
+      --gap: 15px;
+      --day-height: 120px;
+      --day-gap: 15px;
+      --header-font: 18px;
+      --event-font: 15px;
+      --control-font: 14px;
+      --control-pad-v: 8px;
+      --control-pad-h: 12px;
+    }
+    html, body {
+      height: 100%;
+      overflow: hidden; /* evitar scroll en body/iframe */
+    }
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('fonts/BentonSansFB-Book.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('fonts/BentonSansFB-BookOblique.woff2') format('woff2');
+      font-weight: normal;
+      font-style: italic;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('fonts/BentonSansFB-Bold.woff2') format('woff2');
+      font-weight: bold;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('fonts/BentonSansFB-BoldOblique.woff2') format('woff2');
+      font-weight: bold;
+      font-style: italic;
+    }
+
+    body {
+      font-family: 'BentonSansFB', sans-serif;
+    }
+
+    /* Estilos generales del contenedor del calendario */
+    #calendar-section {
+      width: 100vw;
+      max-width: 100%;
+      margin: auto;
+      font-family: 'BentonSansFB', sans-serif;
+      max-height: var(--cap-height); /* límite global */
+      overflow: hidden; /* un solo scroll interno */
+      display: flex;
+      flex-direction: column;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    /* Contenedor principal del calendario con grid para los días */
+    #calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
+      /* equal columns with a solid minimum per day */
+      gap: var(--day-gap);
+      padding: 15px;
+      overflow-x: auto;
+      /* allow horizontal scroll on small screens */
+      -webkit-overflow-scrolling: touch;
+      /* smooth scroll on iOS */
+      box-sizing: border-box;
+      /* ocupa el espacio restante bajo el cap y maneja el scroll vertical cuando sea necesario */
+      flex: 1 1 auto;
+  overflow-y: hidden;
+    }
+
+    /* Encabezados de días (separados del grid de 7x5) */
+    #weekday-headers {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
+      gap: 15px;
+      padding: 0 15px;
+      position: relative;
+      overflow-x: auto; /* sincroniza con el grid */
+      overflow-y: hidden;
+      background: #fff; /* asegurar contraste del texto */
+      scrollbar-width: none; /* Firefox: ocultar barra */
+      -ms-overflow-style: none; /* IE/Edge: ocultar barra */
+      box-sizing: border-box;
+    }
+    #weekday-headers::-webkit-scrollbar { display: none; }
+
+    /* Ensure grid children don't force column expansion */
+    #calendar>* {
+      min-width: 0;
+    }
+
+    /* Encabezado de los días de la semana */
+    .day-header {
+      font-weight: bold;
+      text-align: center;
+      padding: 6px 10px;
+      white-space: nowrap;
+      /* keep on one line */
+      overflow: hidden;
+      /* avoid growing columns */
+      text-overflow: ellipsis;
+      /* show ellipsis if too long */
+    }
+
+    /* Estilo de cada día en el calendario */
+    .day {
+      border: 1px solid #f3f3f3;
+      height: var(--day-height);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: flex-start;
+      box-sizing: border-box;
+      overflow: hidden;
+      background: #f3f3f3;
+    }
+
+    /* Número del día en la esquina superior derecha */
+    .day-number {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      font-size: 18px;
+      font-weight: normal;
+      color: black;
+    }
+
+    .day.has-event .day-number {
+      color: white;
+    }
+
+    /* Añadir este estilo para el día actual */
+    .day.current-day .day-number {
+      font-weight: bold;
+      font-size: 20px;
+      color: #c670da;
+    }
+
+    /* Contenedor para los eventos del día */
+    .event-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Estilos de cada evento */
+    .event {
+      flex-grow: 1;
+      font-size: var(--event-font);
+      color: #fff;
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 4px 5px;
+      min-width: 0;
+      /* ¡Clave para que funcione en flex items! */
+      width: 100%;
+    }
+    /* Etiqueta de agregación +N */
+    .event-aggregator {
+      font-size: calc(var(--event-font) - 1px);
+      color: #702082;
+      padding: 2px 4px;
+      cursor: pointer;
+      user-select: none;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+    }
+    .event-aggregator:hover { text-decoration: underline; }
+
+    /* Elemento interno para el texto */
+    .event span {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
+    /* Tooltip estilo globo de texto */
+    .event-tooltip {
+      display: none;
+      position: absolute;
+      background: white;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      width: 300px;
+      max-height: calc(var(--cap-height) - 150px);
+      overflow-y: auto;
+    }
+
+    .tooltip-header {
+      display: flex;
+      justify-content: right;
+      align-items: right;
+    }
+
+    .tooltip-header button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .tooltip-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    /* Estilo general para la barra de desplazamiento del tooltip */
+    .event-tooltip::-webkit-scrollbar {
+      width: 6px;
+      /* Ancho de la barra de desplazamiento */
+    }
+
+    .event-tooltip::-webkit-scrollbar-thumb {
+      background-color: rgba(0, 0, 0, 0.1);
+      /* Color del pulgar de la barra de desplazamiento */
+      border-radius: 10px;
+    }
+
+    .event-tooltip::-webkit-scrollbar-track {
+      background-color: transparent;
+      /* Fondo de la pista de desplazamiento */
+    }
+
+    /* Para Firefox */
+    .event-tooltip {
+      scrollbar-width: thin;
+      /* Barra de desplazamiento más delgada */
+      scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+      /* Color del pulgar y la pista */
+    }
+
+    /* Ajustar el tamaño y la apariencia del tooltip */
+    .event-tooltip {
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+
+    /* Estilo general para los botones y selectores */
+    button,
+    select {
+      font-size: var(--control-font);
+      padding: var(--control-pad-v) var(--control-pad-h);
+      background-color: transparent;
+      border: 1px solid transparent;
+      /* No tiene borde por defecto */
+      color: #333;
+      cursor: pointer;
+      border-radius: 0px;
+      transition: all 0.3s ease;
+    }
+
+    /* Estilo para los botones con borde */
+    #btn-today {
+      background-color: #702082;
+      color: white;
+      border: 2px solid #702082;
+      /* Borde azul para el botón Hoy */
+      font-weight: bold;
+    }
+
+    /* Estilo para los botones de cambio de mes y año (sin borde) */
+    button:not(#btn-today) {
+      background-color: transparent;
+      color: #702082;
+      border: none;
+    }
+
+    /* Estilo de los botones al pasar el ratón (hover) */
+    button:hover {
+      background-color: #f8f9fa;
+      border-color: #007bff;
+    }
+
+    /* Estilo para el selector de mes y año */
+    select {
+      background-color: transparent;
+      border: 1px solid #e4e4e4;
+      /* Un borde suave */
+    }
+
+    /* Estilo al seleccionar un mes/año */
+    select:focus {
+      border-color: #007bff;
+      /* Borde azul cuando se selecciona */
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    }
+
+    #social-share-icons a {
+      margin: 5px;
+      font-size: 24px;
+      color: #555;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    #social-share-icons a:hover {
+      color: #007bff;
+      /* Cambia al color azul al pasar el ratón */
+    }
+
+    /* --- Responsive móvil: mejorar lectura sin cambiar lógica JS --- */
+  @media (max-width: 640px) {
+
+      /* Header fijo arriba */
+      #calendar-container {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: #fff;
+        padding: 8px 12px;
+        border-bottom: 1px solid #eee;
+      }
+
+      /* Lista vertical de días para una lectura más cómoda */
+      #calendar {
+        display: flex !important;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px;
+        overflow-x: hidden; /* no scroll horizontal */
+        overflow-y: auto;   /* scroll vertical dentro del calendario */
+        -webkit-overflow-scrolling: touch; /* inercia en iOS */
+        max-height: none; /* controlado por el cap y flex */
+        flex: 1 1 auto;
+      }
+
+      /* Oculta encabezados para ahorrar espacio */
+  .day-header {
+        display: none !important;
+      }
+  #weekday-headers { display: none !important; }
+
+      /* Tarjetas de día más altas y legibles */
+      .day {
+        min-width: 0;
+        width: 100% !important;
+        height: auto !important;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 4px #0001;
+        background: #fff;
+        position: static !important;
+        padding: 8px;
+        /* Coloca número a la izquierda y eventos a la derecha */
+        display: grid;
+        grid-template-columns: 3rem 1fr;
+        column-gap: 8px;
+        align-items: start;
+        overflow: visible !important;
+      }
+
+      /* Número de día visible arriba, estilo marca */
+      .day-number {
+        position: static !important;
+        grid-column: 1;
+        grid-row: 1;
+        align-self: start;
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: normal;
+        margin: 0;
+        color: #000000;
+      }
+
+      /* Evitar que el número se "pierda" en días con eventos */
+      .day.has-event .day-number {
+        color: #000000;
+      }
+
+      .day.current-day .day-number {
+        font-weight: bold;
+        font-size: 20px;
+        color: #c670da;
+      }
+
+      /* Contenedor de eventos fluido */
+      .event-container {
+        min-height: 0;
+        max-height: none;
+        height: auto !important;
+        /* crecer según # de eventos */
+        overflow: visible;
+        /* no recortar */
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      /* Chips de evento tocables */
+      .event {
+        min-height: 40px;
+        font-size: 0.95rem;
+        margin: 0;
+        padding: 8px 10px;
+        flex: 0 0 auto;
+        align-items: center;
+        border-radius: 2px;
+        /* no estirar, mantener altura natural */
+      }
+
+      /* Tooltip adaptado al ancho del móvil */
+      .event-tooltip {
+        width: 300px;
+        max-width: 300px;
+      }
+
+      /* Ocultar celdas vacías (espaciadores previos al día 1) */
+      .day:empty {
+        display: none !important;
+      }
+    }
+
+    /* En pantallas bajas, evitar confusión: desactivar sticky y bloquear scroll horizontal */
+    @media (max-width: 640px) and (max-height: 968px) {
+      html, body, #calendar-section { overflow-x: hidden !important; }
+      #calendar-container { position: static !important; top: auto !important; }
+      #weekday-headers { display: none !important; }
+      #calendar {
+        display: flex !important;
+        flex-direction: column;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y; /* priorizar scroll vertical */
+        overscroll-behavior-x: contain; /* evitar desplazamiento lateral */
+      }
+    }
+
+    /* Modo compacto cuando la altura disponible <= 800px */
+    #calendar-section.compact {
+      --gap: 12px;
+      --day-gap: 10px;
+      --day-height: 110px; /* 5 filas = 550 + gaps 40 + paddings => < 800 con headers */
+      --header-font: 16px;
+      --event-font: 14px;
+      --control-font: 13px;
+      --control-pad-v: 6px;
+      --control-pad-h: 10px;
+    }
+    #calendar-section.compact h2#month-year {
+      font-size: 20px;
+      margin: 4px 0;
+    }
+    #calendar-section.compact #calendar { gap: var(--day-gap); }
+    #calendar-section.compact .day-header { padding: 4px 8px; font-size: 13px; }
+    #calendar-section.compact .day-number { font-size: 16px; }
+    #calendar-section.compact .event { padding: 3px 4px; }
+    #calendar-section.compact #weekday-headers { padding: 0 10px; }
+    #calendar-section.compact #calendar { padding: 10px; }
+
+    /* Compacto en móvil: tarjetas más densas y clamp de texto */
+    @media (max-width: 640px) {
+      #calendar-section.compact .day { grid-template-columns: 2.6rem 1fr; }
+      #calendar-section.compact .event span {
+        display: -webkit-box;
+  line-clamp: 1;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section id="calendar-section">
+    <div id="calendar-container">
+      <button id="btn-today" onclick="goToToday()">Hoy</button>
+      <button onclick="changeMonth(-1)"><i class="fas fa-arrow-left"></i></button>
+      <button onclick="changeMonth(1)"><i class="fas fa-arrow-right"></i></button>
+      <select id="select-month"></select>
+      <select id="select-year"></select>
+      <button onclick="goToSelectedMonth()">Ir</button>
+      <h2 id="month-year"></h2>
+    </div>
+  <!-- Encabezados de días se insertarán aquí si no existen -->
+  <div id="weekday-headers"></div>
+    <div id="calendar"></div>
+    <span style="font-size: 10px;color: #f0f0f0;">Powered by: Luis Gustavo O. P.</span>
+
+    <div id="tooltip" class="event-tooltip">
+      <div class="tooltip-header">
+        <button onclick="shareEvent()" title="Compartir evento">
+          <i class="fas fa-share"></i>
+        </button>
+
+        <button onclick="addToCalendar()" title="Añadir al calendario">
+          <i class="fas fa-bell"></i>
+        </button>
+
+        <button onclick="closeTooltip()" title="Cerrar">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <span id="tooltip-title" class="tooltip-title"></span>
+      <p id="tooltip-datetime"></p>
+      <!-- Tooltip de compartir redes sociales -->
+      <div id="social-share-icons" style="display: none;">
+        <p>Compartir en:</p>
+        <div>
+          <a href="https://www.instagram.com/malieducacion/" target="_blank" title="Instagram">
+            <i class="fab fa-instagram"></i>
+          </a>
+          <a href="https://www.tiktok.com/@malieducacion" target="_blank" title="TikTok">
+            <i class="fab fa-tiktok"></i>
+          </a>
+          <a href="https://www.facebook.com/cursosmali" target="_blank" title="Facebook">
+            <i class="fab fa-facebook"></i>
+          </a>
+          <a href="https://pe.linkedin.com/company/museodeartedelima" target="_blank" title="LinkedIn">
+            <i class="fab fa-linkedin"></i>
+          </a>
+        </div>
+      </div>
+      <p id="tooltip-description"></p>
+    </div>
+  </section>
+
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      console.log("%c Powered with ❤️ by: Luis Gustavo O. P.", "color: #00bfff; font-weight: bold; font-size: 14px; font-family: 'Archivo', sans-serif; background-color: #000; padding: 5px; border-radius: 5px;");
+      // Variables y elementos del DOM
+      const apiKey = "AIzaSyBYX8PghzeYplVqrSDUmNfrYm6jNmz4W4c";
+      const calendarId = "talleresmali@mali.pe";
+      const calendarDiv = document.getElementById("calendar");
+  const tooltip = document.getElementById("tooltip");
+  const weekdayHeaders = document.getElementById('weekday-headers');
+      const tooltipTitle = document.getElementById("tooltip-title");
+      const tooltipDatetime = document.getElementById("tooltip-datetime");
+      const tooltipDescription = document.getElementById("tooltip-description");
+      const monthYearLabel = document.getElementById("month-year");
+      const selectMonth = document.getElementById("select-month");
+      const selectYear = document.getElementById("select-year");
+      const today = new Date();
+      let currentYear = today.getFullYear();
+      let currentMonth = today.getMonth() + 1;
+
+      // Días de la semana
+      const weekDays = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+      // Nombres de los meses
+      const monthNames = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+      ];
+
+      // Mostrar mes y año inicial
+      monthYearLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+
+      // Consultar los eventos para el mes actual
+      loadEventsAndRender(currentMonth, currentYear);
+
+      // Función para obtener eventos de Google Calendar
+      function loadEventsAndRender(month, year) {
+        const firstDayOfMonth = new Date(year, month - 1, 1).toISOString();
+        const lastDayOfMonth = new Date(year, month, 0, 23, 59, 59).toISOString();
+        fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?key=${apiKey}&timeMin=${firstDayOfMonth}&timeMax=${lastDayOfMonth}&singleEvents=true&orderBy=startTime`)
+          .then(response => response.json())
+          .then(data => {
+            if (!data.items) return;
+            renderCalendar(month, year, data.items);
+          })
+          .catch(error => console.error("Error al cargar eventos:", error));
+      }
+
+      // Renderiza el calendario y asigna eventos a cada día
+  function renderCalendar(month, year, events) {
+        // Limpiar contenedores
+        calendarDiv.innerHTML = "";
+
+        // Encabezados (se mantienen fuera del grid 7x5)
+  const headersDiv = weekdayHeaders;
+  const isMobile = window.matchMedia('(max-width: 640px)').matches;
+  if (headersDiv && !isMobile) {
+    headersDiv.innerHTML = "";
+          weekDays.forEach(day => {
+            const h = document.createElement('div');
+            h.classList.add('day-header');
+            h.textContent = day;
+            headersDiv.appendChild(h);
+          });
+  } else if (headersDiv) { headersDiv.innerHTML = ""; }
+
+        // Parámetros del mes
+        const firstDay = new Date(year, month - 1, 1).getDay(); // 0=Dom..6=Sab
+        const lastDate = new Date(year, month, 0).getDate();
+
+        // Pre-agrupa eventos por día del mes actual y los ordena por hora de inicio
+        const eventsInMonth = (events || []).filter(ev => {
+          let d;
+          if (ev.start?.dateTime) d = new Date(ev.start.dateTime);
+          else if (ev.start?.date) {
+            const [ys, ms, ds] = ev.start.date.split('-');
+            d = new Date(parseInt(ys), parseInt(ms) - 1, parseInt(ds));
+          }
+          return d && (d.getMonth() + 1) === month && d.getFullYear() === year;
+        });
+
+        const dayMap = new Map(); // day number -> array of events
+        for (const ev of eventsInMonth) {
+          let d;
+          if (ev.start?.dateTime) d = new Date(ev.start.dateTime);
+          else {
+            const [ys, ms, ds] = ev.start.date.split('-');
+            d = new Date(parseInt(ys), parseInt(ms) - 1, parseInt(ds));
+          }
+          const dayNum = d.getDate();
+          if (!dayMap.has(dayNum)) dayMap.set(dayNum, []);
+          dayMap.get(dayNum).push(ev);
+        }
+        // Ordenar eventos por hora de inicio dentro de cada día
+        for (const [dayNum, list] of dayMap.entries()) {
+          list.sort((a, b) => {
+            const ta = a.start?.dateTime ? new Date(a.start.dateTime).getTime() : 0;
+            const tb = b.start?.dateTime ? new Date(b.start.dateTime).getTime() : 0;
+            return ta - tb;
+          });
+        }
+
+        if (!isMobile) {
+          // ----- Escritorio: 7x5 con wrap -----
+          // Crea 35 celdas fijas (7x5)
+          const cells = new Array(35).fill(null).map(() => {
+            const div = document.createElement('div');
+            div.classList.add('day');
+            div.setAttribute('role', 'gridcell');
+            return div;
+          });
+
+          // Colocar cada día con regla de wrap
+          for (let d = 1; d <= lastDate; d++) {
+            let idx = firstDay + (d - 1);
+            if (idx >= 35) idx = idx - 35; // wrap a primera fila/columna correspondiente
+            const cell = cells[idx];
+
+            // Día actual
+            if (d === today.getDate() && month === (today.getMonth() + 1) && year === today.getFullYear()) {
+              cell.classList.add('current-day');
+            }
+
+            // Número del día
+            const dayNumber = document.createElement('div');
+            dayNumber.classList.add('day-number');
+            dayNumber.textContent = String(d);
+            cell.appendChild(dayNumber);
+
+            // Eventos del día
+            const dayEvents = dayMap.get(d) || [];
+            if (dayEvents.length > 0) {
+              cell.classList.add('has-event');
+              const eventContainer = document.createElement('div');
+              eventContainer.classList.add('event-container');
+              const maxEventsVisible = getMaxEventsVisible();
+              let shown = 0;
+              for (const ev of dayEvents) {
+                if (shown >= maxEventsVisible) break;
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('event');
+                const eventText = document.createElement('span');
+                eventText.textContent = ev.summary || '';
+                eventEl.dataset.title = ev.summary || '';
+                eventEl.dataset.datetime = ev.start.dateTime || ev.start.date;
+                eventEl.dataset.description = ev.description || 'Sin descripción';
+                eventEl.style.backgroundColor = getEventColor(eventEl.dataset.description);
+                eventEl.appendChild(eventText);
+                eventEl.addEventListener('click', (e) => openTooltip(e, eventEl));
+                eventEl.title = ev.summary || '';
+                eventContainer.appendChild(eventEl);
+                shown++;
+              }
+              const remaining = dayEvents.length - shown;
+              if (remaining > 0) {
+                const agg = document.createElement('button');
+                agg.className = 'event-aggregator';
+                agg.textContent = `+${remaining} más`;
+                agg.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  showRemainingEvents(dayEvents, cell, isMobile);
+                });
+                eventContainer.appendChild(agg);
+              }
+              cell.appendChild(eventContainer);
+            }
+
+            // Accesibilidad
+            cell.tabIndex = 0;
+            const ariaCount = dayEvents.length;
+            cell.setAttribute('aria-label', `Día ${d} de ${monthNames[month - 1]}. ${ariaCount} evento${ariaCount === 1 ? '' : 's'}`);
+          }
+
+          // Las celdas vacías (sin día válido) no son foco ni anunciadas
+          for (let i = 0; i < 35; i++) {
+            if (!cells[i].querySelector('.day-number')) {
+              cells[i].setAttribute('aria-hidden', 'true');
+              cells[i].tabIndex = -1;
+            }
+          }
+
+          // Render final fijo 7x5
+          calendarDiv.setAttribute('role', 'grid');
+          calendarDiv.setAttribute('aria-label', `Calendario de ${monthNames[month - 1]} ${year}`);
+          cells.forEach(c => calendarDiv.appendChild(c));
+        } else {
+          // ----- Móvil: mantener orden secuencial (sin wrap visual) -----
+          // Pintar en orden ascendente estricto 1..lastDate (sin placeholders)
+          for (let d = 1; d <= lastDate; d++) {
+            const cell = document.createElement('div');
+            cell.classList.add('day');
+            if (d === today.getDate() && month === (today.getMonth() + 1) && year === today.getFullYear()) {
+              cell.classList.add('current-day');
+            }
+            const dayNumber = document.createElement('div');
+            dayNumber.classList.add('day-number');
+            dayNumber.textContent = String(d);
+            cell.appendChild(dayNumber);
+
+            const dayEvents = dayMap.get(d) || [];
+            if (dayEvents.length > 0) {
+              cell.classList.add('has-event');
+              const eventContainer = document.createElement('div');
+              eventContainer.classList.add('event-container');
+              const maxEventsVisible = getMaxEventsVisible();
+              let shown = 0;
+              for (const ev of dayEvents) {
+                if (shown >= maxEventsVisible) break;
+                const eventEl = document.createElement('div');
+                eventEl.classList.add('event');
+                const eventText = document.createElement('span');
+                eventText.textContent = ev.summary || '';
+                eventEl.dataset.title = ev.summary || '';
+                eventEl.dataset.datetime = ev.start.dateTime || ev.start.date;
+                eventEl.dataset.description = ev.description || 'Sin descripción';
+                eventEl.style.backgroundColor = getEventColor(eventEl.dataset.description);
+                eventEl.appendChild(eventText);
+                eventEl.addEventListener('click', (e) => openTooltip(e, eventEl));
+                eventEl.title = ev.summary || '';
+                eventContainer.appendChild(eventEl);
+                shown++;
+              }
+              const remaining = dayEvents.length - shown;
+              if (remaining > 0) {
+                const agg = document.createElement('button');
+                agg.className = 'event-aggregator';
+                agg.textContent = `+${remaining} más`;
+                agg.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  showRemainingEvents(dayEvents, cell, isMobile);
+                });
+                eventContainer.appendChild(agg);
+              }
+              cell.appendChild(eventContainer);
+            }
+
+            // Accesibilidad
+            cell.tabIndex = 0;
+            const ariaCount = dayEvents.length;
+            cell.setAttribute('aria-label', `Día ${d} de ${monthNames[month - 1]}. ${ariaCount} evento${ariaCount === 1 ? '' : 's'}`);
+
+            calendarDiv.appendChild(cell);
+          }
+        }
+
+        // Ajustes móviles: altura y auto-scroll a hoy
+        requestAnimationFrame(() => {
+          setCalendarHeightForMobile();
+          scrollToTodayInMobile();
+          // sincronizar headers con scroll horizontal del calendario en desktop
+          if (!isMobile && weekdayHeaders) {
+            weekdayHeaders.scrollLeft = calendarDiv.scrollLeft;
+          }
+          // ajustar altura de filas para encajar dentro de 800px en desktop
+          if (!isMobile) adjustDayHeightToFit();
+        });
+      }
+
+      // Determina cuántos eventos mostrar en vista compacta
+      function getMaxEventsVisible() {
+        const section = document.getElementById('calendar-section');
+        const isCompact = section.classList.contains('compact');
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (isMobile) return isCompact ? 2 : 3;
+        return isCompact ? 2 : 3; // celdas de 110-120px permiten 2-3 líneas
+      }
+
+      // Muestra los eventos restantes
+      function showRemainingEvents(dayEvents, cell, isMobile) {
+        if (isMobile) {
+          const container = cell.querySelector('.event-container');
+          // Evitar duplicados si ya se expandió
+          if (container.dataset.expanded === 'true') return;
+          container.dataset.expanded = 'true';
+          // Quitar agregador existente
+          const agg = container.querySelector('.event-aggregator');
+          if (agg) agg.remove();
+          // Añadir todos los restantes a partir de los ya visibles
+          const already = container.querySelectorAll('.event').length;
+          for (let i = already; i < dayEvents.length; i++) {
+            const ev = dayEvents[i];
+            const eventEl = document.createElement('div');
+            eventEl.classList.add('event');
+            const eventText = document.createElement('span');
+            eventText.textContent = ev.summary || '';
+            eventEl.dataset.title = ev.summary || '';
+            eventEl.dataset.datetime = ev.start.dateTime || ev.start.date;
+            eventEl.dataset.description = ev.description || 'Sin descripción';
+            eventEl.style.backgroundColor = getEventColor(eventEl.dataset.description);
+            eventEl.appendChild(eventText);
+            eventEl.addEventListener('click', (e) => openTooltip(e, eventEl));
+            eventEl.title = ev.summary || '';
+            container.appendChild(eventEl);
+          }
+        } else {
+          // En escritorio: abrir tooltip tipo lista con todos los eventos del día
+          const rect = cell.getBoundingClientRect();
+          // Crear un tooltip temporal que liste los eventos
+          const html = dayEvents.map(ev => {
+            const dt = ev.start.dateTime || ev.start.date;
+            const color = getEventColor(ev.description || '');
+            return `<div style="display:flex;align-items:center;gap:6px;margin:4px 0;">
+                      <span style="color:${color}">⬤</span>
+                      <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(ev.summary||'')}</span>
+                    </div>`;
+          }).join('');
+          tooltipTitle.textContent = `Eventos del día`;
+          tooltipDatetime.textContent = '';
+          tooltipDescription.innerHTML = html;
+          tooltip.style.display = 'block';
+          const offset = 10;
+          const tipRect = tooltip.getBoundingClientRect();
+          let left = rect.left + window.scrollX + offset;
+          let top = rect.top + window.scrollY + offset;
+          const viewportRight = window.innerWidth + window.scrollX;
+          const viewportBottom = window.innerHeight + window.scrollY;
+          if (left + tipRect.width > viewportRight - offset) {
+            left = rect.right + window.scrollX - tipRect.width - offset;
+          }
+          if (top + tipRect.height > viewportBottom - offset) {
+            top = rect.bottom + window.scrollY - tipRect.height - offset;
+          }
+          left = Math.max(window.scrollX + offset, left);
+          top = Math.max(window.scrollY + offset, top);
+          tooltip.style.left = `${left}px`;
+          tooltip.style.top = `${top}px`;
+        }
+      }
+
+      // Función para obtener el color del evento según la descripción
+      function getEventColor(description) {
+        const colorMapping = {
+          "Cursos de Arte": "#F2357B",
+          "Extensión Profesional": "#025E73",
+          "Visitas": "#F2B544",
+          "Noche MALI": "#52CBD9"
+        };
+        const defaultColor = "#cccccc";
+
+        if (!description) return defaultColor;
+
+        const descLower = description.trim().toLowerCase();
+
+        for (let key in colorMapping) {
+          if (descLower.startsWith(key.toLowerCase())) {
+            return colorMapping[key];
+          }
+        }
+
+        return defaultColor;
+      }
+
+      // Cambia el mes
+      function changeMonth(offset) {
+        currentMonth += offset;
+        if (currentMonth < 1) {
+          currentMonth = 12;
+          currentYear--;
+        } else if (currentMonth > 12) {
+          currentMonth = 1;
+          currentYear++;
+        }
+        monthYearLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+        loadEventsAndRender(currentMonth, currentYear);
+      }
+
+      // Cambia al mes actual
+      function goToToday() {
+        const today = new Date();
+        currentMonth = today.getMonth() + 1;
+        currentYear = today.getFullYear();
+        monthYearLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+        loadEventsAndRender(currentMonth, currentYear);
+      }
+
+      // Ir al mes y año seleccionados
+      function goToSelectedMonth() {
+        const selectedMonth = parseInt(selectMonth.value);
+        const selectedYear = parseInt(selectYear.value);
+        if (selectedMonth && selectedYear) {
+          currentMonth = selectedMonth;
+          currentYear = selectedYear;
+          monthYearLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
+          loadEventsAndRender(currentMonth, currentYear);
+        }
+      }
+
+      function populateMonthYearSelectors() {
+        // Añadir meses al selector de mes
+        for (let i = 0; i < monthNames.length; i++) {
+          const option = document.createElement("option");
+          option.value = i + 1;
+          option.textContent = monthNames[i];
+          selectMonth.appendChild(option);
+        }
+
+        // Añadir años al selector de año (por ejemplo, de 2020 a 2030)
+        for (let i = 2020; i <= 2030; i++) {
+          const option = document.createElement("option");
+          option.value = i;
+          option.textContent = i;
+          selectYear.appendChild(option);
+        }
+
+        // Seleccionar el mes y año actuales
+        selectMonth.value = currentMonth;
+        selectYear.value = currentYear;
+      }
+
+      // Muestra el tooltip
+      function openTooltip(event, element) {
+        const eventColor = getEventColor(element.dataset.description);
+        tooltipTitle.innerHTML = `<span style="color: ${eventColor};">⬤</span> ${element.dataset.title}`;
+        tooltipDatetime.textContent = new Date(element.dataset.datetime).toLocaleString();
+        tooltipDatetime.dataset.datetime = element.dataset.datetime;
+        tooltipDatetime.style.fontSize = "12px";
+        tooltipDescription.innerHTML = `<span style="color: ${eventColor};">፨</span> ${element.dataset.description}`;
+        tooltipDescription.style.fontSize = "14px";
+
+        tooltip.style.display = "block";
+        tooltip.style.padding = "30px";
+
+        // Use viewport-aware positioning near the click with small, constant offsets
+        const offset = 10; // px
+        const tipRect = tooltip.getBoundingClientRect();
+
+        // Click coordinates relative to the page (handles scroll)
+        const clickX = event.clientX + window.scrollX;
+        const clickY = event.clientY + window.scrollY;
+
+        // Default: place to the right and below the click point
+        let left = clickX + offset;
+        let top = clickY + offset;
+
+        // Viewport bounds (also include scroll for absolute positioning)
+        const viewportRight = window.innerWidth + window.scrollX;
+        const viewportBottom = window.innerHeight + window.scrollY;
+
+        // Horizontal collision: if overflow on the right, place to the left of the click
+        if (left + tipRect.width > viewportRight - offset) {
+          left = clickX - tipRect.width - offset;
+        }
+
+        // Vertical collision: if overflow on the bottom, place above the click
+        if (top + tipRect.height > viewportBottom - offset) {
+          top = clickY - tipRect.height - offset;
+        }
+
+        // Final clamps to avoid negative positions (keep near the edge but within viewport)
+        left = Math.max(window.scrollX + offset, left);
+        top = Math.max(window.scrollY + offset, top);
+
+        // Apply final position near the click
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+
+        // Mostrar los iconos de compartir redes sociales
+        const socialShareIcons = document.getElementById("social-share-icons");
+        socialShareIcons.style.display = "none"; // Inicialmente no mostrar
+
+        // Añadir un evento para cerrar el tooltip cuando se haga clic fuera de él
+        document.addEventListener("click", closeTooltipIfClickedOutside);
+      }
+
+      // Cierra el tooltip
+      function closeTooltip() {
+        tooltip.style.display = "none";
+        document.removeEventListener("click", closeTooltipIfClickedOutside);
+        const socialShareIcons = document.getElementById("social-share-icons");
+        socialShareIcons.style.display = "none";  // Ocultar iconos de compartir redes sociales
+      }
+      // Función para cerrar el tooltip si el clic es fuera de él
+      function closeTooltipIfClickedOutside(e) {
+        if (!tooltip.contains(e.target) && !e.target.closest('.event')) {
+          closeTooltip();
+        }
+      }
+
+      // Copiar el enlace al portapapeles
+      function shareEvent() {
+        // Muestra los iconos de las redes sociales en el tooltip
+        const socialShareIcons = document.getElementById("social-share-icons");
+        socialShareIcons.style.display = socialShareIcons.style.display === "none" ? "block" : "none";
+      }
+
+      // Añadir evento al calendario
+      function addToCalendar() {
+        let title = tooltipTitle.textContent.replace(/●\s*/, "");
+        let datetime = tooltipDatetime.dataset.datetime;
+        let description = tooltipDescription.textContent;
+
+        // Verificar si la fecha es válida antes de continuar
+        let startDate = new Date(datetime);
+        if (isNaN(startDate.getTime())) {
+          console.error("Fecha no válida:", datetime);
+          return; // Detener la ejecución si la fecha no es válida
+        }
+
+        let endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+        // Función para formatear la fecha
+        function formatDate(date) {
+          if (isNaN(date.getTime())) {
+            console.error("Fecha no válida para formatear:", date);
+            return ""; // Retornar un valor vacío si la fecha no es válida
+          }
+          return date.toISOString().replace(/[-:.]/g, "").split("Z")[0] + "Z";
+        }
+
+        const startStr = formatDate(startDate);
+        const endStr = formatDate(endDate);
+
+        if (!startStr || !endStr) {
+          console.error("Fechas formateadas no válidas:", startStr, endStr);
+          return; // Detener la ejecución si las fechas formateadas no son válidas
+        }
+
+        const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startStr}/${endStr}&details=${encodeURIComponent(description)}`;
+        window.open(googleCalendarUrl, "_blank");
+      }
+
+      // Hacer las funciones accesibles desde los onclick de los botones del tooltip
+      window.closeTooltip = closeTooltip;
+      window.shareEvent = shareEvent;
+      window.addToCalendar = addToCalendar;
+      window.changeMonth = changeMonth;
+      window.goToToday = goToToday;
+      window.goToSelectedMonth = goToSelectedMonth;
+      populateMonthYearSelectors();
+
+      // ===== Utilidades Responsive Móvil =====
+      function setCalendarHeightForMobile() {
+        const section = document.getElementById('calendar-section');
+        // Activar modo compacto cuando la altura disponible sea <= 800px
+        const available = window.innerHeight;
+        if (available <= 820) section.classList.add('compact'); else section.classList.remove('compact');
+        if (!window.matchMedia('(max-width: 640px)').matches) {
+          // Desktop: el flex/overflow del calendario maneja el scroll interno
+          calendarDiv.style.maxHeight = '';
+          return;
+        }
+        const header = document.getElementById('calendar-container');
+        const headerRect = header.getBoundingClientRect();
+        const cap = parseInt(getComputedStyle(section).getPropertyValue('--cap-height')) || 800;
+        const desired = Math.max(280, cap - headerRect.height - 10);
+        calendarDiv.style.maxHeight = desired + 'px';
+      }
+
+      function scrollToTodayInMobile() {
+        if (!window.matchMedia('(max-width: 640px)').matches) return;
+        const todayCell = calendarDiv.querySelector('.day.current-day');
+        if (!todayCell) return;
+        // Desplazamiento preciso relativo al contenedor scrollable
+        const calRect = calendarDiv.getBoundingClientRect();
+        const dayRect = todayCell.getBoundingClientRect();
+        const current = calendarDiv.scrollTop;
+        const delta = dayRect.top - calRect.top; // distancia visible hasta el día
+        // Considerar la altura del header sticky para que no oculte el día actual
+        const header = document.getElementById('calendar-container');
+        let headerH = 0;
+        if (header) {
+          const cs = getComputedStyle(header);
+          const isSticky = cs.position === 'sticky';
+          if (isSticky && Math.abs(header.getBoundingClientRect().top) < 2) {
+            headerH = header.getBoundingClientRect().height;
+          }
+        }
+        const margin = 8; // respiro adicional
+        const target = Math.max(0, current + delta - headerH - margin);
+        calendarDiv.scrollTo({ top: target, behavior: 'smooth' });
+      }
+
+      // Mantener encabezados alineados con scroll horizontal del calendario (solo desktop)
+      let isSyncingScroll = false;
+      calendarDiv.addEventListener('scroll', () => {
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (!isMobile && weekdayHeaders) {
+          if (isSyncingScroll) return;
+          isSyncingScroll = true;
+          weekdayHeaders.scrollLeft = calendarDiv.scrollLeft;
+          isSyncingScroll = false;
+        }
+      });
+      // Sincronizar también cuando se desplace el header (por gestos o trackpad)
+      weekdayHeaders.addEventListener('scroll', () => {
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (!isMobile && calendarDiv) {
+          if (isSyncingScroll) return;
+          isSyncingScroll = true;
+          calendarDiv.scrollLeft = weekdayHeaders.scrollLeft;
+          isSyncingScroll = false;
+        }
+      });
+
+      window.addEventListener('resize', setCalendarHeightForMobile);
+      window.addEventListener('orientationchange', setCalendarHeightForMobile);
+  // Primera evaluación del modo compacto
+  setCalendarHeightForMobile();
+
+      // Ajusta --day-height para encajar 5 filas dentro del cap de 800px (solo desktop)
+      function adjustDayHeightToFit() {
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (isMobile) return;
+        const section = document.getElementById('calendar-section');
+        const cap = parseInt(getComputedStyle(section).getPropertyValue('--cap-height')) || 800;
+        const header = document.getElementById('calendar-container');
+        const headersDiv = document.getElementById('weekday-headers');
+        const headerH = header ? header.offsetHeight : 0;
+        const headersH = (headersDiv && headersDiv.childElementCount) ? headersDiv.offsetHeight : 0;
+        const csCal = getComputedStyle(calendarDiv);
+        const padTop = parseFloat(csCal.paddingTop) || 0;
+        const padBottom = parseFloat(csCal.paddingBottom) || 0;
+        const rowGap = parseFloat(csCal.rowGap) || parseFloat(csCal.gap) || 0;
+        const rows = 5;
+        const totalGaps = rowGap * (rows - 1);
+        const availableForRows = cap - headerH - headersH - padTop - padBottom - totalGaps;
+        const minRow = 90; // accesible
+        let perRow = Math.floor(availableForRows / rows);
+        if (isNaN(perRow) || perRow <= 0) return;
+        if (perRow < minRow) perRow = minRow; // en caso de poco espacio, permite scroll vertical del calendario
+        section.style.setProperty('--day-height', perRow + 'px');
+      }
+
+      // Re-ajustar al redimensionar
+      window.addEventListener('resize', () => {
+        const isMobile = window.matchMedia('(max-width: 640px)').matches;
+        if (!isMobile) adjustDayHeightToFit();
+      });
+    });
+  </script>
+
+
+</body>
+
+</html>

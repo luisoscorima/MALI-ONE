@@ -17,6 +17,27 @@ enum AppModule {
   workspace_users
   s3_manager
   password_vault
+  widget_educacion
+  widget_biblioteca
+  widget_pam
+}
+
+enum PamEmailStatus {
+  PENDIENTE
+  ENVIADO
+  ERROR_DATOS
+  ERROR_TEMP
+}
+
+enum PamMpStatus {
+  pending
+  in_process
+  approved
+  authorized
+  rejected
+  cancelled
+  refunded
+  charged_back
 }
 
 enum LinkType {
@@ -75,4 +96,110 @@ model ShortLink {
 
   @@index([createdById])
   @@index([tags], type: Gin)
+}
+
+model EducacionWidgetSettings {
+  id              String   @id @default("default")
+  whatsapp        String
+  telefono        String
+  email           String
+  emailVirtual    String
+  soporteVirtual  String
+  imageRectangulo String
+  imageWhatsapp   String
+  imageCorreo     String
+  mapsApiKey      String?
+  updatedAt       DateTime @updatedAt
+}
+
+model EducacionDistrict {
+  id        String          @id @default(cuid())
+  name      String
+  slug      String          @unique
+  sortOrder Int             @default(0)
+  sedes     EducacionSede[]
+}
+
+model EducacionSede {
+  id             String             @id @default(cuid())
+  slug           String             @unique
+  nombre         String
+  direccion      String?
+  lat            Float?
+  lng            Float?
+  horarioHtml    String?            @db.Text
+  brochureUrl    String
+  districtId     String?
+  district       EducacionDistrict? @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  showOnMap      Boolean            @default(true)
+  showOnSelector Boolean            @default(true)
+  sortOrder      Int                @default(0)
+  activo         Boolean            @default(true)
+
+  @@index([districtId])
+}
+
+model BibliotecaCarouselItem {
+  id              String  @id @default(cuid())
+  title           String
+  subtitle        String?
+  descriptionHtml String  @db.Text
+  link            String
+  imageSrc        String
+  imageAlt        String
+  backgroundSrc   String
+  sortOrder       Int     @default(0)
+  activo          Boolean @default(true)
+}
+
+model PamWidgetSettings {
+  id        String   @id @default("default")
+  benefits  Json
+  notes     Json
+  updatedAt DateTime @updatedAt
+}
+
+model PamPlan {
+  id              String  @id @default(cuid())
+  slug            String  @unique
+  name            String
+  color           String
+  exclusive       Boolean @default(false)
+  sortOrder       Int     @default(0)
+  monthlyPrice    String
+  monthlyDuration String
+  monthlyCheckout String
+  monthlyValues   Json
+  yearlyPrice     String
+  yearlyDuration  String
+  yearlyCheckout  String
+  yearlyValues    Json
+  activo          Boolean @default(true)
+}
+
+model PamRegistration {
+  id               String          @id @default(cuid())
+  createdAt        DateTime        @default(now())
+  nombres          String
+  apellidos        String
+  dni              String
+  celular          String
+  correo           String
+  direccion        String?
+  ciudad           String?
+  distrito         String?
+  genero           String?
+  fechaNacimiento  String?
+  comoTeEnteraste  String?
+  plan             String
+  frecuencia       String
+  checkoutUrl      String?
+  aceptaPrivacidad Boolean
+  mpStatus         PamMpStatus?
+  welcomeEmail     PamEmailStatus  @default(PENDIENTE)
+  expiryNotice     PamEmailStatus  @default(PENDIENTE)
+  expiryDate       DateTime?
+
+  @@index([correo])
+  @@index([mpStatus])
 }

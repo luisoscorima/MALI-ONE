@@ -175,4 +175,72 @@ export const api = {
       `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/objects?key=${encodeURIComponent(key)}`,
       { method: 'DELETE' },
     ),
+
+  getEducacionWidgetAdmin: () =>
+    request<import('@mali-one/shared').EducacionAdminStateDto>(
+      '/api/widgets/educacion/admin',
+    ),
+
+  updateEducacionWidgetSettings: (
+    body: Partial<import('@mali-one/shared').EducacionWidgetSettingsDto>,
+  ) =>
+    request('/api/widgets/educacion/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  createEducacionSede: (body: Record<string, unknown>) =>
+    request('/api/widgets/educacion/sedes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateEducacionSede: (id: string, body: Record<string, unknown>) =>
+    request(`/api/widgets/educacion/sedes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteEducacionSede: (id: string) =>
+    request(`/api/widgets/educacion/sedes/${id}`, { method: 'DELETE' }),
+
+  listBibliotecaCarouselAdmin: () =>
+    request<import('@mali-one/shared').BibliotecaCarouselItemDto[]>(
+      '/api/widgets/biblioteca/carousel/admin',
+    ),
+
+  createBibliotecaCarouselItem: (body: Record<string, unknown>) =>
+    request('/api/widgets/biblioteca/carousel', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateBibliotecaCarouselItem: (id: string, body: Record<string, unknown>) =>
+    request(`/api/widgets/biblioteca/carousel/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteBibliotecaCarouselItem: (id: string) =>
+    request(`/api/widgets/biblioteca/carousel/${id}`, { method: 'DELETE' }),
+
+  getPamWidgetAdmin: () =>
+    request<import('@mali-one/shared').PamAdminStateDto>('/api/widgets/pam/admin'),
+
+  updatePamWidgetSettings: (body: { benefits: string[]; notes: string[] }) =>
+    request('/api/widgets/pam/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  updatePamPlan: (id: string, body: Record<string, unknown>) =>
+    request(`/api/widgets/pam/plans/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  listPamRegistrations: () =>
+    request<import('@mali-one/shared').PamRegistrationDto[]>(
+      '/api/widgets/pam/registrations',
+    ),
 };

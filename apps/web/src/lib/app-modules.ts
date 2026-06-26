@@ -25,4 +25,19 @@ export const APP_MODULES: {
     label: 'Bóveda de Contraseñas',
     description: 'Acceder a Vaultwarden para gestionar credenciales.',
   },
+  {
+    id: 'widget_educacion',
+    label: 'Widgets Educación',
+    description: 'Mapa, selector y calendario para educacion.mali.pe.',
+  },
+  {
+    id: 'widget_biblioteca',
+    label: 'Widgets Biblioteca',
+    description: 'Carrusel Koha para biblioteca.mali.pe.',
+  },
+  {
+    id: 'widget_pam',
+    label: 'PAM Membresías',
+    description: 'Planes y registros para mali.pe/es.',
+  },
 ];

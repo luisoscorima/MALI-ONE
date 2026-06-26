@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Sedes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
+    <script src="../shared/widget-api.js"></script>
+    <script src="mapa-app.js"></script>
+    <style>
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('fonts/BentonSansFB-Book.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('fonts/BentonSansFB-BookOblique.woff2') format('woff2');
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('fonts/BentonSansFB-Bold.woff2') format('woff2');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        @font-face {
+            font-family: 'BentonSansFB';
+            src: url('fonts/BentonSansFB-BoldOblique.woff2') format('woff2');
+            font-weight: bold;
+            font-style: italic;
+        }
+        body {
+            font-family: 'BentonSansFB', sans-serif;
+        }
+        .container {
+            display: flex;
+            max-width: 100%;
+            margin: auto;
+            gap: 20px;
+            background-color: #e9e9e9;
+            padding: 20px;
+            border-radius: 0px;
+        }
+        #map {
+            height: 400px;
+            width: 55%;
+            border-radius: 5px;
+        }
+        .locations-container { /* Contenedor que controla la altura */	
+            width: 45%;
+            max-height: 400px; /* o el valor que prefieras */
+            overflow-y: auto;
+            padding-right: 10px; /* para que no tape contenido */
+        }
+                /* Scrollbar personalizado para hacerlo sutil (WebKit-based browsers) */
+        .locations-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .locations-container::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .locations-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .locations {
+            list-style: none;
+            padding: 0;
+        }
+        .district {
+            cursor: pointer;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+            font-weight: bold;
+        }
+        .district:hover {
+            background: #f0f0f0;
+        }
+        .addresses {
+            display: none;
+            list-style: none;
+            padding-left: 20px;
+        }
+        .addresses li {
+            cursor: pointer;
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .addresses li:hover {
+            background: #e0e0e0;
+        }
+        .title {
+            text-align: left;
+            padding: 1px;
+            margin-left: 150px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+        }
+        .details {
+            display: none;
+            padding: 10px;
+            background: #dcdcdc;
+            margin-top: 5px;
+            border-radius: 0px;
+        }
+        .details button {
+            font-family: 'BentonSansFB', sans-serif; /* Usa la fuente declarada */
+            padding: 5px 10px;
+            background: #702082;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 0px; 
+            margin-top: 20px; /* Agrega espacio arriba del botón */
+        }
+        .info-block {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .info-block p {
+            margin: 0;
+        }
+
+        /* Responsive: stack map over locations on small screens */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                gap: 12px;
+            }
+            #map,
+            .locations-container {
+                width: 100%;
+            }
+            #map {
+                height: 300px; /* slightly smaller to fit on phones */
+            }
+            .locations-container {
+                max-height: none; /* let page scroll naturally */
+                overflow-y: auto;
+                padding-right: 0;
+                max-height: 300px; /* o el valor que prefieras */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="map"></div>
+        <div class="locations-container">
+            <h3 onclick="resetMarker()" style="cursor: pointer;">
+                <span id="active-marker" style="color:#702082 ;">⬤</span> Conoce nuestras sedes
+            </h3>
+            <p style="font-size: smaller;">Descubre nuestras ubicaciones y horarios de atención para que puedas visitarnos fácilmente.</p>
+            <ul class="locations" id="locations-root"></ul>
+        </div>
+    </div>
+    <span style="font-size: 10px;color: #f0f0f0;">Powered by: Luis Gustavo O. P.</span>
+
+    <script>
+        function initMap() {
+            console.log("%c Powered with ❤️ by: Luis Gustavo O. P.", "color: #00bfff; font-weight: bold; font-size: 14px; font-family: 'Archivo', sans-serif; background-color: #000; padding: 5px; border-radius: 5px;");
+            const map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: -12.060064822464469, lng: -77.03735101905501 }, // Coordenadas de la sede principal
+                zoom: 15,
+            });
+
+            window.marker = new google.maps.Marker({
+                position: { lat: -12.060064822464469, lng: -77.03735101905501 },
+                map,
+                title: "Sede Principal",
+                icon: {
+                    url: "https://mali-assets.s3.us-east-1.amazonaws.com/assets-educacion/marker.png",
+                    scaledSize: new google.maps.Size(50, 50)
+                }
+            });
+            window.map = map;
+        }
+
+        function setMarker(lat, lng, title) {
+            window.marker.setPosition({ lat, lng });
+            window.marker.setTitle(title);
+            window.map.setCenter({ lat, lng });
+            window.map.setZoom(15); // Volvemos al zoom por defecto
+        }
+
+        function toggleAddresses(id) {
+            const element = document.getElementById(id);
+            const isVisible = element.style.display === 'block';
+            
+            document.querySelectorAll('.addresses').forEach(address => address.style.display = 'none');
+            document.querySelectorAll('.details').forEach(detail => detail.style.display = 'none');
+            
+            element.style.display = isVisible ? 'none' : 'block';
+        }
+
+        function toggleDetails(id) {
+            const element = document.getElementById(id);
+            element.style.display = (element.style.display === 'none' || element.style.display === '') ? 'block' : 'none';
+        }
+        function selectSchool(lat, lng, id) {
+            setMarker(lat, lng);
+            const element = document.getElementById(id);
+
+            // Alternar visibilidad del detalle
+            if (element.style.display === 'block') {
+                element.style.display = 'none';
+            } else {
+                document.querySelectorAll('.details').forEach(detail => detail.style.display = 'none');
+                element.style.display = 'block';
+            }
+        }
+        function moveMarker(element, id) {
+            const marker = document.getElementById("active-marker");
+            
+            // Mueve el marcador ⬤ al lado del distrito seleccionado
+            element.prepend(marker);
+
+            // Alternar visibilidad de direcciones
+            toggleAddresses(id);
+        }
+        function resetMarker() {
+            const marker = document.getElementById("active-marker");
+            const sedePrincipal = document.querySelector("h3"); // Seleccionamos el título de la sede principal
+
+            // Mueve el ⬤ al lado de "Sede Principal"
+            sedePrincipal.prepend(marker);
+
+            // Restablece la posición y zoom del mapa
+            setMarker(-12.060064822464469, -77.03735101905501, "Sede Principal");
+        }
+    </script>
+</body>
+</html>

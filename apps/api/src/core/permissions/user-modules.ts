@@ -5,6 +5,9 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.workspace_users,
   AppModule.s3_manager,
   AppModule.password_vault,
+  AppModule.widget_educacion,
+  AppModule.widget_biblioteca,
+  AppModule.widget_pam,
 ];
 
 type UserWithModules = User & {

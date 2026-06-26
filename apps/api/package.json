@@ -9,7 +9,8 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:migrate:dev": "prisma migrate dev"
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:seed:widgets": "tsx prisma/seed-widgets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
@@ -21,6 +22,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.10",
+    "@nestjs/schedule": "^5.0.1",
     "@prisma/client": "^6.4.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
@@ -28,6 +30,7 @@
     "googleapis": "^144.0.0",
     "ioredis": "^5.5.0",
     "nanoid": "^3.3.8",
+    "nodemailer": "^6.10.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
@@ -42,10 +45,12 @@
     "@types/express": "^5.0.0",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.5",
+    "@types/nodemailer": "^6.4.17",
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/passport-jwt": "^4.0.1",
     "@types/qrcode": "^1.5.5",
     "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
 }

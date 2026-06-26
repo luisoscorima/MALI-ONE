@@ -10,6 +10,9 @@ import { LinksPage } from '@/pages/links-page';
 import { LoginPage } from '@/pages/login-page';
 import { PasswordVaultPage } from '@/pages/password-vault-page';
 import { S3ManagerPage } from '@/pages/s3-manager-page';
+import { WidgetBibliotecaPage } from '@/pages/widget-biblioteca-page';
+import { WidgetEducacionPage } from '@/pages/widget-educacion-page';
+import { WidgetPamPage } from '@/pages/widget-pam-page';
 
 export function App() {
   return (
@@ -32,6 +35,15 @@ export function App() {
               </Route>
               <Route element={<ModuleGuard module="password_vault" />}>
                 <Route path="vault" element={<PasswordVaultPage />} />
+              </Route>
+              <Route element={<ModuleGuard module="widget_educacion" />}>
+                <Route path="widgets/educacion" element={<WidgetEducacionPage />} />
+              </Route>
+              <Route element={<ModuleGuard module="widget_biblioteca" />}>
+                <Route path="widgets/biblioteca" element={<WidgetBibliotecaPage />} />
+              </Route>
+              <Route element={<ModuleGuard module="widget_pam" />}>
+                <Route path="widgets/pam" element={<WidgetPamPage />} />
               </Route>
               <Route element={<SuperAdminGuard />}>
                 <Route path="admin/app-users" element={<AppUsersPage />} />

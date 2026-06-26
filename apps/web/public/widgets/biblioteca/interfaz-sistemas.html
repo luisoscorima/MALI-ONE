@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interfaz MALI</title>
+    <link rel="icon" href="https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Cuadrado_Texto.png" type="image/png">
+    <style>
+        @font-face {
+            font-family: "BentonSansFB";
+            src: url("../educacion/fonts/BentonSansFB-Book.woff2") format("woff2");
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: "BentonSansFB";
+            src: url("../educacion/fonts/BentonSansFB-BookOblique.woff2") format("woff2");
+            font-weight: 400;
+            font-style: italic;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: "BentonSansFB";
+            src: url("../educacion/fonts/BentonSansFB-Bold.woff2") format("woff2");
+            font-weight: 700;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: "BentonSansFB";
+            src: url("../educacion/fonts/BentonSansFB-BoldOblique.woff2") format("woff2");
+            font-weight: 700;
+            font-style: italic;
+            font-display: swap;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font: 14px/2 "BentonSansFB", Arial, Helvetica, sans-serif;
+            letter-spacing: 0.05em;
+            background: #000;
+        }
+
+        .main-content {
+            width: 100%;
+            height: 100%;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 13px 20px;
+            color: #fff;
+            text-decoration: none;
+            position: relative;
+            background: transparent;
+            border: 1px solid #e1e1e1;
+            font: 700 12px/1.2 "BentonSansFB", Arial, Helvetica, sans-serif;
+            letter-spacing: 0.4em;
+            text-align: center;
+            text-indent: 2px;
+            text-transform: uppercase;
+            transition: color 0.1s linear 0.05s;
+
+            &::before {
+                content: "";
+                display: block;
+                position: absolute;
+                top: 50%;
+                left: 0;
+                width: 100%;
+                height: 1px;
+                background: #e1e1e1;
+                z-index: 1;
+                opacity: 0;
+                transition: height 0.2s ease, top 0.2s ease, opacity 0s linear 0.2s;
+            }
+
+            &::after {
+                transition: border 0.1s linear 0.05s;
+            }
+
+            .btn-inner {
+                position: relative;
+                z-index: 2;
+            }
+
+            &:hover {
+                color: #373737;
+                transition: color 0.1s linear 0s;
+
+                &::before {
+                    top: 0;
+                    height: 100%;
+                    opacity: 1;
+                    transition: height 0.2s ease, top 0.2s ease, opacity 0s linear 0s;
+                }
+
+                &::after {
+                    border-color: #373737;
+                    transition: border 0.1s linear 0s;
+                }
+            }
+        }
+
+        .slideshow {
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+
+            .slideshow-inner {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+
+            .slides {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+            }
+
+            .slide {
+                display: none;
+                overflow: hidden;
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 1;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+
+                &.is-active {
+                    display: block;
+                }
+
+                &.is-loaded {
+                    opacity: 1;
+                }
+
+                .caption {
+                    padding: 0 100px;
+                }
+
+                .image-container {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background-position: center;
+                    z-index: 1;
+                    background-size: cover;
+                    image-rendering: optimizeQuality;
+
+                    &::before {
+                        content: "";
+                        display: block;
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.5);
+                    }
+                }
+
+                .image {
+                    width: 100%;
+                    width: 100%;
+                    object-fit: cover;
+                    height: 100%;
+                }
+
+                &-content {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    z-index: 2;
+                    color: #fff;
+                    text-align: center;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                }
+
+                .title {
+                    margin: 0 auto 15px;
+                    max-width: 1000px;
+                    font: 500 50px/1.2 "BentonSansFB", Arial, Helvetica, sans-serif;
+                    letter-spacing: 0.15em;
+                    text-transform: uppercase;
+                    -webkit-text-stroke: 1px rgba(0, 0, 0, 0.35);
+                    paint-order: stroke fill;
+                }
+
+                .text {
+                    margin: 0 auto;
+                    max-width: 1000px;
+                    font-size: 18px;
+                    line-height: 1.4;
+                }
+
+                .btn {
+                    margin: 15px 0 0;
+                    border-color: #fff;
+
+                    &::before {
+                        background: #fff
+                    }
+                }
+            }
+
+            .pagination {
+                position: absolute;
+                bottom: 35px;
+                left: 0;
+                width: 100%;
+                height: 12px;
+                cursor: default;
+                z-index: 2;
+                text-align: center;
+
+                .item {
+                    display: inline-block;
+                    padding: 15px 5px;
+                    position: relative;
+                    width: 46px;
+                    height: 32px;
+                    cursor: pointer;
+                    text-indent: -999em;
+                    z-index: 1;
+
+                    +.page {
+                        margin-left: -2px;
+                    }
+
+                    &::before {
+                        content: "";
+                        display: block;
+                        position: absolute;
+                        top: 15px;
+                        left: 5px;
+                        width: 36px;
+                        height: 2px;
+                        background: rgba(255, 255, 255, 0.5);
+                        transition: background 0.2s ease;
+                    }
+
+                    &::after {
+                        width: 0;
+                        background: #fff;
+                        z-index: 2;
+                        transition: width 0.2s ease;
+                    }
+
+                    &:hover::before,
+                    &.is-active::before {
+                        background-color: #fff;
+                    }
+                }
+            }
+
+            .arrows {
+                .arrow {
+                    margin: -33px 0 0;
+                    padding: 20px;
+                    position: absolute;
+                    top: 50%;
+                    cursor: pointer;
+                    z-index: 3;
+                }
+
+                .prev {
+                    left: 30px;
+
+                    &:hover .svg {
+                        left: -10px;
+                    }
+                }
+
+                .next {
+                    right: 30px;
+
+                    &:hover .svg {
+                        left: 10px;
+                    }
+                }
+
+                .svg {
+                    position: relative;
+                    left: 0;
+                    width: 14px;
+                    height: 26px;
+                    fill: #fff;
+                    transition: left 0.2s ease;
+                }
+            }
+        }
+
+        /* Estilos planos (CSS válido) para el contenido del slide */
+        .slideshow .slide-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            color: #fff;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .slideshow .slide .caption {
+            padding: 0 100px;
+        }
+
+        .slideshow .slide .title {
+            margin: 0 auto 15px;
+            max-width: 1000px;
+            font: 500 50px/1.2 "BentonSansFB", Arial, Helvetica, sans-serif;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            -webkit-text-stroke: 1px rgba(0, 0, 0, 0.35);
+            paint-order: stroke fill;
+        }
+
+        .slideshow .slide .text {
+            margin: 0 auto;
+            max-width: 1000px;
+            font: 18px/1.4 "BentonSansFB", Arial, Helvetica, sans-serif;
+        }
+
+        .slideshow .slide .image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-position: center;
+            z-index: 1;
+            background-size: cover;
+            image-rendering: optimizeQuality;
+        }
+
+        .slideshow .slide .image-container::before {
+            content: "";
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .slideshow .slide .image {
+            width: 100%;
+            object-fit: cover;
+            height: 100%;
+        }
+
+        .slideshow .slide .btn {
+            margin: 15px 0 0;
+            border-color: #fff;
+        }
+
+        .slideshow .slide .btn::before {
+            background: #fff;
+        }
+
+        .credits {
+            position: absolute;
+            bottom: 10px;
+            right: 20px;
+            z-index: 4;
+        }
+
+        .credits p {
+            margin: 0;
+            font: 11px/1.4 "BentonSansFB", Arial, Helvetica, sans-serif;
+            color: rgba(255, 255, 255, 0.3);
+            letter-spacing: 0.05em;
+        }
+
+        .credits strong {
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* ===== RESPONSIVE MOBILE ===== */
+        @media (max-width: 768px) {
+            body {
+                font-size: 12px;
+            }
+
+            .slideshow {
+                height: 100vh;
+            }
+
+            .slideshow .slide .caption {
+                padding: 0 20px;
+            }
+
+            .slideshow .slide .title {
+                font-size: 28px;
+                margin: 0 auto 10px;
+                max-width: 100%;
+            }
+
+            .slideshow .slide .text {
+                font-size: 14px;
+                max-width: 100%;
+                margin: 0 auto 15px;
+            }
+
+            .slideshow .slide .text p {
+                margin: 0;
+            }
+
+            .slideshow .slide .btn {
+                padding: 10px 16px;
+                font-size: 11px;
+            }
+
+            .slideshow .arrows .arrow {
+                padding: 15px;
+                margin: -25px 0 0;
+            }
+
+            .slideshow .arrows .prev {
+                left: 10px;
+            }
+
+            .slideshow .arrows .next {
+                right: 10px;
+            }
+
+            .slideshow .arrows .svg {
+                width: 12px;
+                height: 22px;
+            }
+
+            .slideshow .pagination {
+                bottom: 20px;
+            }
+
+            .slideshow .pagination .item {
+                padding: 10px 3px;
+                width: 40px;
+                height: 28px;
+            }
+
+            .slideshow .pagination .item::before {
+                top: 12px;
+                left: 3px;
+                width: 34px;
+                height: 1px;
+            }
+
+            .credits {
+                bottom: 70px;
+                right: 10px;
+            }
+
+            .credits p {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .slideshow .slide .title {
+                font-size: 22px;
+                letter-spacing: 0.1em;
+            }
+
+            .slideshow .slide .text {
+                font-size: 12px;
+                line-height: 1.3;
+            }
+
+            .slideshow .slide .caption {
+                padding: 0 15px;
+            }
+
+            .slideshow .slide .btn {
+                padding: 9px 14px;
+                font-size: 10px;
+                margin: 10px 0 0;
+            }
+
+            .slideshow .arrows .arrow {
+                padding: 12px;
+            }
+
+            .slideshow .arrows .prev {
+                left: 5px;
+            }
+
+            .slideshow .arrows .next {
+                right: 5px;
+            }
+
+            .slideshow .pagination {
+                bottom: 15px;
+            }
+
+            .slideshow .pagination .item {
+                padding: 8px 2px;
+                width: 36px;
+                height: 24px;
+            }
+
+            .slideshow .pagination .item::before {
+                width: 32px;
+            }
+
+            .credits {
+                bottom: 60px;
+                right: 5px;
+            }
+
+            .credits p {
+                font-size: 8px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="main-content">
+        <section class="slideshow">
+            <div class="slideshow-inner">
+                <div class="slides">
+                    <div class="slide is-active ">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">COLECCIÓN MALI</div>
+                                <div class="text">
+                                    <p>MALI en Línea</p>
+                                </div>
+                                <a href="https://coleccion.mali.pe" class="btn" target="_top">
+                                    <span class="btn-inner">VISÍTANOS AQUÍ</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="https://coleccion.mali.pe/internal/media/logodispatcher/_MG_9040-21.jpg" alt=""
+                                class="image" />
+                        </div>
+                    </div>
+                    <div class="slide">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">BIBLIOTECA MALI</div>
+                                <div class="text">
+                                    <p>Conoce nuestras últimas adquisiciones</p>
+                                </div>
+                                <a href="https://biblioteca.mali.pe" class="btn" target="_top">
+                                    <span class="btn-inner">Visitanos aquí</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/vista_panoramica_biblioteca.jpg"
+                                alt="" class="image" />
+                        </div>
+                    </div>
+                    <div class="slide">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">HISTORIAS</div>
+                                <div class="text">
+                                    <p>Plataforma digital sobre arte en el Perú impulsada por la Fundación Telefónica y
+                                        el Museo de Arte de Lima</p>
+                                </div>
+                                <a href="https://historias.pe" class="btn" target="_top">
+                                    <span class="btn-inner">Conoce Más</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="https://storage.googleapis.com/enciclopedia-arte-peruano-stage/compress_1765395869219_Banner%20Archivo%20Mariotti-Luy.jpg"
+                                alt="" class="image" />
+                        </div>
+                    </div>
+                    <div class="slide">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">Archivo de Arte Peruano</div>
+                                <div class="text">
+                                    <p>Archivos MALI en Línea</p>
+                                </div>
+                                <a href="https://archivo.mali.pe" class="btn" target="_top">
+                                    <span class="btn-inner">Conoce Más</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="https://archivo.mali.pe/themes/default/assets/pawtucket/graphics//banners/banner01-min.png"
+                                alt="" class="image" />
+                        </div>
+                    </div>
+                    <div class="slide">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">EPPA</div>
+                                <div class="text">
+                                    <p>Espacio-Plataforma de Preservación Audiovisual impulsado por ATA y MALI</p>
+                                </div>
+                                <a href="https://e-ppa.org/" class="btn" target="_top">
+                                    <span class="btn-inner">Explora aquí</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="https://admin.e-ppa.org/media/collectiveaccess/images/1/30888_ca_object_representations_media_173_original.jpg"
+                                alt="" class="image" />
+                        </div>
+                    </div>
+                    <div class="slide">
+                        <div class="slide-content">
+                            <div class="caption">
+                                <div class="title">ARCHI</div>
+                                <div class="text">
+                                    <p>Archivo Digital de Arte Peruano</p>
+                                </div>
+                                <a href="https://archi.pe" class="btn" target="_top">
+                                    <span class="btn-inner">Explora aquí</span>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <img src="img/archi-bg.jpg"
+                                alt="" class="image" />
+                        </div>
+                    </div>
+                </div>
+                <div class="pagination">
+                    <div class="item is-active">
+                        <span class="icon">1</span>
+                    </div>
+                    <div class="item">
+                        <span class="icon">2</span>
+                    </div>
+                    <div class="item">
+                        <span class="icon">3</span>
+                    </div>
+                    <div class="item">
+                        <span class="icon">4</span>
+                    </div>
+                    <div class="item">
+                        <span class="icon">5</span>
+                    </div>
+                    <div class="item">
+                        <span class="icon">6</span>
+                    </div>
+                </div>
+                <div class="arrows">
+                    <div class="arrow prev">
+                        <span class="svg svg-arrow-left">
+                            <svg version="1.1" id="svg4-Layer_1" xmlns="http://www.w3.org/2000/svg"
+                                xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="14px" height="26px"
+                                viewBox="0 0 14 26" enable-background="new 0 0 14 26" xml:space="preserve">
+                                <path
+                                    d="M13,26c-0.256,0-0.512-0.098-0.707-0.293l-12-12c-0.391-0.391-0.391-1.023,0-1.414l12-12c0.391-0.391,1.023-0.391,1.414,0s0.391,1.023,0,1.414L2.414,13l11.293,11.293c0.391,0.391,0.391,1.023,0,1.414C13.512,25.902,13.256,26,13,26z" />
+                            </svg>
+                            <span class="alt sr-only"></span>
+                        </span>
+                    </div>
+                    <div class="arrow next">
+                        <span class="svg svg-arrow-right">
+                            <svg version="1.1" id="svg5-Layer_1" xmlns="http://www.w3.org/2000/svg"
+                                xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="14px" height="26px"
+                                viewBox="0 0 14 26" enable-background="new 0 0 14 26" xml:space="preserve">
+                                <path
+                                    d="M1,0c0.256,0,0.512,0.098,0.707,0.293l12,12c0.391,0.391,0.391,1.023,0,1.414l-12,12c-0.391,0.391-1.023,0.391-1.414,0s-0.391-1.023,0-1.414L11.586,13L0.293,1.707c-0.391-0.391-0.391-1.023,0-1.414C0.488,0.098,0.744,0,1,0z" />
+                            </svg>
+                            <span class="alt sr-only"></span>
+                        </span>
+                    </div>
+                </div>
+                <div class="credits">
+                    <p>Powered by: <strong> Luis G. Oscorima P.</strong></p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js"></script>
+    <script>
+        var slideshowDuration = 4000;
+        var slideshow = document.querySelector('.main-content .slideshow');
+
+        if (slideshow) {
+            var waitMap = new WeakMap();
+            var timeoutMap = new WeakMap();
+            var windowHeight = window.innerHeight;
+
+            function setWait(el, value) {
+                waitMap.set(el, value);
+            }
+
+            function getWait(el) {
+                return waitMap.get(el) === true;
+            }
+
+            function setTimeoutFor(el, value) {
+                timeoutMap.set(el, value);
+            }
+
+            function getTimeoutFor(el) {
+                return timeoutMap.get(el);
+            }
+
+            function getSlides(slideshowEl) {
+                return Array.prototype.slice.call(slideshowEl.querySelectorAll('.slide'));
+            }
+
+            function getPaginationItems(slideshowEl) {
+                return Array.prototype.slice.call(slideshowEl.querySelectorAll('.pagination .item'));
+            }
+
+            function getActiveSlide(slides) {
+                return slides.find(function (slide) { return slide.classList.contains('is-active'); }) || slides[0];
+            }
+
+            function slideshowSwitch(slideshowEl, index, auto) {
+                if (getWait(slideshowEl)) return;
+
+                var slides = getSlides(slideshowEl);
+                var activeSlide = getActiveSlide(slides);
+                var newSlide = slides[index];
+                if (!newSlide || newSlide === activeSlide) return;
+
+                var activeSlideImage = activeSlide.querySelector('.image-container');
+                var newSlideImage = newSlide.querySelector('.image-container');
+                var newSlideContent = newSlide.querySelector('.slide-content');
+                var newSlideElements = newSlide.querySelectorAll('.caption > *');
+                var transition = slideshowEl.getAttribute('data-transition');
+
+                newSlide.classList.add('is-new');
+                var timeout = getTimeoutFor(slideshowEl);
+                if (timeout) {
+                    clearTimeout(timeout);
+                }
+                setWait(slideshowEl, true);
+
+                if (transition === 'fade' && window.TweenMax) {
+                    newSlide.style.display = 'block';
+                    newSlide.style.zIndex = '2';
+                    newSlideImage.style.opacity = '0';
+
+                    TweenMax.to(newSlideImage, 1, {
+                        alpha: 1,
+                        onComplete: function () {
+                            newSlide.classList.add('is-active');
+                            newSlide.classList.remove('is-new');
+                            activeSlide.classList.remove('is-active');
+                            newSlide.style.display = '';
+                            newSlide.style.zIndex = '';
+                            newSlideImage.style.opacity = '';
+                            paginationCheck(slideshowEl);
+                            setWait(slideshowEl, false);
+                            if (auto) {
+                                timeout = setTimeout(function () {
+                                    slideshowNext(slideshowEl, false, true);
+                                }, slideshowDuration);
+                                setTimeoutFor(slideshowEl, timeout);
+                            }
+                        }
+                    });
+                    return;
+                }
+
+                if (window.TweenMax && window.Power3) {
+                    var slideshowWidth = slideshowEl.getBoundingClientRect().width;
+                    var isForward = slides.indexOf(newSlide) > slides.indexOf(activeSlide);
+
+                    var newSlideRight = isForward ? 0 : '';
+                    var newSlideLeft = isForward ? 'auto' : 0;
+                    var newSlideImageRight = isForward ? -slideshowWidth / 8 : 'auto';
+                    var newSlideImageLeft = isForward ? 'auto' : -slideshowWidth / 8;
+                    var newSlideImageToRight = isForward ? 0 : '';
+                    var newSlideImageToLeft = isForward ? 'auto' : 0;
+                    var newSlideContentLeft = isForward ? 'auto' : 0;
+                    var newSlideContentRight = isForward ? 0 : 'auto';
+                    var activeSlideImageLeft = isForward ? -slideshowWidth / 4 : slideshowWidth / 4;
+
+                    newSlide.style.display = 'block';
+                    newSlide.style.width = '0px';
+                    newSlide.style.right = newSlideRight;
+                    newSlide.style.left = newSlideLeft;
+                    newSlide.style.zIndex = '2';
+
+                    newSlideImage.style.width = slideshowWidth + 'px';
+                    newSlideImage.style.right = newSlideImageRight;
+                    newSlideImage.style.left = newSlideImageLeft;
+
+                    newSlideContent.style.width = slideshowWidth + 'px';
+                    newSlideContent.style.left = newSlideContentLeft;
+                    newSlideContent.style.right = newSlideContentRight;
+
+                    if (activeSlideImage) {
+                        activeSlideImage.style.left = '0px';
+                    }
+
+                    TweenMax.set(newSlideElements, { y: 20, force3D: true });
+                    TweenMax.to(activeSlideImage, 1, {
+                        left: activeSlideImageLeft,
+                        ease: Power3.easeInOut
+                    });
+
+                    TweenMax.to(newSlide, 1, {
+                        width: slideshowWidth,
+                        ease: Power3.easeInOut
+                    });
+
+                    TweenMax.to(newSlideImage, 1, {
+                        right: newSlideImageToRight,
+                        left: newSlideImageToLeft,
+                        ease: Power3.easeInOut
+                    });
+
+                    TweenMax.staggerFromTo(newSlideElements, 0.8, { alpha: 0, y: 60 }, { alpha: 1, y: 0, ease: Power3.easeOut, force3D: true, delay: 0.6 }, 0.1, function () {
+                        newSlide.classList.add('is-active');
+                        newSlide.classList.remove('is-new');
+                        activeSlide.classList.remove('is-active');
+
+                        newSlide.style.display = '';
+                        newSlide.style.width = '';
+                        newSlide.style.left = '';
+                        newSlide.style.right = '';
+                        newSlide.style.zIndex = '';
+
+                        newSlideImage.style.width = '';
+                        newSlideImage.style.right = '';
+                        newSlideImage.style.left = '';
+
+                        newSlideContent.style.width = '';
+                        newSlideContent.style.left = '';
+                        newSlideContent.style.right = '';
+
+                        Array.prototype.forEach.call(newSlideElements, function (el) {
+                            el.style.opacity = '';
+                            el.style.transform = '';
+                        });
+
+                        if (activeSlideImage) {
+                            activeSlideImage.style.left = '';
+                        }
+
+                        paginationCheck(slideshowEl);
+                        setWait(slideshowEl, false);
+                        if (auto) {
+                            timeout = setTimeout(function () {
+                                slideshowNext(slideshowEl, false, true);
+                            }, slideshowDuration);
+                            setTimeoutFor(slideshowEl, timeout);
+                        }
+                    });
+                    return;
+                }
+
+                activeSlide.classList.remove('is-active');
+                newSlide.classList.add('is-active');
+                newSlide.classList.remove('is-new');
+                paginationCheck(slideshowEl);
+                setWait(slideshowEl, false);
+
+                if (auto) {
+                    timeout = setTimeout(function () {
+                        slideshowNext(slideshowEl, false, true);
+                    }, slideshowDuration);
+                    setTimeoutFor(slideshowEl, timeout);
+                }
+            }
+
+            function slideshowNext(slideshowEl, previous, auto) {
+                var slides = getSlides(slideshowEl);
+                var activeSlide = getActiveSlide(slides);
+                var activeIndex = slides.indexOf(activeSlide);
+                var newIndex = previous ? activeIndex - 1 : activeIndex + 1;
+
+                if (newIndex < 0) {
+                    newIndex = slides.length - 1;
+                } else if (newIndex >= slides.length) {
+                    newIndex = 0;
+                }
+
+                slideshowSwitch(slideshowEl, newIndex, auto);
+            }
+
+            function paginationCheck(slideshowEl) {
+                var pages = getPaginationItems(slideshowEl);
+                var slides = getSlides(slideshowEl);
+                var activeSlide = getActiveSlide(slides);
+                var index = slides.indexOf(activeSlide);
+
+                pages.forEach(function (page, i) {
+                    if (i === index) {
+                        page.classList.add('is-active');
+                    } else {
+                        page.classList.remove('is-active');
+                    }
+                });
+            }
+
+            function homeSlideshowParallax() {
+                var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+                if (scrollTop > windowHeight) return;
+                var inner = slideshow.querySelector('.slideshow-inner');
+                if (!inner) return;
+                var newHeight = windowHeight - (scrollTop / 2);
+                var newTop = scrollTop * 0.8;
+
+                inner.style.transform = 'translateY(' + newTop + 'px)';
+                inner.style.height = newHeight + 'px';
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var slides = getSlides(slideshow);
+                slides.forEach(function (slide) {
+                    slide.classList.add('is-loaded');
+                });
+
+                slideshow.addEventListener('click', function (event) {
+                    var arrow = event.target.closest('.slideshow .arrows .arrow');
+                    if (arrow) {
+                        slideshowNext(slideshow, arrow.classList.contains('prev'));
+                        return;
+                    }
+
+                    var page = event.target.closest('.slideshow .pagination .item');
+                    if (page) {
+                        var pages = getPaginationItems(slideshow);
+                        var index = pages.indexOf(page);
+                        if (index >= 0) {
+                            slideshowSwitch(slideshow, index);
+                        }
+                    }
+                });
+
+                var timeout = setTimeout(function () {
+                    slideshowNext(slideshow, false, true);
+                }, slideshowDuration);
+
+                setTimeoutFor(slideshow, timeout);
+            });
+
+            if (document.querySelectorAll('.main-content .slideshow').length > 1) {
+                window.addEventListener('scroll', homeSlideshowParallax);
+            }
+
+            window.addEventListener('resize', function () {
+                windowHeight = window.innerHeight;
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
+import { AppModule } from '@prisma/client';
+import { Public } from '../../../core/guards/public.decorator';
+import { RequireModule } from '../../../core/guards/module.decorator';
+import { EducacionWidgetsService } from './educacion-widgets.service';
+import { UpdateEducacionSettingsDto } from '../dto/update-educacion-settings.dto';
+import {
+  CreateEducacionDistrictDto,
+  UpdateEducacionDistrictDto,
+} from '../dto/create-educacion-district.dto';
+import {
+  CreateEducacionSedeDto,
+  UpdateEducacionSedeDto,
+} from '../dto/create-educacion-sede.dto';
+
+@Controller('widgets/educacion')
+export class EducacionWidgetsController {
+  constructor(private readonly service: EducacionWidgetsService) {}
+
+  @Public()
+  @Get('config')
+  getPublicConfig() {
+    return this.service.getPublicConfig();
+  }
+
+  @Get('admin')
+  @RequireModule(AppModule.widget_educacion)
+  getAdmin() {
+    return this.service.getAdminState();
+  }
+
+  @Put('settings')
+  @RequireModule(AppModule.widget_educacion)
+  updateSettings(@Body() body: UpdateEducacionSettingsDto) {
+    return this.service.updateSettings(body);
+  }
+
+  @Post('districts')
+  @RequireModule(AppModule.widget_educacion)
+  createDistrict(@Body() body: CreateEducacionDistrictDto) {
+    return this.service.createDistrict(body);
+  }
+
+  @Patch('districts/:id')
+  @RequireModule(AppModule.widget_educacion)
+  updateDistrict(
+    @Param('id') id: string,
+    @Body() body: UpdateEducacionDistrictDto,
+  ) {
+    return this.service.updateDistrict(id, body);
+  }
+
+  @Delete('districts/:id')
+  @RequireModule(AppModule.widget_educacion)
+  deleteDistrict(@Param('id') id: string) {
+    return this.service.deleteDistrict(id);
+  }
+
+  @Post('sedes')
+  @RequireModule(AppModule.widget_educacion)
+  createSede(@Body() body: CreateEducacionSedeDto) {
+    return this.service.createSede(body);
+  }
+
+  @Patch('sedes/:id')
+  @RequireModule(AppModule.widget_educacion)
+  updateSede(@Param('id') id: string, @Body() body: UpdateEducacionSedeDto) {
+    return this.service.updateSede(id, body);
+  }
+
+  @Delete('sedes/:id')
+  @RequireModule(AppModule.widget_educacion)
+  deleteSede(@Param('id') id: string) {
+    return this.service.deleteSede(id);
+  }
+}

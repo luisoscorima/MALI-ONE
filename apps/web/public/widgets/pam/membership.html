@@ -1,0 +1,3253 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Programa Amigos del MALI - PAM</title>
+
+  <style>
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('../educacion/fonts/BentonSansFB-Book.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('../educacion/fonts/BentonSansFB-BookOblique.woff2') format('woff2');
+      font-weight: 400;
+      font-style: italic;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('../educacion/fonts/BentonSansFB-Bold.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    @font-face {
+      font-family: 'BentonSansFB';
+      src: url('../educacion/fonts/BentonSansFB-BoldOblique.woff2') format('woff2');
+      font-weight: 700;
+      font-style: italic;
+      font-display: swap;
+    }
+
+    :root {
+      --accent: #6cddc7;
+      --accent-hover: #5bc4b0;
+      --accent-soft: rgba(108, 221, 199, 0.15);
+      --accent-glow: rgba(108, 221, 199, 0.35);
+      --radius: 0;
+      --radius-sm: 0;
+      --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      --pam-lime: #cefa5b;
+      --pam-lime-chip: #b5d944;
+      --pam-lime-row: rgba(206, 250, 91, 0.2);
+      --pam-lime-row-hover: rgba(206, 250, 91, 0.34);
+      --pam-green: #1bc469;
+      --pam-green-chip: #17ad5b;
+      --pam-green-row: rgba(27, 196, 105, 0.14);
+      --pam-green-row-hover: rgba(27, 196, 105, 0.26);
+      --pam-pink: #f7b5b0;
+      --pam-pink-chip: #e5a09a;
+      --pam-pink-row: rgba(247, 181, 176, 0.24);
+      --pam-pink-row-hover: rgba(247, 181, 176, 0.38);
+      --pam-blue: #3a5ad0;
+      --pam-blue-chip: #2f4eba;
+      --pam-blue-row: rgba(58, 90, 208, 0.14);
+      --pam-blue-row-hover: rgba(58, 90, 208, 0.26);
+      --pam-col-benefits: 1.18fr;
+      --pam-col-plan: 1fr;
+      --pam-col-gap: 0.9rem;
+      --pam-grid-cols: minmax(0, var(--pam-col-benefits)) repeat(3, minmax(0, var(--pam-col-plan)));
+      --pam-header-pad-y: 1.35rem;
+      --pam-header-pad-x: 1.5rem;
+      --pam-row-min-h: 4.4rem;
+      --pam-row-font: 1.4rem;
+      --pam-plan-row-font: calc(var(--pam-row-font) + 0.25rem);
+      --pam-card-title: 2.2rem;
+      --pam-benefits-title: 3rem;
+      --pam-price-value: 3.6rem;
+      --pam-price-currency: 1.35rem;
+      --pam-price-duration: 1.3rem;
+      --pam-btn-font: 1.25rem;
+    }
+
+    [data-theme="light"] {
+      --bg: #ffffff;
+      --bg-gradient: none;
+      --card-bg: #ffffff;
+      --card-shadow: 0 4px 24px rgba(26, 43, 60, 0.08);
+      --card-shadow-hover: 0 12px 40px rgba(26, 43, 60, 0.14);
+      --text: #1D1D1B;
+      --text-muted: rgba(29, 29, 27, 0.72);
+      --text-on-accent: #1D1D1B;
+      --border: rgba(29, 29, 27, 0.1);
+      --switch-bg: #ffffff;
+      --switch-border: #1D1D1B;
+      --switch-label: #1D1D1B;
+      --switch-active-text: #ffffff;
+      --feature-badge-bg: var(--accent-soft);
+      --feature-badge-text: #1D1D1B;
+      --notes-text: rgba(29, 29, 27, 0.85);
+      --toggle-bg: #ffffff;
+      --toggle-icon: #1D1D1B;
+      --row-border: rgba(26, 43, 60, 0.09);
+      --row-hover-bg: rgba(108, 221, 199, 0.2);
+    }
+
+    [data-theme="dark"] {
+      --bg: #0d1520;
+      --bg-gradient: linear-gradient(160deg, #0a1018 0%, #111c2a 50%, #0d1520 100%);
+      --card-bg: #1a2736;
+      --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+      --card-shadow-hover: 0 16px 48px rgba(0, 0, 0, 0.5);
+      --text: #e8f2f8;
+      --text-muted: #9bb0c0;
+      --text-on-accent: #0a1f1c;
+      --border: rgba(255, 255, 255, 0.08);
+      --switch-bg: #243447;
+      --switch-border: var(--accent);
+      --switch-label: #c8dce8;
+      --switch-active-text: var(--text-on-accent);
+      --feature-badge-bg: rgba(108, 221, 199, 0.12);
+      --feature-badge-text: var(--accent);
+      --notes-text: #9bb0c0;
+      --toggle-bg: #243447;
+      --toggle-icon: var(--accent);
+      --row-border: rgba(255, 255, 255, 0.07);
+      --row-hover-bg: rgba(108, 221, 199, 0.12);
+    }
+
+    [data-theme="dark"] .pam-rows-scroll {
+      background: #ffffff;
+    }
+
+    [data-theme="dark"] .pam-layout-mobile .pricing-body,
+    [data-theme="dark"] .pam-mobile-benefits-card__inner {
+      background: #ffffff;
+    }
+
+    @media (max-width: 1023px) {
+      .pam-layout-desktop {
+        display: none !important;
+      }
+
+      .pam-layout-mobile {
+        display: block;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .pam-layout-desktop {
+        display: grid;
+      }
+
+      .pam-layout-mobile {
+        display: none;
+      }
+
+      .pam-page-header__shapes {
+        display: none;
+      }
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      font-size: 62.5%;
+      scroll-behavior: smooth;
+    }
+
+    html * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      margin: 0;
+      font-size: 1.6rem;
+      font-family: 'BentonSansFB', sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      background-image: var(--bg-gradient);
+      min-height: 100vh;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    /* Theme toggle */
+    .theme-toggle {
+      position: fixed;
+      top: 1.6rem;
+      right: 1.6rem;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      background: var(--toggle-bg);
+      color: var(--toggle-icon);
+      cursor: pointer;
+      box-shadow: var(--card-shadow);
+      transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+    }
+
+    .theme-toggle:hover {
+      transform: scale(1.08);
+      box-shadow: var(--card-shadow-hover);
+    }
+
+    .theme-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: currentColor;
+      transition: transform 0.4s ease;
+    }
+
+    .theme-toggle:hover svg {
+      transform: rotate(20deg);
+    }
+
+    [data-theme="light"] .icon-moon { display: block; }
+    [data-theme="light"] .icon-sun { display: none; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    [data-theme="dark"] .icon-sun { display: block; }
+
+    /* Page layout */
+    .pam-pricing-page {
+      min-height: 100vh;
+      padding: 1px 0 3em;
+    }
+
+    .pam-page-header {
+      display: grid;
+      grid-template-columns: var(--pam-grid-cols);
+      gap: var(--pam-col-gap);
+      align-items: end;
+      margin-bottom: 2rem;
+      flex-shrink: 0;
+    }
+
+    .pam-page-header__spacer {
+      grid-column: 3;
+      min-height: 0;
+    }
+
+    .pam-page-header__controls {
+      grid-column: 4;
+      justify-self: end;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1rem;
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .pam-page-header__shapes {
+      width: 100%;
+      line-height: 0;
+    }
+
+    .pam-page-header__shapes svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 72px;
+    }
+
+    .pam-page-header .pricing-switcher {
+      justify-self: auto;
+      text-align: right;
+      width: 100%;
+    }
+
+    .pam-page-header h1 {
+      grid-column: 1;
+      margin: 0;
+      font-size: 2.8rem;
+      line-height: 1.08;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: var(--text);
+      text-align: left;
+      max-width: 11ch;
+    }
+
+    .pam-page-header__copy {
+      grid-column: 2;
+      min-width: 0;
+    }
+
+    .pam-page-header__copy p {
+      margin: 0;
+      font-size: 1.35rem;
+      line-height: 1.35;
+      color: var(--text-muted);
+      text-align: left;
+    }
+
+    .pam-page-header__copy .pam-page-header__lead {
+      margin-bottom: 0.35rem;
+    }
+
+    .pam-page-header__copy strong {
+      display: block;
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.25;
+      color: var(--text);
+    }
+
+    .pricing-container {
+      display: flex;
+      flex-direction: column;
+      width: 94%;
+      max-width: 1280px;
+      margin: 2rem auto 0;
+      padding: 0;
+    }
+
+    /* Billing switcher */
+    .pricing-switcher {
+      text-align: center;
+    }
+
+    .pricing-switcher .fieldset {
+      display: inline-flex;
+      position: relative;
+      padding: 3px;
+      border-radius: 50em;
+      border: 2px solid var(--switch-border);
+      margin: 0;
+      background: var(--switch-bg);
+      box-shadow: none;
+    }
+
+    .pricing-switcher input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .pricing-switcher label {
+      position: relative;
+      z-index: 1;
+      display: inline-block;
+      width: 88px;
+      height: 36px;
+      line-height: 36px;
+      cursor: pointer;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--switch-label);
+      text-align: center;
+      letter-spacing: 0;
+      transition: color var(--transition);
+    }
+
+    .pricing-switcher .switch {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      height: 36px;
+      width: 88px;
+      background-color: var(--pam-lime);
+      border-radius: 50em;
+      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: none;
+    }
+
+    .pricing-switcher input#yearly-1:checked ~ .switch {
+      transform: translateX(88px);
+    }
+
+    .pricing-switcher input#monthly-1:checked ~ label[for="monthly-1"],
+    .pricing-switcher input#yearly-1:checked ~ label[for="yearly-1"] {
+      color: #1D1D1B;
+    }
+
+    /* Pricing layout: 4 columnas, listas con scroll independiente */
+    .pam-pricing-viewport {
+      width: 100%;
+      margin-top: 0;
+      flex-shrink: 0;
+    }
+
+    .pam-pricing-scale__inner {
+      width: 100%;
+      height: 100%;
+      transform-origin: top center;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .pam-pricing-layout {
+      flex: 1 1 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: var(--pam-grid-cols);
+      gap: var(--pam-col-gap);
+      margin: 0;
+      align-items: stretch;
+    }
+
+    .pricing-list {
+      grid-column: 2 / -1;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--pam-col-gap);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      min-width: 0;
+    }
+
+    .pricing-list > li {
+      list-style: none;
+      animation: cardEnter 0.7s ease both;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .benefits-card,
+    .pricing-wrapper,
+    .pricing-wrapper > li.is-visible {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .benefits-card__header,
+    .pricing-header,
+    .benefits-card__footer,
+    .pricing-footer {
+      flex-shrink: 0;
+    }
+
+    .pam-rows-scroll {
+      overflow-x: hidden;
+    }
+
+    .pam-rows-scroll::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .benefits-card .pam-rows-scroll::-webkit-scrollbar-thumb {
+      background: var(--pam-lime-chip);
+      border-radius: 0;
+    }
+
+    .benefits-card .pam-rows-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--pam-lime);
+    }
+
+    .pricing-list > li:nth-child(1) .pam-rows-scroll::-webkit-scrollbar-thumb {
+      background: var(--pam-green-chip);
+      border-radius: 0;
+    }
+
+    .pricing-list > li:nth-child(1) .pam-rows-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--pam-green);
+    }
+
+    .pricing-list > li:nth-child(2) .pam-rows-scroll::-webkit-scrollbar-thumb {
+      background: var(--pam-pink-chip);
+      border-radius: 0;
+    }
+
+    .pricing-list > li:nth-child(2) .pam-rows-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--pam-pink);
+    }
+
+    .pricing-list > li:nth-child(3) .pam-rows-scroll::-webkit-scrollbar-thumb {
+      background: var(--pam-blue-chip);
+      border-radius: 0;
+    }
+
+    .pricing-list > li:nth-child(3) .pam-rows-scroll::-webkit-scrollbar-thumb:hover {
+      background: var(--pam-blue);
+    }
+
+    @media (min-width: 1024px) {
+      .pam-pricing-viewport {
+        width: 100%;
+        aspect-ratio: auto;
+        max-height: none;
+        min-height: 0;
+        margin-inline: 0;
+        overflow: visible;
+      }
+
+      .pam-pricing-viewport.is-wheel-active {
+        cursor: default;
+      }
+
+      .pam-pricing-scale__inner {
+        height: auto;
+      }
+
+      .pam-pricing-layout {
+        flex: 0 0 auto;
+        height: min(72vh, 780px);
+        min-height: 520px;
+        max-height: min(72vh, 780px);
+        overflow: hidden;
+      }
+
+      .benefits-card {
+        height: 100%;
+        min-height: 0;
+        animation: none;
+        opacity: 1;
+      }
+
+      .pam-pricing-layout > * {
+        min-height: 0;
+        min-width: 0;
+      }
+
+      .pricing-list {
+        height: 100%;
+        max-height: 100%;
+        min-height: 0;
+        align-self: stretch;
+      }
+
+      .pricing-list > li {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .benefits-card,
+      .pricing-wrapper,
+      .pricing-wrapper > li.is-visible {
+        min-height: 0;
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+      }
+
+      .pricing-wrapper {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .pricing-wrapper > li.is-visible {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      .pam-rows-scroll {
+        flex: 1 1 0%;
+        min-height: 0;
+        max-height: 100%;
+        overflow-y: scroll;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-gutter: stable;
+      }
+
+      .benefits-card .pam-rows-scroll {
+        scrollbar-color: var(--pam-lime-chip) rgba(206, 250, 91, 0.15);
+      }
+
+      .pricing-list > li:nth-child(1) .pam-rows-scroll {
+        scrollbar-color: var(--pam-green-chip) rgba(27, 196, 105, 0.15);
+      }
+
+      .pricing-list > li:nth-child(2) .pam-rows-scroll {
+        scrollbar-color: var(--pam-pink-chip) rgba(247, 181, 176, 0.2);
+      }
+
+      .pricing-list > li:nth-child(3) .pam-rows-scroll {
+        scrollbar-color: var(--pam-blue-chip) rgba(58, 90, 208, 0.15);
+      }
+
+      .benefits-list,
+      .pricing-features {
+        flex: none;
+      }
+
+      .pam-page-header {
+        margin-bottom: 2rem;
+      }
+
+      .benefits-list li,
+      .pricing-features li {
+        min-height: var(--pam-row-min-h);
+        padding: 0.65rem 1.25rem;
+        line-height: 1.35;
+      }
+
+      .benefits-list li {
+        font-size: var(--pam-row-font);
+      }
+
+      .pricing-features li {
+        font-size: var(--pam-plan-row-font);
+      }
+
+      .benefits-card__header,
+      .pricing-header {
+        padding: var(--pam-header-pad-y) var(--pam-header-pad-x);
+      }
+
+      .benefits-card__header h2 {
+        font-size: var(--pam-benefits-title);
+        margin-top: auto;
+        margin-bottom: 0;
+      }
+
+      .pricing-header h2 {
+        font-size: var(--pam-card-title);
+        margin-bottom: 0.45rem;
+      }
+
+      .benefits-card__spacer {
+        display: none;
+      }
+
+      .value {
+        font-size: var(--pam-price-value);
+      }
+
+      .currency {
+        font-size: var(--pam-price-currency);
+        margin-top: 0.55rem;
+      }
+
+      .duration {
+        font-size: var(--pam-price-duration);
+        margin-bottom: 0.2rem;
+      }
+
+      .pricing-features li {
+        font-size: var(--pam-plan-row-font);
+      }
+
+      .pricing-features em {
+        font-size: var(--pam-plan-row-font);
+      }
+
+      .benefits-card__footer,
+      .pricing-footer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.85rem 1rem 1rem;
+      }
+
+      .select {
+        max-width: none;
+        padding: 0.95rem 1rem;
+        font-size: var(--pam-btn-font);
+      }
+
+      .exclusive .pricing-wrapper > li.is-visible::before {
+        display: none;
+      }
+
+      .exclusive .pricing-wrapper > li.is-visible {
+        border: none;
+        box-shadow: none;
+      }
+
+      .pricing-list > li.exclusive:hover .pricing-wrapper > li.is-visible {
+        border: none;
+        box-shadow: none;
+      }
+    }
+
+    @media (max-width: 1023px) {
+      .pricing-container {
+        width: 92%;
+        padding: 0;
+      }
+
+      .pam-pricing-viewport,
+      .pam-pricing-scale__inner {
+        width: 100%;
+        overflow: visible;
+        transform: none !important;
+        margin-bottom: 0 !important;
+      }
+
+      .pam-pricing-viewport {
+        display: block;
+        margin-top: 1em;
+        margin-bottom: 0.75rem;
+      }
+
+      .pam-page-header {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.2rem;
+        margin-bottom: 2rem;
+      }
+
+      .pam-page-header__controls {
+        width: 100%;
+        align-items: center;
+        max-width: none;
+        gap: 1.25rem;
+      }
+
+      .pam-page-header__shapes {
+        display: block;
+        width: 100%;
+        max-width: 280px;
+        margin-inline: auto;
+      }
+
+      .pam-page-header .pricing-switcher {
+        grid-column: unset;
+        justify-self: auto;
+        text-align: center;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+
+      .pam-page-header h1 {
+        grid-column: unset;
+        max-width: none;
+        font-size: 2.4rem;
+      }
+
+      .pam-page-header__copy {
+        grid-column: unset;
+      }
+
+      .pam-page-header__spacer {
+        display: none;
+      }
+
+      .pam-pricing-mount {
+        width: 100%;
+      }
+
+      .pam-layout-desktop {
+        display: none !important;
+      }
+
+      .pam-mobile-carousel__track {
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scroll-behavior: smooth;
+        scroll-padding-inline: 6vw;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding: 0.5rem 0 0.75rem;
+        margin: 0 -4%;
+        width: calc(100% + 8%);
+      }
+
+      .pam-mobile-carousel__track::-webkit-scrollbar {
+        display: none;
+      }
+
+      .pam-mobile-plans {
+        display: flex;
+        flex-direction: row;
+        gap: 1rem;
+        padding: 0 6vw;
+        margin: 0;
+        list-style: none;
+        width: max-content;
+        min-width: 100%;
+      }
+
+      .pam-mobile-plan-item,
+      .pam-mobile-benefits-card {
+        flex: 0 0 88vw;
+        max-width: 400px;
+        scroll-snap-align: center;
+        list-style: none;
+        transition: transform 0.35s ease, opacity 0.35s ease;
+        opacity: 0.72;
+        transform: scale(0.96);
+      }
+
+      .pam-mobile-plan-item.is-carousel-active,
+      .pam-mobile-benefits-card.is-carousel-active {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      .pam-mobile-benefits-card__inner {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+        border-radius: 0;
+      }
+
+      .pam-mobile-benefits-card.is-carousel-active .pam-mobile-benefits-card__inner {
+        box-shadow: var(--card-shadow-hover);
+      }
+
+      .pam-mobile-benefits-card .benefits-card__header {
+        padding: 1.1rem 1.25rem 0.85rem;
+        background: var(--pam-lime);
+        color: #1D1D1B;
+        text-align: center;
+      }
+
+      .pam-mobile-benefits-card .benefits-card__header h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+      }
+
+      .pam-mobile-benefits-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .pam-mobile-benefits-list li {
+        padding: 0.85rem 1.1rem;
+        font-size: 1.35rem;
+        line-height: 1.35;
+        color: #1D1D1B;
+        text-align: left;
+        background: var(--pam-lime-row);
+        border-bottom: 1px solid #ffffff;
+      }
+
+      .pam-mobile-benefits-list li:last-child {
+        border-bottom: none;
+      }
+
+      .pam-mobile-plan-item .pricing-wrapper > li.is-visible {
+        display: flex;
+        flex-direction: column;
+        border-radius: 0;
+        overflow: hidden;
+        box-shadow: var(--card-shadow);
+      }
+
+      .pam-mobile-plan-item.is-carousel-active .pricing-wrapper > li.is-visible {
+        box-shadow: var(--card-shadow-hover);
+      }
+
+      .pam-mobile-carousel__dots {
+        display: flex;
+        justify-content: center;
+        gap: 0.75rem;
+        padding: 0.25rem 0 0.5rem;
+      }
+
+      .pam-mobile-carousel__dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        opacity: 0.35;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+      }
+
+      .pam-mobile-carousel__dot.is-active {
+        opacity: 1;
+        transform: scale(1.2);
+      }
+
+      .pam-mobile-carousel__dot--green { background: var(--pam-green); }
+      .pam-mobile-carousel__dot--pink { background: var(--pam-pink); }
+      .pam-mobile-carousel__dot--blue { background: var(--pam-blue); }
+
+      .pam-mobile-carousel__dot--lime { background: var(--pam-lime-chip); }
+
+      .pam-mobile-plan-item--green .pricing-header {
+        background: var(--pam-green);
+        color: #ffffff;
+      }
+
+      .pam-mobile-plan-item--green .pricing-header h2,
+      .pam-mobile-plan-item--green .pricing-header .value,
+      .pam-mobile-plan-item--green .pricing-header .currency,
+      .pam-mobile-plan-item--green .pricing-header .duration {
+        color: #ffffff;
+      }
+
+      .pam-mobile-plan-item--pink .pricing-header {
+        background: var(--pam-pink);
+        color: #1D1D1B;
+      }
+
+      .pam-mobile-plan-item--pink .pricing-header h2,
+      .pam-mobile-plan-item--pink .pricing-header .value,
+      .pam-mobile-plan-item--pink .pricing-header .currency,
+      .pam-mobile-plan-item--pink .pricing-header .duration {
+        color: #1D1D1B;
+      }
+
+      .pam-mobile-plan-item--blue .pricing-header {
+        background: var(--pam-blue);
+        color: #ffffff;
+      }
+
+      .pam-mobile-plan-item--blue .pricing-header h2,
+      .pam-mobile-plan-item--blue .pricing-header .value,
+      .pam-mobile-plan-item--blue .pricing-header .currency,
+      .pam-mobile-plan-item--blue .pricing-header .duration {
+        color: #ffffff;
+      }
+
+      .pam-mobile-plan-item .pricing-header {
+        padding: 1.1rem 1.25rem 0.85rem;
+      }
+
+      .pam-mobile-plan-item .pricing-header h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0 0 0.35rem;
+      }
+
+      .pam-mobile-plan-item .value {
+        font-size: 2.4rem;
+        font-weight: 700;
+      }
+
+      .pam-mobile-plan-item .currency {
+        font-size: 1.1rem;
+        margin-top: 0.35em;
+      }
+
+      .pam-mobile-plan-item .duration {
+        font-size: 1rem;
+        align-self: flex-end;
+      }
+
+      .pam-plan-benefits {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .pam-plan-benefit-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.85rem 1.1rem;
+        font-size: 1.35rem;
+        line-height: 1.35;
+        color: #1D1D1B;
+        border-bottom: 1px solid #ffffff;
+      }
+
+      .pam-mobile-plan-item--green .pam-plan-benefit-row {
+        background: var(--pam-green-row);
+      }
+
+      .pam-mobile-plan-item--pink .pam-plan-benefit-row {
+        background: var(--pam-pink-row);
+      }
+
+      .pam-mobile-plan-item--blue .pam-plan-benefit-row {
+        background: var(--pam-blue-row);
+      }
+
+      .pam-plan-benefit-row:last-child {
+        border-bottom: none;
+      }
+
+      .pam-plan-benefit-row__label {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: left;
+      }
+
+      .pam-plan-benefit-row__value {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .pam-plan-benefit-row__value em {
+        font-style: normal;
+        font-weight: 700;
+        font-size: 1.2rem;
+        min-width: 2.5em;
+        display: inline-block;
+        text-align: center;
+      }
+
+      .pam-mobile-plan-item .pricing-footer {
+        padding: 1rem 1.1rem;
+      }
+
+      .pam-mobile-plan-item .select {
+        width: 100%;
+        padding: 0.95rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 700;
+      }
+
+      .pam-mobile-plan-item--green .select {
+        background: var(--pam-green);
+        color: #ffffff;
+      }
+
+      .pam-mobile-plan-item--pink .select {
+        background: var(--pam-pink);
+        color: #1D1D1B;
+      }
+
+      .pam-mobile-plan-item--blue .select {
+        background: var(--pam-blue);
+        color: #ffffff;
+      }
+
+      .pricing-notes {
+        margin-top: 1.25rem;
+      }
+
+      .pricing-switcher .fieldset {
+        padding: 2px;
+        border-width: 1.5px;
+      }
+
+      .pricing-switcher label {
+        width: 62px;
+        height: 26px;
+        line-height: 26px;
+        font-size: 1rem;
+      }
+
+      .pricing-switcher .switch {
+        top: 2px;
+        left: 2px;
+        width: 62px;
+        height: 26px;
+      }
+
+      .pricing-switcher input#yearly-1:checked ~ .switch {
+        transform: translateX(62px);
+      }
+    }
+
+    .benefits-card {
+      grid-column: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: transparent;
+      border: none;
+      box-shadow: none;
+      overflow: hidden;
+      animation: cardEnter 0.7s ease both;
+    }
+
+    .benefits-card__header {
+      padding: var(--pam-header-pad-y) var(--pam-header-pad-x);
+      text-align: left;
+      border-bottom: none;
+      background: var(--pam-lime);
+      color: #1D1D1B;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }
+
+    .benefits-card__header h2,
+    .pricing-header h2 {
+      margin: 0 0 0.45rem;
+      font-size: var(--pam-card-title);
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+      flex-shrink: 0;
+    }
+
+    .benefits-card__header h2 {
+      color: #1D1D1B;
+      text-align: left;
+      width: 100%;
+      font-weight: 700;
+      font-size: var(--pam-benefits-title);
+      margin-top: auto;
+      margin-bottom: 0;
+    }
+
+    .pricing-header h2 {
+      text-align: left;
+      width: 100%;
+      font-weight: 700;
+    }
+
+    .benefits-card__spacer {
+      display: none;
+    }
+
+    .benefits-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .benefits-list li,
+    .pricing-features li {
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+      min-height: var(--pam-row-min-h);
+      padding: 0.65rem 1.25rem;
+      font-size: var(--pam-row-font);
+      line-height: 1.35;
+      color: #1D1D1B;
+      border-bottom: none;
+      transition: background 0.22s ease;
+    }
+
+    .benefits-list li {
+      justify-content: flex-start;
+      text-align: left;
+      background: var(--pam-lime-row);
+      border-bottom: 1px solid #ffffff;
+    }
+
+    .pricing-features li {
+      justify-content: center;
+      padding-left: 1.6em;
+      padding-right: 1.6em;
+      white-space: normal;
+      word-wrap: break-word;
+      font-size: var(--pam-plan-row-font);
+    }
+
+    .benefits-list li:last-child,
+    .pricing-features li:last-child {
+      border-bottom: none;
+    }
+
+    .pam-benefit-row.is-row-hover {
+      box-shadow: none;
+    }
+
+    .benefits-card .pam-benefit-row.is-row-hover {
+      background: var(--pam-lime-row-hover);
+    }
+
+    .benefits-card__footer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 0.85rem 1rem 1rem;
+      border-top: none;
+      box-sizing: border-box;
+      background: transparent;
+    }
+
+    .benefits-card__footer svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 72px;
+    }
+
+    @media (min-width: 1024px) {
+      .benefits-card__header {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: flex-start;
+      }
+
+      .pricing-header {
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: flex-start;
+      }
+
+      .benefits-card__spacer {
+        display: none;
+      }
+    }
+
+    /* Pricing grid — siempre 3 columnas de planes junto a beneficios */
+
+    .pricing-list > li:nth-child(1) { animation-delay: 0.1s; }
+    .pricing-list > li:nth-child(2) { animation-delay: 0.22s; }
+    .pricing-list > li:nth-child(3) { animation-delay: 0.34s; }
+
+    @keyframes cardEnter {
+      from {
+        opacity: 0;
+        transform: translateY(28px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Card wrapper & flip */
+    .pricing-wrapper {
+      position: relative;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+      perspective: 2000px;
+    }
+
+    @media (min-width: 1024px) {
+      .pricing-wrapper {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        max-height: 100%;
+        overflow: hidden;
+      }
+    }
+
+    .pricing-wrapper > li {
+      display: flex;
+      flex-direction: column;
+      background-color: transparent;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      overflow: hidden;
+      backface-visibility: hidden;
+      transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+    }
+
+    @media (min-width: 1024px) {
+      .pricing-wrapper > li.is-visible {
+        height: 100%;
+        min-height: 0;
+      }
+    }
+
+    .pricing-wrapper > li::after {
+      display: none;
+    }
+
+    .pricing-list > li:hover .pricing-wrapper > li.is-visible {
+      transform: none;
+    }
+
+    /* Card header */
+    .pricing-header {
+      padding: var(--pam-header-pad-y) var(--pam-header-pad-x);
+      text-align: left;
+      border-bottom: none;
+    }
+
+    .pricing-list > li:nth-child(1) .pricing-header {
+      background: var(--pam-green);
+      color: #ffffff;
+    }
+
+    .pricing-list > li:nth-child(2) .pricing-header {
+      background: var(--pam-pink);
+      color: #1D1D1B;
+    }
+
+    .pricing-list > li:nth-child(3) .pricing-header {
+      background: var(--pam-blue);
+      color: #ffffff;
+    }
+
+    .exclusive .pricing-wrapper > li.is-visible {
+      border: none;
+      box-shadow: none;
+    }
+
+    .exclusive .pricing-wrapper > li.is-visible::before {
+      display: none;
+    }
+
+    .pricing-wrapper.is-switched .is-visible {
+      transform: rotateY(180deg);
+      animation: rotate 0.5s;
+    }
+
+    .pricing-wrapper.is-switched .is-hidden {
+      transform: rotateY(0);
+      animation: rotate-inverse 0.5s;
+      opacity: 0;
+    }
+
+    .pricing-wrapper.is-switched .is-selected {
+      opacity: 1;
+    }
+
+    .pricing-wrapper.is-switched.reverse-animation .is-visible {
+      transform: rotateY(-180deg);
+      animation: rotate-back 0.5s;
+    }
+
+    .pricing-wrapper.is-switched.reverse-animation .is-hidden {
+      transform: rotateY(0);
+      animation: rotate-inverse-back 0.5s;
+      opacity: 0;
+    }
+
+    .pricing-wrapper.is-switched.reverse-animation .is-selected {
+      opacity: 1;
+    }
+
+    .pricing-wrapper .is-visible {
+      position: relative;
+      z-index: 5;
+    }
+
+    .pricing-wrapper .is-hidden {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+      transform: rotateY(180deg);
+    }
+
+    .pricing-wrapper .is-selected {
+      z-index: 3 !important;
+    }
+
+    .pricing-list > li:nth-child(1) .pricing-header h2,
+    .pricing-list > li:nth-child(1) .pricing-header .value,
+    .pricing-list > li:nth-child(1) .pricing-header .currency,
+    .pricing-list > li:nth-child(1) .pricing-header .duration {
+      color: #ffffff;
+    }
+
+    .pricing-list > li:nth-child(2) .pricing-header h2,
+    .pricing-list > li:nth-child(2) .pricing-header .value,
+    .pricing-list > li:nth-child(2) .pricing-header .currency,
+    .pricing-list > li:nth-child(2) .pricing-header .duration {
+      color: #1D1D1B;
+    }
+
+    .pricing-list > li:nth-child(3) .pricing-header h2,
+    .pricing-list > li:nth-child(3) .pricing-header .value,
+    .pricing-list > li:nth-child(3) .pricing-header .currency,
+    .pricing-list > li:nth-child(3) .pricing-header .duration {
+      color: #ffffff;
+    }
+
+    .price {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 0.15em;
+      line-height: 1;
+      width: 100%;
+    }
+
+    .currency {
+      margin-top: 0.55rem;
+      font-size: var(--pam-price-currency);
+      font-weight: 700;
+    }
+
+    .value {
+      font-size: var(--pam-price-value);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .duration {
+      align-self: flex-end;
+      margin-bottom: 0.2rem;
+      font-size: var(--pam-price-duration);
+      font-weight: 700;
+      text-transform: capitalize;
+      letter-spacing: 0;
+    }
+
+    .duration::before {
+      content: '/';
+      margin-right: 2px;
+    }
+
+    /* Features list — scroll sincronizado entre las 4 columnas (web) */
+    .pricing-body {
+      padding: 0;
+      overflow: visible;
+    }
+
+    @media (min-width: 1024px) {
+      .pricing-body {
+        flex: 1 1 0%;
+        min-height: 0;
+        max-height: 100%;
+      }
+
+      .pricing-body.pam-rows-scroll {
+        overflow-y: scroll;
+        overflow-x: hidden;
+      }
+    }
+
+    .pricing-features {
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .pricing-features em {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: auto;
+      padding: 0;
+      font-size: var(--pam-plan-row-font);
+      font-weight: 700;
+      font-style: normal;
+      text-align: center;
+      color: inherit;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .pricing-list > li:nth-child(1) .pricing-features li {
+      background: var(--pam-green-row);
+      color: #1D1D1B;
+      border-bottom: 1px solid #ffffff;
+    }
+
+    .pricing-list > li:nth-child(2) .pricing-features li {
+      background: var(--pam-pink-row);
+      color: #1D1D1B;
+      border-bottom: 1px solid #ffffff;
+    }
+
+    .pricing-list > li:nth-child(3) .pricing-features li {
+      background: var(--pam-blue-row);
+      color: #1D1D1B;
+      border-bottom: 1px solid #ffffff;
+    }
+
+    .pricing-list > li:nth-child(1) .pricing-features li.pam-benefit-row.is-row-hover {
+      background: var(--pam-green-row-hover);
+    }
+
+    .pricing-list > li:nth-child(2) .pricing-features li.pam-benefit-row.is-row-hover {
+      background: var(--pam-pink-row-hover);
+    }
+
+    .pricing-list > li:nth-child(3) .pricing-features li.pam-benefit-row.is-row-hover {
+      background: var(--pam-blue-row-hover);
+    }
+
+    /* CTA */
+    .pricing-footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.85rem 1rem 1rem;
+      text-align: center;
+      border-top: none;
+      box-sizing: border-box;
+      background: transparent;
+    }
+
+    .select {
+      display: block;
+      width: 100%;
+      max-width: none;
+      padding: 0.95rem 1rem;
+      font-family: 'BentonSansFB', sans-serif;
+      font-size: var(--pam-btn-font);
+      font-weight: 700;
+      border: none;
+      border-radius: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+
+    .pricing-list > li:nth-child(1) .select {
+      color: #1D1D1B;
+      background: var(--pam-green);
+      border-color: var(--pam-green);
+    }
+
+    .pricing-list > li:nth-child(1) .select:hover {
+      background: var(--pam-green-chip);
+      border-color: var(--pam-green-chip);
+    }
+
+    .pricing-list > li:nth-child(2) .select {
+      color: #1D1D1B;
+      background: var(--pam-pink);
+      border-color: var(--pam-pink);
+    }
+
+    .pricing-list > li:nth-child(2) .select:hover {
+      background: var(--pam-pink-chip);
+      border-color: var(--pam-pink-chip);
+    }
+
+    .pricing-list > li:nth-child(3) .select {
+      color: #ffffff;
+      background: var(--pam-blue);
+      border-color: var(--pam-blue);
+    }
+
+    .pricing-list > li:nth-child(3) .select:hover {
+      background: var(--pam-blue-chip);
+      border-color: var(--pam-blue-chip);
+    }
+
+    /* Notes — siempre al final del bloque de precios */
+    .pricing-notes {
+      flex-shrink: 0;
+      width: 100%;
+      margin: 1.75em auto 0;
+      padding: 1.6em 2em;
+      font-size: 1.35rem;
+      line-height: 1.55;
+      color: var(--notes-text);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      box-shadow: var(--card-shadow);
+    }
+
+    .pricing-notes p {
+      margin: 0;
+    }
+
+    .pricing-notes p + p {
+      margin-top: 0.4em;
+    }
+
+    .pricing-notes p:last-child {
+      margin-top: 0.8em;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* Flip keyframes */
+    @keyframes rotate {
+      0% { transform: perspective(2000px) rotateY(0); }
+      70% { transform: perspective(2000px) rotateY(200deg); }
+      100% { transform: perspective(2000px) rotateY(180deg); }
+    }
+
+    @keyframes rotate-inverse {
+      0% { transform: perspective(2000px) rotateY(-180deg); }
+      70% { transform: perspective(2000px) rotateY(20deg); }
+      100% { transform: perspective(2000px) rotateY(0); }
+    }
+
+    @keyframes rotate-back {
+      0% { transform: perspective(2000px) rotateY(0); }
+      70% { transform: perspective(2000px) rotateY(-200deg); }
+      100% { transform: perspective(2000px) rotateY(-180deg); }
+    }
+
+    @keyframes rotate-inverse-back {
+      0% { transform: perspective(2000px) rotateY(180deg); }
+      70% { transform: perspective(2000px) rotateY(-20deg); }
+      100% { transform: perspective(2000px) rotateY(0); }
+    }
+
+    @media (min-width: 1024px) {
+      .pam-page-header {
+        margin-top: 0.5rem;
+      }
+    }
+
+    @media (max-width: 699px) {
+      .theme-toggle {
+        top: 1rem;
+        right: 1rem;
+        width: 40px;
+        height: 40px;
+      }
+
+      .pam-page-header {
+        margin-top: 3.5rem;
+      }
+
+      .pricing-switcher label {
+        width: 56px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 0.95rem;
+      }
+
+      .pricing-switcher .switch {
+        width: 56px;
+        height: 24px;
+      }
+
+      .pricing-switcher input#yearly-1:checked ~ .switch {
+        transform: translateX(56px);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Registration modal */
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .pam-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.6rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .pam-modal.is-open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .pam-modal__backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 16, 24, 0.65);
+      backdrop-filter: blur(4px);
+    }
+
+    .pam-modal__dialog {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 640px;
+      max-height: min(90vh, 820px);
+      display: flex;
+      flex-direction: column;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(16px) scale(0.98);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .pam-modal.is-open .pam-modal__dialog {
+      transform: translateY(0) scale(1);
+    }
+
+    .pam-modal__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.6em 1.6em 1em;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, var(--accent-soft) 0%, transparent 100%);
+    }
+
+    .pam-modal__header h2 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .pam-modal__header p {
+      margin: 0.4em 0 0;
+      font-size: 1.35rem;
+      color: var(--text-muted);
+    }
+
+    .pam-modal__close {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 2rem;
+      line-height: 1;
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition);
+    }
+
+    .pam-modal__close:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .pam-modal__body {
+      padding: 1.4em 1.6em;
+      overflow-y: auto;
+    }
+
+    .pam-form {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.2em;
+    }
+
+    @media (min-width: 560px) {
+      .pam-form {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .pam-form__full {
+        grid-column: 1 / -1;
+      }
+    }
+
+    .pam-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4em;
+    }
+
+    .pam-field label {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    .pam-field label span {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .pam-field input,
+    .pam-field select,
+    .pam-field textarea {
+      width: 100%;
+      padding: 0.75em 0.9em;
+      font-family: 'BentonSansFB', sans-serif;
+      font-size: 1.4rem;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .pam-field input:focus,
+    .pam-field select:focus,
+    .pam-field textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .pam-field input.is-invalid,
+    .pam-field select.is-invalid,
+    .pam-field textarea.is-invalid {
+      border-color: #e05c5c;
+    }
+
+    .pam-field textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .pam-field__error {
+      display: none;
+      font-size: 1.2rem;
+      color: #e05c5c;
+    }
+
+    .pam-field.has-error .pam-field__error {
+      display: block;
+    }
+
+    .pam-field--checkbox {
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 0.75em;
+    }
+
+    .pam-field--checkbox input[type="checkbox"] {
+      width: auto;
+      margin-top: 0.3em;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+    }
+
+    .pam-field--checkbox label {
+      font-weight: 400;
+      font-size: 1.2rem;
+      line-height: 1.45;
+    }
+
+    .pam-field--checkbox label a {
+      color: var(--accent);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .pam-field--checkbox label a:hover {
+      text-decoration: none;
+    }
+
+    .pam-field--checkbox .pam-field__error {
+      flex-basis: 100%;
+      margin-left: 1.75em;
+    }
+
+    .pam-modal__footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8em;
+      padding: 1.2em 1.6em 1.6em;
+      border-top: 1px solid var(--border);
+    }
+
+    .pam-btn {
+      flex: 1;
+      min-width: 140px;
+      padding: 1em 1.4em;
+      font-family: 'BentonSansFB', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition), transform var(--transition);
+    }
+
+    .pam-btn--primary {
+      color: var(--text-on-accent);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .pam-btn--primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .pam-btn--primary:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .pam-btn--ghost {
+      color: var(--text-muted);
+      background: transparent;
+      border-color: var(--border);
+    }
+
+    .pam-btn--ghost:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    /* Modal — tema por plan (Amigo / Comunidad / Círculo) */
+    .pam-modal--plan-green {
+      --pam-modal-accent: var(--pam-green);
+      --pam-modal-accent-hover: var(--pam-green-chip);
+      --pam-modal-accent-soft: var(--pam-green-row);
+      --pam-modal-on-accent: #ffffff;
+      --pam-modal-header-text: #ffffff;
+      --pam-modal-close-border: rgba(255, 255, 255, 0.45);
+    }
+
+    .pam-modal--plan-pink {
+      --pam-modal-accent: var(--pam-pink);
+      --pam-modal-accent-hover: var(--pam-pink-chip);
+      --pam-modal-accent-soft: var(--pam-pink-row);
+      --pam-modal-on-accent: #1D1D1B;
+      --pam-modal-header-text: #1D1D1B;
+      --pam-modal-close-border: rgba(26, 43, 60, 0.25);
+    }
+
+    .pam-modal--plan-blue {
+      --pam-modal-accent: var(--pam-blue);
+      --pam-modal-accent-hover: var(--pam-blue-chip);
+      --pam-modal-accent-soft: var(--pam-blue-row);
+      --pam-modal-on-accent: #ffffff;
+      --pam-modal-header-text: #ffffff;
+      --pam-modal-close-border: rgba(255, 255, 255, 0.45);
+    }
+
+    .pam-modal--plan-green .pam-modal__dialog,
+    .pam-modal--plan-pink .pam-modal__dialog,
+    .pam-modal--plan-blue .pam-modal__dialog {
+      border-color: var(--pam-modal-accent);
+    }
+
+    .pam-modal--plan-green .pam-modal__header,
+    .pam-modal--plan-pink .pam-modal__header,
+    .pam-modal--plan-blue .pam-modal__header {
+      background: var(--pam-modal-accent);
+      border-bottom-color: rgba(255, 255, 255, 0.28);
+    }
+
+    .pam-modal--plan-green .pam-modal__header h2,
+    .pam-modal--plan-pink .pam-modal__header h2,
+    .pam-modal--plan-blue .pam-modal__header h2,
+    .pam-modal--plan-green .pam-modal__header p,
+    .pam-modal--plan-pink .pam-modal__header p,
+    .pam-modal--plan-blue .pam-modal__header p {
+      color: var(--pam-modal-header-text);
+    }
+
+    .pam-modal--plan-green .pam-modal__close,
+    .pam-modal--plan-pink .pam-modal__close,
+    .pam-modal--plan-blue .pam-modal__close {
+      border-color: var(--pam-modal-close-border);
+      color: var(--pam-modal-header-text);
+    }
+
+    .pam-modal--plan-green .pam-modal__close:hover,
+    .pam-modal--plan-blue .pam-modal__close:hover {
+      color: #ffffff;
+      border-color: #ffffff;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .pam-modal--plan-pink .pam-modal__close:hover {
+      color: #1D1D1B;
+      border-color: #1D1D1B;
+      background: rgba(26, 43, 60, 0.08);
+    }
+
+    .pam-modal--plan-green .pam-modal__body,
+    .pam-modal--plan-pink .pam-modal__body,
+    .pam-modal--plan-blue .pam-modal__body,
+    .pam-modal--plan-green .pam-modal__footer,
+    .pam-modal--plan-pink .pam-modal__footer,
+    .pam-modal--plan-blue .pam-modal__footer {
+      background: var(--pam-modal-accent-soft);
+    }
+
+    .pam-modal--plan-green .pam-modal__footer,
+    .pam-modal--plan-pink .pam-modal__footer,
+    .pam-modal--plan-blue .pam-modal__footer {
+      border-top-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .pam-modal--plan-green .pam-field input:focus,
+    .pam-modal--plan-green .pam-field select:focus,
+    .pam-modal--plan-green .pam-field textarea:focus,
+    .pam-modal--plan-pink .pam-field input:focus,
+    .pam-modal--plan-pink .pam-field select:focus,
+    .pam-modal--plan-pink .pam-field textarea:focus,
+    .pam-modal--plan-blue .pam-field input:focus,
+    .pam-modal--plan-blue .pam-field select:focus,
+    .pam-modal--plan-blue .pam-field textarea:focus {
+      border-color: var(--pam-modal-accent);
+      box-shadow: 0 0 0 3px var(--pam-modal-accent-soft);
+    }
+
+    .pam-modal--plan-green .pam-field--checkbox input[type="checkbox"],
+    .pam-modal--plan-pink .pam-field--checkbox input[type="checkbox"],
+    .pam-modal--plan-blue .pam-field--checkbox input[type="checkbox"] {
+      accent-color: var(--pam-modal-accent);
+    }
+
+    .pam-modal--plan-green .pam-field--checkbox label a,
+    .pam-modal--plan-pink .pam-field--checkbox label a,
+    .pam-modal--plan-blue .pam-field--checkbox label a {
+      color: var(--pam-modal-accent);
+    }
+
+    .pam-modal--plan-green .pam-btn--primary,
+    .pam-modal--plan-pink .pam-btn--primary,
+    .pam-modal--plan-blue .pam-btn--primary {
+      color: var(--pam-modal-on-accent);
+      background: var(--pam-modal-accent);
+      border-color: var(--pam-modal-accent);
+    }
+
+    .pam-modal--plan-green .pam-btn--primary:hover:not(:disabled),
+    .pam-modal--plan-pink .pam-btn--primary:hover:not(:disabled),
+    .pam-modal--plan-blue .pam-btn--primary:hover:not(:disabled) {
+      background: var(--pam-modal-accent-hover);
+      border-color: var(--pam-modal-accent-hover);
+    }
+
+    .pam-form__notice {
+      margin: 0;
+      font-size: 1.25rem;
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+
+    /* Modo embed (iframe en WordPress u otros sitios) */
+    html[data-embed="true"],
+    html[data-embed="true"] body,
+    html[data-embed="true"] .pam-pricing-page {
+      overflow: hidden;
+      min-height: 0 !important;
+      height: auto !important;
+    }
+
+    [data-embed="true"] .theme-toggle {
+      display: none;
+    }
+
+    [data-embed="true"] .pam-pricing-viewport,
+    [data-embed="true"] .pam-pricing-scale__inner {
+      overflow: visible;
+      height: auto;
+      min-height: 0;
+    }
+
+    @media (min-width: 1024px) {
+      [data-embed="true"] .pam-pricing-layout {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+      }
+
+      [data-embed="true"] .benefits-card,
+      [data-embed="true"] .pricing-wrapper,
+      [data-embed="true"] .pricing-wrapper > li.is-visible,
+      [data-embed="true"] .pricing-list > li {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+      }
+
+      [data-embed="true"] .pam-rows-scroll,
+      [data-embed="true"] .pricing-body.pam-rows-scroll {
+        overflow: visible !important;
+        max-height: none !important;
+        flex: none !important;
+      }
+
+      [data-embed="true"] .pricing-list {
+        height: auto !important;
+        max-height: none !important;
+      }
+    }
+  </style>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('embed') === '1' || window.self !== window.top) {
+        document.documentElement.setAttribute('data-embed', 'true');
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
+</head>
+
+<body>
+
+  <button class="theme-toggle" id="theme-toggle" aria-label="Cambiar tema claro/oscuro">
+    <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0-5v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42m12.72-12.72 1.42-1.42" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <main class="pam-pricing-page">
+    <div class="pricing-container has-margins">
+      <div class="pam-pricing-viewport">
+        <div class="pam-pricing-scale__inner">
+      <header class="pam-page-header">
+        <h1>Programa Amigos del Museo</h1>
+        <div class="pam-page-header__copy">
+          <p class="pam-page-header__lead"><strong>¿Te animas a ser parte del arte?</strong></p>
+          <p class="pam-page-header__sub">Inicia tu suscripción y forma parte de la comunidad que apoya al Museo de Arte de Lima.</p>
+        </div>
+        <div class="pam-page-header__spacer" aria-hidden="true"></div>
+        <div class="pam-page-header__controls">
+          <div class="pam-page-header__shapes" id="pam-header-shapes" aria-hidden="true"></div>
+        <div class="pricing-switcher">
+          <p class="fieldset">
+            <input type="radio" name="duration-1" value="monthly" id="monthly-1" checked>
+            <label for="monthly-1">Mensual</label>
+
+            <input type="radio" name="duration-1" value="yearly" id="yearly-1">
+            <label for="yearly-1">Anual</label>
+
+            <span class="switch"></span>
+          </p>
+        </div>
+        </div>
+      </header>
+
+      <div id="pam-pricing-mount" class="pam-pricing-mount"></div>
+        </div>
+      </div>
+
+      <div class="pricing-notes" id="pam-pricing-notes"></div>
+    </div>
+  </main>
+
+  <div class="pam-modal" id="pam-registro-modal" role="dialog" aria-modal="true" aria-labelledby="pam-modal-title" hidden>
+    <div class="pam-modal__backdrop" data-close-modal></div>
+    <div class="pam-modal__dialog">
+      <header class="pam-modal__header">
+        <div>
+          <h2 id="pam-modal-title">Datos de registro</h2>
+          <p id="pam-modal-subtitle">Completa tus datos para continuar al pago.</p>
+        </div>
+        <button type="button" class="pam-modal__close" data-close-modal aria-label="Cerrar">&times;</button>
+      </header>
+
+      <div class="pam-modal__body">
+        <form class="pam-form" id="pam-registro-form" novalidate>
+          <div class="pam-field">
+            <label for="reg-nombres">Nombres <span>*</span></label>
+            <input type="text" id="reg-nombres" name="nombres" autocomplete="given-name" required>
+            <span class="pam-field__error">Ingresa tus nombres.</span>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-apellidos">Apellidos <span>*</span></label>
+            <input type="text" id="reg-apellidos" name="apellidos" autocomplete="family-name" required>
+            <span class="pam-field__error">Ingresa tus apellidos.</span>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-dni">DNI <span>*</span></label>
+            <input type="text" id="reg-dni" name="dni" inputmode="numeric" maxlength="8" pattern="[0-9]{8}" autocomplete="off" required>
+            <span class="pam-field__error">Ingresa un DNI válido de 8 dígitos.</span>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-celular">Celular <span>*</span></label>
+            <input type="tel" id="reg-celular" name="celular" inputmode="tel" autocomplete="tel" placeholder="Ej. 987 654 321" required>
+            <span class="pam-field__error">Ingresa un celular válido.</span>
+          </div>
+
+          <div class="pam-field pam-form__full">
+            <label for="reg-correo">Correo electrónico <span>*</span></label>
+            <input type="email" id="reg-correo" name="correo" autocomplete="email" required>
+            <span class="pam-field__error">Ingresa un correo válido.</span>
+          </div>
+
+          <div class="pam-field pam-form__full">
+            <label for="reg-direccion">Dirección <span>*</span></label>
+            <input type="text" id="reg-direccion" name="direccion" autocomplete="street-address" required>
+            <span class="pam-field__error">Ingresa tu dirección.</span>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-ciudad">Ciudad <span>*</span></label>
+            <input type="text" id="reg-ciudad" name="ciudad" autocomplete="address-level2" required>
+            <span class="pam-field__error">Ingresa tu ciudad.</span>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-distrito">Distrito</label>
+            <input type="text" id="reg-distrito" name="distrito" autocomplete="address-level3">
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-genero">Género</label>
+            <select id="reg-genero" name="genero">
+              <option value="">Seleccionar</option>
+              <option value="Femenino">Femenino</option>
+              <option value="Masculino">Masculino</option>
+              <option value="No binario">No binario</option>
+              <option value="Prefiero no decir">Prefiero no decir</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+
+          <div class="pam-field">
+            <label for="reg-nacimiento">Fecha de nacimiento</label>
+            <input type="date" id="reg-nacimiento" name="fecha_nacimiento">
+          </div>
+
+          <div class="pam-field pam-form__full">
+            <label for="reg-origen">¿Cómo te enteraste de nosotros? <span>*</span></label>
+            <select id="reg-origen" name="como_te_enteraste" required>
+              <option value="">Seleccionar una opción</option>
+              <option value="Tienda MALI">Tienda MALI</option>
+              <option value="Redes sociales">Redes sociales (RRSS)</option>
+              <option value="Cursos MALI">Cursos MALI</option>
+              <option value="Conversatorios">Conversatorios</option>
+              <option value="Recomendación de un amigo">Recomendación de un amigo</option>
+              <option value="Web mali.pe">Web mali.pe</option>
+              <option value="Visita al museo">Visita al museo</option>
+              <option value="Prensa o medios">Prensa o medios</option>
+              <option value="Otro">Otro</option>
+            </select>
+            <span class="pam-field__error">Selecciona una opción.</span>
+          </div>
+
+          <div class="pam-field pam-form__full" id="reg-origen-otro-wrap" hidden>
+            <label for="reg-origen-otro">Cuéntanos cómo te enteraste</label>
+            <input type="text" id="reg-origen-otro" name="como_te_enteraste_otro">
+          </div>
+
+          <div class="pam-field pam-field--checkbox pam-form__full">
+            <input type="checkbox" id="reg-privacidad" name="acepta_privacidad" value="1" required>
+            <label for="reg-privacidad">
+              Acepto los
+              <a href="https://mali.pe/es/wp-content/uploads/2026/06/Terminosycondiciones_PAM_2026.pdf" target="_blank" rel="noopener noreferrer">términos y condiciones del Programa Amigos del MALI</a>.
+              <span>*</span>
+            </label>
+            <span class="pam-field__error">Debes aceptar los términos y condiciones del Programa Amigos del MALI.</span>
+          </div>
+
+          <p class="pam-form__notice pam-form__full">Los campos marcados con <span>*</span> son obligatorios. Serás redirigido a Mercado Pago para completar tu suscripción.</p>
+        </form>
+      </div>
+
+      <footer class="pam-modal__footer">
+        <button type="button" class="pam-btn pam-btn--ghost" data-close-modal>Cancelar</button>
+        <button type="submit" class="pam-btn pam-btn--primary" form="pam-registro-form" id="pam-registro-submit">Continuar al pago</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="pam-shapes.js"></script>
+  <script src="../shared/widget-api.js"></script>
+  <script src="pam-render.js"></script>
+  <script>
+    (function initPamEmbedResize() {
+      if (document.documentElement.getAttribute('data-embed') !== 'true') return;
+
+      var notifyTimer;
+      var stabilizeTimer;
+      var lastSentHeight = 0;
+      var EMBED_HEIGHT_BUFFER = 8;
+
+      function isContentReady() {
+        var mount = document.getElementById('pam-pricing-mount');
+        return !!(mount && mount.children.length > 0);
+      }
+
+      function getMeasureRoot() {
+        return document.querySelector('.pricing-container')
+          || document.querySelector('.pam-pricing-page');
+      }
+
+      function measureEmbedHeight(extraHeight) {
+        var root = getMeasureRoot();
+        var height = 0;
+
+        if (root) {
+          var rect = root.getBoundingClientRect();
+          height = rect.bottom + window.scrollY;
+        }
+
+        if (extraHeight) {
+          height = Math.max(height, extraHeight);
+        }
+
+        return Math.ceil(height) + EMBED_HEIGHT_BUFFER;
+      }
+
+      function postHeight(height) {
+        if (window.parent === window || height <= 0) return;
+        if (lastSentHeight > 0 && Math.abs(height - lastSentHeight) < 3) return;
+        lastSentHeight = height;
+        window.parent.postMessage(
+          { type: 'pam-iframe-resize', height: height },
+          '*'
+        );
+      }
+
+      function scheduleStableNotify(extraHeight) {
+        clearTimeout(stabilizeTimer);
+        stabilizeTimer = setTimeout(function () {
+          if (!isContentReady() && !extraHeight) {
+            scheduleStableNotify(extraHeight);
+            return;
+          }
+
+          requestAnimationFrame(function () {
+            var first = measureEmbedHeight(extraHeight);
+
+            setTimeout(function () {
+              requestAnimationFrame(function () {
+                var second = measureEmbedHeight(extraHeight);
+
+                if (Math.abs(first - second) > 6) {
+                  scheduleStableNotify(extraHeight);
+                  return;
+                }
+
+                postHeight(second);
+              });
+            }, 180);
+          });
+        }, 80);
+      }
+
+      function notifyParentHeight(extraHeight) {
+        if (window.parent === window) return;
+        clearTimeout(notifyTimer);
+        notifyTimer = setTimeout(function () {
+          scheduleStableNotify(extraHeight);
+        }, 40);
+      }
+
+      window.notifyPamIframeHeight = notifyParentHeight;
+
+      window.addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'pam-iframe-request-height') {
+          scheduleStableNotify();
+        }
+      });
+
+      window.addEventListener('load', function () {
+        scheduleStableNotify();
+      });
+
+      window.addEventListener('resize', function () {
+        lastSentHeight = 0;
+        notifyParentHeight();
+      });
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', function () {
+          lastSentHeight = 0;
+          notifyParentHeight();
+        });
+      }
+
+      if (typeof ResizeObserver !== 'undefined') {
+        var resizeObserver = new ResizeObserver(function () {
+          if (isContentReady()) {
+            notifyParentHeight();
+          }
+        });
+
+        var measureRoot = getMeasureRoot();
+        if (measureRoot) {
+          resizeObserver.observe(measureRoot);
+        }
+      }
+
+      var pricingMountEl = document.getElementById('pam-pricing-mount');
+      if (pricingMountEl && typeof MutationObserver !== 'undefined') {
+        var mountObserver = new MutationObserver(function () {
+          if (isContentReady()) {
+            scheduleStableNotify();
+          }
+        });
+        mountObserver.observe(pricingMountEl, { childList: true, subtree: true });
+      }
+    })();
+
+    (function initTheme() {
+      var isEmbed = document.documentElement.getAttribute('data-embed') === 'true';
+      var theme;
+
+      if (isEmbed) {
+        theme = 'light';
+      } else {
+        var saved = localStorage.getItem('pam-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        theme = saved || (prefersDark ? 'dark' : 'light');
+      }
+
+      document.documentElement.setAttribute('data-theme', theme);
+
+      document.getElementById('theme-toggle').addEventListener('click', function () {
+        if (isEmbed) return;
+
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('pam-theme', next);
+      });
+    })();
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var headerShapes = document.getElementById('pam-header-shapes');
+      if (headerShapes && typeof getPamShapesSvg === 'function') {
+        headerShapes.innerHTML = getPamShapesSvg('pam-shapes-glow-header');
+      }
+
+      maliWidgetFetch('/pam/config').then(function (data) {
+        window.PAM_DATA = data;
+        PamRender.mount(document.getElementById('pam-pricing-mount'), window.PAM_DATA);
+        PamRender.renderNotes(window.PAM_DATA, document.getElementById('pam-pricing-notes'));
+
+        bouncyFilter(document.querySelectorAll('.pricing-container'));
+        initRegistroModal();
+        initMobileBenefitLabels();
+        initSyncedRowHover();
+        initPamScrollAreas();
+        PamRender.initMobileCarousel();
+        requestAnimationFrame(function () {
+          applyPamViewportSize();
+          syncPamLayout();
+          updatePamScale();
+          refreshMobileBenefitTooltips();
+          if (typeof window.notifyPamIframeHeight === 'function') {
+            window.notifyPamIframeHeight();
+          }
+        });
+      }).catch(function (err) {
+        console.error('No se pudo cargar configuración PAM', err);
+      });
+
+      function initRegistroModal() {
+        // URL del Web App de Google Apps Script (ver mali/pam/google-apps-script/Code.gs)
+        var PAM_REGISTRO_API = location.origin + '/api/widgets/pam/registrations';
+        var modal = document.getElementById('pam-registro-modal');
+        var form = document.getElementById('pam-registro-form');
+        var subtitle = document.getElementById('pam-modal-subtitle');
+        var submitBtn = document.getElementById('pam-registro-submit');
+        var origenSelect = document.getElementById('reg-origen');
+        var origenOtroWrap = document.getElementById('reg-origen-otro-wrap');
+        var pendingCheckout = { url: '', plan: '', billing: '' };
+        var modalPlanThemes = ['pam-modal--plan-green', 'pam-modal--plan-pink', 'pam-modal--plan-blue'];
+
+        function setModalPlanTheme(btn) {
+          var themeClass = modalPlanThemes[0];
+          var mobilePlan = btn.closest('.pam-mobile-plan-item');
+
+          if (mobilePlan) {
+            if (mobilePlan.classList.contains('pam-mobile-plan-item--green')) {
+              themeClass = 'pam-modal--plan-green';
+            } else if (mobilePlan.classList.contains('pam-mobile-plan-item--pink')) {
+              themeClass = 'pam-modal--plan-pink';
+            } else if (mobilePlan.classList.contains('pam-mobile-plan-item--blue')) {
+              themeClass = 'pam-modal--plan-blue';
+            }
+          } else {
+            var planColumn = btn.closest('.pricing-wrapper');
+            planColumn = planColumn ? planColumn.parentElement : null;
+
+            if (planColumn && planColumn.parentElement) {
+              var index = Array.prototype.indexOf.call(planColumn.parentElement.children, planColumn);
+              if (index >= 0 && index < modalPlanThemes.length) {
+                themeClass = modalPlanThemes[index];
+              }
+            }
+          }
+
+          modalPlanThemes.forEach(function (className) {
+            modal.classList.remove(className);
+          });
+          modal.classList.add(themeClass);
+        }
+
+        document.querySelectorAll('.js-open-registro').forEach(function (btn) {
+          btn.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            var card = btn.closest('li[data-type]');
+            var plan = card ? card.querySelector('.pricing-header h2').textContent.trim() : 'PAM';
+            var billing = card && card.getAttribute('data-type') === 'yearly' ? 'anual' : 'mensual';
+
+            pendingCheckout.url = btn.getAttribute('href');
+            pendingCheckout.plan = plan;
+            pendingCheckout.billing = billing;
+
+            setModalPlanTheme(btn);
+            subtitle.textContent = 'Plan ' + plan + ' (' + billing + ') — completa tus datos para continuar al pago.';
+            openModal();
+          });
+        });
+
+        modal.querySelectorAll('[data-close-modal]').forEach(function (el) {
+          el.addEventListener('click', closeModal);
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape' && modal.classList.contains('is-open')) {
+            closeModal();
+          }
+        });
+
+        origenSelect.addEventListener('change', function () {
+          var isOtro = origenSelect.value === 'Otro';
+          origenOtroWrap.hidden = !isOtro;
+          if (!isOtro) {
+            document.getElementById('reg-origen-otro').value = '';
+          }
+        });
+
+        form.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (!validateForm()) return;
+
+          var payload = buildPayload();
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Procesando…';
+
+          saveRegistro(payload)
+            .then(function () {
+              sessionStorage.setItem('pam-ultimo-registro', JSON.stringify(payload));
+              closeModal();
+
+              if (!openCheckoutInNewTab(pendingCheckout.url)) {
+                alert(
+                  'Tus datos fueron guardados. Si Mercado Pago no se abrió, ' +
+                  'permite ventanas emergentes en el navegador e inténtalo de nuevo.'
+                );
+              }
+
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Continuar al pago';
+            })
+            .catch(function (err) {
+              console.error('PAM registro:', err);
+              alert('No pudimos guardar tus datos. Por favor, intenta nuevamente.');
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Continuar al pago';
+            });
+        });
+
+        function openCheckoutInNewTab(url) {
+          if (!url) return false;
+
+          // No usar window.top: en iframe cross-origin (mali.pe ← proyectosti.mali.pe) lanza SecurityError.
+          try {
+            var newTab = window.open(url, '_blank', 'noopener,noreferrer');
+            if (newTab) return true;
+          } catch (err) {
+            console.warn('PAM checkout window.open:', err);
+          }
+
+          try {
+            var link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            return true;
+          } catch (err2) {
+            console.warn('PAM checkout link:', err2);
+          }
+
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'pam-open-checkout', url: url }, '*');
+            }
+          } catch (err3) {
+            console.warn('PAM checkout postMessage:', err3);
+          }
+
+          return false;
+        }
+
+        function openModal() {
+          modal.hidden = false;
+          requestAnimationFrame(function () {
+            modal.classList.add('is-open');
+            if (typeof window.notifyPamIframeHeight === 'function') {
+              var dialog = modal.querySelector('.pam-modal__dialog');
+              var extra = 0;
+              if (dialog) {
+                extra = dialog.getBoundingClientRect().bottom + window.scrollY;
+              }
+              window.notifyPamIframeHeight(extra);
+            }
+          });
+          document.body.classList.add('modal-open');
+          document.getElementById('reg-nombres').focus();
+        }
+
+        function closeModal() {
+          modal.classList.remove('is-open');
+          document.body.classList.remove('modal-open');
+          window.setTimeout(function () {
+            if (!modal.classList.contains('is-open')) {
+              modal.hidden = true;
+            }
+            if (typeof window.notifyPamIframeHeight === 'function') {
+              window.notifyPamIframeHeight();
+            }
+          }, 300);
+        }
+
+        function buildPayload() {
+          var origen = origenSelect.value;
+          if (origen === 'Otro') {
+            var otro = document.getElementById('reg-origen-otro').value.trim();
+            if (otro) origen = 'Otro: ' + otro;
+          }
+
+          return {
+            nombres: form.nombres.value.trim(),
+            apellidos: form.apellidos.value.trim(),
+            dni: form.dni.value.trim(),
+            celular: form.celular.value.trim(),
+            correo: form.correo.value.trim(),
+            direccion: form.direccion.value.trim(),
+            ciudad: form.ciudad.value.trim(),
+            distrito: form.distrito.value.trim(),
+            genero: form.genero.value,
+            fechaNacimiento: form.fecha_nacimiento.value,
+            comoTeEnteraste: origen,
+            plan: pendingCheckout.plan,
+            frecuencia: pendingCheckout.billing,
+            checkoutUrl: pendingCheckout.url,
+            aceptaPrivacidad: true
+          };
+        }
+
+        function saveRegistro(payload) {
+          if (!PAM_REGISTRO_API) {
+            return Promise.reject(new Error('PAM_REGISTRO_API no configurada'));
+          }
+
+          return fetch(PAM_REGISTRO_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).then(function (response) {
+            if (!response.ok) {
+              throw new Error('HTTP ' + response.status);
+            }
+            return response.json().catch(function () { return {}; });
+          });
+        }
+
+        function validateForm() {
+          var valid = true;
+          clearErrors();
+
+          valid = checkRequired(form.nombres, 'Ingresa tus nombres.') && valid;
+          valid = checkRequired(form.apellidos, 'Ingresa tus apellidos.') && valid;
+
+          if (!/^\d{8}$/.test(form.dni.value.trim())) {
+            setFieldError(form.dni, 'Ingresa un DNI válido de 8 dígitos.');
+            valid = false;
+          }
+
+          if (!/^\+?\d[\d\s-]{8,}$/.test(form.celular.value.trim())) {
+            setFieldError(form.celular, 'Ingresa un celular válido.');
+            valid = false;
+          }
+
+          if (!form.correo.checkValidity()) {
+            setFieldError(form.correo, 'Ingresa un correo válido.');
+            valid = false;
+          }
+
+          valid = checkRequired(form.direccion, 'Ingresa tu dirección.') && valid;
+          valid = checkRequired(form.ciudad, 'Ingresa tu ciudad.') && valid;
+
+          if (!form.como_te_enteraste.value) {
+            setFieldError(form.como_te_enteraste, 'Selecciona una opción.');
+            valid = false;
+          }
+
+          if (form.como_te_enteraste.value === 'Otro' && !document.getElementById('reg-origen-otro').value.trim()) {
+            setFieldError(document.getElementById('reg-origen-otro'), 'Indica cómo te enteraste.');
+            valid = false;
+          }
+
+          if (!form.acepta_privacidad.checked) {
+            setFieldError(form.acepta_privacidad, 'Debes aceptar la política de privacidad.');
+            valid = false;
+          }
+
+          return valid;
+        }
+
+        function checkRequired(input, message) {
+          if (!input.value.trim()) {
+            setFieldError(input, message);
+            return false;
+          }
+          return true;
+        }
+
+        function setFieldError(input, message) {
+          var field = input.closest('.pam-field');
+          if (!field) return;
+          field.classList.add('has-error');
+          input.classList.add('is-invalid');
+          var error = field.querySelector('.pam-field__error');
+          if (error && message) error.textContent = message;
+        }
+
+        function clearErrors() {
+          form.querySelectorAll('.pam-field').forEach(function (field) {
+            field.classList.remove('has-error');
+          });
+          form.querySelectorAll('.is-invalid').forEach(function (input) {
+            input.classList.remove('is-invalid');
+          });
+        }
+
+        form.querySelectorAll('input, select, textarea').forEach(function (input) {
+          var clearInputError = function () {
+            var field = input.closest('.pam-field');
+            if (field) field.classList.remove('has-error');
+            input.classList.remove('is-invalid');
+          };
+          input.addEventListener('input', clearInputError);
+          input.addEventListener('change', clearInputError);
+        });
+      }
+
+      function bouncyFilter(containers) {
+        containers.forEach(function (pricingTable) {
+          var filterListContainer = pricingTable.querySelector('.pricing-switcher');
+          var filterRadios = filterListContainer.querySelectorAll('input[type="radio"]');
+          var pricingTableWrappers = pricingTable.querySelectorAll('.pricing-wrapper');
+
+          var tableElements = {};
+
+          filterRadios.forEach(function (radio) {
+            var filterType = radio.value;
+            tableElements[filterType] = pricingTable.querySelectorAll('li[data-type="' + filterType + '"]');
+          });
+
+          filterRadios.forEach(function (radio) {
+            radio.addEventListener('change', function (event) {
+              event.preventDefault();
+
+              var selectedFilter = event.target.value;
+
+              showSelectedItems(tableElements[selectedFilter]);
+
+              pricingTableWrappers.forEach(function (wrapper) {
+                wrapper.classList.add('is-switched');
+              });
+
+              var firstWrapper = pricingTableWrappers[0];
+              var animationFinished = false;
+
+              function finishAnimation() {
+                if (animationFinished) return;
+                animationFinished = true;
+
+                hideNotSelectedItems(tableElements, selectedFilter);
+
+                pricingTableWrappers.forEach(function (wrapper) {
+                  wrapper.classList.remove('is-switched');
+                });
+
+                if (pricingTable.querySelector('.pricing-list').classList.contains('bounce-invert')) {
+                  pricingTableWrappers.forEach(function (wrapper) {
+                    wrapper.classList.toggle('reverse-animation');
+                  });
+                }
+              }
+
+              firstWrapper.addEventListener('animationend', finishAnimation, { once: true });
+              firstWrapper.addEventListener('webkitAnimationEnd', finishAnimation, { once: true });
+
+              setTimeout(function () {
+                finishAnimation();
+                if (typeof window.applyPamViewportSize === 'function') {
+                  window.applyPamViewportSize();
+                }
+                if (typeof window.syncPamLayout === 'function') {
+                  window.syncPamLayout();
+                }
+                if (typeof window.resetPamScroll === 'function') {
+                  window.resetPamScroll();
+                }
+                if (typeof window.updatePamScale === 'function') {
+                  window.updatePamScale();
+                }
+                if (typeof window.updatePamCarousel === 'function') {
+                  window.updatePamCarousel();
+                }
+                if (typeof window.refreshMobileBenefitTooltips === 'function') {
+                  window.refreshMobileBenefitTooltips();
+                }
+                if (typeof window.notifyPamIframeHeight === 'function') {
+                  window.notifyPamIframeHeight();
+                }
+              }, 650);
+            });
+          });
+        });
+      }
+
+      function showSelectedItems(selectedElements) {
+        selectedElements.forEach(function (element) {
+          element.classList.add('is-selected');
+        });
+      }
+
+      function hideNotSelectedItems(tableContainers, filter) {
+        Object.keys(tableContainers).forEach(function (key) {
+          tableContainers[key].forEach(function (element) {
+            if (key !== filter) {
+              element.classList.remove('is-visible', 'is-selected');
+              element.classList.add('is-hidden');
+            } else {
+              element.classList.add('is-visible');
+              element.classList.remove('is-hidden', 'is-selected');
+            }
+          });
+        });
+      }
+
+      function initSyncedRowHover() {
+        var layout = document.querySelector('.pam-layout-desktop');
+        if (!layout) return;
+
+        var benefitItems = layout.querySelectorAll('.benefits-list li');
+        benefitItems.forEach(function (item, index) {
+          item.classList.add('pam-benefit-row');
+          item.setAttribute('data-row', String(index));
+        });
+
+        layout.querySelectorAll('.pricing-features').forEach(function (list) {
+          list.querySelectorAll('li').forEach(function (item, index) {
+            item.classList.add('pam-benefit-row');
+            item.setAttribute('data-row', String(index));
+          });
+        });
+
+        function clearRowHover() {
+          layout.querySelectorAll('.pam-benefit-row.is-row-hover').forEach(function (row) {
+            row.classList.remove('is-row-hover');
+          });
+        }
+
+        function highlightRow(index) {
+          clearRowHover();
+          layout.querySelectorAll('.pam-benefit-row[data-row="' + index + '"]').forEach(function (row) {
+            var card = row.closest('li[data-type]');
+            if (card && card.classList.contains('is-hidden')) return;
+            row.classList.add('is-row-hover');
+          });
+        }
+
+        layout.querySelectorAll('.pam-benefit-row').forEach(function (row) {
+          row.addEventListener('mouseenter', function () {
+            highlightRow(row.getAttribute('data-row'));
+          });
+        });
+
+        layout.addEventListener('mouseleave', clearRowHover);
+      }
+
+      function syncPamLayout() {
+        var layout = document.querySelector('.pam-layout-desktop');
+        if (!layout) return;
+
+        var isDesktopScroll = window.matchMedia('(min-width: 1024px)').matches;
+        var shouldSync = window.innerWidth >= 360;
+        var syncTargets = layout.querySelectorAll(
+          '.benefits-card__header, .pricing-header, .benefits-card__footer, .pricing-footer, .pam-benefit-row'
+        );
+
+        syncTargets.forEach(function (el) {
+          el.style.minHeight = '';
+          el.style.height = '';
+          el.style.maxHeight = '';
+        });
+
+        layout.querySelectorAll('.pricing-body').forEach(function (body) {
+          body.style.paddingTop = '';
+        });
+
+        var benefitsSpacer = layout.querySelector('.benefits-card__spacer');
+        if (benefitsSpacer) {
+          benefitsSpacer.style.height = '';
+          benefitsSpacer.style.minHeight = '';
+        }
+
+        if (!isDesktopScroll || !shouldSync) return;
+
+        function getVisiblePlanHeaders() {
+          return Array.prototype.slice.call(
+            layout.querySelectorAll('.pricing-wrapper > li.is-visible .pricing-header')
+          );
+        }
+
+        function getVisiblePlanFooters() {
+          return Array.prototype.slice.call(
+            layout.querySelectorAll('.pricing-wrapper > li.is-visible .pricing-footer')
+          );
+        }
+
+        function getVisibleRows(index) {
+          return Array.prototype.filter.call(
+            layout.querySelectorAll('.pam-benefit-row[data-row="' + index + '"]'),
+            function (row) {
+              var card = row.closest('li[data-type]');
+              return !card || !card.classList.contains('is-hidden');
+            }
+          );
+        }
+
+        function measureBlock(el) {
+          if (isDesktopScroll) {
+            return el.getBoundingClientRect().height;
+          }
+          return Math.max(el.offsetHeight, el.scrollHeight);
+        }
+
+        function equalizeBlockHeights(elements) {
+          if (!elements.length) return;
+          elements.forEach(function (el) {
+            el.style.height = 'auto';
+            el.style.minHeight = '0';
+          });
+          var max = 0;
+          elements.forEach(function (el) {
+            max = Math.max(max, measureBlock(el));
+          });
+          var heightPx = Math.ceil(max) + 'px';
+          elements.forEach(function (el) {
+            el.style.minHeight = heightPx;
+            if (!isDesktopScroll) {
+              el.style.height = heightPx;
+            }
+          });
+        }
+
+        function equalizeRowHeights(index) {
+          var rows = getVisibleRows(index);
+          if (!rows.length) return;
+
+          rows.forEach(function (row) {
+            row.style.height = 'auto';
+            row.style.minHeight = '0';
+            row.style.maxHeight = 'none';
+          });
+
+          var max = 0;
+          rows.forEach(function (row) {
+            max = Math.max(max, measureBlock(row));
+          });
+
+          var heightPx = Math.ceil(max) + 'px';
+          rows.forEach(function (row) {
+            row.style.minHeight = heightPx;
+            row.style.height = isDesktopScroll ? 'auto' : heightPx;
+            if (!isDesktopScroll) {
+              row.style.maxHeight = heightPx;
+            }
+          });
+        }
+
+        function equalizeHeaderHeights() {
+          var benefitHeader = layout.querySelector('.benefits-card__header');
+          var planHeaders = getVisiblePlanHeaders();
+          if (!benefitHeader || !planHeaders.length) return;
+
+          [benefitHeader].concat(planHeaders).forEach(function (el) {
+            el.style.height = 'auto';
+            el.style.minHeight = '0';
+          });
+
+          var max = 0;
+          planHeaders.forEach(function (el) {
+            max = Math.max(max, measureBlock(el));
+          });
+
+          var heightPx = Math.ceil(max) + 'px';
+          [benefitHeader].concat(planHeaders).forEach(function (el) {
+            el.style.minHeight = heightPx;
+            if (!isDesktopScroll) {
+              el.style.height = heightPx;
+            }
+          });
+        }
+
+        function runLayoutSync() {
+          var benefitsSpacerEl = layout.querySelector('.benefits-card__spacer');
+          var referencePrice = layout.querySelector('.pricing-wrapper > li.is-visible .price');
+
+          if (benefitsSpacerEl && referencePrice) {
+            benefitsSpacerEl.style.height = 'auto';
+            benefitsSpacerEl.style.minHeight = '0';
+            var priceRowHeight = Math.ceil(measureBlock(referencePrice)) + 'px';
+            benefitsSpacerEl.style.height = priceRowHeight;
+            benefitsSpacerEl.style.minHeight = priceRowHeight;
+          }
+
+          equalizeHeaderHeights();
+
+          var benefitFooter = layout.querySelector('.benefits-card__footer');
+          equalizeBlockHeights([benefitFooter].concat(getVisiblePlanFooters()));
+
+          var rowCount = layout.querySelectorAll('.benefits-list li').length;
+          var i;
+
+          for (i = 0; i < rowCount; i++) {
+            equalizeRowHeights(i);
+          }
+        }
+
+        runLayoutSync();
+
+        if (document.documentElement.getAttribute('data-embed') === 'true'
+            && typeof window.notifyPamIframeHeight === 'function') {
+          window.notifyPamIframeHeight();
+        }
+      }
+
+      function initMobileBenefitLabels() {
+        if (!window.matchMedia('(min-width: 1024px)').matches) return;
+
+        document.querySelectorAll('.pam-layout-desktop .benefits-list li').forEach(function (item) {
+          if (item.querySelector('.benefits-list__text')) return;
+
+          var text = item.textContent.trim();
+          item.textContent = '';
+          var span = document.createElement('span');
+          span.className = 'benefits-list__text';
+          span.textContent = text;
+          item.appendChild(span);
+        });
+      }
+
+      function refreshMobileBenefitTooltips() {
+        /* Beneficios en móvil van dentro de cada card; sin tooltips de truncado. */
+      }
+
+      window.refreshMobileBenefitTooltips = refreshMobileBenefitTooltips;
+
+      window.syncPamLayout = syncPamLayout;
+
+      function applyPamViewportSize() {
+        var wrap = document.querySelector('.pam-pricing-viewport');
+        if (!wrap) return;
+
+        wrap.style.width = '';
+        wrap.style.height = '';
+      }
+
+      window.applyPamViewportSize = applyPamViewportSize;
+
+      function updatePamScale() {
+        var wrap = document.querySelector('.pam-pricing-viewport');
+        var inner = document.querySelector('.pam-pricing-scale__inner');
+        if (!wrap || !inner) return;
+
+        if (window.matchMedia('(min-width: 1024px)').matches) {
+          inner.style.transform = '';
+          inner.style.width = '';
+          inner.style.marginBottom = '';
+          wrap.style.height = '';
+          wrap.style.minHeight = '';
+          wrap.style.overflow = '';
+          applyPamViewportSize();
+          syncPamLayout();
+          return;
+        }
+
+        inner.style.transform = 'none';
+        inner.style.width = '100%';
+        inner.style.marginBottom = '0';
+        wrap.style.height = 'auto';
+        wrap.style.minHeight = '0';
+        wrap.style.overflow = 'visible';
+
+        if (typeof window.updatePamCarousel === 'function') {
+          window.updatePamCarousel();
+        }
+      }
+
+      window.updatePamScale = updatePamScale;
+
+      function initPamScrollAreas() {
+        var layout = document.querySelector('.pam-layout-desktop');
+        if (!layout) return;
+
+        var areas = layout.querySelectorAll('.pam-rows-scroll');
+        var viewport = document.querySelector('.pam-pricing-viewport');
+        var activeScrollArea = null;
+        var syncing = false;
+
+        function getVisibleScrollAreas() {
+          return Array.prototype.filter.call(areas, function (area) {
+            var card = area.closest('li[data-type]');
+            return !card || !card.classList.contains('is-hidden');
+          });
+        }
+
+        function isScrollableArea(area) {
+          return area && area.scrollHeight > area.clientHeight + 1;
+        }
+
+        function syncAllScrollAreas(source, top) {
+          syncing = true;
+          getVisibleScrollAreas().forEach(function (other) {
+            if (other !== source) other.scrollTop = top;
+          });
+          syncing = false;
+        }
+
+        function resolveScrollArea(target, x, y) {
+          var fromTarget = target && target.closest ? target.closest('.pam-rows-scroll') : null;
+          if (fromTarget) {
+            var card = fromTarget.closest('li[data-type]');
+            if (!card || !card.classList.contains('is-hidden')) return fromTarget;
+          }
+
+          if (activeScrollArea) return activeScrollArea;
+
+          var visible = getVisibleScrollAreas();
+          var i;
+          for (i = 0; i < visible.length; i++) {
+            var rect = visible[i].getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+              return visible[i];
+            }
+          }
+
+          for (i = 0; i < visible.length; i++) {
+            var column = visible[i].closest('.benefits-card') || visible[i].closest('.pricing-list > li');
+            if (!column) continue;
+            var colRect = column.getBoundingClientRect();
+            if (x >= colRect.left && x <= colRect.right) {
+              return visible[i];
+            }
+          }
+
+          return null;
+        }
+
+        window.resetPamScroll = function () {
+          getVisibleScrollAreas().forEach(function (area) {
+            area.scrollTop = 0;
+          });
+        };
+
+        areas.forEach(function (area) {
+          area.addEventListener('scroll', function () {
+            if (window.innerWidth < 1024) return;
+            var card = area.closest('li[data-type]');
+            if (card && card.classList.contains('is-hidden')) return;
+            if (syncing) return;
+            syncAllScrollAreas(area, area.scrollTop);
+          }, { passive: true });
+        });
+
+        if (!viewport || !layout) return;
+
+        layout.addEventListener('mouseenter', function () {
+          viewport.classList.add('is-wheel-active');
+        });
+
+        layout.addEventListener('mouseleave', function () {
+          viewport.classList.remove('is-wheel-active');
+          activeScrollArea = null;
+        });
+
+        layout.addEventListener('mousemove', function (event) {
+          if (window.innerWidth < 1024) return;
+          activeScrollArea = resolveScrollArea(event.target, event.clientX, event.clientY);
+        });
+
+        viewport.addEventListener('wheel', function (event) {
+          if (window.innerWidth < 1024) return;
+          if (!viewport.classList.contains('is-wheel-active')) return;
+
+          var area = resolveScrollArea(event.target, event.clientX, event.clientY);
+          if (!area || !isScrollableArea(area)) return;
+
+          var maxTop = area.scrollHeight - area.clientHeight;
+          var nextTop = Math.max(0, Math.min(area.scrollTop + event.deltaY, maxTop));
+          var atTop = area.scrollTop <= 0;
+          var atBottom = area.scrollTop >= maxTop - 1;
+          var scrollingUp = event.deltaY < 0;
+          var scrollingDown = event.deltaY > 0;
+
+          if ((scrollingUp && atTop) || (scrollingDown && atBottom)) {
+            return;
+          }
+
+          event.preventDefault();
+          syncing = true;
+          getVisibleScrollAreas().forEach(function (other) {
+            other.scrollTop = nextTop;
+          });
+          syncing = false;
+        }, { passive: false });
+      }
+
+      var syncResizeTimer;
+      var lastLayoutWidth = window.innerWidth;
+
+      function schedulePamLayoutUpdate() {
+        clearTimeout(syncResizeTimer);
+        syncResizeTimer = setTimeout(function () {
+          var currentWidth = window.innerWidth;
+          var isMobileLayout = !window.matchMedia('(min-width: 1024px)').matches;
+
+          if (!isMobileLayout && currentWidth === lastLayoutWidth) {
+            return;
+          }
+
+          lastLayoutWidth = currentWidth;
+          applyPamViewportSize();
+          syncPamLayout();
+          updatePamScale();
+          if (typeof window.updatePamCarousel === 'function') {
+            window.updatePamCarousel();
+          }
+          refreshMobileBenefitTooltips();
+          if (typeof window.notifyPamIframeHeight === 'function') {
+            window.notifyPamIframeHeight();
+          }
+        }, 120);
+      }
+
+      window.addEventListener('resize', schedulePamLayoutUpdate);
+
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(function () {
+          applyPamViewportSize();
+          syncPamLayout();
+          updatePamScale();
+          refreshMobileBenefitTooltips();
+          if (typeof window.notifyPamIframeHeight === 'function') {
+            window.notifyPamIframeHeight();
+          }
+        });
+      }
+
+    });
+  </script>
+
+</body>
+</html>

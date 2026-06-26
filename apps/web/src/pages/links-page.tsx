@@ -29,6 +29,33 @@ interface EditLinkState {
   saving: boolean;
 }
 
+function TagsField({
+  value,
+  onChange,
+  id,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  id?: string;
+}) {
+  return (
+    <label className="block" htmlFor={id}>
+      <span className="mb-2 block text-sm text-muted">
+        Tags (opcional, separados por coma)
+      </span>
+      <Input
+        id={id}
+        placeholder="campana, ventas, qr-flyer"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="mt-1 text-xs text-muted">
+        Minúsculas, números, guiones y guiones bajos. Máx. 10 tags.
+      </p>
+    </label>
+  );
+}
+
 export function LinksPage() {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('url');
@@ -283,33 +310,6 @@ export function LinksPage() {
   const filteredLinks = tagFilter
     ? links.filter((link) => link.tags.includes(tagFilter))
     : links;
-
-  function TagsField({
-    value,
-    onChange,
-    id,
-  }: {
-    value: string;
-    onChange: (value: string) => void;
-    id?: string;
-  }) {
-    return (
-      <label className="block" htmlFor={id}>
-        <span className="mb-2 block text-sm text-muted">
-          Tags (opcional, separados por coma)
-        </span>
-        <Input
-          id={id}
-          placeholder="campana, ventas, qr-flyer"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-muted">
-          Minúsculas, números, guiones y guiones bajos. Máx. 10 tags.
-        </p>
-      </label>
-    );
-  }
 
   return (
     <div>

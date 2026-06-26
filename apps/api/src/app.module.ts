@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { QrModule } from './core/qr/qr.module';
@@ -15,10 +16,12 @@ import { AuthGoogleModule } from './modules/auth-google/auth-google.module';
 import { GoogleAdminModule } from './modules/google-admin/google-admin.module';
 import { LinksModule } from './modules/links/links.module';
 import { S3ManagerModule } from './modules/s3-manager/s3-manager.module';
+import { WidgetsModule } from './modules/widgets/widgets.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
     S3Module,
@@ -28,6 +31,7 @@ import { S3ManagerModule } from './modules/s3-manager/s3-manager.module';
     LinksModule,
     S3ManagerModule,
     AppUsersModule,
+    WidgetsModule,
   ],
   controllers: [HealthController],
   providers: [
