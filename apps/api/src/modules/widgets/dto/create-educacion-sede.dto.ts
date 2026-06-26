@@ -42,10 +42,6 @@ export class CreateEducacionSedeDto {
   showOnMap?: boolean;
 
   @IsOptional()
-  @IsBoolean()
-  showOnSelector?: boolean;
-
-  @IsOptional()
   @IsInt()
   @Min(0)
   sortOrder?: number;
@@ -91,10 +87,6 @@ export class UpdateEducacionSedeDto {
   @IsOptional()
   @IsBoolean()
   showOnMap?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  showOnSelector?: boolean;
 
   @IsOptional()
   @IsInt()

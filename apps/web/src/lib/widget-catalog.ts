@@ -39,10 +39,9 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
       {
         id: 'calendario',
         label: 'Calendario',
-        description: 'Calendario de actividades (contenido estático).',
+        description: 'Eventos desde Google Calendar (vía MALI ONE).',
         path: 'calendario',
         icon: Calendar,
-        previewOnly: true,
         embedHost: 'educacion.mali.pe',
       },
       {

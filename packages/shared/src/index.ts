@@ -112,6 +112,16 @@ export interface EducacionWidgetSettingsDto {
   imageCorreo: string;
   imageMarker: string;
   mapsApiKey: string | null;
+  googleCalendarId: string | null;
+}
+
+export interface EducacionSelectorSedeDto {
+  id: string;
+  slug: string;
+  nombre: string;
+  brochureUrl: string;
+  sortOrder: number;
+  activo: boolean;
 }
 
 export interface EducacionDistrictDto {
@@ -132,7 +142,6 @@ export interface EducacionSedeDto {
   brochureUrl: string;
   districtId: string | null;
   showOnMap: boolean;
-  showOnSelector: boolean;
   sortOrder: number;
   activo: boolean;
   district?: EducacionDistrictDto | null;
@@ -142,6 +151,7 @@ export interface EducacionAdminStateDto {
   settings: EducacionWidgetSettingsDto;
   districts: (EducacionDistrictDto & { sedes?: EducacionSedeDto[] })[];
   sedes: EducacionSedeDto[];
+  selectorSedes: EducacionSelectorSedeDto[];
 }
 
 export interface BibliotecaCarouselItemDto {

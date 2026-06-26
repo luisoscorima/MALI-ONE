@@ -651,6 +651,7 @@
 			if (!carouselData.length) {
 				console.warn("No hay ítems en el carrusel.");
 			}
+			setup();
 		}).catch(function (err) {
 			console.error('Error cargando carrusel', err);
 		});
@@ -1142,8 +1143,6 @@
 				}, transitionMs + 50);
 			};
 		}
-
-		setup();
 	});
 </script>
 

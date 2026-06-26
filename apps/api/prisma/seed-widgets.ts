@@ -33,7 +33,13 @@ type SedeSeed = {
   brochureUrl: string;
   districtSlug?: string;
   showOnMap: boolean;
-  showOnSelector: boolean;
+  sortOrder: number;
+};
+
+type SelectorSedeSeed = {
+  slug: string;
+  nombre: string;
+  brochureUrl: string;
   sortOrder: number;
 };
 
@@ -84,7 +90,16 @@ function sedeRow(
     brochureUrl: s.brochureUrl,
     districtId: s.districtSlug ? districtIds[s.districtSlug] ?? null : null,
     showOnMap: s.showOnMap,
-    showOnSelector: s.showOnSelector,
+    sortOrder: s.sortOrder,
+    activo: true,
+  };
+}
+
+function selectorSedeRow(s: SelectorSedeSeed) {
+  return {
+    slug: s.slug,
+    nombre: s.nombre,
+    brochureUrl: s.brochureUrl,
     sortOrder: s.sortOrder,
     activo: true,
   };
@@ -100,6 +115,7 @@ async function seedEducacion() {
 
   const settingsData = {
     ...settings,
+    googleCalendarId: 'talleresmali@mali.pe',
     ...(process.env.GOOGLE_MAPS_API_KEY
       ? { mapsApiKey: process.env.GOOGLE_MAPS_API_KEY }
       : {}),
@@ -121,10 +137,9 @@ async function seedEducacion() {
     districtIds[d.slug] = row.id;
   }
 
-  const allSedes = [...mapSedes, ...selectorSedes];
-  const activeSlugs = new Set(allSedes.map((s) => s.slug));
+  const mapActiveSlugs = new Set(mapSedes.map((s) => s.slug));
 
-  for (const s of allSedes) {
+  for (const s of mapSedes) {
     const data = sedeRow(s, districtIds);
     await prisma.educacionSede.upsert({
       where: { slug: s.slug },
@@ -137,14 +152,29 @@ async function seedEducacion() {
     where: {
       OR: [
         { slug: { in: OBSOLETE_SEDE_SLUGS } },
-        { slug: { notIn: [...activeSlugs] } },
+        { slug: { notIn: [...mapActiveSlugs] } },
       ],
     },
     data: { activo: false },
   });
 
+  const selectorActiveSlugs = new Set(selectorSedes.map((s) => s.slug));
+  for (const s of selectorSedes) {
+    const data = selectorSedeRow(s);
+    await prisma.educacionSelectorSede.upsert({
+      where: { slug: s.slug },
+      create: data,
+      update: data,
+    });
+  }
+
+  await prisma.educacionSelectorSede.updateMany({
+    where: { slug: { notIn: [...selectorActiveSlugs] } },
+    data: { activo: false },
+  });
+
   console.log(
-    `  educacion: ${districts.length} distritos, ${allSedes.length} sedes`,
+    `  educacion: ${districts.length} distritos, ${mapSedes.length} sedes mapa, ${selectorSedes.length} sedes selector`,
   );
 }
 

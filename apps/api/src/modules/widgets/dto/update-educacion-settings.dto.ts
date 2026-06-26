@@ -44,4 +44,8 @@ export class UpdateEducacionSettingsDto {
   @IsOptional()
   @IsString()
   mapsApiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  googleCalendarId?: string;
 }

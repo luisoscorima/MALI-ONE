@@ -209,6 +209,21 @@ export const api = {
   deleteEducacionSede: (id: string) =>
     request(`/api/widgets/educacion/sedes/${id}`, { method: 'DELETE' }),
 
+  createEducacionSelectorSede: (body: Record<string, unknown>) =>
+    request('/api/widgets/educacion/selector/sedes', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateEducacionSelectorSede: (id: string, body: Record<string, unknown>) =>
+    request(`/api/widgets/educacion/selector/sedes/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteEducacionSelectorSede: (id: string) =>
+    request(`/api/widgets/educacion/selector/sedes/${id}`, { method: 'DELETE' }),
+
   listBibliotecaCarouselAdmin: () =>
     request<import('@mali-one/shared').BibliotecaCarouselItemDto[]>(
       '/api/widgets/biblioteca/carousel/admin',

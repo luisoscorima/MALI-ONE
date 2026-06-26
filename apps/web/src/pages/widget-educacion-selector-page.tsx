@@ -1,10 +1,12 @@
-import type { EducacionSedeDto } from '@mali-one/shared';
+import { useState } from 'react';
+import type { EducacionSelectorSedeDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
+import { slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
@@ -18,100 +20,123 @@ const SELECTOR_PREVIEW = [
   },
 ];
 
+function emptySelectorSede(): EducacionSelectorSedeDto {
+  return {
+    id: '',
+    slug: '',
+    nombre: '',
+    brochureUrl: '',
+    sortOrder: 0,
+    activo: true,
+  };
+}
+
 export function WidgetEducacionSelectorPage() {
   const toast = useToast();
-  const { state, setState, loading } = useEducacionAdmin();
+  const { state, setState, loading, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
+  const [draft, setDraft] = useState<EducacionSelectorSedeDto | null>(null);
 
-  async function saveSede(sede: EducacionSedeDto) {
+  async function persistSede(sede: EducacionSelectorSedeDto) {
+    const payload = {
+      slug: sede.slug.trim(),
+      nombre: sede.nombre.trim(),
+      brochureUrl: sede.brochureUrl.trim(),
+      sortOrder: sede.sortOrder,
+      activo: sede.activo,
+    };
+
+    if (!payload.slug || !payload.nombre || !payload.brochureUrl) {
+      toast.error('Slug, nombre y brochure son obligatorios');
+      return;
+    }
+
     try {
-      await api.updateEducacionSede(sede.id, {
-        nombre: sede.nombre,
-        direccion: sede.direccion,
-        lat: sede.lat,
-        lng: sede.lng,
-        horarioHtml: sede.horarioHtml,
-        brochureUrl: sede.brochureUrl,
-        showOnMap: sede.showOnMap,
-        showOnSelector: sede.showOnSelector,
-        activo: sede.activo,
-      });
-      toast.success(`Sede ${sede.nombre} guardada`);
+      if (sede.id) {
+        await api.updateEducacionSelectorSede(sede.id, payload);
+        toast.success(`Sede ${payload.nombre} guardada`);
+      } else {
+        await api.createEducacionSelectorSede(payload);
+        toast.success(`Sede ${payload.nombre} creada`);
+        setDraft(null);
+      }
+      await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar sede');
     }
+  }
+
+  async function removeSede(sede: EducacionSelectorSedeDto) {
+    if (!confirm(`¿Eliminar "${sede.nombre}" del selector?`)) return;
+    try {
+      await api.deleteEducacionSelectorSede(sede.id);
+      toast.success('Sede eliminada');
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+    }
+  }
+
+  function duplicateSede(sede: EducacionSelectorSedeDto) {
+    setDraft({
+      ...emptySelectorSede(),
+      slug: slugify(`${sede.slug}-copia`),
+      nombre: `${sede.nombre} (copia)`,
+      brochureUrl: sede.brochureUrl,
+      sortOrder: sede.sortOrder + 1,
+    });
   }
 
   if (loading || !state) {
     return <Spinner className="mx-auto mt-12" />;
   }
 
-  const selectorSedes = state.sedes.filter((s) => s.showOnSelector);
-
   const config = (
     <Card className="space-y-4 p-4">
-      <h2 className="font-semibold">Sedes en el selector ({selectorSedes.length})</h2>
-      <p className="text-sm text-muted">
-        Botón flotante con enlaces a brochures. Comparte registros de sede con el
-        mapa: nombre y brochure son los mismos datos.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">
+            Sedes del selector ({state.selectorSedes.length})
+          </h2>
+          <p className="text-sm text-muted">
+            Sedes principales con enlace a brochure. Datos independientes del mapa.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setDraft(emptySelectorSede())}>
+          Nueva sede
+        </Button>
+      </div>
+
+      {draft && !draft.id && (
+        <SelectorEditor
+          sede={draft}
+          onChange={setDraft}
+          onSave={() => void persistSede(draft)}
+          onCancel={() => setDraft(null)}
+          title="Nueva sede"
+        />
+      )}
+
       <div className="space-y-4">
-        {state.sedes.map((sede) => (
-          <div key={sede.id} className="rounded-lg border border-border p-3 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-muted">{sede.slug}</span>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={sede.showOnSelector}
-                  onChange={(e) =>
-                    setState({
-                      ...state,
-                      sedes: state.sedes.map((s) =>
-                        s.id === sede.id
-                          ? { ...s, showOnSelector: e.target.checked }
-                          : s,
-                      ),
-                    })
-                  }
-                />
-                Visible en selector
-              </label>
-            </div>
-            {!sede.showOnSelector ? (
-              <p className="text-xs text-muted">Oculta en el selector</p>
-            ) : (
-              <>
-                <Input
-                  placeholder="Nombre visible"
-                  value={sede.nombre}
-                  onChange={(e) =>
-                    setState({
-                      ...state,
-                      sedes: state.sedes.map((s) =>
-                        s.id === sede.id ? { ...s, nombre: e.target.value } : s,
-                      ),
-                    })
-                  }
-                />
-                <Input
-                  placeholder="Brochure URL"
-                  value={sede.brochureUrl}
-                  onChange={(e) =>
-                    setState({
-                      ...state,
-                      sedes: state.sedes.map((s) =>
-                        s.id === sede.id ? { ...s, brochureUrl: e.target.value } : s,
-                      ),
-                    })
-                  }
-                />
-                <Button className="text-sm px-3 py-1.5" onClick={() => void saveSede(sede)}>
-                  Guardar sede
-                </Button>
-              </>
-            )}
-          </div>
+        {state.selectorSedes.map((sede) => (
+          <SelectorEditor
+            key={sede.id}
+            sede={sede}
+            onChange={(next) =>
+              setState({
+                ...state,
+                selectorSedes: state.selectorSedes.map((s) =>
+                  s.id === sede.id ? { ...s, ...next } : s,
+                ),
+              })
+            }
+            onSave={() => {
+              const current = state.selectorSedes.find((s) => s.id === sede.id);
+              if (current) void persistSede(current);
+            }}
+            onDelete={() => void removeSede(sede)}
+            onDuplicate={() => duplicateSede(sede)}
+          />
         ))}
       </div>
     </Card>
@@ -121,9 +146,87 @@ export function WidgetEducacionSelectorPage() {
     <WidgetToolLayout
       backLink={<WidgetBackLink area={area} />}
       title="Selector de sedes"
-      description="Widget para educacion.mali.pe — brochures por sede"
+      description="Widget para educacion.mali.pe — brochures por sede principal"
       config={config}
       preview={<WidgetPreviewFrame tabs={SELECTOR_PREVIEW} />}
     />
+  );
+}
+
+function SelectorEditor({
+  sede,
+  onChange,
+  onSave,
+  onCancel,
+  onDelete,
+  onDuplicate,
+  title,
+}: {
+  sede: EducacionSelectorSedeDto;
+  onChange: (sede: EducacionSelectorSedeDto) => void;
+  onSave: () => void;
+  onCancel?: () => void;
+  onDelete?: () => void;
+  onDuplicate?: () => void;
+  title?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-2">
+      {title && <p className="text-sm font-medium">{title}</p>}
+      <div className="grid gap-2 md:grid-cols-2">
+        <Input
+          placeholder="Slug"
+          value={sede.slug}
+          disabled={Boolean(sede.id)}
+          onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+        />
+        <Input
+          placeholder="Orden"
+          type="number"
+          value={sede.sortOrder}
+          onChange={(e) =>
+            onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
+          }
+        />
+      </div>
+      <Input
+        placeholder="Nombre visible"
+        value={sede.nombre}
+        onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+      />
+      <Input
+        placeholder="Brochure URL"
+        value={sede.brochureUrl}
+        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={sede.activo}
+          onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
+        />
+        Activa
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+          Guardar
+        </Button>
+        {onDuplicate && (
+          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
+            Duplicar
+          </Button>
+        )}
+        {onDelete && (
+          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
+            Eliminar
+          </Button>
+        )}
+        {onCancel && (
+          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
+            Cancelar
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

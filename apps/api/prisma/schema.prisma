@@ -110,8 +110,9 @@ model EducacionWidgetSettings {
   imageCirculo    String
   imageCorreo     String
   imageMarker     String
-  mapsApiKey      String?
-  updatedAt       DateTime @updatedAt
+  mapsApiKey       String?
+  googleCalendarId String?
+  updatedAt        DateTime @updatedAt
 }
 
 model EducacionDistrict {
@@ -134,11 +135,19 @@ model EducacionSede {
   districtId     String?
   district       EducacionDistrict? @relation(fields: [districtId], references: [id], onDelete: SetNull)
   showOnMap      Boolean            @default(true)
-  showOnSelector Boolean            @default(true)
   sortOrder      Int                @default(0)
   activo         Boolean            @default(true)
 
   @@index([districtId])
+}
+
+model EducacionSelectorSede {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  nombre      String
+  brochureUrl String
+  sortOrder   Int     @default(0)
+  activo      Boolean @default(true)
 }
 
 model BibliotecaCarouselItem {

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { AppModule } from '@prisma/client';
 import { Public } from '../../../core/guards/public.decorator';
@@ -21,6 +22,10 @@ import {
   CreateEducacionSedeDto,
   UpdateEducacionSedeDto,
 } from '../dto/create-educacion-sede.dto';
+import {
+  CreateEducacionSelectorSedeDto,
+  UpdateEducacionSelectorSedeDto,
+} from '../dto/create-educacion-selector-sede.dto';
 
 @Controller('widgets/educacion')
 export class EducacionWidgetsController {
@@ -30,6 +35,24 @@ export class EducacionWidgetsController {
   @Get('config')
   getPublicConfig() {
     return this.service.getPublicConfig();
+  }
+
+  @Public()
+  @Get('selector/config')
+  getSelectorPublicConfig() {
+    return this.service.getSelectorPublicConfig();
+  }
+
+  @Public()
+  @Get('calendar/events')
+  getCalendarEvents(
+    @Query('month') month: string,
+    @Query('year') year: string,
+  ) {
+    return this.service.getCalendarEvents(
+      Number(month) || new Date().getMonth() + 1,
+      Number(year) || new Date().getFullYear(),
+    );
   }
 
   @Get('admin')
@@ -81,5 +104,26 @@ export class EducacionWidgetsController {
   @RequireModule(AppModule.widget_educacion)
   deleteSede(@Param('id') id: string) {
     return this.service.deleteSede(id);
+  }
+
+  @Post('selector/sedes')
+  @RequireModule(AppModule.widget_educacion)
+  createSelectorSede(@Body() body: CreateEducacionSelectorSedeDto) {
+    return this.service.createSelectorSede(body);
+  }
+
+  @Patch('selector/sedes/:id')
+  @RequireModule(AppModule.widget_educacion)
+  updateSelectorSede(
+    @Param('id') id: string,
+    @Body() body: UpdateEducacionSelectorSedeDto,
+  ) {
+    return this.service.updateSelectorSede(id, body);
+  }
+
+  @Delete('selector/sedes/:id')
+  @RequireModule(AppModule.widget_educacion)
+  deleteSelectorSede(@Param('id') id: string) {
+    return this.service.deleteSelectorSede(id);
   }
 }

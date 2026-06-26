@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { UpdateEducacionSettingsDto } from '../dto/update-educacion-settings.dto';
@@ -11,9 +16,15 @@ import {
   UpdateEducacionSedeDto,
 } from '../dto/create-educacion-sede.dto';
 import {
+  CreateEducacionSelectorSedeDto,
+  UpdateEducacionSelectorSedeDto,
+} from '../dto/create-educacion-selector-sede.dto';
+import {
   EDUCACION_ASSET_URLS,
   resolveEducacionImage,
 } from './educacion-asset-urls';
+
+const DEFAULT_CALENDAR_ID = 'talleresmali@mali.pe';
 
 @Injectable()
 export class EducacionWidgetsService {
@@ -27,7 +38,7 @@ export class EducacionWidgetsService {
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({ orderBy: { sortOrder: 'asc' } }),
       this.prisma.educacionSede.findMany({
-        where: { activo: true },
+        where: { activo: true, showOnMap: true },
         orderBy: { sortOrder: 'asc' },
         include: { district: true },
       }),
@@ -63,26 +74,62 @@ export class EducacionWidgetsService {
         slug: d.slug,
         sortOrder: d.sortOrder,
       })),
+      sedes: sedes.map((s) => this.mapSedePublic(s)),
+    };
+  }
+
+  async getSelectorPublicConfig() {
+    const sedes = await this.prisma.educacionSelectorSede.findMany({
+      where: { activo: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return {
       sedes: sedes.map((s) => ({
         id: s.id,
         slug: s.slug,
         nombre: s.nombre,
-        direccion: s.direccion,
-        lat: s.lat,
-        lng: s.lng,
-        horarioHtml: s.horarioHtml,
         brochureUrl: s.brochureUrl,
-        districtId: s.districtId,
-        districtSlug: s.district?.slug ?? null,
-        showOnMap: s.showOnMap,
-        showOnSelector: s.showOnSelector,
         sortOrder: s.sortOrder,
       })),
     };
   }
 
+  async getCalendarEvents(month: number, year: number) {
+    const settings = await this.ensureSettings();
+    const apiKey = this.config.get<string>('GOOGLE_CALENDAR_API_KEY');
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        'GOOGLE_CALENDAR_API_KEY no configurada en el servidor',
+      );
+    }
+
+    const calendarId =
+      settings.googleCalendarId?.trim() || DEFAULT_CALENDAR_ID;
+    const firstDay = new Date(year, month - 1, 1).toISOString();
+    const lastDay = new Date(year, month, 0, 23, 59, 59).toISOString();
+    const url =
+      'https://www.googleapis.com/calendar/v3/calendars/' +
+      encodeURIComponent(calendarId) +
+      '/events?key=' +
+      encodeURIComponent(apiKey) +
+      '&timeMin=' +
+      encodeURIComponent(firstDay) +
+      '&timeMax=' +
+      encodeURIComponent(lastDay) +
+      '&singleEvents=true&orderBy=startTime';
+
+    const res = await fetch(url);
+    const body = (await res.json()) as { items?: unknown[]; error?: { message?: string } };
+    if (!res.ok) {
+      throw new BadGatewayException(
+        body.error?.message ?? 'No se pudo cargar el calendario de Google',
+      );
+    }
+    return body;
+  }
+
   async getAdminState() {
-    const [settings, districts, sedes] = await Promise.all([
+    const [settings, districts, sedes, selectorSedes] = await Promise.all([
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({
         orderBy: { sortOrder: 'asc' },
@@ -92,8 +139,11 @@ export class EducacionWidgetsService {
         orderBy: { sortOrder: 'asc' },
         include: { district: true },
       }),
+      this.prisma.educacionSelectorSede.findMany({
+        orderBy: { sortOrder: 'asc' },
+      }),
     ]);
-    return { settings, districts, sedes };
+    return { settings, districts, sedes, selectorSedes };
   }
 
   async updateSettings(dto: UpdateEducacionSettingsDto) {
@@ -136,6 +186,52 @@ export class EducacionWidgetsService {
     return this.prisma.educacionSede.delete({ where: { id } });
   }
 
+  createSelectorSede(dto: CreateEducacionSelectorSedeDto) {
+    return this.prisma.educacionSelectorSede.create({ data: dto });
+  }
+
+  async updateSelectorSede(id: string, dto: UpdateEducacionSelectorSedeDto) {
+    await this.findSelectorSede(id);
+    return this.prisma.educacionSelectorSede.update({ where: { id }, data: dto });
+  }
+
+  async deleteSelectorSede(id: string) {
+    await this.findSelectorSede(id);
+    return this.prisma.educacionSelectorSede.delete({ where: { id } });
+  }
+
+  private mapSedePublic(
+    s: {
+      id: string;
+      slug: string;
+      nombre: string;
+      direccion: string | null;
+      lat: number | null;
+      lng: number | null;
+      horarioHtml: string | null;
+      brochureUrl: string;
+      districtId: string | null;
+      showOnMap: boolean;
+      sortOrder: number;
+      district?: { slug: string } | null;
+    },
+  ) {
+    return {
+      id: s.id,
+      slug: s.slug,
+      nombre: s.nombre,
+      direccion: s.direccion,
+      lat: s.lat,
+      lng: s.lng,
+      horarioHtml: s.horarioHtml,
+      brochureUrl: s.brochureUrl,
+      districtId: s.districtId,
+      districtSlug: s.district?.slug ?? null,
+      showOnMap: s.showOnMap,
+      sortOrder: s.sortOrder,
+    };
+  }
+
   private async ensureSettings() {
     return this.prisma.educacionWidgetSettings.upsert({
       where: { id: 'default' },
@@ -151,6 +247,7 @@ export class EducacionWidgetsService {
         imageCirculo: EDUCACION_ASSET_URLS.circulo,
         imageCorreo: EDUCACION_ASSET_URLS.correo,
         imageMarker: EDUCACION_ASSET_URLS.marker,
+        googleCalendarId: DEFAULT_CALENDAR_ID,
       },
       update: {},
     });
@@ -165,6 +262,14 @@ export class EducacionWidgetsService {
   private async findSede(id: string) {
     const row = await this.prisma.educacionSede.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Sede no encontrada');
+    return row;
+  }
+
+  private async findSelectorSede(id: string) {
+    const row = await this.prisma.educacionSelectorSede.findUnique({
+      where: { id },
+    });
+    if (!row) throw new NotFoundException('Sede del selector no encontrada');
     return row;
   }
 }
