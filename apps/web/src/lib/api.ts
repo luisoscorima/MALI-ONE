@@ -86,24 +86,48 @@ export const api = {
       body: JSON.stringify({ modules }),
     }),
 
-  shortenUrl: (url: string, customSlug?: string) =>
+  shortenUrl: (url: string, customSlug?: string, tags?: string[]) =>
     request<import('@mali-one/shared').ShortLinkDto>('/api/links/shorten', {
       method: 'POST',
-      body: JSON.stringify({ url, customSlug }),
+      body: JSON.stringify({ url, customSlug, tags }),
     }),
 
-  uploadFile: (file: File, customSlug?: string) => {
+  createWhatsappLink: (
+    phone: string,
+    text?: string,
+    customSlug?: string,
+    tags?: string[],
+  ) =>
+    request<import('@mali-one/shared').ShortLinkDto>('/api/links/whatsapp', {
+      method: 'POST',
+      body: JSON.stringify({ phone, text, customSlug, tags }),
+    }),
+
+  uploadFile: (file: File, customSlug?: string, tags?: string[]) => {
     const form = new FormData();
     form.append('file', file);
     if (customSlug) form.append('customSlug', customSlug);
+    if (tags?.length) form.append('tags', tags.join(','));
     return request<import('@mali-one/shared').ShortLinkDto>('/api/links/upload', {
       method: 'POST',
       body: form,
     });
   },
 
-  listLinks: () =>
-    request<import('@mali-one/shared').ShortLinkDto[]>('/api/links'),
+  listLinks: (tag?: string) => {
+    const params = new URLSearchParams();
+    if (tag) params.set('tag', tag);
+    const qs = params.toString();
+    return request<import('@mali-one/shared').ShortLinkDto[]>(
+      `/api/links${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  updateLink: (id: string, body: import('@mali-one/shared').UpdateShortLinkDto) =>
+    request<import('@mali-one/shared').ShortLinkDto>(`/api/links/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 
   deleteLink: (id: string) =>
     request(`/api/links/${id}`, { method: 'DELETE' }),

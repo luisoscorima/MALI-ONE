@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsArray, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class ShortenUrlDto {
   @IsUrl({ require_protocol: true })
@@ -7,4 +7,9 @@ export class ShortenUrlDto {
   @IsOptional()
   @IsString()
   customSlug?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
 }

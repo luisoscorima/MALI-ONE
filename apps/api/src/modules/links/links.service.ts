@@ -30,6 +30,7 @@ export class LinksService {
     user: User,
     url: string,
     customSlug?: string,
+    tags?: string[],
   ) {
     let parsed: URL;
     try {
@@ -48,6 +49,7 @@ export class LinksService {
         slug,
         targetUrl: parsed.toString(),
         type: LinkType.URL,
+        tags: this.normalizeTags(tags),
         createdById: user.id,
       },
     });
@@ -56,10 +58,35 @@ export class LinksService {
     return this.toDto(link);
   }
 
+  async createWhatsappLink(
+    user: User,
+    phone: string,
+    text?: string,
+    customSlug?: string,
+    tags?: string[],
+  ) {
+    const targetUrl = this.buildWhatsappUrl(phone, text);
+    const slug = await this.resolveSlug(customSlug);
+
+    const link = await this.prisma.shortLink.create({
+      data: {
+        slug,
+        targetUrl,
+        type: LinkType.WHATSAPP,
+        tags: this.normalizeTags(tags),
+        createdById: user.id,
+      },
+    });
+
+    await this.cacheSlug(slug, targetUrl);
+    return this.toDto(link);
+  }
+
   async uploadFile(
     user: User,
     file: Express.Multer.File,
     customSlug?: string,
+    tags?: string[],
   ) {
     if (!file) {
       throw new BadRequestException('Archivo requerido');
@@ -82,6 +109,7 @@ export class LinksService {
         s3Key: key,
         fileName: file.originalname,
         mimeType: file.mimetype,
+        tags: this.normalizeTags(tags),
         createdById: user.id,
       },
     });
@@ -91,14 +119,99 @@ export class LinksService {
     return this.toDto(link);
   }
 
-  async listLinks(user: User) {
-    const where = user.role === UserRole.admin ? {} : { createdById: user.id };
+  async listLinks(user: User, tag?: string) {
+    const where =
+      user.role === UserRole.admin ? {} : { createdById: user.id };
+    const normalizedTag = tag?.trim().toLowerCase();
+
     const links = await this.prisma.shortLink.findMany({
-      where,
+      where: normalizedTag
+        ? { ...where, tags: { has: normalizedTag } }
+        : where,
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
     return Promise.all(links.map((l) => this.toDto(l, false)));
+  }
+
+  async updateLink(
+    user: User,
+    id: string,
+    input: {
+      url?: string;
+      phone?: string;
+      text?: string;
+      tags?: string[];
+    },
+  ) {
+    const link = await this.findOwnedLink(user, id);
+    const data: {
+      targetUrl?: string;
+      tags?: string[];
+    } = {};
+
+    if (input.tags !== undefined) {
+      data.tags = this.normalizeTags(input.tags);
+    }
+
+    if (link.type === LinkType.WHATSAPP) {
+      if (input.url !== undefined) {
+        throw new BadRequestException(
+          'Usa phone y text para editar enlaces de WhatsApp',
+        );
+      }
+
+      if (input.phone !== undefined || input.text !== undefined) {
+        const current = this.parseWhatsappFromUrl(link.targetUrl);
+        const phone = input.phone ?? current.phone;
+        const text = input.text !== undefined ? input.text : current.text;
+        data.targetUrl = this.buildWhatsappUrl(phone, text);
+      }
+    } else if (link.type === LinkType.URL) {
+      if (input.phone !== undefined || input.text !== undefined) {
+        throw new BadRequestException(
+          'Usa url para editar enlaces de tipo URL',
+        );
+      }
+
+      if (input.url !== undefined) {
+        let parsed: URL;
+        try {
+          parsed = new URL(input.url);
+        } catch {
+          throw new BadRequestException('URL inválida');
+        }
+
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          throw new BadRequestException('Solo se permiten URLs http/https');
+        }
+
+        data.targetUrl = parsed.toString();
+      }
+    } else if (
+      input.url !== undefined ||
+      input.phone !== undefined ||
+      input.text !== undefined
+    ) {
+      throw new BadRequestException(
+        'Los enlaces de archivo solo permiten editar tags',
+      );
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No hay cambios para aplicar');
+    }
+
+    const updated = await this.prisma.shortLink.update({
+      where: { id },
+      data,
+    });
+
+    if (data.targetUrl) {
+      await this.refreshCache(link.slug, data.targetUrl);
+    }
+
+    return this.toDto(updated, false);
   }
 
   async deleteLink(user: User, id: string) {
@@ -165,6 +278,79 @@ export class LinksService {
     await this.redis.client.set(`link:${slug}`, targetUrl, 'EX', 60 * 60 * 24);
   }
 
+  private async refreshCache(slug: string, targetUrl: string) {
+    await this.redis.client.del(`link:${slug}`);
+    await this.cacheSlug(slug, targetUrl);
+  }
+
+  private async findOwnedLink(user: User, id: string) {
+    const link = await this.prisma.shortLink.findUnique({ where: { id } });
+    if (!link) {
+      throw new NotFoundException('Enlace no encontrado');
+    }
+    if (user.role !== UserRole.admin && link.createdById !== user.id) {
+      throw new NotFoundException('Enlace no encontrado');
+    }
+    return link;
+  }
+
+  private normalizeTags(tags?: string[]): string[] {
+    if (!tags?.length) return [];
+
+    const normalized = tags
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean);
+
+    const unique = [...new Set(normalized)];
+    if (unique.length > 10) {
+      throw new BadRequestException('Máximo 10 tags por enlace');
+    }
+
+    for (const tag of unique) {
+      if (tag.length > 32) {
+        throw new BadRequestException('Cada tag admite hasta 32 caracteres');
+      }
+      if (!/^[a-z0-9_-]+$/.test(tag)) {
+        throw new BadRequestException(
+          'Tags inválidos (solo minúsculas, números, _ y -)',
+        );
+      }
+    }
+
+    return unique;
+  }
+
+  private parseWhatsappFromUrl(targetUrl: string): {
+    phone: string;
+    text?: string;
+  } {
+    try {
+      const parsed = new URL(targetUrl);
+      const phone = parsed.searchParams.get('phone') ?? '';
+      const text = parsed.searchParams.get('text') ?? undefined;
+      return { phone, text };
+    } catch {
+      throw new BadRequestException('Enlace de WhatsApp inválido');
+    }
+  }
+
+  private buildWhatsappUrl(phone: string, text?: string): string {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 15) {
+      throw new BadRequestException(
+        'Número inválido (8-15 dígitos con código de país)',
+      );
+    }
+
+    const params = new URLSearchParams({ phone: digits });
+    const message = text?.trim();
+    if (message) {
+      params.set('text', message);
+    }
+
+    return `https://api.whatsapp.com/send?${params.toString()}`;
+  }
+
   private async resolveSlug(customSlug?: string): Promise<string> {
     const slug = customSlug?.trim() || generateSlug();
     if (!/^[a-zA-Z0-9_-]{3,32}$/.test(slug)) {
@@ -191,6 +377,7 @@ export class LinksService {
       mimeType: string | null;
       clickCount: number;
       createdAt: Date;
+      tags: string[];
     },
     includeQr = true,
   ) {
@@ -210,6 +397,7 @@ export class LinksService {
       s3Key: link.s3Key,
       clickCount: link.clickCount,
       createdAt: link.createdAt.toISOString(),
+      tags: link.tags,
       qrBase64,
     };
   }

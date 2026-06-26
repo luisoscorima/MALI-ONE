@@ -50,13 +50,21 @@ export interface ShortLinkDto {
   slug: string;
   targetUrl: string;
   shortUrl: string;
-  type: 'URL' | 'FILE';
+  type: 'URL' | 'FILE' | 'WHATSAPP';
   fileName: string | null;
   mimeType: string | null;
   s3Key: string | null;
   clickCount: number;
   createdAt: string;
+  tags: string[];
   qrBase64?: string;
+}
+
+export interface UpdateShortLinkDto {
+  url?: string;
+  phone?: string;
+  text?: string;
+  tags?: string[];
 }
 
 export interface GoogleWorkspaceUser {

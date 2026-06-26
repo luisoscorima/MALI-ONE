@@ -22,6 +22,7 @@ enum AppModule {
 enum LinkType {
   URL
   FILE
+  WHATSAPP
 }
 
 model User {
@@ -70,6 +71,8 @@ model ShortLink {
   createdBy   User     @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   clickCount  Int      @default(0)
+  tags        String[] @default([])
 
   @@index([createdById])
+  @@index([tags], type: Gin)
 }

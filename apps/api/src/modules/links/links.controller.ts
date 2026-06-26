@@ -4,7 +4,9 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -14,8 +16,16 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule, User } from '@prisma/client';
 import { Request, Response } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
+import { CreateWhatsappLinkDto } from './dto/create-whatsapp.dto';
 import { ShortenUrlDto } from './dto/shorten-url.dto';
+import { UpdateLinkDto } from './dto/update-link.dto';
 import { LinksService } from './links.service';
+
+function parseTagsInput(raw?: string | string[]): string[] | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const values = Array.isArray(raw) ? raw : raw.split(',');
+  return values.map((tag) => tag.trim()).filter(Boolean);
+}
 
 @Controller('links')
 @RequireModule(AppModule.links)
@@ -24,7 +34,23 @@ export class LinksController {
 
   @Post('shorten')
   shorten(@Req() req: Request, @Body() body: ShortenUrlDto) {
-    return this.links.shortenUrl(req.user as User, body.url, body.customSlug);
+    return this.links.shortenUrl(
+      req.user as User,
+      body.url,
+      body.customSlug,
+      body.tags,
+    );
+  }
+
+  @Post('whatsapp')
+  whatsapp(@Req() req: Request, @Body() body: CreateWhatsappLinkDto) {
+    return this.links.createWhatsappLink(
+      req.user as User,
+      body.phone,
+      body.text,
+      body.customSlug,
+      body.tags,
+    );
   }
 
   @Post('upload')
@@ -33,13 +59,28 @@ export class LinksController {
     @Req() req: Request,
     @UploadedFile() file: Express.Multer.File,
     @Body('customSlug') customSlug?: string,
+    @Body('tags') tagsRaw?: string,
   ) {
-    return this.links.uploadFile(req.user as User, file, customSlug);
+    return this.links.uploadFile(
+      req.user as User,
+      file,
+      customSlug,
+      parseTagsInput(tagsRaw),
+    );
   }
 
   @Get()
-  list(@Req() req: Request) {
-    return this.links.listLinks(req.user as User);
+  list(@Req() req: Request, @Query('tag') tag?: string) {
+    return this.links.listLinks(req.user as User, tag);
+  }
+
+  @Patch(':id')
+  update(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: UpdateLinkDto,
+  ) {
+    return this.links.updateLink(req.user as User, id, body);
   }
 
   @Delete(':id')

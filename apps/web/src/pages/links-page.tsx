@@ -1,13 +1,18 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import type { ShortLinkDto } from '@mali-one/shared';
+import type { ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
+import {
+  formatTagsInput,
+  parseTagsInput,
+  parseWhatsappTarget,
+} from '@/lib/parse-tags';
 import { useToast } from '@/contexts/toast-context';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import { Button, Card, Input } from '@/components/ui';
 
-type Tab = 'url' | 'file';
+type Tab = 'url' | 'file' | 'whatsapp';
 
 interface QrPreview {
   link: ShortLinkDto;
@@ -15,11 +20,24 @@ interface QrPreview {
   loading?: boolean;
 }
 
+interface EditLinkState {
+  link: ShortLinkDto;
+  url: string;
+  phone: string;
+  text: string;
+  tags: string;
+  saving: boolean;
+}
+
 export function LinksPage() {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('url');
   const [url, setUrl] = useState('');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappText, setWhatsappText] = useState('');
   const [customSlug, setCustomSlug] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ShortLinkDto | null>(null);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
@@ -27,6 +45,7 @@ export function LinksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [qrPreview, setQrPreview] = useState<QrPreview | null>(null);
+  const [editLink, setEditLink] = useState<EditLinkState | null>(null);
 
   const loadLinks = useCallback(async () => {
     setListLoading(true);
@@ -56,20 +75,67 @@ export function LinksPage() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [qrPreview]);
 
+  useEffect(() => {
+    if (!editLink) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setEditLink(null);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [editLink]);
+
+  function getTagsFromInput() {
+    const tags = parseTagsInput(tagsInput);
+    return tags.length ? tags : undefined;
+  }
+
   async function handleShorten(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError('');
     setResult(null);
     try {
-      const data = await api.shortenUrl(url, customSlug || undefined);
+      const data = await api.shortenUrl(
+        url,
+        customSlug || undefined,
+        getTagsFromInput(),
+      );
       setResult(data);
       setUrl('');
       setCustomSlug('');
+      setTagsInput('');
       toast.success('Enlace acortado correctamente');
       await loadLinks();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al acortar';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleWhatsapp(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    setResult(null);
+    try {
+      const data = await api.createWhatsappLink(
+        whatsappPhone,
+        whatsappText || undefined,
+        customSlug || undefined,
+        getTagsFromInput(),
+      );
+      setResult(data);
+      setWhatsappPhone('');
+      setWhatsappText('');
+      setCustomSlug('');
+      setTagsInput('');
+      toast.success('Enlace de WhatsApp creado correctamente');
+      await loadLinks();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al crear enlace de WhatsApp';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -84,10 +150,15 @@ export function LinksPage() {
     setError('');
     setResult(null);
     try {
-      const data = await api.uploadFile(file, customSlug || undefined);
+      const data = await api.uploadFile(
+        file,
+        customSlug || undefined,
+        getTagsFromInput(),
+      );
       setResult(data);
       setFile(null);
       setCustomSlug('');
+      setTagsInput('');
       toast.success('Archivo subido y QR generado');
       await loadLinks();
     } catch (e) {
@@ -96,6 +167,62 @@ export function LinksPage() {
       toast.error(msg);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function openEdit(link: ShortLinkDto) {
+    if (link.type === 'WHATSAPP') {
+      const { phone, text } = parseWhatsappTarget(link.targetUrl);
+      setEditLink({
+        link,
+        url: '',
+        phone,
+        text,
+        tags: formatTagsInput(link.tags),
+        saving: false,
+      });
+      return;
+    }
+
+    setEditLink({
+      link,
+      url: link.type === 'URL' ? link.targetUrl : '',
+      phone: '',
+      text: '',
+      tags: formatTagsInput(link.tags),
+      saving: false,
+    });
+  }
+
+  async function handleSaveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editLink) return;
+
+    setEditLink((current) => (current ? { ...current, saving: true } : null));
+    setError('');
+
+    const body: UpdateShortLinkDto = {
+      tags: parseTagsInput(editLink.tags),
+    };
+
+    if (editLink.link.type === 'WHATSAPP') {
+      body.phone = editLink.phone;
+      body.text = editLink.text;
+    } else if (editLink.link.type === 'URL') {
+      body.url = editLink.url;
+    }
+
+    try {
+      const updated = await api.updateLink(editLink.link.id, body);
+      if (result?.id === updated.id) setResult(updated);
+      toast.success('Enlace actualizado (URL corta y QR sin cambios)');
+      setEditLink(null);
+      await loadLinks();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al actualizar enlace';
+      setError(msg);
+      toast.error(msg);
+      setEditLink((current) => (current ? { ...current, saving: false } : null));
     }
   }
 
@@ -152,12 +279,43 @@ export function LinksPage() {
   }, [qrPreview?.objectUrl]);
 
   const resultDest = result ? formatLinkDestination(result) : null;
+  const allTags = [...new Set(links.flatMap((link) => link.tags))].sort();
+  const filteredLinks = tagFilter
+    ? links.filter((link) => link.tags.includes(tagFilter))
+    : links;
+
+  function TagsField({
+    value,
+    onChange,
+    id,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+    id?: string;
+  }) {
+    return (
+      <label className="block" htmlFor={id}>
+        <span className="mb-2 block text-sm text-muted">
+          Tags (opcional, separados por coma)
+        </span>
+        <Input
+          id={id}
+          placeholder="campana, ventas, qr-flyer"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-muted">
+          Minúsculas, números, guiones y guiones bajos. Máx. 10 tags.
+        </p>
+      </label>
+    );
+  }
 
   return (
     <div>
       <PageHeader
         title="Enlaces y QR"
-        description="Acorta URLs, genera códigos QR y comparte archivos vía S3"
+        description="Acorta URLs, crea enlaces de WhatsApp, genera códigos QR y comparte archivos vía S3"
       />
 
       <div className="mb-6 flex gap-2">
@@ -172,6 +330,12 @@ export function LinksPage() {
           onClick={() => setTab('file')}
         >
           Archivo
+        </Button>
+        <Button
+          variant={tab === 'whatsapp' ? 'default' : 'outline'}
+          onClick={() => setTab('whatsapp')}
+        >
+          WhatsApp
         </Button>
       </div>
 
@@ -193,6 +357,11 @@ export function LinksPage() {
               value={customSlug}
               onChange={(e) => setCustomSlug(e.target.value)}
             />
+            <TagsField
+              id="tags-url"
+              value={tagsInput}
+              onChange={setTagsInput}
+            />
             <Button type="submit" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
@@ -200,6 +369,46 @@ export function LinksPage() {
                 </span>
               ) : (
                 'Acortar y generar QR'
+              )}
+            </Button>
+          </form>
+        ) : tab === 'whatsapp' ? (
+          <form className="grid gap-3" onSubmit={handleWhatsapp}>
+            <Input
+              placeholder="Número con código de país (ej. 51987654321 o +51 987 654 321)"
+              value={whatsappPhone}
+              onChange={(e) => setWhatsappPhone(e.target.value)}
+              required
+            />
+            <label className="block">
+              <span className="mb-2 block text-sm text-muted">
+                Mensaje prellenado (opcional)
+              </span>
+              <textarea
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="Hola, me gustaría obtener más información..."
+                value={whatsappText}
+                onChange={(e) => setWhatsappText(e.target.value)}
+                rows={4}
+              />
+            </label>
+            <Input
+              placeholder="Slug personalizado (opcional)"
+              value={customSlug}
+              onChange={(e) => setCustomSlug(e.target.value)}
+            />
+            <TagsField
+              id="tags-whatsapp"
+              value={tagsInput}
+              onChange={setTagsInput}
+            />
+            <Button type="submit" disabled={submitting}>
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <Spinner className="h-4 w-4" /> Procesando...
+                </span>
+              ) : (
+                'Crear enlace y generar QR'
               )}
             </Button>
           </form>
@@ -220,6 +429,11 @@ export function LinksPage() {
               placeholder="Slug personalizado (opcional)"
               value={customSlug}
               onChange={(e) => setCustomSlug(e.target.value)}
+            />
+            <TagsField
+              id="tags-file"
+              value={tagsInput}
+              onChange={setTagsInput}
             />
             <Button type="submit" disabled={submitting || !file}>
               {submitting ? (
@@ -272,6 +486,21 @@ export function LinksPage() {
                   <p className="mt-1 text-xs text-muted">{resultDest.secondary}</p>
                 )}
               </div>
+              {result.tags.length > 0 && (
+                <div>
+                  <p className="mb-1 text-muted">Tags</p>
+                  <div className="flex flex-wrap gap-1">
+                    {result.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded bg-border px-2 py-0.5 text-xs"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <a
                 href={api.qrUrl(result.id)}
                 className="inline-block text-primary underline"
@@ -286,7 +515,28 @@ export function LinksPage() {
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-border px-4 py-3">
-          <h3 className="font-semibold">Historial</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-semibold">Historial</h3>
+            {allTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant={tagFilter ? 'outline' : 'default'}
+                  onClick={() => setTagFilter('')}
+                >
+                  Todos
+                </Button>
+                {allTags.map((tag) => (
+                  <Button
+                    key={tag}
+                    variant={tagFilter === tag ? 'default' : 'outline'}
+                    onClick={() => setTagFilter(tag)}
+                  >
+                    #{tag}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
@@ -294,27 +544,32 @@ export function LinksPage() {
               <tr>
                 <th className="p-4">Slug</th>
                 <th className="p-4">Tipo</th>
+                <th className="p-4">Tags</th>
                 <th className="p-4">Destino</th>
                 <th className="p-4">Clicks</th>
                 <th className="p-4">Acciones</th>
               </tr>
             </thead>
             {listLoading ? (
-              <TableSkeleton rows={4} cols={5} />
-            ) : links.length === 0 ? (
+              <TableSkeleton rows={4} cols={6} />
+            ) : filteredLinks.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <EmptyState
-                      title="Sin enlaces todavía"
-                      description="Acorta una URL o sube un archivo para empezar."
+                      title={tagFilter ? 'Sin enlaces con ese tag' : 'Sin enlaces todavía'}
+                      description={
+                        tagFilter
+                          ? 'Prueba otro tag o quita el filtro.'
+                          : 'Acorta una URL, crea un enlace de WhatsApp o sube un archivo para empezar.'
+                      }
                     />
                   </td>
                 </tr>
               </tbody>
             ) : (
               <tbody>
-                {links.map((link) => {
+                {filteredLinks.map((link) => {
                   const dest = formatLinkDestination(link);
                   return (
                     <tr key={link.id} className="border-b border-border/60">
@@ -333,11 +588,31 @@ export function LinksPage() {
                           className={
                             link.type === 'FILE'
                               ? 'rounded bg-primary/15 px-2 py-0.5 text-xs text-primary'
-                              : 'rounded bg-border px-2 py-0.5 text-xs'
+                              : link.type === 'WHATSAPP'
+                                ? 'rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400'
+                                : 'rounded bg-border px-2 py-0.5 text-xs'
                           }
                         >
                           {link.type}
                         </span>
+                      </td>
+                      <td className="p-4">
+                        {link.tags.length > 0 ? (
+                          <div className="flex max-w-[10rem] flex-wrap gap-1">
+                            {link.tags.map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                className="rounded bg-border px-2 py-0.5 text-xs hover:bg-border/70"
+                                onClick={() => setTagFilter(tag)}
+                              >
+                                #{tag}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
                       </td>
                       <td className="max-w-xs p-4" title={dest.secondary ?? dest.primary}>
                         <p className="truncate font-medium">{dest.primary}</p>
@@ -350,6 +625,12 @@ export function LinksPage() {
                       <td className="p-4">{link.clickCount}</td>
                       <td className="p-4">
                         <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => openEdit(link)}
+                          >
+                            Editar
+                          </Button>
                           <Button
                             variant="outline"
                             onClick={() => void handleRegenerateQr(link)}
@@ -378,6 +659,121 @@ export function LinksPage() {
           </table>
         </div>
       </Card>
+
+      {editLink && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setEditLink(null)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Card className="w-full max-w-lg">
+              <h3 id="edit-dialog-title" className="mb-1 font-semibold">
+                Editar enlace
+              </h3>
+              <p className="mb-4 text-sm text-muted">
+                El slug, URL corta y QR no cambian. Solo se actualiza el destino
+                y los tags.
+              </p>
+
+              <form className="grid gap-3" onSubmit={handleSaveEdit}>
+                {editLink.link.type === 'WHATSAPP' && (
+                  <>
+                    <Input
+                      placeholder="Número con código de país"
+                      value={editLink.phone}
+                      onChange={(e) =>
+                        setEditLink((current) =>
+                          current
+                            ? { ...current, phone: e.target.value }
+                            : null,
+                        )
+                      }
+                      required
+                    />
+                    <label className="block">
+                      <span className="mb-2 block text-sm text-muted">
+                        Mensaje prellenado
+                      </span>
+                      <textarea
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                        value={editLink.text}
+                        onChange={(e) =>
+                          setEditLink((current) =>
+                            current
+                              ? { ...current, text: e.target.value }
+                              : null,
+                          )
+                        }
+                        rows={4}
+                      />
+                    </label>
+                  </>
+                )}
+
+                {editLink.link.type === 'URL' && (
+                  <Input
+                    placeholder="https://ejemplo.com/pagina"
+                    value={editLink.url}
+                    onChange={(e) =>
+                      setEditLink((current) =>
+                        current ? { ...current, url: e.target.value } : null,
+                      )
+                    }
+                    required
+                  />
+                )}
+
+                {editLink.link.type === 'FILE' && (
+                  <p className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted">
+                    Archivo: {editLink.link.fileName ?? editLink.link.slug}. Solo
+                    puedes editar los tags.
+                  </p>
+                )}
+
+                <TagsField
+                  id="edit-tags"
+                  value={editLink.tags}
+                  onChange={(value) =>
+                    setEditLink((current) =>
+                      current ? { ...current, tags: value } : null,
+                    )
+                  }
+                />
+
+                <p className="text-xs text-muted">
+                  Enlace corto:{' '}
+                  <span className="font-medium">{editLink.link.shortUrl}</span>
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={editLink.saving}>
+                    {editLink.saving ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner className="h-4 w-4" /> Guardando...
+                      </span>
+                    ) : (
+                      'Guardar cambios'
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditLink(null)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        </div>
+      )}
 
       {qrPreview && (
         <div

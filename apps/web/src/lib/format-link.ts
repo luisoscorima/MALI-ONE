@@ -12,6 +12,24 @@ export function formatLinkDestination(link: ShortLinkDto): {
     return { primary, secondary };
   }
 
+  if (link.type === 'WHATSAPP') {
+    try {
+      const parsed = new URL(link.targetUrl);
+      const phone = parsed.searchParams.get('phone') ?? '';
+      const text = parsed.searchParams.get('text');
+      return {
+        primary: phone ? `WhatsApp · +${phone}` : 'WhatsApp',
+        secondary: text
+          ? text.length > 80
+            ? `${text.slice(0, 80)}…`
+            : text
+          : link.targetUrl,
+      };
+    } catch {
+      return { primary: 'WhatsApp', secondary: link.targetUrl };
+    }
+  }
+
   try {
     const parsed = new URL(link.targetUrl);
     return {
