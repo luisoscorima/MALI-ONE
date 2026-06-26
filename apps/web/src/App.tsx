@@ -8,6 +8,7 @@ import { AppUsersPage } from '@/pages/app-users-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { LinksPage } from '@/pages/links-page';
 import { LoginPage } from '@/pages/login-page';
+import { PasswordVaultPage } from '@/pages/password-vault-page';
 import { S3ManagerPage } from '@/pages/s3-manager-page';
 
 export function App() {
@@ -28,6 +29,9 @@ export function App() {
               </Route>
               <Route element={<ModuleGuard module="s3_manager" />}>
                 <Route path="admin/s3" element={<S3ManagerPage />} />
+              </Route>
+              <Route element={<ModuleGuard module="password_vault" />}>
+                <Route path="vault" element={<PasswordVaultPage />} />
               </Route>
               <Route element={<SuperAdminGuard />}>
                 <Route path="admin/app-users" element={<AppUsersPage />} />

@@ -20,4 +20,9 @@ export const APP_MODULES: {
     label: 'Gestor S3',
     description: 'Explorar buckets y archivos en AWS.',
   },
+  {
+    id: 'password_vault',
+    label: 'Bóveda de Contraseñas',
+    description: 'Acceder a Vaultwarden para gestionar credenciales.',
+  },
 ];

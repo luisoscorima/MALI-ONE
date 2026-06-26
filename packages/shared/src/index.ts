@@ -1,6 +1,10 @@
 export type UserRole = 'admin' | 'operator';
 
-export type AppModule = 'links' | 'workspace_users' | 's3_manager';
+export type AppModule =
+  | 'links'
+  | 'workspace_users'
+  | 's3_manager'
+  | 'password_vault';
 
 export interface AuthUser {
   id: string;

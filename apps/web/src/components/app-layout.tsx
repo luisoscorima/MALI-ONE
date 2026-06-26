@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { HardDrive, Link2, LayoutDashboard, LogOut, Menu, Shield, Users, X } from 'lucide-react';
+import {
+  HardDrive,
+  KeyRound,
+  Link2,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Shield,
+  Users,
+  X,
+} from 'lucide-react';
 import type { AppModule } from '@mali-one/shared';
 import { useAuth } from '@/contexts/auth-context';
 import { MaliLogo } from '@/components/mali-logo';
@@ -34,6 +44,12 @@ const navItems: {
     label: 'Gestor S3',
     icon: HardDrive,
     module: 's3_manager',
+  },
+  {
+    to: '/vault',
+    label: 'Bóveda de Contraseñas',
+    icon: KeyRound,
+    module: 'password_vault',
   },
 ];
 

@@ -4,6 +4,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.links,
   AppModule.workspace_users,
   AppModule.s3_manager,
+  AppModule.password_vault,
 ];
 
 type UserWithModules = User & {
