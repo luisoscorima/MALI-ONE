@@ -107,7 +107,9 @@ model EducacionWidgetSettings {
   soporteVirtual  String
   imageRectangulo String
   imageWhatsapp   String
+  imageCirculo    String
   imageCorreo     String
+  imageMarker     String
   mapsApiKey      String?
   updatedAt       DateTime @updatedAt
 }

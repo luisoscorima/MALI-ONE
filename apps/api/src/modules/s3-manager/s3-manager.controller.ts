@@ -36,6 +36,14 @@ export class S3ManagerController {
     return this.s3Manager.getDownloadUrl(bucket, key);
   }
 
+  @Get('buckets/:bucket/public-url')
+  publicUrl(
+    @Param('bucket') bucket: string,
+    @Query('key') key: string,
+  ) {
+    return this.s3Manager.getPublicUrl(bucket, key);
+  }
+
   @Delete('buckets/:bucket/objects')
   deleteObject(
     @Param('bucket') bucket: string,

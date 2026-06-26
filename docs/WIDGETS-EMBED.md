@@ -51,8 +51,10 @@ window.addEventListener('message', function (e) {
 ## Configuración en MALI ONE
 
 1. Asigna módulos `widget_educacion`, `widget_biblioteca` o `widget_pam` en **Accesos MALI ONE**.
-2. Edita datos en **Widgets Educación / Biblioteca / PAM** (pestaña Configuración).
+2. Edita datos en **Widgets Educación / Biblioteca / PAM** (`/admin/widgets/...`, pestaña Configuración).
 3. Previsualiza en la pestaña **Vista previa**.
+
+**Nota:** Las rutas del panel admin son `/admin/widgets/*`. Los HTML embebibles públicos siguen en `/widgets/*.html` (sin conflicto con nginx).
 
 ## API pública (sin autenticación)
 

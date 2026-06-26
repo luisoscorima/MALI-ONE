@@ -1,17 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PamAdminStateDto, PamPlanDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
+import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
+import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
-import { PAM_PREVIEW_TABS } from '@/lib/widget-tools';
 
-export function WidgetPamPage() {
+const MEMBERSHIP_PREVIEW = [
+  {
+    id: 'membership',
+    label: 'Membresías',
+    src: '/widgets/pam/membership.html',
+    height: '900px',
+    pamEmbed: true,
+  },
+];
+
+export function WidgetMuseoMembershipPage() {
   const toast = useToast();
   const [state, setState] = useState<PamAdminStateDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const area = WIDGET_AREAS.museo;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,10 +216,11 @@ export function WidgetPamPage() {
 
   return (
     <WidgetToolLayout
-      title="PAM Membresías"
-      description="Configura planes y registros para mali.pe/es"
+      backLink={<WidgetBackLink area={area} />}
+      title="Membresías PAM"
+      description="Widget para mali.pe/es — planes, beneficios y registros"
       config={config}
-      preview={<WidgetPreviewFrame tabs={PAM_PREVIEW_TABS} />}
+      preview={<WidgetPreviewFrame tabs={MEMBERSHIP_PREVIEW} />}
     />
   );
 }

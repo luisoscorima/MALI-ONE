@@ -4,6 +4,7 @@ import {
   Download,
   Folder,
   HardDrive,
+  Link2,
   RefreshCw,
   Trash2,
 } from 'lucide-react';
@@ -115,6 +116,23 @@ export function S3ManagerPage() {
       void loadObjects(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+    }
+  }
+
+  async function handleCopyPublicUrl(item: S3ObjectItem) {
+    if (!selectedBucket || item.isFolder) return;
+    try {
+      const { url } = await api.getS3PublicUrl(selectedBucket, item.key);
+      if (!url) {
+        toast.error('Este archivo no tiene enlace público');
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success('Enlace público copiado al portapapeles');
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Error al obtener enlace público',
+      );
     }
   }
 
@@ -250,13 +268,20 @@ export function S3ManagerPage() {
                       </td>
                       <td className="p-4">
                         {!item.isFolder && (
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <Button
                               variant="outline"
                               onClick={() => void handleDownload(item)}
                             >
                               <Download size={14} className="mr-1 inline" />
                               Descargar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => void handleCopyPublicUrl(item)}
+                            >
+                              <Link2 size={14} className="mr-1 inline" />
+                              Enlace público
                             </Button>
                             <Button
                               variant="danger"

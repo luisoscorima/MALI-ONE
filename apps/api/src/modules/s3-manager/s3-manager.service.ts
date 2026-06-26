@@ -106,6 +106,19 @@ export class S3ManagerService {
     });
   }
 
+  async getPublicUrl(bucket: string, key: string) {
+    return this.run(`publicUrl:${bucket}`, async () => {
+      this.assertBucketAllowed(bucket);
+      if (!key || key.endsWith('/')) {
+        throw new BadRequestException('Clave de objeto inválida');
+      }
+
+      const url = this.buildPublicUrl(bucket, key);
+      const isPublic = await this.isPubliclyAccessible(url);
+      return { url: isPublic ? url : null };
+    });
+  }
+
   async deleteObject(bucket: string, key: string) {
     return this.run(`delete:${bucket}`, async () => {
       this.assertBucketAllowed(bucket);
@@ -171,5 +184,22 @@ export class S3ManagerService {
       .split(',')
       .map((b) => b.trim())
       .filter(Boolean);
+  }
+
+  private buildPublicUrl(bucket: string, key: string): string {
+    const encodedKey = key
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+    return `https://${bucket}.s3.${this.region}.amazonaws.com/${encodedKey}`;
+  }
+
+  private async isPubliclyAccessible(url: string): Promise<boolean> {
+    try {
+      const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 }

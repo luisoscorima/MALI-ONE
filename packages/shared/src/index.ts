@@ -48,6 +48,10 @@ export interface S3ListObjectsResult {
   nextContinuationToken: string | null;
 }
 
+export interface S3PublicUrlResult {
+  url: string | null;
+}
+
 export interface ShortLinkDto {
   id: string;
   slug: string;
@@ -104,7 +108,9 @@ export interface EducacionWidgetSettingsDto {
   soporteVirtual: string;
   imageRectangulo: string;
   imageWhatsapp: string;
+  imageCirculo: string;
   imageCorreo: string;
+  imageMarker: string;
   mapsApiKey: string | null;
 }
 

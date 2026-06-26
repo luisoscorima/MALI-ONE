@@ -170,6 +170,11 @@ export const api = {
       `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/download?key=${encodeURIComponent(key)}`,
     ),
 
+  getS3PublicUrl: (bucket: string, key: string) =>
+    request<import('@mali-one/shared').S3PublicUrlResult>(
+      `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/public-url?key=${encodeURIComponent(key)}`,
+    ),
+
   deleteS3Object: (bucket: string, key: string) =>
     request<{ ok: boolean }>(
       `/api/s3-manager/buckets/${encodeURIComponent(bucket)}/objects?key=${encodeURIComponent(key)}`,

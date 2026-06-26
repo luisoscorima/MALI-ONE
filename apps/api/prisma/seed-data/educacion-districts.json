@@ -1,0 +1,37 @@
+[
+  {
+    "slug": "lima",
+    "name": "Sede Principal - Lima",
+    "sortOrder": 0
+  },
+  {
+    "slug": "chorrillos",
+    "name": "Chorrillos",
+    "sortOrder": 1
+  },
+  {
+    "slug": "la-molina",
+    "name": "La Molina",
+    "sortOrder": 2
+  },
+  {
+    "slug": "los-olivos",
+    "name": "Los Olivos",
+    "sortOrder": 3
+  },
+  {
+    "slug": "sjl",
+    "name": "San Juan de Lurigancho",
+    "sortOrder": 4
+  },
+  {
+    "slug": "san-miguel",
+    "name": "San Miguel",
+    "sortOrder": 5
+  },
+  {
+    "slug": "sede-virtual",
+    "name": "Sede Virtual",
+    "sortOrder": 6
+  }
+]

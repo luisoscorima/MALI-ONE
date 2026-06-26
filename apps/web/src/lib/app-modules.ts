@@ -37,7 +37,7 @@ export const APP_MODULES: {
   },
   {
     id: 'widget_pam',
-    label: 'PAM Membresías',
-    description: 'Planes y registros para mali.pe/es.',
+    label: 'Widgets Museo',
+    description: 'Membresías PAM y widgets para mali.pe/es.',
   },
 ];

@@ -20,7 +20,9 @@
       var key = img.getAttribute('data-img');
       if (key === 'RECTANGULO') img.src = settings.images.rectangulo;
       if (key === 'WHATSAPP') img.src = settings.images.whatsapp;
+      if (key === 'CIRCULO') img.src = settings.images.circulo;
       if (key === 'CORREO') img.src = settings.images.correo;
+      if (key === 'MARKER') img.src = settings.images.marker;
     });
   }
 

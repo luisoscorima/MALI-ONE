@@ -31,7 +31,15 @@ export class UpdateEducacionSettingsDto {
 
   @IsOptional()
   @IsString()
+  imageCirculo?: string;
+
+  @IsOptional()
+  @IsString()
   imageCorreo?: string;
+
+  @IsOptional()
+  @IsString()
+  imageMarker?: string;
 
   @IsOptional()
   @IsString()

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, GraduationCap, HardDrive, Heart, KeyRound, Link2, Users } from 'lucide-react';
+import { ArrowRight, BookOpen, GraduationCap, HardDrive, KeyRound, Landmark, Link2, Users } from 'lucide-react';
 import { APP_MODULES } from '@/lib/app-modules';
 import { useAuth } from '@/contexts/auth-context';
 import { EmptyState } from '@/components/feedback';
@@ -15,9 +15,9 @@ const moduleRoutes: Record<
   workspace_users: { to: '/admin/users', icon: Users },
   s3_manager: { to: '/admin/s3', icon: HardDrive },
   password_vault: { to: '/vault', icon: KeyRound },
-  widget_educacion: { to: '/widgets/educacion', icon: GraduationCap },
-  widget_biblioteca: { to: '/widgets/biblioteca', icon: BookOpen },
-  widget_pam: { to: '/widgets/pam', icon: Heart },
+  widget_educacion: { to: '/admin/widgets/educacion', icon: GraduationCap },
+  widget_biblioteca: { to: '/admin/widgets/biblioteca', icon: BookOpen },
+  widget_pam: { to: '/admin/widgets/museo', icon: Landmark },
 };
 
 export function DashboardPage() {

@@ -10,9 +10,15 @@ import { LinksPage } from '@/pages/links-page';
 import { LoginPage } from '@/pages/login-page';
 import { PasswordVaultPage } from '@/pages/password-vault-page';
 import { S3ManagerPage } from '@/pages/s3-manager-page';
-import { WidgetBibliotecaPage } from '@/pages/widget-biblioteca-page';
-import { WidgetEducacionPage } from '@/pages/widget-educacion-page';
-import { WidgetPamPage } from '@/pages/widget-pam-page';
+import { WidgetBibliotecaCarruselPage } from '@/pages/widget-biblioteca-carrusel-page';
+import { WidgetBibliotecaHubPage } from '@/pages/widget-biblioteca-hub-page';
+import { WidgetBibliotecaInterfazPage } from '@/pages/widget-biblioteca-interfaz-page';
+import { WidgetEducacionCalendarioPage } from '@/pages/widget-educacion-calendario-page';
+import { WidgetEducacionHubPage } from '@/pages/widget-educacion-hub-page';
+import { WidgetEducacionMapaPage } from '@/pages/widget-educacion-mapa-page';
+import { WidgetEducacionSelectorPage } from '@/pages/widget-educacion-selector-page';
+import { WidgetMuseoHubPage } from '@/pages/widget-museo-hub-page';
+import { WidgetMuseoMembershipPage } from '@/pages/widget-museo-membership-page';
 
 export function App() {
   return (
@@ -37,13 +43,21 @@ export function App() {
                 <Route path="vault" element={<PasswordVaultPage />} />
               </Route>
               <Route element={<ModuleGuard module="widget_educacion" />}>
-                <Route path="widgets/educacion" element={<WidgetEducacionPage />} />
+                <Route path="admin/widgets/educacion" element={<WidgetEducacionHubPage />} />
+                <Route path="admin/widgets/educacion/calendario" element={<WidgetEducacionCalendarioPage />} />
+                <Route path="admin/widgets/educacion/mapa" element={<WidgetEducacionMapaPage />} />
+                <Route path="admin/widgets/educacion/selector" element={<WidgetEducacionSelectorPage />} />
               </Route>
               <Route element={<ModuleGuard module="widget_biblioteca" />}>
-                <Route path="widgets/biblioteca" element={<WidgetBibliotecaPage />} />
+                <Route path="admin/widgets/biblioteca" element={<WidgetBibliotecaHubPage />} />
+                <Route path="admin/widgets/biblioteca/carrusel" element={<WidgetBibliotecaCarruselPage />} />
+                <Route path="admin/widgets/biblioteca/interfaz-sistemas" element={<WidgetBibliotecaInterfazPage />} />
               </Route>
               <Route element={<ModuleGuard module="widget_pam" />}>
-                <Route path="widgets/pam" element={<WidgetPamPage />} />
+                <Route path="admin/widgets/museo" element={<WidgetMuseoHubPage />} />
+                <Route path="admin/widgets/museo/membership" element={<WidgetMuseoMembershipPage />} />
+                <Route path="admin/widgets/pam" element={<Navigate to="/admin/widgets/museo" replace />} />
+                <Route path="admin/widgets/pam/*" element={<Navigate to="/admin/widgets/museo" replace />} />
               </Route>
               <Route element={<SuperAdminGuard />}>
                 <Route path="admin/app-users" element={<AppUsersPage />} />

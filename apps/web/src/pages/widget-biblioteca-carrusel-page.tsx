@@ -1,17 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BibliotecaCarouselItemDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
+import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
+import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
-import { BIBLIOTECA_PREVIEW_TABS } from '@/lib/widget-tools';
 
-export function WidgetBibliotecaPage() {
+const CARRUSEL_PREVIEW = [
+  {
+    id: 'carrusel',
+    label: 'Carrusel Koha',
+    src: '/widgets/biblioteca/carrusel-biblioteca.html',
+    height: '720px',
+  },
+];
+
+export function WidgetBibliotecaCarruselPage() {
   const toast = useToast();
   const [items, setItems] = useState<BibliotecaCarouselItemDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const area = WIDGET_AREAS.biblioteca;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -129,10 +140,11 @@ export function WidgetBibliotecaPage() {
 
   return (
     <WidgetToolLayout
-      title="Widgets Biblioteca"
-      description="Configura el carrusel para biblioteca.mali.pe"
+      backLink={<WidgetBackLink area={area} />}
+      title="Carrusel Koha"
+      description="Widget para biblioteca.mali.pe — novedades bibliográficas"
       config={config}
-      preview={<WidgetPreviewFrame tabs={BIBLIOTECA_PREVIEW_TABS} />}
+      preview={<WidgetPreviewFrame tabs={CARRUSEL_PREVIEW} />}
     />
   );
 }

@@ -159,7 +159,7 @@
         <div id="map"></div>
         <div class="locations-container">
             <h3 onclick="resetMarker()" style="cursor: pointer;">
-                <span id="active-marker" style="color:#702082 ;">⬤</span> Conoce nuestras sedes
+                <img id="active-marker" class="dynamic-img" data-img="CIRCULO" style="height: 14px; vertical-align: middle;" alt=""> Conoce nuestras sedes
             </h3>
             <p style="font-size: smaller;">Descubre nuestras ubicaciones y horarios de atención para que puedas visitarnos fácilmente.</p>
             <ul class="locations" id="locations-root"></ul>
@@ -175,12 +175,17 @@
                 zoom: 15,
             });
 
+            const markerIcon =
+                (window.__MALI_MAPA_CONFIG__ &&
+                    window.__MALI_MAPA_CONFIG__.settings.images.marker) ||
+                'https://mali-assets.s3.us-east-1.amazonaws.com/assets-educacion/marker.png';
+
             window.marker = new google.maps.Marker({
                 position: { lat: -12.060064822464469, lng: -77.03735101905501 },
                 map,
                 title: "Sede Principal",
                 icon: {
-                    url: "https://mali-assets.s3.us-east-1.amazonaws.com/assets-educacion/marker.png",
+                    url: markerIcon,
                     scaledSize: new google.maps.Size(50, 50)
                 }
             });

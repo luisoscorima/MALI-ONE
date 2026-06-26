@@ -1,0 +1,169 @@
+{
+  "mapSedes": [
+    {
+      "slug": "museo-principal",
+      "nombre": "Museo de Arte de Lima",
+      "direccion": "Paseo Colón 125 - Cercado - Museo de Arte de Lima",
+      "lat": -12.060064822464469,
+      "lng": -77.03735101905501,
+      "horarioHtml": "Martes a viernes de 11 a.m. a 8 p.m.<br>\nSábado de 9 a.m. a 8 p.m.<br>\nDomingos de 9 a.m. a 5 p.m.",
+      "brochureUrl": "https://drive.google.com/file/d/1EBjwy5tHEZfuroli-e0EubN5eVIEAvH9/view?usp=sharing",
+      "districtSlug": "lima",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "faisanes",
+      "nombre": "Innova Schools Faisanes",
+      "direccion": "Av. Los Faisanes cdra. 9 s/n - Innova Schools Chorrillos - Los Faisanes",
+      "lat": -12.170613221909935,
+      "lng": -76.99343750655301,
+      "horarioHtml": "Atención solo por medios digitales o en la sede principal.",
+      "brochureUrl": "https://drive.google.com/file/d/1uDUGpC78k9lh0q6gdCDZSqWIEl0GniKe/view?usp=sharing",
+      "districtSlug": "chorrillos",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "camacho",
+      "nombre": "Sede La Molina",
+      "direccion": "Av. Javier Prado Este 5193 - C.C. Plaza Camacho. Local 2B",
+      "lat": -12.0799717137281,
+      "lng": -76.96669571212993,
+      "horarioHtml": "Martes a viernes de 11 a.m. a 8 p.m.<br>\nSábados y domingos de 9 a.m. a 5 p.m.",
+      "brochureUrl": "https://drive.google.com/file/d/1HrI5udhX9UD7yk1ohBPEaOeUyEb30Qjx/view?usp=sharing",
+      "districtSlug": "la-molina",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "villasol",
+      "nombre": "Innova Schools Villa Sol",
+      "direccion": "Calle Justo Arias Aranguez Mz. G Lote 23 - Innova Schools Los Olivos - Villa Sol",
+      "lat": -11.962331579668724,
+      "lng": -77.07110542189972,
+      "horarioHtml": "Atención solo por medios digitales o en la sede principal.",
+      "brochureUrl": "https://drive.google.com/file/d/1CQ8xPi89ouQy-onLAVzMFnPUar3z82_W/view?usp=sharing",
+      "districtSlug": "los-olivos",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "arabiscos",
+      "nombre": "Innova Schools Arabiscos",
+      "direccion": "Calle Los Hinojos 1237 Urb. Los Jardines de San Juan - Innova Schools SJL - Arabiscos",
+      "lat": -12.0148263,
+      "lng": -77.0054427,
+      "horarioHtml": "Atención solo por medios digitales o en la sede principal.",
+      "brochureUrl": "https://drive.google.com/file/d/15qYVLjleAI3h_OYauyGlt-HUlMMXbvJJ/view?usp=sharing",
+      "districtSlug": "sjl",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "sanmiguel",
+      "nombre": "Innova Schools San Miguel 1",
+      "direccion": "Av. Libertad 860, San Miguel - Innova Schools San Miguel 1",
+      "lat": -12.085071193836322,
+      "lng": -77.09042677772025,
+      "horarioHtml": "Atención solo por medios digitales o en la sede principal.",
+      "brochureUrl": "https://drive.google.com/file/d/126G2zJSMaAg5--z9vnUoL4XWxHU48jtU/view?usp=sharing",
+      "districtSlug": "san-miguel",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    },
+    {
+      "slug": "virtual-mapa",
+      "nombre": "Sede Virtual",
+      "direccion": "Plataforma digital del MALI",
+      "lat": -12.060064822464469,
+      "lng": -77.03735101905501,
+      "horarioHtml": "Atención solo por medios digitales o en la sede principal.",
+      "brochureUrl": "https://drive.google.com/file/d/1ZF0pwx17aua0I_O0SPD-5yM1mNIhAXOd/view?usp=sharing",
+      "districtSlug": "sede-virtual",
+      "showOnMap": true,
+      "showOnSelector": false,
+      "sortOrder": 0
+    }
+  ],
+  "selectorSedes": [
+    {
+      "slug": "principal",
+      "nombre": "MALI Principal",
+      "brochureUrl": "https://drive.google.com/file/d/1EBjwy5tHEZfuroli-e0EubN5eVIEAvH9/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 0
+    },
+    {
+      "slug": "la-molina",
+      "nombre": "MALI La Molina",
+      "brochureUrl": "https://drive.google.com/file/d/1HrI5udhX9UD7yk1ohBPEaOeUyEb30Qjx/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 1
+    },
+    {
+      "slug": "san-miguel",
+      "nombre": "MALI San Miguel",
+      "brochureUrl": "https://drive.google.com/file/d/126G2zJSMaAg5--z9vnUoL4XWxHU48jtU/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 2
+    },
+    {
+      "slug": "chorrillos",
+      "nombre": "MALI Chorrillos",
+      "brochureUrl": "https://drive.google.com/file/d/1uDUGpC78k9lh0q6gdCDZSqWIEl0GniKe/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 3
+    },
+    {
+      "slug": "los-olivos",
+      "nombre": "MALI Los Olivos",
+      "brochureUrl": "https://drive.google.com/file/d/1CQ8xPi89ouQy-onLAVzMFnPUar3z82_W/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 4
+    },
+    {
+      "slug": "sjl",
+      "nombre": "MALI San Juan de Lurigancho",
+      "brochureUrl": "https://drive.google.com/file/d/15qYVLjleAI3h_OYauyGlt-HUlMMXbvJJ/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 5
+    },
+    {
+      "slug": "pueblo-libre",
+      "nombre": "MALI Pueblo Libre",
+      "brochureUrl": "https://drive.google.com/file/d/139KbCvqhZDOfE5MX_NYP4fNpX3RAtZW3/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 6
+    },
+    {
+      "slug": "bellavista",
+      "nombre": "MALI Bellavista",
+      "brochureUrl": "https://drive.google.com/file/d/1id4CMFX_TSsTA8D3wa78eElgpzjTP45l/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 7
+    },
+    {
+      "slug": "virtual",
+      "nombre": "MALI Virtual",
+      "brochureUrl": "https://drive.google.com/file/d/1ZF0pwx17aua0I_O0SPD-5yM1mNIhAXOd/view?usp=sharing",
+      "showOnMap": false,
+      "showOnSelector": true,
+      "sortOrder": 8
+    }
+  ]
+}

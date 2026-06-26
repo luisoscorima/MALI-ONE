@@ -10,6 +10,10 @@ import {
   CreateEducacionSedeDto,
   UpdateEducacionSedeDto,
 } from '../dto/create-educacion-sede.dto';
+import {
+  EDUCACION_ASSET_URLS,
+  resolveEducacionImage,
+} from './educacion-asset-urls';
 
 @Injectable()
 export class EducacionWidgetsService {
@@ -42,9 +46,14 @@ export class EducacionWidgetsService {
         emailVirtual: settings.emailVirtual,
         soporteVirtual: settings.soporteVirtual,
         images: {
-          rectangulo: settings.imageRectangulo,
-          whatsapp: settings.imageWhatsapp,
-          correo: settings.imageCorreo,
+          rectangulo: resolveEducacionImage(
+            settings.imageRectangulo,
+            'rectangulo',
+          ),
+          whatsapp: resolveEducacionImage(settings.imageWhatsapp, 'whatsapp'),
+          circulo: resolveEducacionImage(settings.imageCirculo, 'circulo'),
+          correo: resolveEducacionImage(settings.imageCorreo, 'correo'),
+          marker: resolveEducacionImage(settings.imageMarker, 'marker'),
         },
         mapsApiKey,
       },
@@ -137,9 +146,11 @@ export class EducacionWidgetsService {
         email: '',
         emailVirtual: '',
         soporteVirtual: '',
-        imageRectangulo: '',
-        imageWhatsapp: '',
-        imageCorreo: '',
+        imageRectangulo: EDUCACION_ASSET_URLS.rectangulo,
+        imageWhatsapp: EDUCACION_ASSET_URLS.whatsapp,
+        imageCirculo: EDUCACION_ASSET_URLS.circulo,
+        imageCorreo: EDUCACION_ASSET_URLS.correo,
+        imageMarker: EDUCACION_ASSET_URLS.marker,
       },
       update: {},
     });
