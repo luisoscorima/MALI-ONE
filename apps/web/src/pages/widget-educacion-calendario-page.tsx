@@ -27,8 +27,10 @@ export function WidgetEducacionCalendarioPage() {
     <Card className="space-y-4 p-4">
       <h2 className="font-semibold">Calendario Google</h2>
       <p className="text-sm text-muted">
-        El widget consulta eventos vía MALI ONE. La API key va en{' '}
-        <code className="text-xs">GOOGLE_CALENDAR_API_KEY</code> del servidor.
+        La key se entrega al widget y Google la valida por referrer (
+        <code className="text-xs">dev.mali.pe</code>,{' '}
+        <code className="text-xs">educacion.mali.pe</code>). Debe tener la{' '}
+        <strong>Calendar API</strong> habilitada en Google Cloud.
       </p>
       <div>
         <label htmlFor="googleCalendarId" className="mb-1 block text-sm text-muted">

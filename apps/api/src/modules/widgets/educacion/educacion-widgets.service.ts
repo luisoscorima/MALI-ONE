@@ -94,6 +94,15 @@ export class EducacionWidgetsService {
     };
   }
 
+  async getCalendarPublicConfig() {
+    const settings = await this.ensureSettings();
+    const apiKey = this.config.get<string>('GOOGLE_CALENDAR_API_KEY') ?? null;
+    return {
+      calendarId: settings.googleCalendarId?.trim() || DEFAULT_CALENDAR_ID,
+      apiKey,
+    };
+  }
+
   async getCalendarEvents(month: number, year: number) {
     const settings = await this.ensureSettings();
     const apiKey = this.config.get<string>('GOOGLE_CALENDAR_API_KEY');

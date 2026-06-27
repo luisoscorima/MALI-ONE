@@ -580,22 +580,58 @@
       // Mostrar mes y año inicial
       monthYearLabel.textContent = `${monthNames[currentMonth - 1]} ${currentYear}`;
 
-      // Consultar los eventos para el mes actual
-      loadEventsAndRender(currentMonth, currentYear);
+      var calendarConfig = null;
 
-      // Función para obtener eventos de Google Calendar
+      maliWidgetFetch('/educacion/calendar/config')
+        .then(function (cfg) {
+          calendarConfig = cfg;
+          loadEventsAndRender(currentMonth, currentYear);
+        })
+        .catch(function (error) {
+          console.error('Error cargando config del calendario', error);
+          calendarDiv.innerHTML = '<p style="padding:16px;color:#702082;text-align:center;">No se pudo cargar la configuración del calendario.</p>';
+        });
+
+      function showCalendarError(message) {
+        calendarDiv.innerHTML = '<p style="padding:16px;color:#702082;text-align:center;">' + message + '</p>';
+      }
+
+      // Eventos desde Google Calendar (desde el navegador; la API key usa restricción por referrer)
       function loadEventsAndRender(month, year) {
-        maliWidgetFetch('/educacion/calendar/events?month=' + month + '&year=' + year)
+        if (!calendarConfig || !calendarConfig.apiKey) {
+          showCalendarError('Configura GOOGLE_CALENDAR_API_KEY en el servidor de MALI ONE.');
+          return;
+        }
+
+        var firstDayOfMonth = new Date(year, month - 1, 1).toISOString();
+        var lastDayOfMonth = new Date(year, month, 0, 23, 59, 59).toISOString();
+        var url =
+          'https://www.googleapis.com/calendar/v3/calendars/' +
+          encodeURIComponent(calendarConfig.calendarId) +
+          '/events?key=' +
+          encodeURIComponent(calendarConfig.apiKey) +
+          '&timeMin=' +
+          encodeURIComponent(firstDayOfMonth) +
+          '&timeMax=' +
+          encodeURIComponent(lastDayOfMonth) +
+          '&singleEvents=true&orderBy=startTime&timeZone=America%2FLima';
+
+        fetch(url)
+          .then(function (response) {
+            return response.json().then(function (data) {
+              if (!response.ok) {
+                var msg = (data && data.error && data.error.message) ? data.error.message : response.statusText;
+                throw new Error(msg);
+              }
+              return data;
+            });
+          })
           .then(function (data) {
-            if (!data.items) {
-              renderCalendar(month, year, []);
-              return;
-            }
-            renderCalendar(month, year, data.items);
+            renderCalendar(month, year, data.items || []);
           })
           .catch(function (error) {
-            console.error("Error al cargar eventos:", error);
-            calendarDiv.innerHTML = '<p style="padding:16px;color:#702082;text-align:center;">No se pudo cargar el calendario. Verifica GOOGLE_CALENDAR_API_KEY en el servidor.</p>';
+            console.error('Error al cargar eventos:', error);
+            showCalendarError('No se pudo cargar el calendario: ' + error.message);
           });
       }
 

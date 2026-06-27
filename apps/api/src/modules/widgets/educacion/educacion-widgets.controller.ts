@@ -44,6 +44,12 @@ export class EducacionWidgetsController {
   }
 
   @Public()
+  @Get('calendar/config')
+  getCalendarConfig() {
+    return this.service.getCalendarPublicConfig();
+  }
+
+  @Public()
   @Get('calendar/events')
   getCalendarEvents(
     @Query('month') month: string,
