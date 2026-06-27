@@ -7,19 +7,19 @@ const INTERFAZ_PREVIEW = [
   {
     id: 'sistemas',
     label: 'Interfaz sistemas',
-    src: '/widgets/biblioteca/interfaz-sistemas.html',
+    src: '/widgets/museo/interfaz-sistemas.html',
     height: 'min(90vh, 900px)',
   },
 ];
 
-export function WidgetBibliotecaInterfazPage() {
-  const area = WIDGET_AREAS.biblioteca;
+export function WidgetMuseoInterfazPage() {
+  const area = WIDGET_AREAS.museo;
 
   return (
     <WidgetToolLayout
       backLink={<WidgetBackLink area={area} />}
       title="Interfaz de sistemas"
-      description="Widget estático para biblioteca.mali.pe — slideshow de plataformas MALI"
+      description="Widget estático para mali.pe/es — slideshow de plataformas MALI"
       preview={<WidgetPreviewFrame tabs={INTERFAZ_PREVIEW} />}
       previewOnly
     />

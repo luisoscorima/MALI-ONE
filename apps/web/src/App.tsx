@@ -12,12 +12,12 @@ import { PasswordVaultPage } from '@/pages/password-vault-page';
 import { S3ManagerPage } from '@/pages/s3-manager-page';
 import { WidgetBibliotecaCarruselPage } from '@/pages/widget-biblioteca-carrusel-page';
 import { WidgetBibliotecaHubPage } from '@/pages/widget-biblioteca-hub-page';
-import { WidgetBibliotecaInterfazPage } from '@/pages/widget-biblioteca-interfaz-page';
 import { WidgetEducacionCalendarioPage } from '@/pages/widget-educacion-calendario-page';
 import { WidgetEducacionHubPage } from '@/pages/widget-educacion-hub-page';
 import { WidgetEducacionMapaPage } from '@/pages/widget-educacion-mapa-page';
 import { WidgetEducacionSelectorPage } from '@/pages/widget-educacion-selector-page';
 import { WidgetMuseoHubPage } from '@/pages/widget-museo-hub-page';
+import { WidgetMuseoInterfazPage } from '@/pages/widget-museo-interfaz-page';
 import { WidgetMuseoMembershipPage } from '@/pages/widget-museo-membership-page';
 
 export function App() {
@@ -51,11 +51,11 @@ export function App() {
               <Route element={<ModuleGuard module="widget_biblioteca" />}>
                 <Route path="admin/widgets/biblioteca" element={<WidgetBibliotecaHubPage />} />
                 <Route path="admin/widgets/biblioteca/carrusel" element={<WidgetBibliotecaCarruselPage />} />
-                <Route path="admin/widgets/biblioteca/interfaz-sistemas" element={<WidgetBibliotecaInterfazPage />} />
               </Route>
               <Route element={<ModuleGuard module="widget_pam" />}>
                 <Route path="admin/widgets/museo" element={<WidgetMuseoHubPage />} />
                 <Route path="admin/widgets/museo/membership" element={<WidgetMuseoMembershipPage />} />
+                <Route path="admin/widgets/museo/interfaz-sistemas" element={<WidgetMuseoInterfazPage />} />
                 <Route path="admin/widgets/pam" element={<Navigate to="/admin/widgets/museo" replace />} />
                 <Route path="admin/widgets/pam/*" element={<Navigate to="/admin/widgets/museo" replace />} />
               </Route>

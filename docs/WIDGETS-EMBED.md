@@ -7,7 +7,7 @@ MALI ONE sirve los shells HTML en `{APP_URL}/widgets/**` y la configuración en 
 | Sitio | Widget | URL iframe |
 |-------|--------|------------|
 | [biblioteca.mali.pe](https://biblioteca.mali.pe) | Carrusel Koha | `{APP_URL}/widgets/biblioteca/carrusel-biblioteca.html` |
-| [mali.pe/es](https://mali.pe/es) | Interfaz sistemas | `{APP_URL}/widgets/biblioteca/interfaz-sistemas.html` |
+| [mali.pe/es](https://mali.pe/es) | Interfaz sistemas | `{APP_URL}/widgets/museo/interfaz-sistemas.html` |
 | [mali.pe/es](https://mali.pe/es) | PAM membresías | `{APP_URL}/widgets/pam/membership.html?embed=1` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Calendario | `{APP_URL}/widgets/educacion/calendario.html` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Mapa sedes | `{APP_URL}/widgets/educacion/mapa.html` |

@@ -76,15 +76,6 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
         icon: Images,
         embedHost: 'biblioteca.mali.pe',
       },
-      {
-        id: 'interfaz-sistemas',
-        label: 'Interfaz de sistemas',
-        description: 'Slideshow de plataformas MALI (contenido estático).',
-        path: 'interfaz-sistemas',
-        icon: LayoutGrid,
-        previewOnly: true,
-        embedHost: 'biblioteca.mali.pe',
-      },
     ],
   },
   museo: {
@@ -93,6 +84,15 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
     description: 'Herramientas embebibles en mali.pe/es',
     basePath: '/admin/widgets/museo',
     widgets: [
+      {
+        id: 'interfaz-sistemas',
+        label: 'Interfaz de sistemas',
+        description: 'Slideshow de plataformas MALI (contenido estático).',
+        path: 'interfaz-sistemas',
+        icon: LayoutGrid,
+        previewOnly: true,
+        embedHost: 'mali.pe/es',
+      },
       {
         id: 'membership',
         label: 'Membresías PAM',
