@@ -211,6 +211,13 @@ export interface BibliotecaCarouselItemDto {
   activo: boolean;
 }
 
+export interface BibliotecaCarouselSettingsDto {
+  id: string;
+  headerTitle: string;
+  headerColor: string;
+  updatedAt: string;
+}
+
 export interface PamPlanDto {
   id: string;
   slug: string;

@@ -269,6 +269,20 @@ export const api = {
       '/api/widgets/biblioteca/carousel/admin',
     ),
 
+  getBibliotecaCarouselSettings: () =>
+    request<import('@mali-one/shared').BibliotecaCarouselSettingsDto>(
+      '/api/widgets/biblioteca/carousel/settings',
+    ),
+
+  updateBibliotecaCarouselSettings: (body: {
+    headerTitle: string;
+    headerColor: string;
+  }) =>
+    request<import('@mali-one/shared').BibliotecaCarouselSettingsDto>(
+      '/api/widgets/biblioteca/carousel/settings',
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   createBibliotecaCarouselItem: (body: Record<string, unknown>) =>
     request('/api/widgets/biblioteca/carousel', {
       method: 'POST',

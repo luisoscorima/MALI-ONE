@@ -6,11 +6,13 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { AppModule } from '@prisma/client';
 import { Public } from '../../../core/guards/public.decorator';
 import { RequireModule } from '../../../core/guards/module.decorator';
 import { BibliotecaWidgetsService } from './biblioteca-widgets.service';
+import { UpdateBibliotecaCarouselSettingsDto } from '../dto/biblioteca-carousel-settings.dto';
 import {
   CreateCarouselItemDto,
   UpdateCarouselItemDto,
@@ -21,9 +23,27 @@ export class BibliotecaWidgetsController {
   constructor(private readonly service: BibliotecaWidgetsService) {}
 
   @Public()
+  @Get('carousel/config')
+  getPublicCarouselConfig() {
+    return this.service.getPublicCarouselConfig();
+  }
+
+  @Public()
   @Get('carousel')
   getPublicCarousel() {
     return this.service.getPublicCarousel();
+  }
+
+  @Get('carousel/settings')
+  @RequireModule(AppModule.widget_biblioteca)
+  getCarouselSettings() {
+    return this.service.getCarouselSettings();
+  }
+
+  @Put('carousel/settings')
+  @RequireModule(AppModule.widget_biblioteca)
+  updateCarouselSettings(@Body() body: UpdateBibliotecaCarouselSettingsDto) {
+    return this.service.updateCarouselSettings(body);
   }
 
   @Get('carousel/admin')

@@ -1,10 +1,35 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../core/prisma/prisma.service';
+import { UpdateBibliotecaCarouselSettingsDto } from '../dto/biblioteca-carousel-settings.dto';
 import { CreateCarouselItemDto, UpdateCarouselItemDto } from '../dto/create-carousel-item.dto';
+
+const DEFAULT_CAROUSEL_SETTINGS = {
+  headerTitle: 'CONOCE NUESTRAS NUEVAS ADQUISICIONES',
+  headerColor: '#e82323',
+};
 
 @Injectable()
 export class BibliotecaWidgetsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  getPublicCarouselConfig() {
+    return this.ensureCarouselSettings();
+  }
+
+  getCarouselSettings() {
+    return this.ensureCarouselSettings();
+  }
+
+  async updateCarouselSettings(dto: UpdateBibliotecaCarouselSettingsDto) {
+    await this.ensureCarouselSettings();
+    return this.prisma.bibliotecaCarouselSettings.update({
+      where: { id: 'default' },
+      data: {
+        headerTitle: dto.headerTitle.trim(),
+        headerColor: dto.headerColor.toLowerCase(),
+      },
+    });
+  }
 
   getPublicCarousel() {
     return this.prisma.bibliotecaCarouselItem.findMany({
@@ -48,5 +73,13 @@ export class BibliotecaWidgetsService {
     });
     if (!row) throw new NotFoundException('Ítem no encontrado');
     return row;
+  }
+
+  private ensureCarouselSettings() {
+    return this.prisma.bibliotecaCarouselSettings.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', ...DEFAULT_CAROUSEL_SETTINGS },
+      update: {},
+    });
   }
 }

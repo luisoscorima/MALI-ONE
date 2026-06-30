@@ -217,6 +217,13 @@ model BibliotecaCarouselItem {
   activo          Boolean @default(true)
 }
 
+model BibliotecaCarouselSettings {
+  id          String   @id @default("default")
+  headerTitle String   @default("CONOCE NUESTRAS NUEVAS ADQUISICIONES")
+  headerColor String   @default("#e82323")
+  updatedAt   DateTime @updatedAt
+}
+
 model PamWidgetSettings {
   id        String   @id @default("default")
   benefits  Json

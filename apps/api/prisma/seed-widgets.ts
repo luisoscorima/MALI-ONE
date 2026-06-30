@@ -237,6 +237,16 @@ async function seedBiblioteca() {
     data: { activo: false },
   });
 
+  await prisma.bibliotecaCarouselSettings.upsert({
+    where: { id: 'default' },
+    create: {
+      id: 'default',
+      headerTitle: 'CONOCE NUESTRAS NUEVAS ADQUISICIONES',
+      headerColor: '#e82323',
+    },
+    update: {},
+  });
+
   console.log(`  biblioteca: ${items.length} ítems carrusel`);
 }
 
