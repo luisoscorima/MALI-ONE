@@ -97,6 +97,8 @@ Los plugins legacy (`mali-calendario`, `mapa-mali`, etc.) pueden desactivarse tr
 ```env
 GOOGLE_MAPS_API_KEY=          # mapa educación
 GOOGLE_CALENDAR_API_KEY=      # calendario educación
+# Orígenes de sitios que cargan widgets vía fetch (selector, popup)
+CORS_ORIGINS=https://educacion.mali.pe,https://biblioteca.mali.pe,https://mali.pe
 PAM_SMTP_HOST=
 PAM_SMTP_PORT=587
 PAM_SMTP_USER=

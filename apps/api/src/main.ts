@@ -3,6 +3,20 @@ import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
+function parseCorsOrigins(): Set<string> {
+  const origins = new Set<string>();
+  const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+  if (appUrl) origins.add(appUrl);
+
+  const extra = process.env.CORS_ORIGINS?.split(',') ?? [];
+  for (const raw of extra) {
+    const origin = raw.trim().replace(/\/$/, '');
+    if (origin) origins.add(origin);
+  }
+
+  return origins;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -10,8 +24,22 @@ async function bootstrap() {
     exclude: [{ path: 'r/:slug', method: RequestMethod.GET }],
   });
   app.use(cookieParser());
+
+  const allowedOrigins = parseCorsOrigins();
   app.enableCors({
-    origin: process.env.APP_URL?.replace(/\/$/, '') ?? true,
+    origin: (origin, callback) => {
+      // Peticiones sin Origin (curl, same-origin) — permitir
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      const normalized = origin.replace(/\/$/, '');
+      if (allowedOrigins.size === 0 || allowedOrigins.has(normalized)) {
+        callback(null, origin);
+        return;
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
   });
 
