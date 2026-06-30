@@ -1,0 +1,19 @@
+{
+  "activo": false,
+  "imagenUrl": "",
+  "imagenLinkUrl": null,
+  "imagenTarget": "_blank",
+  "titulo": null,
+  "botonTexto": "Ver más",
+  "botonUrl": "",
+  "botonTarget": "_blank",
+  "showOnce": false,
+  "delayMs": 800,
+  "animationSpeedMs": 300,
+  "scheduleEnabled": false,
+  "scheduleDateStart": null,
+  "scheduleDateEnd": null,
+  "scheduleTimeStart": null,
+  "scheduleTimeEnd": null,
+  "scheduleTimezone": "America/Lima"
+}

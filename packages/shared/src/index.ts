@@ -130,7 +130,16 @@ export type EducacionAliadoCategoria =
   | 'aliado'
   | 'socio';
 
-export interface EducacionPopupSettingsDto {
+export interface PopupScheduleFieldsDto {
+  scheduleEnabled: boolean;
+  scheduleDateStart: string | null;
+  scheduleDateEnd: string | null;
+  scheduleTimeStart: string | null;
+  scheduleTimeEnd: string | null;
+  scheduleTimezone: string;
+}
+
+export interface EducacionPopupSettingsDto extends PopupScheduleFieldsDto {
   id: string;
   activo: boolean;
   imagenUrl: string;
@@ -144,6 +153,8 @@ export interface EducacionPopupSettingsDto {
   delayMs: number;
   animationSpeedMs: number;
 }
+
+export type MuseoPopupSettingsDto = EducacionPopupSettingsDto;
 
 export interface EducacionAliadoDto {
   id: string;
@@ -238,4 +249,5 @@ export interface PamAdminStateDto {
   settings: { id: string; benefits: string[]; notes: string[] };
   plans: PamPlanDto[];
   registrations: PamRegistrationDto[];
+  popup: MuseoPopupSettingsDto;
 }

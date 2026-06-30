@@ -12,7 +12,8 @@ MALI ONE sirve los shells HTML en `{APP_URL}/widgets/**` y la configuración en 
 | [educacion.mali.pe](https://educacion.mali.pe) | Calendario | `{APP_URL}/widgets/educacion/calendario.html` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Mapa sedes | `{APP_URL}/widgets/educacion/mapa.html` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Selector sedes | Script `{APP_URL}/widgets/educacion/selector-loader.js` |
-| [educacion.mali.pe](https://educacion.mali.pe) | Popup promocional | Script `{APP_URL}/widgets/educacion/popup-loader.js` |
+| [educacion.mali.pe](https://educacion.mali.pe) | Popup promocional | Script `{APP_URL}/widgets/shared/popup-loader.js?site=educacion` |
+| [mali.pe/es](https://mali.pe/es) | Popup promocional | Script `{APP_URL}/widgets/shared/popup-loader.js?site=museo` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Aliados | `{APP_URL}/widgets/educacion/aliados.html` |
 
 Reemplaza `{APP_URL}` por tu instancia (ej. `https://dev.mali.pe`).
@@ -66,9 +67,11 @@ Los widgets cargan `widgets/educacion/benton-sans.css`, que apunta a:
 
 Asegúrate de que esos 4 archivos `.woff2` existan en el contenedor `web` (misma carpeta que usa mapa y calendario). No van en git por licencia; cópialos desde el tema WordPress o MALI-TI al desplegar.
 
-Los loaders **selector-loader.js** y **popup-loader.js** incluyen la fuente automáticamente al inyectarse en educacion.mali.pe.
+Los loaders **selector-loader.js** y **popup-loader.js** (en `/widgets/shared/`) incluyen la fuente automáticamente al inyectarse.
 
 ## WordPress (plugin `mali-one-embed`)
+
+### Educación (`web-educacion-wp`)
 
 En `wp-config.php`:
 
@@ -83,11 +86,21 @@ Activa el plugin y usa los shortcodes:
 | `[mali_mapa]` | iframe del mapa |
 | `[mali_calendario]` | iframe del calendario |
 | `[mali_aliados]` | iframe de aliados |
-| `[mali_popup]` | flag: carga popup-loader.js |
+| `[mali_popup]` | flag: carga popup-loader.js (`site=educacion`) |
 
 El **selector flotante** se carga globalmente en todas las páginas (filtro `mali_one_embed_selector_global`).
 
-Los plugins legacy (`mali-calendario`, `mapa-mali`, etc.) pueden desactivarse tras migrar.
+### Museo (`web-mali-wp`)
+
+Mismo `MALI_ONE_URL` en `wp-config.php`. Shortcodes:
+
+| Shortcode | Comportamiento |
+|-----------|----------------|
+| `[mali_popup]` | Popup del museo (`site=museo`, config separada) |
+| `[mali_membership]` / `[mali_pam]` | iframe PAM + postMessage |
+| `[mali_interfaz]` | iframe interfaz de sistemas |
+
+Tras migrar, desactiva `mali-popup` y la config popup legacy de `mali-shared-config`.
 
 ## API pública (sin autenticación)
 
@@ -96,6 +109,7 @@ Los plugins legacy (`mali-calendario`, `mapa-mali`, etc.) pueden desactivarse tr
 - `GET /api/widgets/educacion/calendar/config`
 - `GET /api/widgets/educacion/calendar/events?month=&year=`
 - `GET /api/widgets/educacion/popup/config`
+- `GET /api/widgets/museo/popup/config`
 - `GET /api/widgets/educacion/aliados/config`
 - `GET /api/widgets/biblioteca/carousel`
 - `GET /api/widgets/pam/config`

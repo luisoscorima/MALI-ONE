@@ -2,21 +2,37 @@
   'use strict';
 
   var POPUP_ID = 'mali-popup-main';
+  var SITE_ENDPOINTS = {
+    educacion: '/educacion/popup/config',
+    museo: '/museo/popup/config',
+  };
 
-  function scriptOrigin() {
+  function scriptContext() {
     var scripts = document.getElementsByTagName('script');
     for (var i = scripts.length - 1; i >= 0; i--) {
       var src = scripts[i].src || '';
-      if (src.indexOf('popup-loader.js') !== -1) {
-        return src.replace(/\/widgets\/educacion\/popup-loader\.js.*$/, '');
+      if (src.indexOf('/widgets/shared/popup-loader.js') === -1) continue;
+
+      var origin = src.replace(/\/widgets\/shared\/popup-loader\.js.*$/, '');
+      var site = 'educacion';
+      var q = src.indexOf('?');
+      if (q !== -1) {
+        try {
+          var params = new URLSearchParams(src.slice(q));
+          site = params.get('site') || site;
+        } catch (err) {
+          /* URLSearchParams no disponible */
+        }
       }
+
+      if (!SITE_ENDPOINTS[site]) site = 'educacion';
+      return { origin: origin, site: site };
     }
-    return '';
+    return { origin: '', site: 'educacion' };
   }
 
-  function widgetApiBase() {
-    var origin = scriptOrigin();
-    return (origin || '') + '/api/widgets';
+  function widgetApiConfigUrl(origin, site) {
+    return (origin || '') + '/api/widgets' + SITE_ENDPOINTS[site];
   }
 
   function loadStylesheet(href, marker) {
@@ -60,9 +76,10 @@
       this.config = config;
       if (!config || !config.imagenUrl || !config.botonUrl) return;
 
-      var origin = scriptOrigin();
-      loadStylesheet(origin + '/widgets/educacion/benton-sans.css', 'benton-sans');
-      loadStylesheet(origin + '/widgets/educacion/popup.css', 'popup');
+      var ctx = scriptContext();
+      var assets = ctx.origin + '/widgets/educacion';
+      loadStylesheet(assets + '/benton-sans.css', 'benton-sans');
+      loadStylesheet(assets + '/popup.css', 'popup');
       buildPopupHtml();
       this.injectContent();
       this.bindEvents();
@@ -163,7 +180,8 @@
     },
   };
 
-  fetch(widgetApiBase() + '/educacion/popup/config')
+  var ctx = scriptContext();
+  fetch(widgetApiConfigUrl(ctx.origin, ctx.site))
     .then(function (res) {
       if (!res.ok) throw new Error('popup config');
       return res.json();

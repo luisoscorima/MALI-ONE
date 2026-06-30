@@ -232,6 +232,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  updateMuseoPopup: (
+    body: Partial<import('@mali-one/shared').MuseoPopupSettingsDto>,
+  ) =>
+    request('/api/widgets/museo/popup', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
   createEducacionAliado: (body: Record<string, unknown>) =>
     request('/api/widgets/educacion/aliados', {
       method: 'POST',

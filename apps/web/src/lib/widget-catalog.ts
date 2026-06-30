@@ -119,6 +119,14 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
         icon: Heart,
         embedHost: 'mali.pe/es',
       },
+      {
+        id: 'popup',
+        label: 'Popup promocional',
+        description: 'Overlay global con imagen y CTA (independiente de Educación).',
+        path: 'popup',
+        icon: Megaphone,
+        embedHost: 'mali.pe/es',
+      },
     ],
   },
 };

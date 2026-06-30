@@ -24,6 +24,7 @@ import {
   CreateEducacionAliadoDto,
   UpdateEducacionAliadoDto,
 } from '../dto/create-educacion-aliado.dto';
+import { buildPopupPublicConfig } from '../popup-schedule.util';
 import {
   EDUCACION_ASSET_URLS,
   resolveEducacionImage,
@@ -43,6 +44,12 @@ const DEFAULT_POPUP = {
   showOnce: false,
   delayMs: 800,
   animationSpeedMs: 300,
+  scheduleEnabled: false,
+  scheduleDateStart: null as string | null,
+  scheduleDateEnd: null as string | null,
+  scheduleTimeStart: null as string | null,
+  scheduleTimeEnd: null as string | null,
+  scheduleTimezone: 'America/Lima',
 };
 
 @Injectable()
@@ -158,22 +165,7 @@ export class EducacionWidgetsService {
 
   async getPopupPublicConfig() {
     const popup = await this.ensurePopup();
-    if (!popup.activo || !popup.imagenUrl.trim() || !popup.botonUrl.trim()) {
-      return { activo: false };
-    }
-    return {
-      activo: true,
-      imagenUrl: popup.imagenUrl,
-      imagenLinkUrl: popup.imagenLinkUrl,
-      imagenTarget: popup.imagenTarget,
-      titulo: popup.titulo,
-      botonTexto: popup.botonTexto,
-      botonUrl: popup.botonUrl,
-      botonTarget: popup.botonTarget,
-      showOnce: popup.showOnce,
-      delayMs: popup.delayMs,
-      animationSpeedMs: popup.animationSpeedMs,
-    };
+    return buildPopupPublicConfig(popup);
   }
 
   async getAliadosPublicConfig() {

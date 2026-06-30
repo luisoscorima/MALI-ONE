@@ -52,4 +52,28 @@ export class UpdateEducacionPopupDto {
   @IsInt()
   @Min(0)
   animationSpeedMs?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  scheduleEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  scheduleDateStart?: string | null;
+
+  @IsOptional()
+  @IsString()
+  scheduleDateEnd?: string | null;
+
+  @IsOptional()
+  @IsString()
+  scheduleTimeStart?: string | null;
+
+  @IsOptional()
+  @IsString()
+  scheduleTimeEnd?: string | null;
+
+  @IsOptional()
+  @IsString()
+  scheduleTimezone?: string;
 }

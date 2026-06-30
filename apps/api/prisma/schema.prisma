@@ -151,19 +151,47 @@ model EducacionSelectorSede {
 }
 
 model EducacionPopupSettings {
-  id               String   @id @default("default")
-  activo           Boolean  @default(false)
-  imagenUrl        String
-  imagenLinkUrl    String?
-  imagenTarget     String   @default("_blank")
-  titulo           String?
-  botonTexto       String
-  botonUrl         String
-  botonTarget      String   @default("_blank")
-  showOnce         Boolean  @default(false)
-  delayMs          Int      @default(800)
-  animationSpeedMs Int      @default(300)
-  updatedAt        DateTime @updatedAt
+  id                 String   @id @default("default")
+  activo             Boolean  @default(false)
+  imagenUrl          String
+  imagenLinkUrl      String?
+  imagenTarget       String   @default("_blank")
+  titulo             String?
+  botonTexto         String
+  botonUrl           String
+  botonTarget        String   @default("_blank")
+  showOnce           Boolean  @default(false)
+  delayMs            Int      @default(800)
+  animationSpeedMs   Int      @default(300)
+  scheduleEnabled    Boolean  @default(false)
+  scheduleDateStart  String?
+  scheduleDateEnd    String?
+  scheduleTimeStart  String?
+  scheduleTimeEnd    String?
+  scheduleTimezone   String   @default("America/Lima")
+  updatedAt          DateTime @updatedAt
+}
+
+model MuseoPopupSettings {
+  id                 String   @id @default("default")
+  activo             Boolean  @default(false)
+  imagenUrl          String
+  imagenLinkUrl      String?
+  imagenTarget       String   @default("_blank")
+  titulo             String?
+  botonTexto         String
+  botonUrl           String
+  botonTarget        String   @default("_blank")
+  showOnce           Boolean  @default(false)
+  delayMs            Int      @default(800)
+  animationSpeedMs   Int      @default(300)
+  scheduleEnabled    Boolean  @default(false)
+  scheduleDateStart  String?
+  scheduleDateEnd    String?
+  scheduleTimeStart  String?
+  scheduleTimeEnd    String?
+  scheduleTimezone   String   @default("America/Lima")
+  updatedAt          DateTime @updatedAt
 }
 
 model EducacionAliado {

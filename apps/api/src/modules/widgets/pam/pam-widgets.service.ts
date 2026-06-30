@@ -12,9 +12,31 @@ import {
   UpdatePamPlanDto,
   UpdatePamSettingsDto,
 } from '../dto/pam.dto';
+import { UpdateMuseoPopupDto } from '../dto/update-museo-popup.dto';
+import { buildPopupPublicConfig } from '../popup-schedule.util';
 import { PamEmailService } from './pam-email.service';
 
 const MP_CONFIRMED: PamMpStatus[] = ['approved', 'authorized'];
+
+const DEFAULT_MUSEO_POPUP = {
+  activo: false,
+  imagenUrl: '',
+  imagenLinkUrl: null as string | null,
+  imagenTarget: '_blank',
+  titulo: null as string | null,
+  botonTexto: 'Ver más',
+  botonUrl: '',
+  botonTarget: '_blank',
+  showOnce: false,
+  delayMs: 800,
+  animationSpeedMs: 300,
+  scheduleEnabled: false,
+  scheduleDateStart: null as string | null,
+  scheduleDateEnd: null as string | null,
+  scheduleTimeStart: null as string | null,
+  scheduleTimeEnd: null as string | null,
+  scheduleTimezone: 'America/Lima',
+};
 
 @Injectable()
 export class PamWidgetsService {
@@ -58,15 +80,16 @@ export class PamWidgetsService {
   }
 
   async getAdminState() {
-    const [settings, plans, registrations] = await Promise.all([
+    const [settings, plans, registrations, popup] = await Promise.all([
       this.ensureSettings(),
       this.prisma.pamPlan.findMany({ orderBy: { sortOrder: 'asc' } }),
       this.prisma.pamRegistration.findMany({
         orderBy: { createdAt: 'desc' },
         take: 500,
       }),
+      this.ensureMuseoPopup(),
     ]);
-    return { settings, plans, registrations };
+    return { settings, plans, registrations, popup };
   }
 
   async updateSettings(dto: UpdatePamSettingsDto) {
@@ -77,6 +100,19 @@ export class PamWidgetsService {
         benefits: dto.benefits,
         notes: dto.notes,
       },
+    });
+  }
+
+  async getMuseoPopupPublicConfig() {
+    const popup = await this.ensureMuseoPopup();
+    return buildPopupPublicConfig(popup);
+  }
+
+  async updateMuseoPopup(dto: UpdateMuseoPopupDto) {
+    await this.ensureMuseoPopup();
+    return this.prisma.museoPopupSettings.update({
+      where: { id: 'default' },
+      data: dto,
     });
   }
 
@@ -219,6 +255,14 @@ export class PamWidgetsService {
     return this.prisma.pamWidgetSettings.upsert({
       where: { id: 'default' },
       create: { id: 'default', benefits: [], notes: [] },
+      update: {},
+    });
+  }
+
+  private async ensureMuseoPopup() {
+    return this.prisma.museoPopupSettings.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', ...DEFAULT_MUSEO_POPUP },
       update: {},
     });
   }
