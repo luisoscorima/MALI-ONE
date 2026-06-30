@@ -10,6 +10,7 @@ import {
   CreatePamPlanDto,
   CreatePamRegistrationDto,
   UpdatePamPlanDto,
+  UpdatePamRegistrationDto,
   UpdatePamSettingsDto,
 } from '../dto/pam.dto';
 import { UpdateMuseoPopupDto } from '../dto/update-museo-popup.dto';
@@ -134,6 +135,99 @@ export class PamWidgetsService {
     return this.prisma.pamRegistration.findMany({
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async updateRegistration(id: string, dto: UpdatePamRegistrationDto) {
+    const existing = await this.findRegistration(id);
+    const data: Prisma.PamRegistrationUpdateInput = {};
+
+    const stringFields = [
+      'nombres',
+      'apellidos',
+      'dni',
+      'celular',
+      'correo',
+      'direccion',
+      'ciudad',
+      'distrito',
+      'genero',
+      'fechaNacimiento',
+      'comoTeEnteraste',
+      'plan',
+      'frecuencia',
+      'checkoutUrl',
+    ] as const;
+
+    for (const field of stringFields) {
+      if (dto[field] !== undefined) {
+        data[field] = dto[field];
+      }
+    }
+
+    if (dto.aceptaPrivacidad !== undefined) {
+      data.aceptaPrivacidad = dto.aceptaPrivacidad;
+    }
+
+    if (dto.welcomeEmail !== undefined) {
+      data.welcomeEmail = dto.welcomeEmail as PamEmailStatus;
+    }
+
+    if (dto.expiryNotice !== undefined) {
+      data.expiryNotice = dto.expiryNotice as PamEmailStatus;
+    }
+
+    if (dto.expiryDate !== undefined) {
+      data.expiryDate = dto.expiryDate ? new Date(dto.expiryDate) : null;
+    }
+
+    const mpStatusChanging = dto.mpStatus !== undefined;
+    if (mpStatusChanging) {
+      data.mpStatus =
+        dto.mpStatus === '' ? null : (dto.mpStatus as PamMpStatus);
+    }
+
+    const frecuencia = dto.frecuencia ?? existing.frecuencia;
+    const effectiveMp = mpStatusChanging
+      ? dto.mpStatus === ''
+        ? null
+        : (dto.mpStatus as PamMpStatus)
+      : existing.mpStatus;
+
+    if (
+      effectiveMp &&
+      MP_CONFIRMED.includes(effectiveMp) &&
+      dto.expiryDate === undefined &&
+      !existing.expiryDate
+    ) {
+      data.expiryDate = this.calculateExpiryDate(existing.createdAt, frecuencia);
+    }
+
+    const updated = await this.prisma.pamRegistration.update({
+      where: { id },
+      data,
+    });
+
+    const wasConfirmed =
+      existing.mpStatus != null && MP_CONFIRMED.includes(existing.mpStatus);
+    const nowConfirmed =
+      updated.mpStatus != null && MP_CONFIRMED.includes(updated.mpStatus);
+
+    if (nowConfirmed && (!wasConfirmed || mpStatusChanging)) {
+      await this.email.sendWelcomeIfNeeded(updated.id);
+    }
+
+    return updated;
+  }
+
+  async resendWelcome(id: string) {
+    const reg = await this.findRegistration(id);
+    if (!reg.mpStatus || !MP_CONFIRMED.includes(reg.mpStatus)) {
+      throw new BadRequestException(
+        'Solo se puede reenviar la bienvenida con pago confirmado (approved/authorized)',
+      );
+    }
+    await this.email.resendWelcome(reg);
+    return this.findRegistration(id);
   }
 
   async createRegistration(dto: CreatePamRegistrationDto, ip: string) {
@@ -270,6 +364,12 @@ export class PamWidgetsService {
   private async findPlan(id: string) {
     const row = await this.prisma.pamPlan.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Plan no encontrado');
+    return row;
+  }
+
+  private async findRegistration(id: string) {
+    const row = await this.prisma.pamRegistration.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Registro no encontrado');
     return row;
   }
 }

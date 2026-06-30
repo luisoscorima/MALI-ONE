@@ -18,6 +18,7 @@ import {
   CreatePamPlanDto,
   CreatePamRegistrationDto,
   UpdatePamPlanDto,
+  UpdatePamRegistrationDto,
   UpdatePamSettingsDto,
 } from '../dto/pam.dto';
 
@@ -57,6 +58,21 @@ export class PamWidgetsController {
   @RequireModule(AppModule.widget_pam)
   listRegistrations() {
     return this.service.listRegistrations();
+  }
+
+  @Patch('registrations/:id')
+  @RequireModule(AppModule.widget_pam)
+  updateRegistration(
+    @Param('id') id: string,
+    @Body() body: UpdatePamRegistrationDto,
+  ) {
+    return this.service.updateRegistration(id, body);
+  }
+
+  @Post('registrations/:id/resend-welcome')
+  @RequireModule(AppModule.widget_pam)
+  resendWelcome(@Param('id') id: string) {
+    return this.service.resendWelcome(id);
   }
 
   @Put('settings')

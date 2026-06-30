@@ -39,6 +39,10 @@ export class PamEmailService {
     await this.sendWelcome(reg);
   }
 
+  async resendWelcome(reg: PamRegistration) {
+    await this.sendWelcome(reg);
+  }
+
   async sendPendingWelcomeEmails() {
     const rows = await this.prisma.pamRegistration.findMany({
       where: {

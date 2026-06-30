@@ -237,12 +237,42 @@ export interface PamRegistrationDto {
   dni: string;
   celular: string;
   correo: string;
+  direccion: string | null;
+  ciudad: string | null;
+  distrito: string | null;
+  genero: string | null;
+  fechaNacimiento: string | null;
+  comoTeEnteraste: string | null;
   plan: string;
   frecuencia: string;
+  checkoutUrl: string | null;
+  aceptaPrivacidad: boolean;
   mpStatus: string | null;
   welcomeEmail: string;
   expiryNotice: string;
   expiryDate: string | null;
+}
+
+export interface UpdatePamRegistrationDto {
+  nombres?: string;
+  apellidos?: string;
+  dni?: string;
+  celular?: string;
+  correo?: string;
+  direccion?: string;
+  ciudad?: string;
+  distrito?: string;
+  genero?: string;
+  fechaNacimiento?: string;
+  comoTeEnteraste?: string;
+  plan?: string;
+  frecuencia?: string;
+  checkoutUrl?: string;
+  aceptaPrivacidad?: boolean;
+  mpStatus?: string;
+  welcomeEmail?: string;
+  expiryNotice?: string;
+  expiryDate?: string;
 }
 
 export interface PamAdminStateDto {

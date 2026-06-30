@@ -2,11 +2,30 @@ import {
   IsArray,
   IsBoolean,
   IsEmail,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Min,
 } from 'class-validator';
+
+const PAM_MP_STATUSES = [
+  'pending',
+  'in_process',
+  'approved',
+  'authorized',
+  'rejected',
+  'cancelled',
+  'refunded',
+  'charged_back',
+] as const;
+
+const PAM_EMAIL_STATUSES = [
+  'PENDIENTE',
+  'ENVIADO',
+  'ERROR_DATOS',
+  'ERROR_TEMP',
+] as const;
 
 export class UpdatePamSettingsDto {
   @IsArray()
@@ -177,4 +196,82 @@ export class CreatePamRegistrationDto {
 
   @IsBoolean()
   aceptaPrivacidad!: boolean;
+}
+
+export class UpdatePamRegistrationDto {
+  @IsOptional()
+  @IsString()
+  nombres?: string;
+
+  @IsOptional()
+  @IsString()
+  apellidos?: string;
+
+  @IsOptional()
+  @IsString()
+  dni?: string;
+
+  @IsOptional()
+  @IsString()
+  celular?: string;
+
+  @IsOptional()
+  @IsEmail()
+  correo?: string;
+
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @IsOptional()
+  @IsString()
+  ciudad?: string;
+
+  @IsOptional()
+  @IsString()
+  distrito?: string;
+
+  @IsOptional()
+  @IsString()
+  genero?: string;
+
+  @IsOptional()
+  @IsString()
+  fechaNacimiento?: string;
+
+  @IsOptional()
+  @IsString()
+  comoTeEnteraste?: string;
+
+  @IsOptional()
+  @IsString()
+  plan?: string;
+
+  @IsOptional()
+  @IsString()
+  frecuencia?: string;
+
+  @IsOptional()
+  @IsString()
+  checkoutUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  aceptaPrivacidad?: boolean;
+
+  @IsOptional()
+  @IsIn([...PAM_MP_STATUSES, ''])
+  mpStatus?: string;
+
+  @IsOptional()
+  @IsIn(PAM_EMAIL_STATUSES)
+  welcomeEmail?: string;
+
+  @IsOptional()
+  @IsIn(PAM_EMAIL_STATUSES)
+  expiryNotice?: string;
+
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
 }

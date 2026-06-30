@@ -303,4 +303,19 @@ export const api = {
     request<import('@mali-one/shared').PamRegistrationDto[]>(
       '/api/widgets/pam/registrations',
     ),
+
+  updatePamRegistration: (
+    id: string,
+    body: import('@mali-one/shared').UpdatePamRegistrationDto,
+  ) =>
+    request<import('@mali-one/shared').PamRegistrationDto>(
+      `/api/widgets/pam/registrations/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  resendPamWelcome: (id: string) =>
+    request<import('@mali-one/shared').PamRegistrationDto>(
+      `/api/widgets/pam/registrations/${id}/resend-welcome`,
+      { method: 'POST' },
+    ),
 };

@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { PamAdminStateDto, PamPlanDto } from '@mali-one/shared';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import type {
+  PamAdminStateDto,
+  PamPlanDto,
+  PamRegistrationDto,
+  UpdatePamRegistrationDto,
+} from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
@@ -19,10 +24,336 @@ const MEMBERSHIP_PREVIEW = [
   },
 ];
 
+const MP_STATUSES = [
+  { value: '', label: '— Sin estado —' },
+  { value: 'pending', label: 'pending' },
+  { value: 'in_process', label: 'in_process' },
+  { value: 'approved', label: 'approved' },
+  { value: 'authorized', label: 'authorized' },
+  { value: 'rejected', label: 'rejected' },
+  { value: 'cancelled', label: 'cancelled' },
+  { value: 'refunded', label: 'refunded' },
+  { value: 'charged_back', label: 'charged_back' },
+];
+
+const EMAIL_STATUSES = ['PENDIENTE', 'ENVIADO', 'ERROR_DATOS', 'ERROR_TEMP'];
+
+const CONFIRMED_MP = ['approved', 'authorized'];
+
+function isPending(reg: PamRegistrationDto) {
+  return !reg.mpStatus || !CONFIRMED_MP.includes(reg.mpStatus);
+}
+
+function formatDate(iso: string | null) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('es-PE');
+}
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString('es-PE');
+}
+
+function toDateInput(iso: string | null) {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
+function DetailField({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="text-sm">{value || '—'}</dd>
+    </div>
+  );
+}
+
+function RegistrationRow({
+  reg,
+  expanded,
+  editing,
+  editForm,
+  onToggle,
+  onStartEdit,
+  onCancelEdit,
+  onChange,
+  onSave,
+  onResendWelcome,
+  saving,
+}: {
+  reg: PamRegistrationDto;
+  expanded: boolean;
+  editing: boolean;
+  editForm: UpdatePamRegistrationDto;
+  onToggle: () => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onChange: (patch: UpdatePamRegistrationDto) => void;
+  onSave: () => void;
+  onResendWelcome: () => void;
+  saving: boolean;
+}) {
+  const pending = isPending(reg);
+
+  return (
+    <>
+      <tr
+        className="border-b border-border/60 cursor-pointer hover:bg-border/20"
+        onClick={onToggle}
+      >
+        <td className="py-2 pr-2">
+          <span className="mr-1 text-muted">{expanded ? '▾' : '▸'}</span>
+          {formatDate(reg.createdAt)}
+        </td>
+        <td className="py-2 pr-2">
+          {reg.nombres} {reg.apellidos}
+          {pending && (
+            <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-400">
+              pendiente
+            </span>
+          )}
+        </td>
+        <td className="py-2 pr-2">{reg.correo}</td>
+        <td className="py-2 pr-2">
+          {reg.plan} / {reg.frecuencia}
+        </td>
+        <td className="py-2">{reg.mpStatus ?? '—'}</td>
+      </tr>
+      {expanded && (
+        <tr className="border-b border-border/60 bg-border/10">
+          <td colSpan={5} className="p-4">
+            {editing ? (
+              <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Nombres</span>
+                    <Input
+                      value={editForm.nombres ?? ''}
+                      onChange={(e) => onChange({ nombres: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Apellidos</span>
+                    <Input
+                      value={editForm.apellidos ?? ''}
+                      onChange={(e) => onChange({ apellidos: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">DNI</span>
+                    <Input
+                      value={editForm.dni ?? ''}
+                      onChange={(e) => onChange({ dni: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Celular</span>
+                    <Input
+                      value={editForm.celular ?? ''}
+                      onChange={(e) => onChange({ celular: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Correo</span>
+                    <Input
+                      type="email"
+                      value={editForm.correo ?? ''}
+                      onChange={(e) => onChange({ correo: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Género</span>
+                    <Input
+                      value={editForm.genero ?? ''}
+                      onChange={(e) => onChange({ genero: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm sm:col-span-2">
+                    <span className="text-muted">Dirección</span>
+                    <Input
+                      value={editForm.direccion ?? ''}
+                      onChange={(e) => onChange({ direccion: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Ciudad</span>
+                    <Input
+                      value={editForm.ciudad ?? ''}
+                      onChange={(e) => onChange({ ciudad: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Distrito</span>
+                    <Input
+                      value={editForm.distrito ?? ''}
+                      onChange={(e) => onChange({ distrito: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Fecha nacimiento</span>
+                    <Input
+                      type="date"
+                      value={editForm.fechaNacimiento ?? ''}
+                      onChange={(e) => onChange({ fechaNacimiento: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Cómo te enteraste</span>
+                    <Input
+                      value={editForm.comoTeEnteraste ?? ''}
+                      onChange={(e) => onChange({ comoTeEnteraste: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Plan</span>
+                    <Input
+                      value={editForm.plan ?? ''}
+                      onChange={(e) => onChange({ plan: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Frecuencia</span>
+                    <Input
+                      value={editForm.frecuencia ?? ''}
+                      onChange={(e) => onChange({ frecuencia: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm sm:col-span-2 lg:col-span-3">
+                    <span className="text-muted">Checkout URL (Mercado Pago)</span>
+                    <Input
+                      value={editForm.checkoutUrl ?? ''}
+                      onChange={(e) => onChange({ checkoutUrl: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Estado Mercado Pago</span>
+                    <select
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                      value={editForm.mpStatus ?? ''}
+                      onChange={(e) => onChange({ mpStatus: e.target.value })}
+                    >
+                      {MP_STATUSES.map((s) => (
+                        <option key={s.value || 'empty'} value={s.value}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Mensaje bienvenida</span>
+                    <select
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                      value={editForm.welcomeEmail ?? 'PENDIENTE'}
+                      onChange={(e) => onChange({ welcomeEmail: e.target.value })}
+                    >
+                      {EMAIL_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Fecha caducidad</span>
+                    <Input
+                      type="date"
+                      value={editForm.expiryDate ?? ''}
+                      onChange={(e) => onChange({ expiryDate: e.target.value })}
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-muted">Aviso caducidad</span>
+                    <select
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                      value={editForm.expiryNotice ?? 'PENDIENTE'}
+                      onChange={(e) => onChange({ expiryNotice: e.target.value })}
+                    >
+                      {EMAIL_STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="text-xs text-muted">
+                  Al marcar MP como <strong>approved</strong> o <strong>authorized</strong>, se
+                  calculará la fecha de caducidad y se enviará el correo de bienvenida si aún está
+                  pendiente.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button disabled={saving} onClick={() => void onSave()}>
+                    {saving ? 'Guardando…' : 'Guardar cambios'}
+                  </Button>
+                  <Button variant="outline" onClick={onCancelEdit}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div onClick={(e) => e.stopPropagation()}>
+                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <DetailField label="Registrado en" value={formatDateTime(reg.createdAt)} />
+                  <DetailField label="DNI" value={reg.dni} />
+                  <DetailField label="Celular" value={reg.celular} />
+                  <DetailField label="Dirección" value={reg.direccion} />
+                  <DetailField label="Ciudad" value={reg.ciudad} />
+                  <DetailField label="Distrito" value={reg.distrito} />
+                  <DetailField label="Género" value={reg.genero} />
+                  <DetailField label="Fecha nacimiento" value={reg.fechaNacimiento} />
+                  <DetailField label="Cómo te enteraste" value={reg.comoTeEnteraste} />
+                  <DetailField
+                    label="Checkout URL"
+                    value={
+                      reg.checkoutUrl ? (
+                        <a
+                          href={reg.checkoutUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-all text-primary hover:underline"
+                        >
+                          {reg.checkoutUrl}
+                        </a>
+                      ) : (
+                        '—'
+                      )
+                    }
+                  />
+                  <DetailField
+                    label="Acepta privacidad"
+                    value={reg.aceptaPrivacidad ? 'Sí' : 'No'}
+                  />
+                  <DetailField label="Estado MP" value={reg.mpStatus} />
+                  <DetailField label="Mensaje bienvenida" value={reg.welcomeEmail} />
+                  <DetailField label="Fecha caducidad" value={formatDate(reg.expiryDate)} />
+                  <DetailField label="Aviso caducidad" value={reg.expiryNotice} />
+                </dl>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={onStartEdit}>
+                    Editar
+                  </Button>
+                  {reg.mpStatus && CONFIRMED_MP.includes(reg.mpStatus) && (
+                    <Button variant="outline" onClick={() => void onResendWelcome()}>
+                      Reenviar bienvenida
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 export function WidgetMuseoMembershipPage() {
   const toast = useToast();
   const [state, setState] = useState<PamAdminStateDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<UpdatePamRegistrationDto>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
   const area = WIDGET_AREAS.museo;
 
   const load = useCallback(async () => {
@@ -66,6 +397,67 @@ export function WidgetMuseoMembershipPage() {
       toast.success(`Plan ${plan.name} guardado`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar plan');
+    }
+  }
+
+  function startEdit(reg: PamRegistrationDto) {
+    setEditingId(reg.id);
+    setEditForm({
+      nombres: reg.nombres,
+      apellidos: reg.apellidos,
+      dni: reg.dni,
+      celular: reg.celular,
+      correo: reg.correo,
+      direccion: reg.direccion ?? '',
+      ciudad: reg.ciudad ?? '',
+      distrito: reg.distrito ?? '',
+      genero: reg.genero ?? '',
+      fechaNacimiento: reg.fechaNacimiento ?? '',
+      comoTeEnteraste: reg.comoTeEnteraste ?? '',
+      plan: reg.plan,
+      frecuencia: reg.frecuencia,
+      checkoutUrl: reg.checkoutUrl ?? '',
+      mpStatus: reg.mpStatus ?? '',
+      welcomeEmail: reg.welcomeEmail,
+      expiryNotice: reg.expiryNotice,
+      expiryDate: toDateInput(reg.expiryDate),
+    });
+  }
+
+  function updateRegistrationInState(updated: PamRegistrationDto) {
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            registrations: prev.registrations.map((r) =>
+              r.id === updated.id ? updated : r,
+            ),
+          }
+        : prev,
+    );
+  }
+
+  async function saveRegistration(id: string) {
+    setSavingId(id);
+    try {
+      const updated = await api.updatePamRegistration(id, editForm);
+      updateRegistrationInState(updated);
+      setEditingId(null);
+      toast.success('Registro actualizado');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al guardar registro');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function resendWelcome(id: string) {
+    try {
+      const updated = await api.resendPamWelcome(id);
+      updateRegistrationInState(updated);
+      toast.success('Correo de bienvenida reenviado');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al reenviar correo');
     }
   }
 
@@ -179,9 +571,13 @@ export function WidgetMuseoMembershipPage() {
       </Card>
 
       <Card className="overflow-x-auto p-4">
-        <h2 className="mb-3 font-semibold">
+        <h2 className="mb-1 font-semibold">
           Registros recientes ({state.registrations.length})
         </h2>
+        <p className="mb-3 text-xs text-muted">
+          Haz clic en una fila para ver el detalle. Los registros sin pago confirmado aparecen
+          como pendientes; puedes marcar MP como approved para activar bienvenida y caducidad.
+        </p>
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-muted">
@@ -194,19 +590,25 @@ export function WidgetMuseoMembershipPage() {
           </thead>
           <tbody>
             {state.registrations.map((r) => (
-              <tr key={r.id} className="border-b border-border/60">
-                <td className="py-2 pr-2">
-                  {new Date(r.createdAt).toLocaleDateString('es-PE')}
-                </td>
-                <td className="py-2 pr-2">
-                  {r.nombres} {r.apellidos}
-                </td>
-                <td className="py-2 pr-2">{r.correo}</td>
-                <td className="py-2 pr-2">
-                  {r.plan} / {r.frecuencia}
-                </td>
-                <td className="py-2">{r.mpStatus ?? '—'}</td>
-              </tr>
+              <RegistrationRow
+                key={r.id}
+                reg={r}
+                expanded={expandedId === r.id}
+                editing={editingId === r.id}
+                editForm={editForm}
+                saving={savingId === r.id}
+                onToggle={() => {
+                  setExpandedId((prev) => (prev === r.id ? null : r.id));
+                  if (editingId && editingId !== r.id) setEditingId(null);
+                }}
+                onStartEdit={() => startEdit(r)}
+                onCancelEdit={() => setEditingId(null)}
+                onChange={(patch) =>
+                  setEditForm((prev: UpdatePamRegistrationDto) => ({ ...prev, ...patch }))
+                }
+                onSave={() => void saveRegistration(r.id)}
+                onResendWelcome={() => void resendWelcome(r.id)}
+              />
             ))}
           </tbody>
         </table>
