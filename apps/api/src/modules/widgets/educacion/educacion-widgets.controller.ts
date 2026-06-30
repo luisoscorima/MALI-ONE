@@ -31,6 +31,7 @@ import {
   CreateEducacionAliadoDto,
   UpdateEducacionAliadoDto,
 } from '../dto/create-educacion-aliado.dto';
+import { ImportEducacionAliadosDto } from '../dto/import-educacion-aliados.dto';
 
 @Controller('widgets/educacion')
 export class EducacionWidgetsController {
@@ -160,6 +161,12 @@ export class EducacionWidgetsController {
   @RequireModule(AppModule.widget_educacion)
   createAliado(@Body() body: CreateEducacionAliadoDto) {
     return this.service.createAliado(body);
+  }
+
+  @Post('aliados/import')
+  @RequireModule(AppModule.widget_educacion)
+  importAliados(@Body() body: ImportEducacionAliadosDto) {
+    return this.service.importAliados(body.items, body.replace ?? true);
   }
 
   @Patch('aliados/:id')

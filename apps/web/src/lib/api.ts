@@ -238,6 +238,15 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  importEducacionAliados: (items: Record<string, unknown>[], replace = true) =>
+    request<{ upserted: number; total: number }>(
+      '/api/widgets/educacion/aliados/import',
+      {
+        method: 'POST',
+        body: JSON.stringify({ items, replace }),
+      },
+    ),
+
   updateEducacionAliado: (id: string, body: Record<string, unknown>) =>
     request(`/api/widgets/educacion/aliados/${id}`, {
       method: 'PATCH',

@@ -19,12 +19,12 @@
     return (origin || '') + '/api/widgets';
   }
 
-  function loadStylesheet(href) {
-    if (document.querySelector('link[data-mali-popup-css]')) return;
+  function loadStylesheet(href, marker) {
+    if (document.querySelector('link[data-mali-css="' + marker + '"]')) return;
     var link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
-    link.setAttribute('data-mali-popup-css', '1');
+    link.setAttribute('data-mali-css', marker);
     document.head.appendChild(link);
   }
 
@@ -61,7 +61,8 @@
       if (!config || !config.imagenUrl || !config.botonUrl) return;
 
       var origin = scriptOrigin();
-      loadStylesheet(origin + '/widgets/educacion/popup.css');
+      loadStylesheet(origin + '/widgets/educacion/benton-sans.css', 'benton-sans');
+      loadStylesheet(origin + '/widgets/educacion/popup.css', 'popup');
       buildPopupHtml();
       this.injectContent();
       this.bindEvents();

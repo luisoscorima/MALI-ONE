@@ -103,6 +103,7 @@
   color: #fff;
   padding: 12px 24px;
   text-decoration: none;
+  font-family: var(--mali-font-primary, 'BentonSansFB', Arial, Helvetica, sans-serif);
   font-weight: 600;
   font-size: 14px;
   min-width: 165px;

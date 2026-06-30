@@ -58,6 +58,16 @@ window.addEventListener('message', function (e) {
 
 **Nota:** Las rutas del panel admin son `/admin/widgets/*`. Los HTML embebibles públicos siguen en `/widgets/*.html` (sin conflicto con nginx).
 
+### Fuente BentonSansFB
+
+Los widgets cargan `widgets/educacion/benton-sans.css`, que apunta a:
+
+`widgets/educacion/fonts/BentonSansFB-*.woff2`
+
+Asegúrate de que esos 4 archivos `.woff2` existan en el contenedor `web` (misma carpeta que usa mapa y calendario). No van en git por licencia; cópialos desde el tema WordPress o MALI-TI al desplegar.
+
+Los loaders **selector-loader.js** y **popup-loader.js** incluyen la fuente automáticamente al inyectarse en educacion.mali.pe.
+
 ## WordPress (plugin `mali-one-embed`)
 
 En `wp-config.php`:

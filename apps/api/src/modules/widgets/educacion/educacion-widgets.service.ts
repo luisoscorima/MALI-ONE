@@ -292,6 +292,61 @@ export class EducacionWidgetsService {
     return this.prisma.educacionAliado.delete({ where: { id } });
   }
 
+  async importAliados(
+    items: {
+      nombre: string;
+      imagen?: string;
+      imageUrl?: string;
+      categoria: string;
+      url?: string | null;
+      sortOrder?: number;
+    }[],
+    replace = true,
+  ) {
+    const importedNames = new Set<string>();
+    let upserted = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const nombre = item.nombre?.trim();
+      const imageUrl = (item.imageUrl ?? item.imagen ?? '').trim();
+      if (!nombre || !imageUrl) continue;
+
+      importedNames.add(nombre);
+      const data = {
+        nombre,
+        imageUrl,
+        categoria: item.categoria,
+        url: item.url?.trim() || null,
+        sortOrder: item.sortOrder ?? i,
+        activo: true,
+      };
+
+      const existing = await this.prisma.educacionAliado.findFirst({
+        where: { nombre },
+      });
+
+      if (existing) {
+        await this.prisma.educacionAliado.update({
+          where: { id: existing.id },
+          data,
+        });
+      } else {
+        await this.prisma.educacionAliado.create({ data });
+      }
+      upserted += 1;
+    }
+
+    if (replace && importedNames.size > 0) {
+      await this.prisma.educacionAliado.updateMany({
+        where: { nombre: { notIn: [...importedNames] } },
+        data: { activo: false },
+      });
+    }
+
+    return { upserted, total: importedNames.size };
+  }
+
   private mapSedePublic(
     s: {
       id: string;

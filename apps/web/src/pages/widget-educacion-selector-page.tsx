@@ -16,7 +16,7 @@ const SELECTOR_PREVIEW = [
     id: 'selector',
     label: 'Selector sedes',
     src: '/widgets/educacion/selector-sedes.html',
-    height: '200px',
+    height: '560px',
   },
 ];
 

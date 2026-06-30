@@ -29,6 +29,25 @@ const CATEGORIAS: { value: EducacionAliadoCategoria; label: string }[] = [
   { value: 'socio', label: 'Socio' },
 ];
 
+function parseAliadosImport(raw: string): Record<string, unknown>[] {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error('Pega un JSON con la lista de aliados');
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>[];
+  }
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    Array.isArray((parsed as { aliados?: unknown }).aliados)
+  ) {
+    return (parsed as { aliados: Record<string, unknown>[] }).aliados;
+  }
+  throw new Error('Usa un array [...] o el bloque aliados: [...] de mapa_conf.js');
+}
+
 function emptyAliado(sortOrder: number): EducacionAliadoDto {
   return {
     id: '',
@@ -46,6 +65,8 @@ export function WidgetEducacionAliadosPage() {
   const { state, setState, loading, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<EducacionAliadoDto | null>(null);
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
 
   async function persistAliado(aliado: EducacionAliadoDto) {
     const payload = {
@@ -98,6 +119,21 @@ export function WidgetEducacionAliadosPage() {
     });
   }
 
+  async function runBulkImport() {
+    setImporting(true);
+    try {
+      const items = parseAliadosImport(importJson);
+      const result = await api.importEducacionAliados(items, true);
+      toast.success(`Importados ${result.upserted} aliados (URLs conservadas)`);
+      setImportJson('');
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al importar');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading || !state) {
     return <Spinner className="mx-auto mt-12" />;
   }
@@ -110,13 +146,42 @@ export function WidgetEducacionAliadosPage() {
             Aliados / auspiciadores ({state.aliados.length})
           </h2>
           <p className="text-sm text-muted">
-            Logos con filtro por categoría. Shortcode iframe en WordPress.
+            Logos con filtro por categoría. Las imágenes pueden ser URLs externas
+            (p. ej. WordPress); no hace falta subirlas a S3.
           </p>
         </div>
         <Button variant="outline" onClick={() => setDraft(emptyAliado(state.aliados.length))}>
           Nuevo aliado
         </Button>
       </div>
+
+      <details className="rounded-lg border border-border p-3">
+        <summary className="cursor-pointer text-sm font-medium">
+          Importar en lote (JSON)
+        </summary>
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-muted">
+            Pega el array de <code>mapa_conf.js</code> (campo{' '}
+            <code>imagen</code> o <code>imageUrl</code>). Se conservan las URLs
+            de educacion.mali.pe. Los aliados que no estén en la lista se
+            desactivan.
+          </p>
+          <textarea
+            className="min-h-[140px] w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs"
+            placeholder={'[\n  { "nombre": "...", "imagen": "https://...", "categoria": "aliado", "url": "..." }\n]'}
+            value={importJson}
+            onChange={(e) => setImportJson(e.target.value)}
+          />
+          <Button
+            variant="outline"
+            className="text-sm"
+            disabled={importing || !importJson.trim()}
+            onClick={() => void runBulkImport()}
+          >
+            {importing ? 'Importando…' : 'Importar aliados'}
+          </Button>
+        </div>
+      </details>
 
       {draft && !draft.id && (
         <AliadoEditor

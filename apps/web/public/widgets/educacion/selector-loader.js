@@ -16,12 +16,12 @@
     return scriptOrigin() + '/api/widgets';
   }
 
-  function loadStylesheet(href) {
-    if (document.querySelector('link[data-mali-selector-css]')) return;
+  function loadStylesheet(href, marker) {
+    if (document.querySelector('link[data-mali-css="' + marker + '"]')) return;
     var link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = href;
-    link.setAttribute('data-mali-selector-css', '1');
+    link.setAttribute('data-mali-css', marker);
     document.head.appendChild(link);
   }
 
@@ -62,7 +62,8 @@
   function initSelector(sedes) {
     var origin = scriptOrigin();
     loadMaterialIcons();
-    loadStylesheet(origin + '/widgets/educacion/selector-loader.css');
+    loadStylesheet(origin + '/widgets/educacion/benton-sans.css', 'benton-sans');
+    loadStylesheet(origin + '/widgets/educacion/selector-loader.css', 'selector');
     buildShell();
 
     var btn = document.getElementById('mali-sede-selector');
