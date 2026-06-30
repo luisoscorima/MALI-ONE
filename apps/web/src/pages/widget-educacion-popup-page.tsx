@@ -70,7 +70,7 @@ export function WidgetEducacionPopupPage() {
             Alternativa manual (sin plugin)
           </summary>
           <pre className="mt-2 overflow-x-auto rounded bg-muted/30 p-3 text-xs">
-            {`<script src="https://dev.mali.pe/widgets/shared/popup-loader.js?site=educacion" defer></script>`}
+            {`<script src="https://dev.mali.pe/widgets/shared/popup-loader.js?ctx=educacion" defer></script>`}
           </pre>
         </details>
       </Card>

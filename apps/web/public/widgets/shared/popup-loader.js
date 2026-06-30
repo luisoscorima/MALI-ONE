@@ -19,7 +19,8 @@
       if (q !== -1) {
         try {
           var params = new URLSearchParams(src.slice(q));
-          site = params.get('site') || site;
+          // ctx= evita bloqueo WAF en dev.mali.pe con ?site=museo (502)
+          site = params.get('ctx') || params.get('site') || site;
         } catch (err) {
           /* URLSearchParams no disponible */
         }
