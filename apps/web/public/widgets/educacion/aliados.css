@@ -1,0 +1,100 @@
+.aliados-grid {
+  --aliados-gap: 1.5rem;
+  --aliados-transition: 0.35s ease;
+  margin: 1.5rem 0;
+  font-family: 'BentonSansFB', system-ui, sans-serif;
+}
+
+.aliados-grid__filter {
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 1.5rem;
+}
+
+.aliados-grid__filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aliados-grid__filter-btn {
+  appearance: none;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #6c757d;
+  cursor: pointer;
+  font-size: 0.95rem;
+  margin-bottom: -1px;
+  padding: 0.75rem 1.25rem;
+  transition: color var(--aliados-transition), border-color var(--aliados-transition);
+}
+
+.aliados-grid__filter-btn.is-active {
+  border-bottom-color: #702082;
+  color: #702082;
+  font-weight: 600;
+}
+
+.aliados-grid__items {
+  display: grid;
+  gap: var(--aliados-gap);
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  position: relative;
+}
+
+.aliados-grid__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity var(--aliados-transition), transform var(--aliados-transition);
+}
+
+.aliados-grid__item.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: scale(0.95);
+  visibility: hidden;
+}
+
+.aliados-grid__logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  padding: 0.5rem;
+  width: 100%;
+}
+
+.aliados-grid__logo {
+  display: block;
+  filter: grayscale(100%);
+  max-height: 80px;
+  max-width: 100%;
+  object-fit: contain;
+  transition: filter var(--aliados-transition), transform var(--aliados-transition);
+}
+
+.aliados-grid__logo-wrap:hover .aliados-grid__logo {
+  filter: grayscale(0%) brightness(1.05);
+  transform: scale(1.1);
+}
+
+.aliados-grid__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  text-decoration: none;
+}
+
+.aliados-grid__empty {
+  color: #666;
+  grid-column: 1 / -1;
+  text-align: center;
+}

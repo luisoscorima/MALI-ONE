@@ -26,6 +26,11 @@ import {
   CreateEducacionSelectorSedeDto,
   UpdateEducacionSelectorSedeDto,
 } from '../dto/create-educacion-selector-sede.dto';
+import { UpdateEducacionPopupDto } from '../dto/update-educacion-popup.dto';
+import {
+  CreateEducacionAliadoDto,
+  UpdateEducacionAliadoDto,
+} from '../dto/create-educacion-aliado.dto';
 
 @Controller('widgets/educacion')
 export class EducacionWidgetsController {
@@ -59,6 +64,18 @@ export class EducacionWidgetsController {
       Number(month) || new Date().getMonth() + 1,
       Number(year) || new Date().getFullYear(),
     );
+  }
+
+  @Public()
+  @Get('popup/config')
+  getPopupPublicConfig() {
+    return this.service.getPopupPublicConfig();
+  }
+
+  @Public()
+  @Get('aliados/config')
+  getAliadosPublicConfig() {
+    return this.service.getAliadosPublicConfig();
   }
 
   @Get('admin')
@@ -131,5 +148,32 @@ export class EducacionWidgetsController {
   @RequireModule(AppModule.widget_educacion)
   deleteSelectorSede(@Param('id') id: string) {
     return this.service.deleteSelectorSede(id);
+  }
+
+  @Put('popup')
+  @RequireModule(AppModule.widget_educacion)
+  updatePopup(@Body() body: UpdateEducacionPopupDto) {
+    return this.service.updatePopup(body);
+  }
+
+  @Post('aliados')
+  @RequireModule(AppModule.widget_educacion)
+  createAliado(@Body() body: CreateEducacionAliadoDto) {
+    return this.service.createAliado(body);
+  }
+
+  @Patch('aliados/:id')
+  @RequireModule(AppModule.widget_educacion)
+  updateAliado(
+    @Param('id') id: string,
+    @Body() body: UpdateEducacionAliadoDto,
+  ) {
+    return this.service.updateAliado(id, body);
+  }
+
+  @Delete('aliados/:id')
+  @RequireModule(AppModule.widget_educacion)
+  deleteAliado(@Param('id') id: string) {
+    return this.service.deleteAliado(id);
   }
 }

@@ -1,0 +1,129 @@
+/* Popup MALI — estilos embebidos vía loader */
+:root {
+  --mali-popup-overlay: rgba(51, 51, 51, 0.8);
+  --mali-popup-bg: transparent;
+  --mali-popup-radius: 0px;
+  --mali-popup-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  --mali-popup-animation-duration: 0.3s;
+  --mali-popup-spacing: 30px;
+}
+
+.mali-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 999999;
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--mali-popup-animation-duration) ease,
+    visibility var(--mali-popup-animation-duration) ease;
+}
+
+.mali-popup.is-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+}
+
+.mali-popup__backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--mali-popup-overlay);
+  cursor: pointer;
+}
+
+.mali-popup__dialog {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  background: var(--mali-popup-bg);
+  border-radius: var(--mali-popup-radius);
+  animation: maliSlideInUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  overflow: visible;
+  margin: 20px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mali-popup.is-closing .mali-popup__dialog {
+  animation: maliSlideOutDown 0.3s ease forwards;
+}
+
+.mali-popup__close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 20;
+  color: #ffffff;
+}
+
+.mali-popup__content {
+  padding: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.mali-popup-img-wrap {
+  width: 100%;
+  box-shadow: var(--mali-popup-shadow);
+}
+
+.mali-popup-img-wrap img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.mali-popup-btn-external {
+  text-align: center;
+  margin-top: var(--mali-popup-spacing);
+  width: 100%;
+}
+
+.mali-popup-btn {
+  display: inline-block;
+  background: #702082;
+  color: #fff;
+  padding: 12px 24px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 165px;
+  text-transform: uppercase;
+}
+
+.mali-popup-btn:hover {
+  background: #ae3dc7;
+  color: #fff;
+}
+
+body.mali-popup-open {
+  overflow: hidden;
+}
+
+@keyframes maliSlideInUp {
+  from { opacity: 0; transform: translateY(30px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes maliSlideOutDown {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(30px) scale(0.95); }
+}

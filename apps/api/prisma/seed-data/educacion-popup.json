@@ -1,0 +1,13 @@
+{
+  "activo": true,
+  "imagenUrl": "https://educacion.mali.pe/wp-content/uploads/2026/05/Pop-Up-clases-modelo.png",
+  "imagenLinkUrl": "https://forms.gle/wnJZF2VNjC4upW5C8",
+  "imagenTarget": "_blank",
+  "titulo": "Clases Modelo",
+  "botonTexto": "Regístrate gratis aquí",
+  "botonUrl": "https://forms.gle/wnJZF2VNjC4upW5C8",
+  "botonTarget": "_blank",
+  "showOnce": false,
+  "delayMs": 800,
+  "animationSpeedMs": 300
+}

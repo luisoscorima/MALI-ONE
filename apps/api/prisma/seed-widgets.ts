@@ -173,8 +173,67 @@ async function seedEducacion() {
     data: { activo: false },
   });
 
+  const popup = loadJson<{
+    activo: boolean;
+    imagenUrl: string;
+    imagenLinkUrl?: string;
+    imagenTarget?: string;
+    titulo?: string;
+    botonTexto: string;
+    botonUrl: string;
+    botonTarget?: string;
+    showOnce?: boolean;
+    delayMs?: number;
+    animationSpeedMs?: number;
+  }>('educacion-popup.json');
+
+  await prisma.educacionPopupSettings.upsert({
+    where: { id: 'default' },
+    create: { id: 'default', ...popup },
+    update: popup,
+  });
+
+  const aliados = loadJson<
+    {
+      nombre: string;
+      imageUrl: string;
+      categoria: string;
+      url?: string;
+      sortOrder: number;
+    }[]
+  >('educacion-aliados.json');
+
+  const aliadoNames = new Set<string>();
+  for (const a of aliados) {
+    aliadoNames.add(a.nombre);
+    const data = {
+      nombre: a.nombre,
+      imageUrl: a.imageUrl,
+      categoria: a.categoria,
+      url: a.url ?? null,
+      sortOrder: a.sortOrder,
+      activo: true,
+    };
+    const existing = await prisma.educacionAliado.findFirst({
+      where: { nombre: a.nombre },
+    });
+    if (existing) {
+      await prisma.educacionAliado.update({
+        where: { id: existing.id },
+        data,
+      });
+    } else {
+      await prisma.educacionAliado.create({ data });
+    }
+  }
+
+  await prisma.educacionAliado.updateMany({
+    where: { nombre: { notIn: [...aliadoNames] } },
+    data: { activo: false },
+  });
+
   console.log(
-    `  educacion: ${districts.length} distritos, ${mapSedes.length} sedes mapa, ${selectorSedes.length} sedes selector`,
+    `  educacion: ${districts.length} distritos, ${mapSedes.length} sedes mapa, ${selectorSedes.length} sedes selector, popup, ${aliados.length} aliados`,
   );
 }
 

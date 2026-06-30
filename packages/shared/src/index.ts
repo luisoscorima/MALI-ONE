@@ -124,6 +124,37 @@ export interface EducacionSelectorSedeDto {
   activo: boolean;
 }
 
+export type EducacionAliadoCategoria =
+  | 'patrocinador'
+  | 'auspiciador'
+  | 'aliado'
+  | 'socio';
+
+export interface EducacionPopupSettingsDto {
+  id: string;
+  activo: boolean;
+  imagenUrl: string;
+  imagenLinkUrl: string | null;
+  imagenTarget: string;
+  titulo: string | null;
+  botonTexto: string;
+  botonUrl: string;
+  botonTarget: string;
+  showOnce: boolean;
+  delayMs: number;
+  animationSpeedMs: number;
+}
+
+export interface EducacionAliadoDto {
+  id: string;
+  nombre: string;
+  imageUrl: string;
+  categoria: EducacionAliadoCategoria;
+  url: string | null;
+  sortOrder: number;
+  activo: boolean;
+}
+
 export interface EducacionDistrictDto {
   id: string;
   name: string;
@@ -152,6 +183,8 @@ export interface EducacionAdminStateDto {
   districts: (EducacionDistrictDto & { sedes?: EducacionSedeDto[] })[];
   sedes: EducacionSedeDto[];
   selectorSedes: EducacionSelectorSedeDto[];
+  popup: EducacionPopupSettingsDto;
+  aliados: EducacionAliadoDto[];
 }
 
 export interface BibliotecaCarouselItemDto {

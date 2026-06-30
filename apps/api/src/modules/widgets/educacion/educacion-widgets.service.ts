@@ -19,12 +19,31 @@ import {
   CreateEducacionSelectorSedeDto,
   UpdateEducacionSelectorSedeDto,
 } from '../dto/create-educacion-selector-sede.dto';
+import { UpdateEducacionPopupDto } from '../dto/update-educacion-popup.dto';
+import {
+  CreateEducacionAliadoDto,
+  UpdateEducacionAliadoDto,
+} from '../dto/create-educacion-aliado.dto';
 import {
   EDUCACION_ASSET_URLS,
   resolveEducacionImage,
 } from './educacion-asset-urls';
 
 const DEFAULT_CALENDAR_ID = 'talleresmali@mali.pe';
+
+const DEFAULT_POPUP = {
+  activo: false,
+  imagenUrl: '',
+  imagenLinkUrl: null as string | null,
+  imagenTarget: '_blank',
+  titulo: null as string | null,
+  botonTexto: 'Ver más',
+  botonUrl: '',
+  botonTarget: '_blank',
+  showOnce: false,
+  delayMs: 800,
+  animationSpeedMs: 300,
+};
 
 @Injectable()
 export class EducacionWidgetsService {
@@ -137,8 +156,46 @@ export class EducacionWidgetsService {
     return body;
   }
 
+  async getPopupPublicConfig() {
+    const popup = await this.ensurePopup();
+    if (!popup.activo || !popup.imagenUrl.trim() || !popup.botonUrl.trim()) {
+      return { activo: false };
+    }
+    return {
+      activo: true,
+      imagenUrl: popup.imagenUrl,
+      imagenLinkUrl: popup.imagenLinkUrl,
+      imagenTarget: popup.imagenTarget,
+      titulo: popup.titulo,
+      botonTexto: popup.botonTexto,
+      botonUrl: popup.botonUrl,
+      botonTarget: popup.botonTarget,
+      showOnce: popup.showOnce,
+      delayMs: popup.delayMs,
+      animationSpeedMs: popup.animationSpeedMs,
+    };
+  }
+
+  async getAliadosPublicConfig() {
+    const aliados = await this.prisma.educacionAliado.findMany({
+      where: { activo: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    return {
+      aliados: aliados.map((a) => ({
+        id: a.id,
+        nombre: a.nombre,
+        imageUrl: a.imageUrl,
+        categoria: a.categoria,
+        url: a.url,
+        sortOrder: a.sortOrder,
+      })),
+    };
+  }
+
   async getAdminState() {
-    const [settings, districts, sedes, selectorSedes] = await Promise.all([
+    const [settings, districts, sedes, selectorSedes, popup, aliados] =
+      await Promise.all([
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({
         orderBy: { sortOrder: 'asc' },
@@ -151,8 +208,12 @@ export class EducacionWidgetsService {
       this.prisma.educacionSelectorSede.findMany({
         orderBy: { sortOrder: 'asc' },
       }),
+      this.ensurePopup(),
+      this.prisma.educacionAliado.findMany({
+        orderBy: { sortOrder: 'asc' },
+      }),
     ]);
-    return { settings, districts, sedes, selectorSedes };
+    return { settings, districts, sedes, selectorSedes, popup, aliados };
   }
 
   async updateSettings(dto: UpdateEducacionSettingsDto) {
@@ -209,6 +270,28 @@ export class EducacionWidgetsService {
     return this.prisma.educacionSelectorSede.delete({ where: { id } });
   }
 
+  async updatePopup(dto: UpdateEducacionPopupDto) {
+    await this.ensurePopup();
+    return this.prisma.educacionPopupSettings.update({
+      where: { id: 'default' },
+      data: dto,
+    });
+  }
+
+  createAliado(dto: CreateEducacionAliadoDto) {
+    return this.prisma.educacionAliado.create({ data: dto });
+  }
+
+  async updateAliado(id: string, dto: UpdateEducacionAliadoDto) {
+    await this.findAliado(id);
+    return this.prisma.educacionAliado.update({ where: { id }, data: dto });
+  }
+
+  async deleteAliado(id: string) {
+    await this.findAliado(id);
+    return this.prisma.educacionAliado.delete({ where: { id } });
+  }
+
   private mapSedePublic(
     s: {
       id: string;
@@ -262,6 +345,14 @@ export class EducacionWidgetsService {
     });
   }
 
+  private async ensurePopup() {
+    return this.prisma.educacionPopupSettings.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', ...DEFAULT_POPUP },
+      update: {},
+    });
+  }
+
   private async findDistrict(id: string) {
     const row = await this.prisma.educacionDistrict.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Distrito no encontrado');
@@ -279,6 +370,12 @@ export class EducacionWidgetsService {
       where: { id },
     });
     if (!row) throw new NotFoundException('Sede del selector no encontrada');
+    return row;
+  }
+
+  private async findAliado(id: string) {
+    const row = await this.prisma.educacionAliado.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Aliado no encontrado');
     return row;
   }
 }

@@ -5,7 +5,9 @@ import {
   Images,
   LayoutGrid,
   MapPin,
+  Megaphone,
   MousePointerClick,
+  Users,
 } from 'lucide-react';
 
 export type WidgetAreaId = 'educacion' | 'biblioteca' | 'museo';
@@ -58,6 +60,22 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
         description: 'Botón flotante con brochures por sede.',
         path: 'selector',
         icon: MousePointerClick,
+        embedHost: 'educacion.mali.pe',
+      },
+      {
+        id: 'popup',
+        label: 'Popup promocional',
+        description: 'Overlay global con imagen y CTA.',
+        path: 'popup',
+        icon: Megaphone,
+        embedHost: 'educacion.mali.pe',
+      },
+      {
+        id: 'aliados',
+        label: 'Aliados / auspiciadores',
+        description: 'Grilla de logos con filtro por categoría.',
+        path: 'aliados',
+        icon: Users,
         embedHost: 'educacion.mali.pe',
       },
     ],

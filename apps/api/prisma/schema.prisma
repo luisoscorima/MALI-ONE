@@ -150,6 +150,32 @@ model EducacionSelectorSede {
   activo      Boolean @default(true)
 }
 
+model EducacionPopupSettings {
+  id               String   @id @default("default")
+  activo           Boolean  @default(false)
+  imagenUrl        String
+  imagenLinkUrl    String?
+  imagenTarget     String   @default("_blank")
+  titulo           String?
+  botonTexto       String
+  botonUrl         String
+  botonTarget      String   @default("_blank")
+  showOnce         Boolean  @default(false)
+  delayMs          Int      @default(800)
+  animationSpeedMs Int      @default(300)
+  updatedAt        DateTime @updatedAt
+}
+
+model EducacionAliado {
+  id        String  @id @default(cuid())
+  nombre    String
+  imageUrl  String
+  categoria String
+  url       String?
+  sortOrder Int     @default(0)
+  activo    Boolean @default(true)
+}
+
 model BibliotecaCarouselItem {
   id              String  @id @default(cuid())
   title           String

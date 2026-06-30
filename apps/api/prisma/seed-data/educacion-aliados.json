@@ -1,0 +1,23 @@
+[
+  {
+    "nombre": "Ejemplo Aliado 1",
+    "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2025/04/Mesa-de-trabajo-43.webp",
+    "categoria": "aliado",
+    "url": "https://educacion.mali.pe",
+    "sortOrder": 0
+  },
+  {
+    "nombre": "Ejemplo Aliado 2",
+    "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2025/04/Mesa-de-trabajo-42.webp",
+    "categoria": "aliado",
+    "url": "https://educacion.mali.pe",
+    "sortOrder": 1
+  },
+  {
+    "nombre": "Ejemplo Aliado 17",
+    "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2025/04/Mesa-de-trabajo-27.webp",
+    "categoria": "socio",
+    "url": "https://educacion.mali.pe",
+    "sortOrder": 2
+  }
+]

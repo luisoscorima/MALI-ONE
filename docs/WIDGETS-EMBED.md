@@ -11,7 +11,9 @@ MALI ONE sirve los shells HTML en `{APP_URL}/widgets/**` y la configuración en 
 | [mali.pe/es](https://mali.pe/es) | PAM membresías | `{APP_URL}/widgets/pam/membership.html?embed=1` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Calendario | `{APP_URL}/widgets/educacion/calendario.html` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Mapa sedes | `{APP_URL}/widgets/educacion/mapa.html` |
-| [educacion.mali.pe](https://educacion.mali.pe) | Selector sedes | `{APP_URL}/widgets/educacion/selector-sedes.html` |
+| [educacion.mali.pe](https://educacion.mali.pe) | Selector sedes | Script `{APP_URL}/widgets/educacion/selector-loader.js` |
+| [educacion.mali.pe](https://educacion.mali.pe) | Popup promocional | Script `{APP_URL}/widgets/educacion/popup-loader.js` |
+| [educacion.mali.pe](https://educacion.mali.pe) | Aliados | `{APP_URL}/widgets/educacion/aliados.html` |
 
 Reemplaza `{APP_URL}` por tu instancia (ej. `https://dev.mali.pe`).
 
@@ -56,9 +58,35 @@ window.addEventListener('message', function (e) {
 
 **Nota:** Las rutas del panel admin son `/admin/widgets/*`. Los HTML embebibles públicos siguen en `/widgets/*.html` (sin conflicto con nginx).
 
+## WordPress (plugin `mali-one-embed`)
+
+En `wp-config.php`:
+
+```php
+define('MALI_ONE_URL', 'https://dev.mali.pe');
+```
+
+Activa el plugin y usa los shortcodes:
+
+| Shortcode | Comportamiento |
+|-----------|----------------|
+| `[mali_mapa]` | iframe del mapa |
+| `[mali_calendario]` | iframe del calendario |
+| `[mali_aliados]` | iframe de aliados |
+| `[mali_popup]` | flag: carga popup-loader.js |
+
+El **selector flotante** se carga globalmente en todas las páginas (filtro `mali_one_embed_selector_global`).
+
+Los plugins legacy (`mali-calendario`, `mapa-mali`, etc.) pueden desactivarse tras migrar.
+
 ## API pública (sin autenticación)
 
 - `GET /api/widgets/educacion/config`
+- `GET /api/widgets/educacion/selector/config`
+- `GET /api/widgets/educacion/calendar/config`
+- `GET /api/widgets/educacion/calendar/events?month=&year=`
+- `GET /api/widgets/educacion/popup/config`
+- `GET /api/widgets/educacion/aliados/config`
 - `GET /api/widgets/biblioteca/carousel`
 - `GET /api/widgets/pam/config`
 - `POST /api/widgets/pam/registrations`
@@ -68,6 +96,7 @@ window.addEventListener('message', function (e) {
 
 ```env
 GOOGLE_MAPS_API_KEY=          # mapa educación
+GOOGLE_CALENDAR_API_KEY=      # calendario educación
 PAM_SMTP_HOST=
 PAM_SMTP_PORT=587
 PAM_SMTP_USER=
