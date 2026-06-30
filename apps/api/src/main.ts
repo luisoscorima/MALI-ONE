@@ -27,7 +27,10 @@ async function bootstrap() {
 
   const allowedOrigins = parseCorsOrigins();
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean | string) => void,
+    ) => {
       // Peticiones sin Origin (curl, same-origin) — permitir
       if (!origin) {
         callback(null, true);
