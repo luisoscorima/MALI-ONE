@@ -7,6 +7,8 @@ export type WidgetPreviewTab = {
   src: string;
   height?: string;
   pamEmbed?: boolean;
+  /** Añade ?preview=1 al iframe (estilos de demo en el HTML del widget; no afecta WordPress). */
+  previewMode?: boolean;
 };
 
 type Props = {
@@ -39,9 +41,13 @@ export function WidgetPreviewFrame({ tabs }: Props) {
 
   if (!tab) return null;
 
-  const src = tab.pamEmbed && !tab.src.includes('embed=1')
-    ? `${tab.src}${tab.src.includes('?') ? '&' : '?'}embed=1`
-    : tab.src;
+  let src = tab.src;
+  if (tab.pamEmbed && !src.includes('embed=1')) {
+    src = `${src}${src.includes('?') ? '&' : '?'}embed=1`;
+  }
+  if (tab.previewMode && !src.includes('preview=1')) {
+    src = `${src}${src.includes('?') ? '&' : '?'}preview=1`;
+  }
 
   return (
     <div>

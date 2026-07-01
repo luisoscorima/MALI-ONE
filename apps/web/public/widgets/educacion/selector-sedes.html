@@ -65,6 +65,11 @@
             margin: 0 auto;
         }
 
+        .sede-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
         .btn {
             position: relative;
             outline: 0;
@@ -380,6 +385,82 @@
             }
         }
 
+        /*
+         * Modo vista previa (admin MALI ONE, ?preview=1).
+         * No aplica en WordPress (usa selector-loader.js).
+         */
+        body.preview-mode {
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            overflow: auto;
+            background: #f5f5f5;
+        }
+
+        body.preview-mode .container {
+            width: 100%;
+            max-width: 360px;
+            padding: 0;
+            margin: 0;
+        }
+
+        body.preview-mode .sede-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        body.preview-mode .tooltip-sede {
+            order: 0;
+            position: static;
+            transform: none;
+            margin-bottom: 12px;
+            white-space: normal;
+            text-align: center;
+            max-width: 100%;
+        }
+
+        body.preview-mode .btn {
+            order: 1;
+        }
+
+        body.preview-mode .tooltip-sede::after {
+            display: none;
+        }
+
+        body.preview-mode .tooltip-sede.hidden {
+            opacity: 1;
+            transform: none;
+            pointer-events: auto;
+        }
+
+        body.preview-mode .sede-wrapper .dropdown {
+            order: 2;
+            position: static;
+            width: 100%;
+            max-width: 320px;
+            max-height: min(52vh, 360px);
+            left: auto;
+            bottom: auto;
+            top: auto;
+            transform: none;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            margin-top: 12px;
+        }
+
+        body.preview-mode .sede-wrapper .dropdown::before {
+            display: none;
+        }
+
+        body.preview-mode .btn.active + .dropdown {
+            transform: none;
+        }
+
         /* Mejoras táctiles para dispositivos móviles */
         @media (hover: none) and (pointer: coarse) {
             .btn:active {
@@ -398,7 +479,7 @@
 </head>
 <body>
     <div class="container">
-        <div class="sede-wrapper" style="position:relative; display:inline-block;">
+        <div class="sede-wrapper">
             <button class="btn btn-circle" id="sede-selector" aria-expanded="false" aria-haspopup="true" aria-label="Elige tu sede">
                 <span class="btn-text">Elige tu sede</span>
                 <i class="material-icons">place</i>
@@ -415,6 +496,11 @@
     <script>
         // Esperar a que se cargue mapa_conf.js
         document.addEventListener('DOMContentLoaded', function() {
+            const previewMode = new URLSearchParams(window.location.search).has('preview');
+            if (previewMode) {
+                document.body.classList.add('preview-mode');
+            }
+
             const btn = document.getElementById('sede-selector');
             const sedesList = document.getElementById('sedes-list');
             const btnText = btn.querySelector('.btn-text');
@@ -443,7 +529,7 @@
                     link.appendChild(text);
                     li.appendChild(link);
                     sedesList.appendChild(li);
-                    
+
                     // Evento click en cada sede
                     link.addEventListener('click', function(e) {
                         e.preventDefault();
@@ -472,7 +558,16 @@
             }).catch(function(err) {
                 console.error('Error cargando sedes', err);
             });
-            
+
+            if (previewMode) {
+                tooltip.classList.remove('hidden');
+                btn.classList.add('active');
+                btn.setAttribute('aria-expanded', 'true');
+                dropdown.style.opacity = '1';
+                dropdown.style.visibility = 'visible';
+                dropdown.style.pointerEvents = 'auto';
+            }
+
             // Toggle dropdown
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
