@@ -222,4 +222,4 @@ pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:widgets
 ```
 
-O reinicia el contenedor `api` en Docker (ejecuta `prisma migrate deploy` al arrancar).
+En Docker, al arrancar el contenedor `api` solo se aplican migraciones. El seed **no** corre por defecto (para no sobrescribir datos editados en el admin). Para un entorno vacío, define `WIDGET_SEED_ON_START=true` en `.env` o ejecuta el seed manualmente dentro del contenedor.

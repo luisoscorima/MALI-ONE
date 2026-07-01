@@ -146,9 +146,11 @@ PAM_SMTP_FROM=pam@mali.pe
 
 ## Seed inicial
 
+Solo para el primer despliegue o entornos vacíos. En producción los datos se gestionan desde el admin; el arranque de Docker **no** ejecuta el seed salvo `WIDGET_SEED_ON_START=true`.
+
 ```bash
 pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:widgets
 ```
 
-Datos importados desde MALI-TI (`mapa_conf`, `carrusel-data`, `pam-data`).
+Datos de referencia en `apps/api/prisma/seed-data/` (fuente histórica: MALI-TI).

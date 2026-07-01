@@ -119,7 +119,7 @@ export function WidgetEducacionMapaPage() {
     ['email', 'Email'],
     ['emailVirtual', 'Email virtual'],
     ['soporteVirtual', 'Soporte virtual'],
-    ['mapsApiKey', 'Google Maps API key (opcional)'],
+    ['mapsApiKey', 'Google Maps API key (no borrar)'],
   ] as const;
 
   const config = (

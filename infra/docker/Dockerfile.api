@@ -30,6 +30,8 @@ COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 
+COPY infra/docker/entrypoint-api.sh /entrypoint-api.sh
+
 WORKDIR /app/apps/api
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm prisma:migrate && pnpm prisma:seed:widgets && node dist/main.js"]
+CMD ["sh", "/entrypoint-api.sh"]

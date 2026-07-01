@@ -1,3 +1,8 @@
+/**
+ * Seed inicial de widgets (educación, biblioteca, PAM).
+ * No se ejecuta al arrancar la API salvo WIDGET_SEED_ON_START=true.
+ * Manual: pnpm --filter @mali-one/api prisma:seed:widgets
+ */
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { join } from 'path';
