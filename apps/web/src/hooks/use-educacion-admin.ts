@@ -21,14 +21,28 @@ const SETTINGS_UPDATE_KEYS = [
   'googleCalendarId',
 ] as const satisfies ReadonlyArray<keyof EducacionWidgetSettingsDto>;
 
+type EducacionSettingsUpdate = Pick<
+  EducacionWidgetSettingsDto,
+  (typeof SETTINGS_UPDATE_KEYS)[number]
+>;
+
 function toSettingsUpdateBody(
   settings: EducacionWidgetSettingsDto,
-): Partial<EducacionWidgetSettingsDto> {
-  const body: Partial<EducacionWidgetSettingsDto> = {};
-  for (const key of SETTINGS_UPDATE_KEYS) {
-    body[key] = settings[key];
-  }
-  return body;
+): EducacionSettingsUpdate {
+  return {
+    whatsapp: settings.whatsapp,
+    telefono: settings.telefono,
+    email: settings.email,
+    emailVirtual: settings.emailVirtual,
+    soporteVirtual: settings.soporteVirtual,
+    imageRectangulo: settings.imageRectangulo,
+    imageWhatsapp: settings.imageWhatsapp,
+    imageCirculo: settings.imageCirculo,
+    imageCorreo: settings.imageCorreo,
+    imageMarker: settings.imageMarker,
+    mapsApiKey: settings.mapsApiKey,
+    googleCalendarId: settings.googleCalendarId,
+  };
 }
 
 export function useEducacionAdmin() {
