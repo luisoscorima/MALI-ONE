@@ -93,6 +93,7 @@ export interface CreateWorkspaceUserDto {
 }
 
 export interface UpdateWorkspaceUserDto {
+  primaryEmail?: string;
   givenName?: string;
   familyName?: string;
   suspended?: boolean;

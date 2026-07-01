@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
 import { useToast } from '@/contexts/toast-context';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
@@ -16,6 +17,9 @@ export function AdminUsersPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [editingUser, setEditingUser] = useState<GoogleWorkspaceUser | null>(
+    null,
+  );
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -23,6 +27,13 @@ export function AdminUsersPage() {
     givenName: '',
     familyName: '',
     password: '',
+    orgUnitPath: '/',
+  });
+
+  const [editForm, setEditForm] = useState({
+    primaryEmail: '',
+    givenName: '',
+    familyName: '',
     orgUnitPath: '/',
   });
 
@@ -97,6 +108,57 @@ export function AdminUsersPage() {
     }
   }
 
+  function startEdit(user: GoogleWorkspaceUser) {
+    setShowCreate(false);
+    setEditingUser(user);
+    setEditForm({
+      primaryEmail: user.primaryEmail,
+      givenName: user.name.givenName,
+      familyName: user.name.familyName,
+      orgUnitPath: user.orgUnitPath,
+    });
+  }
+
+  function cancelEdit() {
+    setEditingUser(null);
+  }
+
+  async function handleUpdate(e: FormEvent) {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    const emailChanged =
+      editForm.primaryEmail.trim() !== editingUser.primaryEmail;
+    if (emailChanged) {
+      const ok = confirm(
+        `¿Renombrar ${editingUser.primaryEmail} a ${editForm.primaryEmail}? El correo anterior quedará como alias. El cambio puede tardar varios minutos.`,
+      );
+      if (!ok) return;
+    }
+
+    setSubmitting(true);
+    setError('');
+    try {
+      await api.updateWorkspaceUser(editingUser.primaryEmail, {
+        primaryEmail: emailChanged ? editForm.primaryEmail.trim() : undefined,
+        givenName: editForm.givenName.trim(),
+        familyName: editForm.familyName.trim(),
+        orgUnitPath: editForm.orgUnitPath.trim(),
+      });
+      setEditingUser(null);
+      toast.success(
+        emailChanged ? 'Usuario actualizado (correo renombrado)' : 'Usuario actualizado',
+      );
+      await loadUsers(search);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al actualizar';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSuspend(email: string) {
     if (!confirm(`¿Suspender ${email}?`)) return;
     try {
@@ -110,13 +172,49 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleReactivate(email: string) {
+    if (!confirm(`¿Reactivar ${email}?`)) return;
+    try {
+      await api.updateWorkspaceUser(email, { suspended: false });
+      toast.success('Usuario reactivado');
+      await loadUsers(search);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al reactivar';
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function handleSignOut(email: string) {
+    if (
+      !confirm(
+        `¿Cerrar todas las sesiones de ${email}? Deberá volver a iniciar sesión en todos sus dispositivos.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.signOutWorkspaceUser(email);
+      toast.success('Sesiones cerradas');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al cerrar sesiones';
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Usuarios Workspace"
         description="Gestión manual vía Google Admin SDK"
         actions={
-          <Button onClick={() => setShowCreate((v) => !v)}>
+          <Button
+            onClick={() => {
+              setEditingUser(null);
+              setShowCreate((v) => !v);
+            }}
+          >
             {showCreate ? 'Cancelar' : 'Crear usuario'}
           </Button>
         }
@@ -158,6 +256,63 @@ export function AdminUsersPage() {
           </Button>
         </form>
       </Card>
+
+      {editingUser && (
+        <Card className="mb-6">
+          <h3 className="mb-1 font-semibold">Editar usuario</h3>
+          <p className="mb-4 text-sm text-muted">
+            Cuenta actual: <strong>{editingUser.primaryEmail}</strong>
+          </p>
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleUpdate}>
+            <Input
+              placeholder="email@mali.pe"
+              value={editForm.primaryEmail}
+              onChange={(e) =>
+                setEditForm({ ...editForm, primaryEmail: e.target.value })
+              }
+              required
+            />
+            <Input
+              placeholder="Unidad organizativa (ej. /)"
+              value={editForm.orgUnitPath}
+              onChange={(e) =>
+                setEditForm({ ...editForm, orgUnitPath: e.target.value })
+              }
+              required
+            />
+            <Input
+              placeholder="Nombre"
+              value={editForm.givenName}
+              onChange={(e) =>
+                setEditForm({ ...editForm, givenName: e.target.value })
+              }
+              required
+            />
+            <Input
+              placeholder="Apellido"
+              value={editForm.familyName}
+              onChange={(e) =>
+                setEditForm({ ...editForm, familyName: e.target.value })
+              }
+              required
+            />
+            <div className="flex gap-2 md:col-span-2">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner className="h-4 w-4" /> Guardando...
+                  </span>
+                ) : (
+                  'Guardar cambios'
+                )}
+              </Button>
+              <Button type="button" variant="outline" onClick={cancelEdit}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
 
       {showCreate && (
         <Card className="mb-6">
@@ -225,7 +380,7 @@ export function AdminUsersPage() {
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[960px] text-left text-sm">
             <thead className="border-b border-border text-muted">
               <tr>
                 <th className="p-4">Email</th>
@@ -272,11 +427,38 @@ export function AdminUsersPage() {
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
+                          onClick={() => startEdit(u)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => void handleReset(u.primaryEmail)}
                         >
                           Reset pass
                         </Button>
-                        {!u.suspended && (
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleSignOut(u.primaryEmail)}
+                        >
+                          Cerrar sesiones
+                        </Button>
+                        <a
+                          href={googleAdminUserSecurityUrl(u.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-border/40"
+                        >
+                          Consola
+                        </a>
+                        {u.suspended ? (
+                          <Button
+                            variant="outline"
+                            onClick={() => void handleReactivate(u.primaryEmail)}
+                          >
+                            Reactivar
+                          </Button>
+                        ) : (
                           <Button
                             variant="danger"
                             onClick={() => void handleSuspend(u.primaryEmail)}

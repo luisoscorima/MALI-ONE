@@ -73,6 +73,12 @@ export const api = {
       { method: 'POST' },
     ),
 
+  signOutWorkspaceUser: (email: string) =>
+    request<{ ok: boolean }>(
+      `/api/admin/users/${encodeURIComponent(email)}/sign-out`,
+      { method: 'POST' },
+    ),
+
   suspendWorkspaceUser: (email: string) =>
     request(`/api/admin/users/${encodeURIComponent(email)}`, {
       method: 'DELETE',

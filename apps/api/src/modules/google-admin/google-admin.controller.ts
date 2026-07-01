@@ -66,6 +66,14 @@ export class GoogleAdminController {
     return result;
   }
 
+  @Post(':email/sign-out')
+  async signOut(@Req() req: Request, @Param('email') email: string) {
+    const actor = req.user as User;
+    const result = await this.googleAdmin.signOutUser(email);
+    await this.googleAdmin.logAction(actor, 'SIGN_OUT_USER', email);
+    return result;
+  }
+
   @Delete(':email')
   async suspend(@Req() req: Request, @Param('email') email: string) {
     const actor = req.user as User;

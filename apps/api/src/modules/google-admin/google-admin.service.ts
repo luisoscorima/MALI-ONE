@@ -204,6 +204,7 @@ export class GoogleAdminService {
   async updateUser(
     email: string,
     data: {
+      primaryEmail?: string;
       givenName?: string;
       familyName?: string;
       suspended?: boolean;
@@ -214,6 +215,9 @@ export class GoogleAdminService {
       const admin = this.getDirectory();
       const requestBody: Record<string, unknown> = {};
 
+      if (data.primaryEmail) {
+        requestBody.primaryEmail = data.primaryEmail;
+      }
       if (data.givenName || data.familyName) {
         requestBody.name = {
           ...(data.givenName ? { givenName: data.givenName } : {}),
@@ -223,7 +227,7 @@ export class GoogleAdminService {
       if (data.suspended !== undefined) {
         requestBody.suspended = data.suspended;
       }
-      if (data.orgUnitPath) {
+      if (data.orgUnitPath !== undefined) {
         requestBody.orgUnitPath = data.orgUnitPath;
       }
 
@@ -247,6 +251,14 @@ export class GoogleAdminService {
         },
       });
       return { temporaryPassword: tempPassword };
+    });
+  }
+
+  async signOutUser(email: string) {
+    return this.run('signOutUser', async () => {
+      const admin = this.getDirectory();
+      await admin.users.signOut({ userKey: email });
+      return { ok: true };
     });
   }
 
