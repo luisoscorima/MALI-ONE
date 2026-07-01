@@ -80,17 +80,16 @@ export class PamWidgetsService {
     };
   }
 
-  async getAdminState() {
-    const [settings, plans, registrations, popup] = await Promise.all([
-      this.ensureSettings(),
-      this.prisma.pamPlan.findMany({ orderBy: { sortOrder: 'asc' } }),
-      this.prisma.pamRegistration.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 500,
-      }),
-      this.ensureMuseoPopup(),
-    ]);
-    return { settings, plans, registrations, popup };
+  async getSettings() {
+    return this.ensureSettings();
+  }
+
+  listPlans() {
+    return this.prisma.pamPlan.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  getMuseoPopupAdmin() {
+    return this.ensureMuseoPopup();
   }
 
   async updateSettings(dto: UpdatePamSettingsDto) {

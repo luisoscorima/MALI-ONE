@@ -53,8 +53,8 @@ window.addEventListener('message', function (e) {
 
 ## Configuración en MALI ONE
 
-1. Asigna módulos `widget_educacion`, `widget_biblioteca` o `widget_pam` en **Accesos MALI ONE**.
-2. Edita datos en **Widgets Educación / Biblioteca / PAM** (`/admin/widgets/...`, pestaña Configuración).
+1. Asigna módulos `widget_educacion`, `widget_biblioteca`, `widget_museo` y/o `pam_memberships` en **Accesos MALI ONE**.
+2. Edita widgets en **Widgets Educación / Biblioteca / Museo** (`/admin/widgets/...`). La operación PAM (planes, registros) está en **Membresías PAM** (`/admin/pam`).
 3. Previsualiza en la pestaña **Vista previa**.
 
 **Nota:** Las rutas del panel admin son `/admin/widgets/*`. Los HTML embebibles públicos siguen en `/widgets/*.html` (sin conflicto con nginx).
@@ -115,6 +115,20 @@ Tras migrar, desactiva `mali-popup` y la config popup legacy de `mali-shared-con
 - `GET /api/widgets/pam/config`
 - `POST /api/widgets/pam/registrations`
 - `POST /api/widgets/pam/webhooks/mercadopago`
+
+### API administración PAM (requiere módulo `pam_memberships`)
+
+- `GET /api/pam/settings`
+- `PUT /api/pam/settings`
+- `GET /api/pam/plans`
+- `PATCH /api/pam/plans/:id`
+- `GET /api/pam/registrations`
+- `PATCH /api/pam/registrations/:id`
+
+### API administración Widgets Museo (requiere módulo `widget_museo`)
+
+- `GET /api/widgets/museo/popup`
+- `PUT /api/widgets/museo/popup`
 
 ## Variables de entorno
 

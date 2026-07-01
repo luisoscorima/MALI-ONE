@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type {
-  PamAdminStateDto,
   PamPlanDto,
   PamRegistrationDto,
   UpdatePamRegistrationDto,
 } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
-import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
-import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
+
+type PamPageState = {
+  settings: { id: string; benefits: string[]; notes: string[] };
+  plans: PamPlanDto[];
+  registrations: PamRegistrationDto[];
+};
 
 const MEMBERSHIP_PREVIEW = [
   {
@@ -346,20 +349,24 @@ function RegistrationRow({
   );
 }
 
-export function WidgetMuseoMembershipPage() {
+export function PamMembershipsPage() {
   const toast = useToast();
-  const [state, setState] = useState<PamAdminStateDto | null>(null);
+  const [state, setState] = useState<PamPageState | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdatePamRegistrationDto>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-  const area = WIDGET_AREAS.museo;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setState(await api.getPamWidgetAdmin());
+      const [settings, plans, registrations] = await Promise.all([
+        api.getPamSettings(),
+        api.getPamPlans(),
+        api.listPamRegistrations(),
+      ]);
+      setState({ settings, plans, registrations });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al cargar');
     } finally {
@@ -374,7 +381,7 @@ export function WidgetMuseoMembershipPage() {
   async function saveSettings() {
     if (!state) return;
     try {
-      await api.updatePamWidgetSettings({
+      await api.updatePamSettings({
         benefits: state.settings.benefits,
         notes: state.settings.notes,
       });
@@ -618,9 +625,8 @@ export function WidgetMuseoMembershipPage() {
 
   return (
     <WidgetToolLayout
-      backLink={<WidgetBackLink area={area} />}
       title="Membresías PAM"
-      description="Widget para mali.pe/es — planes, beneficios y registros"
+      description="Planes, beneficios, registros y pagos del Programa Amigos del MALI"
       config={config}
       preview={<WidgetPreviewFrame tabs={MEMBERSHIP_PREVIEW} />}
     />

@@ -1,6 +1,6 @@
 {
   "activo": false,
-  "imagenUrl": "",
+  "imagenUrl": "https://mali.pe/es/wp-content/uploads/2026/07/Popup_gif_Chabuca.gif",
   "imagenLinkUrl": null,
   "imagenTarget": "_blank",
   "titulo": null,
@@ -9,11 +9,5 @@
   "botonTarget": "_blank",
   "showOnce": false,
   "delayMs": 800,
-  "animationSpeedMs": 300,
-  "scheduleEnabled": false,
-  "scheduleDateStart": null,
-  "scheduleDateEnd": null,
-  "scheduleTimeStart": null,
-  "scheduleTimeEnd": null,
-  "scheduleTimezone": "America/Lima"
+  "animationSpeedMs": 300
 }

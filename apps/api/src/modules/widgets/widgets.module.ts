@@ -23,5 +23,6 @@ import { MuseoWidgetsController } from './museo/museo-widgets.controller';
     PamEmailService,
     PamSchedulerService,
   ],
+  exports: [PamWidgetsService],
 })
 export class WidgetsModule {}

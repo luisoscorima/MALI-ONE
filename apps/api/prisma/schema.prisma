@@ -19,7 +19,8 @@ enum AppModule {
   password_vault
   widget_educacion
   widget_biblioteca
-  widget_pam
+  widget_museo
+  pam_memberships
 }
 
 enum PamEmailStatus {

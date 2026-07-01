@@ -7,7 +7,13 @@ export type AppModule =
   | 'password_vault'
   | 'widget_educacion'
   | 'widget_biblioteca'
-  | 'widget_pam';
+  | 'widget_museo'
+  | 'pam_memberships';
+
+import { APP_PERMISSION_MODULES } from './permissions';
+
+export type { AppPermission, PermissionAppModule } from './permissions';
+export { APP_PERMISSION_MODULES };
 
 export interface AuthUser {
   id: string;

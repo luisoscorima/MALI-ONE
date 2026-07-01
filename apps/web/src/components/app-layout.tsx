@@ -4,6 +4,7 @@ import {
   BookOpen,
   GraduationCap,
   HardDrive,
+  Heart,
   Landmark,
   KeyRound,
   Link2,
@@ -70,7 +71,13 @@ const navItems: {
     to: '/admin/widgets/museo',
     label: 'Widgets Museo',
     icon: Landmark,
-    module: 'widget_pam',
+    module: 'widget_museo',
+  },
+  {
+    to: '/admin/pam',
+    label: 'Membresías PAM',
+    icon: Heart,
+    module: 'pam_memberships',
   },
 ];
 

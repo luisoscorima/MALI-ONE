@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { AppModule } from '@prisma/client';
 import { Public } from '../../../core/guards/public.decorator';
-import { RequireModule } from '../../../core/guards/module.decorator';
+import { RequirePermission } from '../../../core/guards/permission.decorator';
 import { PamWidgetsService } from '../pam/pam-widgets.service';
 import { UpdateMuseoPopupDto } from '../dto/update-museo-popup.dto';
 
@@ -15,8 +14,14 @@ export class MuseoWidgetsController {
     return this.pam.getMuseoPopupPublicConfig();
   }
 
+  @Get('popup')
+  @RequirePermission('widgets.museo.popup.manage')
+  getPopupAdmin() {
+    return this.pam.getMuseoPopupAdmin();
+  }
+
   @Put('popup')
-  @RequireModule(AppModule.widget_pam)
+  @RequirePermission('widgets.museo.popup.manage')
   updatePopup(@Body() body: UpdateMuseoPopupDto) {
     return this.pam.updateMuseoPopup(body);
   }

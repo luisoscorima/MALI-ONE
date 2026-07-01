@@ -7,7 +7,8 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.password_vault,
   AppModule.widget_educacion,
   AppModule.widget_biblioteca,
-  AppModule.widget_pam,
+  AppModule.widget_museo,
+  AppModule.pam_memberships,
 ];
 
 type UserWithModules = User & {

@@ -20,7 +20,7 @@ import { WidgetEducacionPopupPage } from '@/pages/widget-educacion-popup-page';
 import { WidgetEducacionSelectorPage } from '@/pages/widget-educacion-selector-page';
 import { WidgetMuseoHubPage } from '@/pages/widget-museo-hub-page';
 import { WidgetMuseoInterfazPage } from '@/pages/widget-museo-interfaz-page';
-import { WidgetMuseoMembershipPage } from '@/pages/widget-museo-membership-page';
+import { PamMembershipsPage } from '@/pages/pam-memberships-page';
 import { WidgetMuseoPopupPage } from '@/pages/widget-museo-popup-page';
 
 export function App() {
@@ -57,13 +57,16 @@ export function App() {
                 <Route path="admin/widgets/biblioteca" element={<WidgetBibliotecaHubPage />} />
                 <Route path="admin/widgets/biblioteca/carrusel" element={<WidgetBibliotecaCarruselPage />} />
               </Route>
-              <Route element={<ModuleGuard module="widget_pam" />}>
+              <Route element={<ModuleGuard module="widget_museo" />}>
                 <Route path="admin/widgets/museo" element={<WidgetMuseoHubPage />} />
-                <Route path="admin/widgets/museo/membership" element={<WidgetMuseoMembershipPage />} />
                 <Route path="admin/widgets/museo/popup" element={<WidgetMuseoPopupPage />} />
                 <Route path="admin/widgets/museo/interfaz-sistemas" element={<WidgetMuseoInterfazPage />} />
-                <Route path="admin/widgets/pam" element={<Navigate to="/admin/widgets/museo" replace />} />
-                <Route path="admin/widgets/pam/*" element={<Navigate to="/admin/widgets/museo" replace />} />
+                <Route path="admin/widgets/museo/membership" element={<Navigate to="/admin/pam" replace />} />
+                <Route path="admin/widgets/pam" element={<Navigate to="/admin/pam" replace />} />
+                <Route path="admin/widgets/pam/*" element={<Navigate to="/admin/pam" replace />} />
+              </Route>
+              <Route element={<ModuleGuard module="pam_memberships" />}>
+                <Route path="admin/pam" element={<PamMembershipsPage />} />
               </Route>
               <Route element={<SuperAdminGuard />}>
                 <Route path="admin/app-users" element={<AppUsersPage />} />

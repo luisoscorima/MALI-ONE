@@ -1,7 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Calendar,
-  Heart,
   Images,
   LayoutGrid,
   MapPin,
@@ -109,14 +108,6 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
         path: 'interfaz-sistemas',
         icon: LayoutGrid,
         previewOnly: true,
-        embedHost: 'mali.pe/es',
-      },
-      {
-        id: 'membership',
-        label: 'Membresías PAM',
-        description: 'Planes, beneficios y registros del Programa Amigos del MALI.',
-        path: 'membership',
-        icon: Heart,
         embedHost: 'mali.pe/es',
       },
       {

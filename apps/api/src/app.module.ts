@@ -8,6 +8,7 @@ import { RedisModule } from './core/redis/redis.module';
 import { S3Module } from './core/s3/s3.module';
 import { JwtAuthGuard } from './core/guards/jwt-auth.guard';
 import { ModuleGuard } from './core/guards/module.guard';
+import { PermissionGuard } from './core/guards/permission.guard';
 import { RolesGuard } from './core/guards/roles.guard';
 import { SuperAdminGuard } from './core/guards/super-admin.guard';
 import { HealthController } from './health.controller';
@@ -17,6 +18,7 @@ import { GoogleAdminModule } from './modules/google-admin/google-admin.module';
 import { LinksModule } from './modules/links/links.module';
 import { S3ManagerModule } from './modules/s3-manager/s3-manager.module';
 import { WidgetsModule } from './modules/widgets/widgets.module';
+import { PamModule } from './modules/pam/pam.module';
 
 @Module({
   imports: [
@@ -32,12 +34,14 @@ import { WidgetsModule } from './modules/widgets/widgets.module';
     S3ManagerModule,
     AppUsersModule,
     WidgetsModule,
+    PamModule,
   ],
   controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ModuleGuard },
+    { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_GUARD, useClass: SuperAdminGuard },
   ],
 })

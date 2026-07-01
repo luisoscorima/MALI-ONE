@@ -304,24 +304,29 @@ export const api = {
   deleteBibliotecaCarouselItem: (id: string) =>
     request(`/api/widgets/biblioteca/carousel/${id}`, { method: 'DELETE' }),
 
-  getPamWidgetAdmin: () =>
-    request<import('@mali-one/shared').PamAdminStateDto>('/api/widgets/pam/admin'),
+  getPamSettings: () =>
+    request<{ id: string; benefits: string[]; notes: string[] }>(
+      '/api/pam/settings',
+    ),
 
-  updatePamWidgetSettings: (body: { benefits: string[]; notes: string[] }) =>
-    request('/api/widgets/pam/settings', {
+  getPamPlans: () =>
+    request<import('@mali-one/shared').PamPlanDto[]>('/api/pam/plans'),
+
+  updatePamSettings: (body: { benefits: string[]; notes: string[] }) =>
+    request('/api/pam/settings', {
       method: 'PUT',
       body: JSON.stringify(body),
     }),
 
   updatePamPlan: (id: string, body: Record<string, unknown>) =>
-    request(`/api/widgets/pam/plans/${id}`, {
+    request(`/api/pam/plans/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
 
   listPamRegistrations: () =>
     request<import('@mali-one/shared').PamRegistrationDto[]>(
-      '/api/widgets/pam/registrations',
+      '/api/pam/registrations',
     ),
 
   updatePamRegistration: (
@@ -329,13 +334,18 @@ export const api = {
     body: import('@mali-one/shared').UpdatePamRegistrationDto,
   ) =>
     request<import('@mali-one/shared').PamRegistrationDto>(
-      `/api/widgets/pam/registrations/${id}`,
+      `/api/pam/registrations/${id}`,
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
 
   resendPamWelcome: (id: string) =>
     request<import('@mali-one/shared').PamRegistrationDto>(
-      `/api/widgets/pam/registrations/${id}/resend-welcome`,
+      `/api/pam/registrations/${id}/resend-welcome`,
       { method: 'POST' },
+    ),
+
+  getMuseoPopup: () =>
+    request<import('@mali-one/shared').MuseoPopupSettingsDto>(
+      '/api/widgets/museo/popup',
     ),
 };

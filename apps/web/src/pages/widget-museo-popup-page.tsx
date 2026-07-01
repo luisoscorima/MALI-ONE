@@ -22,8 +22,8 @@ export function WidgetMuseoPopupPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const admin = await api.getPamWidgetAdmin();
-      setPopup(admin.popup);
+      const admin = await api.getMuseoPopup();
+      setPopup(admin);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al cargar');
     } finally {

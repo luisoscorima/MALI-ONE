@@ -36,8 +36,13 @@ export const APP_MODULES: {
     description: 'Carrusel Koha para biblioteca.mali.pe.',
   },
   {
-    id: 'widget_pam',
+    id: 'widget_museo',
     label: 'Widgets Museo',
-    description: 'Membresías PAM y widgets para mali.pe/es.',
+    description: 'Popup e interfaz embebible en mali.pe/es.',
+  },
+  {
+    id: 'pam_memberships',
+    label: 'Membresías PAM',
+    description: 'Planes, beneficios, registros y pagos del programa.',
   },
 ];
