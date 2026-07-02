@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Building2 } from 'lucide-react';
 import type { EducacionSelectorSedeDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
@@ -7,8 +6,7 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemField,
-  WidgetConfigItemMedia,
+  WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
@@ -27,12 +25,14 @@ const SELECTOR_PREVIEW = [
   },
 ];
 
+
 function emptySelectorSede(): EducacionSelectorSedeDto {
   return {
     id: '',
     slug: '',
     nombre: '',
     brochureUrl: '',
+    icon: '',
     sortOrder: 0,
     activo: true,
   };
@@ -45,13 +45,15 @@ export function WidgetEducacionSelectorPage() {
   const [draft, setDraft] = useState<EducacionSelectorSedeDto | null>(null);
 
   async function persistSede(sede: EducacionSelectorSedeDto) {
-    const payload = {
+    const icon = sede.icon.trim();
+    const payload: Record<string, unknown> = {
       slug: sede.slug.trim(),
       nombre: sede.nombre.trim(),
       brochureUrl: sede.brochureUrl.trim(),
       sortOrder: sede.sortOrder,
       activo: sede.activo,
     };
+    if (icon) payload.icon = icon;
 
     if (!payload.slug || !payload.nombre || !payload.brochureUrl) {
       toast.error('Slug, nombre y brochure son obligatorios');
@@ -90,6 +92,7 @@ export function WidgetEducacionSelectorPage() {
       slug: slugify(`${sede.slug}-copia`),
       nombre: `${sede.nombre} (copia)`,
       brochureUrl: sede.brochureUrl,
+      icon: sede.icon,
       sortOrder: sede.sortOrder + 1,
     });
   }
@@ -181,10 +184,10 @@ function SelectorEditor({
     <WidgetConfigItemCard
       badge={title}
       inactive={!sede.activo}
-      media={
-        <WidgetConfigItemMedia
-          placeholderIcon={Building2}
-          placeholderLabel={sede.nombre.trim() || 'Sede principal'}
+      aside={
+        <WidgetConfigItemMaterialIconThumb
+          icon={sede.icon}
+          label={sede.slug || 'sede'}
         />
       }
       actions={
@@ -210,54 +213,47 @@ function SelectorEditor({
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <WidgetConfigItemField label="Título">
+      <div className="space-y-2">
+        <div className="grid gap-2 md:grid-cols-2">
           <Input
-            className="text-base font-semibold"
-            placeholder="Nombre visible"
-            value={sede.nombre}
-            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+            placeholder="Slug"
+            value={sede.slug}
+            disabled={Boolean(sede.id)}
+            onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
           />
-        </WidgetConfigItemField>
-        <WidgetConfigItemField label="Orden">
           <Input
-            type="number"
-            className="w-24"
             placeholder="Orden"
+            type="number"
             value={sede.sortOrder}
             onChange={(e) =>
               onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
             }
           />
-        </WidgetConfigItemField>
-      </div>
-
-      <WidgetConfigItemField label="Subtítulo">
+        </div>
         <Input
-          className="font-mono text-sm"
-          placeholder="Slug"
-          value={sede.slug}
-          disabled={Boolean(sede.id)}
-          onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+          placeholder="Nombre visible"
+          value={sede.nombre}
+          onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <WidgetConfigItemField label="Descripción" hint="Enlace al brochure de la sede">
+        <Input
+          placeholder="Icono Material Icons (nombre del glifo)"
+          value={sede.icon}
+          onChange={(e) => onChange({ ...sede, icon: e.target.value })}
+        />
         <Input
           placeholder="Brochure URL"
           value={sede.brochureUrl}
           onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={sede.activo}
-          onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-        />
-        Activa
-      </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={sede.activo}
+            onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
+          />
+          Activa
+        </label>
+      </div>
     </WidgetConfigItemCard>
   );
 }

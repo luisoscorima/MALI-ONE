@@ -127,6 +127,7 @@ export interface EducacionSelectorSedeDto {
   slug: string;
   nombre: string;
   brochureUrl: string;
+  icon: string;
   sortOrder: number;
   activo: boolean;
 }

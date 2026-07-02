@@ -521,7 +521,7 @@
                     // Icono según tipo de sede
                     const icon = document.createElement('i');
                     icon.className = 'material-icons sede-icon';
-                    icon.textContent = sede.slug.indexOf('virtual') >= 0 ? 'language' : (sede.slug === 'principal' ? 'museum' : 'location_on');
+                    icon.textContent = sede.icon || '';
                     
                     const text = document.createTextNode(sede.nombre);
                     

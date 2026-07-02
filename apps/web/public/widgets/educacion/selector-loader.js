@@ -34,10 +34,8 @@
     document.head.appendChild(link);
   }
 
-  function sedeIcon(slug) {
-    if (slug === 'virtual') return 'language';
-    if (slug === 'principal') return 'museum';
-    return 'location_on';
+  function sedeIcon(sede) {
+    return sede.icon && String(sede.icon).trim();
   }
 
   function buildShell() {
@@ -86,7 +84,7 @@
 
       var icon = document.createElement('i');
       icon.className = 'material-icons mali-sede-icon';
-      icon.textContent = sedeIcon(sede.slug);
+      icon.textContent = sedeIcon(sede) || '';
 
       link.appendChild(icon);
       link.appendChild(document.createTextNode(sede.nombre));

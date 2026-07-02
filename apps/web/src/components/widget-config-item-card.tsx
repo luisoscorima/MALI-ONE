@@ -1,16 +1,19 @@
 import type { LucideIcon } from 'lucide-react';
-import { ImageIcon } from 'lucide-react';
+import { CircleHelp, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { osmStaticMapUrl } from '@/lib/osm-static-map';
+
+const THUMB_CLASS = 'h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40';
 
 export function WidgetConfigItemCard({
   badge,
-  media,
+  aside,
   inactive,
   children,
   actions,
 }: {
   badge?: string;
-  media?: React.ReactNode;
+  aside?: React.ReactNode;
   inactive?: boolean;
   children: React.ReactNode;
   actions: React.ReactNode;
@@ -28,9 +31,10 @@ export function WidgetConfigItemCard({
         </div>
       )}
 
-      {media}
-
-      <div className="space-y-3 p-4">{children}</div>
+      <div className="flex gap-4 p-4">
+        {aside}
+        <div className="min-w-0 flex-1">{children}</div>
+      </div>
 
       <footer className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3">
         {actions}
@@ -39,41 +43,16 @@ export function WidgetConfigItemCard({
   );
 }
 
-export function WidgetConfigItemMedia({
-  imageUrl,
-  alt = '',
-  placeholderIcon: PlaceholderIcon = ImageIcon,
-  placeholderLabel = 'Sin imagen',
-  footer,
+export function WidgetConfigItemFields({
+  children,
+  className,
 }: {
-  imageUrl?: string | null;
-  alt?: string;
-  placeholderIcon?: LucideIcon;
-  placeholderLabel?: string;
-  footer?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
 }) {
-  const hasImage = Boolean(imageUrl?.trim());
-
   return (
-    <div className="border-b border-border">
-      <div className="relative aspect-16/10 w-full bg-muted/50">
-        {hasImage ? (
-          <img
-            src={imageUrl!.trim()}
-            alt={alt}
-            className="h-full w-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-muted">
-            <PlaceholderIcon className="h-10 w-10 stroke-[1.5]" aria-hidden />
-            <span className="text-xs">{placeholderLabel}</span>
-          </div>
-        )}
-      </div>
-      {footer && <div className="space-y-2 border-t border-border bg-background p-3">{footer}</div>}
+    <div className={cn('grid gap-3 sm:grid-cols-2 lg:grid-cols-3', className)}>
+      {children}
     </div>
   );
 }
@@ -81,19 +60,152 @@ export function WidgetConfigItemMedia({
 export function WidgetConfigItemField({
   label,
   hint,
+  span = 1,
   className,
   children,
 }: {
   label?: string;
   hint?: string;
+  span?: 1 | 2 | 3 | 'full';
   className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn('space-y-1', className)}>
+    <div
+      className={cn(
+        'space-y-1',
+        span === 2 && 'sm:col-span-2',
+        span === 3 && 'sm:col-span-2 lg:col-span-3',
+        span === 'full' && 'sm:col-span-2 lg:col-span-3',
+        className,
+      )}
+    >
       {label && <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>}
       {children}
       {hint && <p className="text-xs text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+export function WidgetConfigItemImageThumb({
+  imageUrl,
+  alt = '',
+}: {
+  imageUrl?: string | null;
+  alt?: string;
+}) {
+  const src = imageUrl?.trim();
+
+  return (
+    <div className={THUMB_CLASS} title="Vista referencial">
+      {src ? (
+        <img
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-1 text-muted">
+          <ImageIcon className="h-6 w-6 stroke-[1.5]" aria-hidden />
+          <span className="px-1 text-center text-[10px] leading-tight">Sin imagen</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function WidgetConfigItemMaterialIconThumb({
+  icon,
+  label,
+}: {
+  icon: string;
+  label?: string;
+}) {
+  const glyph = icon.trim();
+
+  if (!glyph) {
+    return (
+      <WidgetConfigItemIconThumb
+        icon={CircleHelp}
+        label={label ?? 'Sin icono'}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(THUMB_CLASS, 'flex flex-col items-center justify-center gap-1 text-primary')}
+      title={label ?? glyph}
+    >
+      <span className="material-icons text-[28px] leading-none" aria-hidden>
+        {glyph}
+      </span>
+      {label && (
+        <span className="max-w-full truncate px-1 text-center text-[10px] text-muted">
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function WidgetConfigItemIconThumb({
+  icon: Icon,
+  label,
+}: {
+  icon: LucideIcon;
+  label?: string;
+}) {
+  return (
+    <div
+      className={cn(THUMB_CLASS, 'flex flex-col items-center justify-center gap-1 text-primary')}
+      title={label}
+    >
+      <Icon className="h-7 w-7 stroke-[1.5]" aria-hidden />
+      {label && (
+        <span className="max-w-full truncate px-1 text-center text-[10px] text-muted">
+          {label}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function WidgetConfigItemMapThumb({
+  lat,
+  lng,
+  label,
+  placeholderIcon: PlaceholderIcon = ImageIcon,
+}: {
+  lat: number | null;
+  lng: number | null;
+  label?: string;
+  placeholderIcon?: LucideIcon;
+}) {
+  const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+
+  if (!hasCoords) {
+    return (
+      <WidgetConfigItemIconThumb
+        icon={PlaceholderIcon}
+        label={label ?? 'Sin coordenadas'}
+      />
+    );
+  }
+
+  const mapUrl = osmStaticMapUrl(lat, lng);
+
+  return (
+    <div className={THUMB_CLASS} title={label ?? `${lat}, ${lng}`}>
+      <img
+        src={mapUrl}
+        alt={label ?? 'Ubicación en mapa'}
+        className="h-full w-full object-cover"
+        loading="lazy"
+      />
     </div>
   );
 }

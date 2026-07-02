@@ -115,6 +115,7 @@ export class EducacionWidgetsService {
         slug: s.slug,
         nombre: s.nombre,
         brochureUrl: s.brochureUrl,
+        icon: s.icon,
         sortOrder: s.sortOrder,
       })),
     };

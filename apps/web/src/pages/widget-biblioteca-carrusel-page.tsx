@@ -9,8 +9,7 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemField,
-  WidgetConfigItemMedia,
+  WidgetConfigItemImageThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -273,28 +272,10 @@ function ItemEditor({
     <WidgetConfigItemCard
       badge={title}
       inactive={!item.activo}
-      media={
-        <WidgetConfigItemMedia
+      aside={
+        <WidgetConfigItemImageThumb
           imageUrl={item.imageSrc}
           alt={item.imageAlt || item.title}
-          footer={
-            <>
-              <WidgetConfigItemField label="Imagen">
-                <Input
-                  placeholder="URL imagen (imageSrc)"
-                  value={item.imageSrc}
-                  onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
-                />
-              </WidgetConfigItemField>
-              <WidgetConfigItemField label="Fondo">
-                <Input
-                  placeholder="URL fondo (backgroundSrc)"
-                  value={item.backgroundSrc}
-                  onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
-                />
-              </WidgetConfigItemField>
-            </>
-          }
         />
       }
       actions={
@@ -320,58 +301,40 @@ function ItemEditor({
         </>
       }
     >
-      <WidgetConfigItemField label="Título">
+      <div className="space-y-2">
         <Input
-          className="text-base font-semibold"
           placeholder="Título"
           value={item.title}
           onChange={(e) => onChange({ ...item, title: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <WidgetConfigItemField label="Subtítulo">
         <Input
-          className="text-sm"
-          placeholder="Subtítulo (opcional)"
-          value={item.subtitle ?? ''}
-          onChange={(e) =>
-            onChange({ ...item, subtitle: e.target.value.trim() || null })
-          }
+          placeholder="Enlace OPAC"
+          value={item.link}
+          onChange={(e) => onChange({ ...item, link: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <WidgetConfigItemField label="Descripción">
+        <Input
+          placeholder="URL imagen (imageSrc)"
+          value={item.imageSrc}
+          onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
+        />
+        <Input
+          placeholder="URL fondo (backgroundSrc)"
+          value={item.backgroundSrc}
+          onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
+        />
         <DescriptionHtmlField
           value={item.descriptionHtml}
           onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
         />
-      </WidgetConfigItemField>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <WidgetConfigItemField label="Enlace">
-          <Input
-            placeholder="Enlace OPAC"
-            value={item.link}
-            onChange={(e) => onChange({ ...item, link: e.target.value })}
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={item.activo}
+            onChange={(e) => onChange({ ...item, activo: e.target.checked })}
           />
-        </WidgetConfigItemField>
-        <WidgetConfigItemField label="Texto alternativo">
-          <Input
-            placeholder="Alt de imagen"
-            value={item.imageAlt}
-            onChange={(e) => onChange({ ...item, imageAlt: e.target.value })}
-          />
-        </WidgetConfigItemField>
+          Activo
+        </label>
       </div>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={item.activo}
-          onChange={(e) => onChange({ ...item, activo: e.target.checked })}
-        />
-        Activo
-      </label>
     </WidgetConfigItemCard>
   );
 }

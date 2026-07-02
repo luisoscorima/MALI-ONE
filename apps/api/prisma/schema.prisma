@@ -147,6 +147,7 @@ model EducacionSelectorSede {
   slug        String  @unique
   nombre      String
   brochureUrl String
+  icon        String  @default("location_on")
   sortOrder   Int     @default(0)
   activo      Boolean @default(true)
 }

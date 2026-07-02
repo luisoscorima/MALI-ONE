@@ -7,8 +7,7 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemField,
-  WidgetConfigItemMedia,
+  WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
@@ -244,44 +243,18 @@ function SedeEditor({
   onDuplicate?: () => void;
   title?: string;
 }) {
-  const districtName =
-    districts.find((d) => d.id === sede.districtId)?.name ?? 'Sin distrito';
+  const { lat, lng } = parseCoordinates(sede.coords);
 
   return (
     <WidgetConfigItemCard
       badge={title}
       inactive={!sede.activo}
-      media={
-        <WidgetConfigItemMedia
+      aside={
+        <WidgetConfigItemMapThumb
+          lat={lat}
+          lng={lng}
+          label={sede.nombre.trim() || 'Sede'}
           placeholderIcon={MapPin}
-          placeholderLabel={sede.nombre.trim() || 'Sede en mapa'}
-          footer={
-            <div className="grid gap-3 sm:grid-cols-2">
-              <WidgetConfigItemField label="Coordenadas" hint="Formato: lat, lng">
-                <Input
-                  placeholder="Coordenadas (lat, lng)"
-                  value={sede.coords}
-                  onChange={(e) => onChange({ ...sede, coords: e.target.value })}
-                />
-              </WidgetConfigItemField>
-              <WidgetConfigItemField label="Distrito">
-                <select
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-                  value={sede.districtId ?? ''}
-                  onChange={(e) =>
-                    onChange({ ...sede, districtId: e.target.value || null })
-                  }
-                >
-                  <option value="">Sin distrito</option>
-                  {districts.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </WidgetConfigItemField>
-            </div>
-          }
         />
       }
       actions={
@@ -307,36 +280,44 @@ function SedeEditor({
         </>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <WidgetConfigItemField label="Título">
+      <div className="space-y-2">
+        <div className="grid gap-2 md:grid-cols-2">
           <Input
-            className="text-base font-semibold"
-            placeholder="Nombre de la sede"
-            value={sede.nombre}
-            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-          />
-        </WidgetConfigItemField>
-        <WidgetConfigItemField label="Slug">
-          <Input
-            className="font-mono text-sm"
             placeholder="Slug (único)"
             value={sede.slug}
             disabled={Boolean(sede.id)}
             onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
           />
-        </WidgetConfigItemField>
-      </div>
-
-      <WidgetConfigItemField label="Subtítulo" hint={districtName}>
+          <Input
+            placeholder="Nombre"
+            value={sede.nombre}
+            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+          />
+        </div>
         <Input
-          className="text-sm"
           placeholder="Dirección"
           value={sede.direccion ?? ''}
           onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <WidgetConfigItemField label="Descripción">
+        <Input
+          placeholder="Coordenadas (lat, lng)"
+          value={sede.coords}
+          onChange={(e) => onChange({ ...sede, coords: e.target.value })}
+        />
+        <select
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          value={sede.districtId ?? ''}
+          onChange={(e) =>
+            onChange({ ...sede, districtId: e.target.value || null })
+          }
+        >
+          <option value="">Sin distrito</option>
+          {districts.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
         <textarea
           className="w-full rounded-lg border border-border bg-background p-2 text-sm"
           rows={3}
@@ -344,33 +325,29 @@ function SedeEditor({
           value={sede.horarioHtml ?? ''}
           onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <WidgetConfigItemField label="Brochure">
         <Input
           placeholder="Brochure URL"
           value={sede.brochureUrl}
           onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
         />
-      </WidgetConfigItemField>
-
-      <div className="flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sede.showOnMap}
-            onChange={(e) => onChange({ ...sede, showOnMap: e.target.checked })}
-          />
-          Visible en mapa
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sede.activo}
-            onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-          />
-          Activa
-        </label>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={sede.showOnMap}
+              onChange={(e) => onChange({ ...sede, showOnMap: e.target.checked })}
+            />
+            Visible en mapa
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={sede.activo}
+              onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
+            />
+            Activa
+          </label>
+        </div>
       </div>
     </WidgetConfigItemCard>
   );

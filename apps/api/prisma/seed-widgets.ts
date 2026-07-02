@@ -169,7 +169,8 @@ async function seedEducacion() {
     await prisma.educacionSelectorSede.upsert({
       where: { slug: s.slug },
       create: data,
-      update: data,
+      // No sobrescribir datos editados en producción (nombre, brochure, icon, etc.)
+      update: { sortOrder: data.sortOrder, activo: true },
     });
   }
 

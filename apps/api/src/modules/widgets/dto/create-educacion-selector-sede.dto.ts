@@ -3,8 +3,11 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Min,
 } from 'class-validator';
+
+const MATERIAL_ICON_PATTERN = /^[a-z0-9_]+$/;
 
 export class CreateEducacionSelectorSedeDto {
   @IsString()
@@ -15,6 +18,13 @@ export class CreateEducacionSelectorSedeDto {
 
   @IsString()
   brochureUrl!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(MATERIAL_ICON_PATTERN, {
+    message: 'icon debe ser un nombre Material Icons válido',
+  })
+  icon?: string;
 
   @IsOptional()
   @IsInt()
@@ -38,6 +48,13 @@ export class UpdateEducacionSelectorSedeDto {
   @IsOptional()
   @IsString()
   brochureUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(MATERIAL_ICON_PATTERN, {
+    message: 'icon debe ser un nombre Material Icons válido',
+  })
+  icon?: string;
 
   @IsOptional()
   @IsInt()
