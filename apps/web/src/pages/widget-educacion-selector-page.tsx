@@ -252,6 +252,7 @@ function SelectorEditor({
         onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
       />
       <SettingSwitchInline
+        label="Sede activa"
         checked={sede.activo}
         onCheckedChange={(activo) => onChange({ ...sede, activo })}
       />

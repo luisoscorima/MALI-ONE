@@ -328,6 +328,7 @@ function ItemEditor({
         onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
       />
       <SettingSwitchInline
+        label="Ítem activo"
         checked={item.activo}
         onCheckedChange={(activo) => onChange({ ...item, activo })}
         activeLabel="Activo"

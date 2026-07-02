@@ -263,6 +263,7 @@ function AliadoEditor({
         }
       />
       <SettingSwitchInline
+        label="Aliado activo"
         checked={aliado.activo}
         onCheckedChange={(activo) => onChange({ ...aliado, activo })}
         activeLabel="Activo"

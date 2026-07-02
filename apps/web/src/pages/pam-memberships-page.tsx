@@ -408,6 +408,7 @@ function PlanEditor({
         onChange={(e) => onChange({ yearlyCheckout: e.target.value })}
       />
       <SettingSwitchInline
+        label="Plan activo"
         checked={plan.activo}
         onCheckedChange={(activo) => onChange({ activo })}
         activeLabel="Activo"
