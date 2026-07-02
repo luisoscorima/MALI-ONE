@@ -1,9 +1,28 @@
 import type { LucideIcon } from 'lucide-react';
 import { CircleHelp, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { osmStaticMapUrl } from '@/lib/osm-static-map';
+import { googleStaticMapUrl } from '@/lib/google-static-map';
 
 const THUMB_CLASS = 'h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40';
+
+export function WidgetConfigItemList({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'grid max-h-[70vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function WidgetConfigItemCard({
   badge,
@@ -33,7 +52,7 @@ export function WidgetConfigItemCard({
 
       <div className="flex gap-4 p-4">
         {aside}
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">{children}</div>
       </div>
 
       <footer className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3">
@@ -41,6 +60,16 @@ export function WidgetConfigItemCard({
       </footer>
     </article>
   );
+}
+
+export function WidgetConfigItemCardFull({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn('sm:col-span-2', className)}>{children}</div>;
 }
 
 export function WidgetConfigItemFields({
@@ -177,26 +206,29 @@ export function WidgetConfigItemIconThumb({
 export function WidgetConfigItemMapThumb({
   lat,
   lng,
+  mapsApiKey,
   label,
   placeholderIcon: PlaceholderIcon = ImageIcon,
 }: {
   lat: number | null;
   lng: number | null;
+  mapsApiKey?: string | null;
   label?: string;
   placeholderIcon?: LucideIcon;
 }) {
   const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+  const apiKey = mapsApiKey?.trim();
 
-  if (!hasCoords) {
+  if (!hasCoords || !apiKey) {
     return (
       <WidgetConfigItemIconThumb
         icon={PlaceholderIcon}
-        label={label ?? 'Sin coordenadas'}
+        label={label ?? (hasCoords ? 'Mapa' : 'Sin coordenadas')}
       />
     );
   }
 
-  const mapUrl = osmStaticMapUrl(lat, lng);
+  const mapUrl = googleStaticMapUrl(lat, lng, apiKey);
 
   return (
     <div className={THUMB_CLASS} title={label ?? `${lat}, ${lng}`}>

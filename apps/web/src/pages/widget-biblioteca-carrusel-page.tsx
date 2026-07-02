@@ -9,7 +9,9 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
+  WidgetConfigItemCardFull,
   WidgetConfigItemImageThumb,
+  WidgetConfigItemList,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -217,11 +219,12 @@ export function WidgetBibliotecaCarruselPage() {
         />
       )}
 
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        {items.map((item) => (
+      <WidgetConfigItemList>
+        {items.map((item, index) => (
           <ItemEditor
             key={item.id}
             item={item}
+            title={`Ítem ${index + 1}`}
             onChange={(next) =>
               setItems((prev) =>
                 prev.map((i) => (i.id === item.id ? { ...i, ...next } : i)),
@@ -235,7 +238,7 @@ export function WidgetBibliotecaCarruselPage() {
             onDuplicate={() => duplicateItem(item)}
           />
         ))}
-      </div>
+      </WidgetConfigItemList>
       </Card>
     </div>
   );
@@ -301,31 +304,33 @@ function ItemEditor({
         </>
       }
     >
-      <div className="space-y-2">
-        <Input
-          placeholder="Título"
-          value={item.title}
-          onChange={(e) => onChange({ ...item, title: e.target.value })}
-        />
-        <Input
-          placeholder="Enlace OPAC"
-          value={item.link}
-          onChange={(e) => onChange({ ...item, link: e.target.value })}
-        />
-        <Input
-          placeholder="URL imagen (imageSrc)"
-          value={item.imageSrc}
-          onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
-        />
-        <Input
-          placeholder="URL fondo (backgroundSrc)"
-          value={item.backgroundSrc}
-          onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
-        />
+      <Input
+        placeholder="Título"
+        value={item.title}
+        onChange={(e) => onChange({ ...item, title: e.target.value })}
+      />
+      <Input
+        placeholder="Enlace OPAC"
+        value={item.link}
+        onChange={(e) => onChange({ ...item, link: e.target.value })}
+      />
+      <Input
+        placeholder="URL imagen (imageSrc)"
+        value={item.imageSrc}
+        onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
+      />
+      <Input
+        placeholder="URL fondo (backgroundSrc)"
+        value={item.backgroundSrc}
+        onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
+      />
+      <WidgetConfigItemCardFull>
         <DescriptionHtmlField
           value={item.descriptionHtml}
           onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
         />
+      </WidgetConfigItemCardFull>
+      <WidgetConfigItemCardFull>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -334,7 +339,7 @@ function ItemEditor({
           />
           Activo
         </label>
-      </div>
+      </WidgetConfigItemCardFull>
     </WidgetConfigItemCard>
   );
 }

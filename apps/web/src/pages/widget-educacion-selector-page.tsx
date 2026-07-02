@@ -6,6 +6,8 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
+  WidgetConfigItemCardFull,
+  WidgetConfigItemList,
   WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
@@ -43,6 +45,7 @@ export function WidgetEducacionSelectorPage() {
   const { state, setState, loading, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<EducacionSelectorSedeDto | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
 
   async function persistSede(sede: EducacionSelectorSedeDto) {
     const icon = sede.icon.trim();
@@ -53,7 +56,11 @@ export function WidgetEducacionSelectorPage() {
       sortOrder: sede.sortOrder,
       activo: sede.activo,
     };
-    if (icon) payload.icon = icon;
+    if (sede.id) {
+      payload.icon = icon;
+    } else if (icon) {
+      payload.icon = icon;
+    }
 
     if (!payload.slug || !payload.nombre || !payload.brochureUrl) {
       toast.error('Slug, nombre y brochure son obligatorios');
@@ -70,6 +77,7 @@ export function WidgetEducacionSelectorPage() {
         setDraft(null);
       }
       await reload();
+      setPreviewKey((k) => k + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar sede');
     }
@@ -81,6 +89,7 @@ export function WidgetEducacionSelectorPage() {
       await api.deleteEducacionSelectorSede(sede.id);
       toast.success('Sede eliminada');
       await reload();
+      setPreviewKey((k) => k + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
     }
@@ -123,15 +132,16 @@ export function WidgetEducacionSelectorPage() {
           onChange={setDraft}
           onSave={() => void persistSede(draft)}
           onCancel={() => setDraft(null)}
-          title="Nueva sede"
+          title="Nuevo ítem"
         />
       )}
 
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-        {state.selectorSedes.map((sede) => (
+      <WidgetConfigItemList>
+        {state.selectorSedes.map((sede, index) => (
           <SelectorEditor
             key={sede.id}
             sede={sede}
+            title={`Ítem ${index + 1}`}
             onChange={(next) =>
               setState({
                 ...state,
@@ -148,7 +158,7 @@ export function WidgetEducacionSelectorPage() {
             onDuplicate={() => duplicateSede(sede)}
           />
         ))}
-      </div>
+      </WidgetConfigItemList>
     </Card>
   );
 
@@ -158,7 +168,7 @@ export function WidgetEducacionSelectorPage() {
       title="Selector de sedes"
       description="Widget para educacion.mali.pe — brochures por sede principal"
       config={config}
-      preview={<WidgetPreviewFrame tabs={SELECTOR_PREVIEW} />}
+      preview={<WidgetPreviewFrame key={previewKey} tabs={SELECTOR_PREVIEW} />}
     />
   );
 }
@@ -213,38 +223,38 @@ function SelectorEditor({
         </>
       }
     >
-      <div className="space-y-2">
-        <div className="grid gap-2 md:grid-cols-2">
-          <Input
-            placeholder="Slug"
-            value={sede.slug}
-            disabled={Boolean(sede.id)}
-            onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
-          />
-          <Input
-            placeholder="Orden"
-            type="number"
-            value={sede.sortOrder}
-            onChange={(e) =>
-              onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
-            }
-          />
-        </div>
-        <Input
-          placeholder="Nombre visible"
-          value={sede.nombre}
-          onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-        />
-        <Input
-          placeholder="Icono Material Icons (nombre del glifo)"
-          value={sede.icon}
-          onChange={(e) => onChange({ ...sede, icon: e.target.value })}
-        />
+      <Input
+        placeholder="Slug"
+        value={sede.slug}
+        disabled={Boolean(sede.id)}
+        onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+      />
+      <Input
+        placeholder="Orden"
+        type="number"
+        value={sede.sortOrder}
+        onChange={(e) =>
+          onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
+        }
+      />
+      <Input
+        placeholder="Nombre visible"
+        value={sede.nombre}
+        onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+      />
+      <Input
+        placeholder="Icono Material Icons (nombre del glifo)"
+        value={sede.icon}
+        onChange={(e) => onChange({ ...sede, icon: e.target.value })}
+      />
+      <WidgetConfigItemCardFull>
         <Input
           placeholder="Brochure URL"
           value={sede.brochureUrl}
           onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
         />
+      </WidgetConfigItemCardFull>
+      <WidgetConfigItemCardFull>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -253,7 +263,7 @@ function SelectorEditor({
           />
           Activa
         </label>
-      </div>
+      </WidgetConfigItemCardFull>
     </WidgetConfigItemCard>
   );
 }

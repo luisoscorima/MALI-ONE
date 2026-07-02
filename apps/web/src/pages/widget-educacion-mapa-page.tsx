@@ -7,6 +7,8 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
+  WidgetConfigItemCardFull,
+  WidgetConfigItemList,
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
@@ -54,6 +56,7 @@ export function WidgetEducacionMapaPage() {
   const { state, setState, loading, saving, saveSettings, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<SedeDraft | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
 
   async function persistSede(sede: SedeDraft) {
     const { lat, lng } = parseCoordinates(sede.coords);
@@ -86,6 +89,7 @@ export function WidgetEducacionMapaPage() {
         setDraft(null);
       }
       await reload();
+      setPreviewKey((k) => k + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar sede');
     }
@@ -97,6 +101,7 @@ export function WidgetEducacionMapaPage() {
       await api.deleteEducacionSede(sede.id);
       toast.success('Sede eliminada');
       await reload();
+      setPreviewKey((k) => k + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
     }
@@ -178,19 +183,22 @@ export function WidgetEducacionMapaPage() {
           <SedeEditor
             sede={draft}
             districts={state.districts}
+            mapsApiKey={state.settings.mapsApiKey}
             onChange={setDraft}
             onSave={() => void persistSede(draft)}
             onCancel={() => setDraft(null)}
-            title="Nueva sede"
+            title="Nuevo ítem"
           />
         )}
 
-        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-          {state.sedes.map((sede) => (
+        <WidgetConfigItemList>
+          {state.sedes.map((sede, index) => (
             <SedeEditor
               key={sede.id}
               sede={withCoords(sede)}
               districts={state.districts}
+              mapsApiKey={state.settings.mapsApiKey}
+              title={`Ítem ${index + 1}`}
               onChange={(next) => {
                 const { lat, lng } = parseCoordinates(next.coords);
                 setState({
@@ -208,7 +216,7 @@ export function WidgetEducacionMapaPage() {
               onDuplicate={() => duplicateSede(sede)}
             />
           ))}
-        </div>
+        </WidgetConfigItemList>
       </Card>
     </div>
   );
@@ -219,7 +227,7 @@ export function WidgetEducacionMapaPage() {
       title="Mapa de sedes"
       description="Widget para educacion.mali.pe — contactos y ubicaciones"
       config={config}
-      preview={<WidgetPreviewFrame tabs={MAPA_PREVIEW} />}
+      preview={<WidgetPreviewFrame key={previewKey} tabs={MAPA_PREVIEW} />}
     />
   );
 }
@@ -227,6 +235,7 @@ export function WidgetEducacionMapaPage() {
 function SedeEditor({
   sede,
   districts,
+  mapsApiKey,
   onChange,
   onSave,
   onCancel,
@@ -236,6 +245,7 @@ function SedeEditor({
 }: {
   sede: SedeDraft;
   districts: EducacionDistrictDto[];
+  mapsApiKey?: string | null;
   onChange: (sede: SedeDraft) => void;
   onSave: () => void;
   onCancel?: () => void;
@@ -253,6 +263,7 @@ function SedeEditor({
         <WidgetConfigItemMapThumb
           lat={lat}
           lng={lng}
+          mapsApiKey={mapsApiKey}
           label={sede.nombre.trim() || 'Sede'}
           placeholderIcon={MapPin}
         />
@@ -280,30 +291,28 @@ function SedeEditor({
         </>
       }
     >
-      <div className="space-y-2">
-        <div className="grid gap-2 md:grid-cols-2">
-          <Input
-            placeholder="Slug (único)"
-            value={sede.slug}
-            disabled={Boolean(sede.id)}
-            onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
-          />
-          <Input
-            placeholder="Nombre"
-            value={sede.nombre}
-            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-          />
-        </div>
-        <Input
-          placeholder="Dirección"
-          value={sede.direccion ?? ''}
-          onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
-        />
-        <Input
-          placeholder="Coordenadas (lat, lng)"
-          value={sede.coords}
-          onChange={(e) => onChange({ ...sede, coords: e.target.value })}
-        />
+      <Input
+        placeholder="Slug (único)"
+        value={sede.slug}
+        disabled={Boolean(sede.id)}
+        onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+      />
+      <Input
+        placeholder="Nombre"
+        value={sede.nombre}
+        onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+      />
+      <Input
+        placeholder="Dirección"
+        value={sede.direccion ?? ''}
+        onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
+      />
+      <Input
+        placeholder="Coordenadas (lat, lng)"
+        value={sede.coords}
+        onChange={(e) => onChange({ ...sede, coords: e.target.value })}
+      />
+      <WidgetConfigItemCardFull>
         <select
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           value={sede.districtId ?? ''}
@@ -318,6 +327,8 @@ function SedeEditor({
             </option>
           ))}
         </select>
+      </WidgetConfigItemCardFull>
+      <WidgetConfigItemCardFull>
         <textarea
           className="w-full rounded-lg border border-border bg-background p-2 text-sm"
           rows={3}
@@ -325,11 +336,15 @@ function SedeEditor({
           value={sede.horarioHtml ?? ''}
           onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
         />
+      </WidgetConfigItemCardFull>
+      <WidgetConfigItemCardFull>
         <Input
           placeholder="Brochure URL"
           value={sede.brochureUrl}
           onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
         />
+      </WidgetConfigItemCardFull>
+      <WidgetConfigItemCardFull>
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input
@@ -348,7 +363,7 @@ function SedeEditor({
             Activa
           </label>
         </div>
-      </div>
+      </WidgetConfigItemCardFull>
     </WidgetConfigItemCard>
   );
 }
