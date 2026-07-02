@@ -5,6 +5,12 @@ import { googleEmbedMapUrl } from '@/lib/google-embed-map';
 
 const THUMB_CLASS = 'h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40';
 
+const PAM_PLAN_HEADER_BG: Record<string, string> = {
+  green: '#1bc469',
+  pink: '#f7b5b0',
+  blue: '#3a5ad0',
+};
+
 export function WidgetConfigItemList({
   children,
   className,
@@ -119,6 +125,49 @@ export function WidgetConfigItemField({
       {label && <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>}
       {children}
       {hint && <p className="text-xs text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+export function WidgetConfigItemPamPlanThumb({
+  name,
+  color,
+  monthlyPrice,
+}: {
+  name: string;
+  color: string;
+  monthlyPrice: string;
+}) {
+  const bg = PAM_PLAN_HEADER_BG[color] ?? '#666666';
+  const lightText = color === 'pink';
+
+  return (
+    <div
+      className={cn(
+        THUMB_CLASS,
+        'flex flex-col items-center justify-center p-1 text-center',
+      )}
+      style={{ backgroundColor: bg }}
+      title={name.trim() || 'Plan'}
+    >
+      <span
+        className={cn(
+          'text-[11px] font-bold leading-tight',
+          lightText ? 'text-foreground' : 'text-white',
+        )}
+      >
+        {name.trim() || 'Plan'}
+      </span>
+      {monthlyPrice.trim() && (
+        <span
+          className={cn(
+            'text-[10px] leading-tight',
+            lightText ? 'text-foreground/80' : 'text-white/90',
+          )}
+        >
+          S/ {monthlyPrice}
+        </span>
+      )}
     </div>
   );
 }

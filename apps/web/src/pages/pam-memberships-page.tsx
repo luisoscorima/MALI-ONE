@@ -7,7 +7,12 @@ import type {
 import { Spinner } from '@/components/feedback';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
-import { Button, Card, Input } from '@/components/ui';
+import {
+  WidgetConfigItemCard,
+  WidgetConfigItemList,
+  WidgetConfigItemPamPlanThumb,
+} from '@/components/widget-config-item-card';
+import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 
@@ -349,6 +354,69 @@ function RegistrationRow({
   );
 }
 
+function PlanEditor({
+  plan,
+  title,
+  onChange,
+  onSave,
+}: {
+  plan: PamPlanDto;
+  title?: string;
+  onChange: (patch: Partial<PamPlanDto>) => void;
+  onSave: () => void;
+}) {
+  return (
+    <WidgetConfigItemCard
+      badge={title}
+      inactive={!plan.activo}
+      aside={
+        <WidgetConfigItemPamPlanThumb
+          name={plan.name}
+          color={plan.color}
+          monthlyPrice={plan.monthlyPrice}
+        />
+      }
+      actions={
+        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+          Guardar
+        </Button>
+      }
+    >
+      <Input
+        placeholder="Nombre del plan"
+        value={plan.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+      />
+      <Input
+        placeholder="Precio mensual"
+        value={plan.monthlyPrice}
+        onChange={(e) => onChange({ monthlyPrice: e.target.value })}
+      />
+      <Input
+        placeholder="Precio anual"
+        value={plan.yearlyPrice}
+        onChange={(e) => onChange({ yearlyPrice: e.target.value })}
+      />
+      <Input
+        placeholder="Checkout mensual MP"
+        value={plan.monthlyCheckout}
+        onChange={(e) => onChange({ monthlyCheckout: e.target.value })}
+      />
+      <Input
+        placeholder="Checkout anual MP"
+        value={plan.yearlyCheckout}
+        onChange={(e) => onChange({ yearlyCheckout: e.target.value })}
+      />
+      <SettingSwitchInline
+        checked={plan.activo}
+        onCheckedChange={(activo) => onChange({ activo })}
+        activeLabel="Activo"
+        inactiveLabel="Inactivo"
+      />
+    </WidgetConfigItemCard>
+  );
+}
+
 export function PamMembershipsPage() {
   const toast = useToast();
   const [state, setState] = useState<PamPageState | null>(null);
@@ -506,75 +574,34 @@ export function PamMembershipsPage() {
       </Card>
 
       <Card className="space-y-4 p-4">
-        <h2 className="font-semibold">Planes</h2>
-        {state.plans.map((plan) => (
-          <div key={plan.id} className="rounded-lg border border-border p-3 space-y-2">
-            <Input
-              value={plan.name}
-              onChange={(e) =>
+        <div>
+          <h2 className="font-semibold">Planes ({state.plans.length})</h2>
+          <p className="text-sm text-muted">
+            Precios y enlaces de checkout Mercado Pago.
+          </p>
+        </div>
+
+        <WidgetConfigItemList>
+          {state.plans.map((plan, index) => (
+            <PlanEditor
+              key={plan.id}
+              plan={plan}
+              title={`Ítem ${index + 1}`}
+              onChange={(patch) =>
                 setState({
                   ...state,
                   plans: state.plans.map((p) =>
-                    p.id === plan.id ? { ...p, name: e.target.value } : p,
+                    p.id === plan.id ? { ...p, ...patch } : p,
                   ),
                 })
               }
+              onSave={() => {
+                const current = state.plans.find((p) => p.id === plan.id);
+                if (current) void savePlan(current);
+              }}
             />
-            <div className="grid gap-2 md:grid-cols-2">
-              <Input
-                placeholder="Precio mensual"
-                value={plan.monthlyPrice}
-                onChange={(e) =>
-                  setState({
-                    ...state,
-                    plans: state.plans.map((p) =>
-                      p.id === plan.id ? { ...p, monthlyPrice: e.target.value } : p,
-                    ),
-                  })
-                }
-              />
-              <Input
-                placeholder="Precio anual"
-                value={plan.yearlyPrice}
-                onChange={(e) =>
-                  setState({
-                    ...state,
-                    plans: state.plans.map((p) =>
-                      p.id === plan.id ? { ...p, yearlyPrice: e.target.value } : p,
-                    ),
-                  })
-                }
-              />
-            </div>
-            <Input
-              placeholder="Checkout mensual MP"
-              value={plan.monthlyCheckout}
-              onChange={(e) =>
-                setState({
-                  ...state,
-                  plans: state.plans.map((p) =>
-                    p.id === plan.id ? { ...p, monthlyCheckout: e.target.value } : p,
-                  ),
-                })
-              }
-            />
-            <Input
-              placeholder="Checkout anual MP"
-              value={plan.yearlyCheckout}
-              onChange={(e) =>
-                setState({
-                  ...state,
-                  plans: state.plans.map((p) =>
-                    p.id === plan.id ? { ...p, yearlyCheckout: e.target.value } : p,
-                  ),
-                })
-              }
-            />
-            <Button className="text-sm px-3 py-1.5" onClick={() => void savePlan(plan)}>
-              Guardar plan
-            </Button>
-          </div>
-        ))}
+          ))}
+        </WidgetConfigItemList>
       </Card>
 
       <Card className="overflow-x-auto p-4">

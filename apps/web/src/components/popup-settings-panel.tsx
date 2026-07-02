@@ -153,11 +153,6 @@ export function PopupSettingsFields({
 
         <SettingSwitchRow
           label="Popup en el sitio"
-          description={
-            scheduleControlsVisibility
-              ? 'Desactiva el horario programado para usar este interruptor.'
-              : 'Muestra u oculta el popup de forma inmediata.'
-          }
           checked={popup.activo}
           disabled={scheduleControlsVisibility}
           onCheckedChange={(activo) => onChange({ activo })}
@@ -165,7 +160,6 @@ export function PopupSettingsFields({
 
         <SettingSwitchRow
           label="Programar por horario"
-          description="El popup solo aparece dentro del rango de fechas y horas configurado."
           checked={popup.scheduleEnabled}
           onCheckedChange={handleScheduleToggle}
         />
@@ -173,11 +167,6 @@ export function PopupSettingsFields({
 
       {scheduleControlsVisibility && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs text-muted">
-            Mientras el horario esté activado, la visibilidad la define el rango
-            inferior — no el interruptor «Popup en el sitio».
-          </p>
-
           <div className="space-y-1">
             <label className="text-xs text-muted">Fecha de inicio</label>
             <Input
@@ -285,7 +274,6 @@ export function PopupSettingsFields({
 
         <SettingSwitchRow
           label="Una sola vez por visitante"
-          description="No vuelve a mostrarse si el visitante ya lo cerró (localStorage)."
           checked={popup.showOnce}
           onCheckedChange={(showOnce) => onChange({ showOnce })}
         />

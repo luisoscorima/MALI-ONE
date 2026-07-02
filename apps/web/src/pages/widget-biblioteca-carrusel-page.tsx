@@ -328,8 +328,6 @@ function ItemEditor({
         onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
       />
       <SettingSwitchInline
-        label="Ítem activo"
-        description="Si está inactivo, no aparece en el carrusel del sitio."
         checked={item.activo}
         onCheckedChange={(activo) => onChange({ ...item, activo })}
         activeLabel="Activo"

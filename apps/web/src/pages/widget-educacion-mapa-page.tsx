@@ -333,8 +333,6 @@ function SedeEditor({
         onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
       />
       <SettingSwitchInline
-        label="Sede activa"
-        description="Si está inactiva, no aparece en el mapa del sitio."
         checked={sede.activo}
         onCheckedChange={(activo) => onChange({ ...sede, activo })}
       />

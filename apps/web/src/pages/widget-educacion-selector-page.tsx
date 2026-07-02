@@ -252,8 +252,6 @@ function SelectorEditor({
         onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
       />
       <SettingSwitchInline
-        label="Sede activa"
-        description="Si está inactiva, no aparece en el selector del sitio."
         checked={sede.activo}
         onCheckedChange={(activo) => onChange({ ...sede, activo })}
       />

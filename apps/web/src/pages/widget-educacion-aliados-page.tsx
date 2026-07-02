@@ -263,8 +263,6 @@ function AliadoEditor({
         }
       />
       <SettingSwitchInline
-        label="Aliado activo"
-        description="Si está inactivo, no aparece en el carrusel del sitio."
         checked={aliado.activo}
         onCheckedChange={(activo) => onChange({ ...aliado, activo })}
         activeLabel="Activo"
