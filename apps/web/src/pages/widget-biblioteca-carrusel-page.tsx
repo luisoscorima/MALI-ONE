@@ -7,6 +7,11 @@ import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
+import {
+  WidgetConfigItemCard,
+  WidgetConfigItemField,
+  WidgetConfigItemMedia,
+} from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { api } from '@/lib/api';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
@@ -265,32 +270,100 @@ function ItemEditor({
   title?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
-      {title && <p className="text-sm font-medium">{title}</p>}
-      <Input
-        placeholder="Título"
-        value={item.title}
-        onChange={(e) => onChange({ ...item, title: e.target.value })}
-      />
-      <Input
-        placeholder="Enlace OPAC"
-        value={item.link}
-        onChange={(e) => onChange({ ...item, link: e.target.value })}
-      />
-      <Input
-        placeholder="URL imagen (imageSrc)"
-        value={item.imageSrc}
-        onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
-      />
-      <Input
-        placeholder="URL fondo (backgroundSrc)"
-        value={item.backgroundSrc}
-        onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
-      />
-      <DescriptionHtmlField
-        value={item.descriptionHtml}
-        onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
-      />
+    <WidgetConfigItemCard
+      badge={title}
+      inactive={!item.activo}
+      media={
+        <WidgetConfigItemMedia
+          imageUrl={item.imageSrc}
+          alt={item.imageAlt || item.title}
+          footer={
+            <>
+              <WidgetConfigItemField label="Imagen">
+                <Input
+                  placeholder="URL imagen (imageSrc)"
+                  value={item.imageSrc}
+                  onChange={(e) => onChange({ ...item, imageSrc: e.target.value })}
+                />
+              </WidgetConfigItemField>
+              <WidgetConfigItemField label="Fondo">
+                <Input
+                  placeholder="URL fondo (backgroundSrc)"
+                  value={item.backgroundSrc}
+                  onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
+                />
+              </WidgetConfigItemField>
+            </>
+          }
+        />
+      }
+      actions={
+        <>
+          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+            Guardar
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
+              Duplicar
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
+              Eliminar
+            </Button>
+          )}
+          {onCancel && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
+              Cancelar
+            </Button>
+          )}
+        </>
+      }
+    >
+      <WidgetConfigItemField label="Título">
+        <Input
+          className="text-base font-semibold"
+          placeholder="Título"
+          value={item.title}
+          onChange={(e) => onChange({ ...item, title: e.target.value })}
+        />
+      </WidgetConfigItemField>
+
+      <WidgetConfigItemField label="Subtítulo">
+        <Input
+          className="text-sm"
+          placeholder="Subtítulo (opcional)"
+          value={item.subtitle ?? ''}
+          onChange={(e) =>
+            onChange({ ...item, subtitle: e.target.value.trim() || null })
+          }
+        />
+      </WidgetConfigItemField>
+
+      <WidgetConfigItemField label="Descripción">
+        <DescriptionHtmlField
+          value={item.descriptionHtml}
+          onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
+        />
+      </WidgetConfigItemField>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <WidgetConfigItemField label="Enlace">
+          <Input
+            placeholder="Enlace OPAC"
+            value={item.link}
+            onChange={(e) => onChange({ ...item, link: e.target.value })}
+          />
+        </WidgetConfigItemField>
+        <WidgetConfigItemField label="Texto alternativo">
+          <Input
+            placeholder="Alt de imagen"
+            value={item.imageAlt}
+            onChange={(e) => onChange({ ...item, imageAlt: e.target.value })}
+          />
+        </WidgetConfigItemField>
+      </div>
+
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -299,27 +372,7 @@ function ItemEditor({
         />
         Activo
       </label>
-      <div className="flex flex-wrap gap-2">
-        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-          Guardar
-        </Button>
-        {onDuplicate && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-            Duplicar
-          </Button>
-        )}
-        {onDelete && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-            Eliminar
-          </Button>
-        )}
-        {onCancel && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-      </div>
-    </div>
+    </WidgetConfigItemCard>
   );
 }
 

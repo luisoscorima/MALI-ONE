@@ -1,9 +1,15 @@
 import { useState } from 'react';
+import { Building2 } from 'lucide-react';
 import type { EducacionSelectorSedeDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
+import {
+  WidgetConfigItemCard,
+  WidgetConfigItemField,
+  WidgetConfigItemMedia,
+} from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { slugify } from '@/lib/coordinates';
@@ -118,7 +124,7 @@ export function WidgetEducacionSelectorPage() {
         />
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         {state.selectorSedes.map((sede) => (
           <SelectorEditor
             key={sede.id}
@@ -172,34 +178,78 @@ function SelectorEditor({
   title?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
-      {title && <p className="text-sm font-medium">{title}</p>}
-      <div className="grid gap-2 md:grid-cols-2">
+    <WidgetConfigItemCard
+      badge={title}
+      inactive={!sede.activo}
+      media={
+        <WidgetConfigItemMedia
+          placeholderIcon={Building2}
+          placeholderLabel={sede.nombre.trim() || 'Sede principal'}
+        />
+      }
+      actions={
+        <>
+          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+            Guardar
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
+              Duplicar
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
+              Eliminar
+            </Button>
+          )}
+          {onCancel && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
+              Cancelar
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <WidgetConfigItemField label="Título">
+          <Input
+            className="text-base font-semibold"
+            placeholder="Nombre visible"
+            value={sede.nombre}
+            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+          />
+        </WidgetConfigItemField>
+        <WidgetConfigItemField label="Orden">
+          <Input
+            type="number"
+            className="w-24"
+            placeholder="Orden"
+            value={sede.sortOrder}
+            onChange={(e) =>
+              onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
+            }
+          />
+        </WidgetConfigItemField>
+      </div>
+
+      <WidgetConfigItemField label="Subtítulo">
         <Input
+          className="font-mono text-sm"
           placeholder="Slug"
           value={sede.slug}
           disabled={Boolean(sede.id)}
           onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
         />
+      </WidgetConfigItemField>
+
+      <WidgetConfigItemField label="Descripción" hint="Enlace al brochure de la sede">
         <Input
-          placeholder="Orden"
-          type="number"
-          value={sede.sortOrder}
-          onChange={(e) =>
-            onChange({ ...sede, sortOrder: Number(e.target.value) || 0 })
-          }
+          placeholder="Brochure URL"
+          value={sede.brochureUrl}
+          onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
         />
-      </div>
-      <Input
-        placeholder="Nombre visible"
-        value={sede.nombre}
-        onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-      />
-      <Input
-        placeholder="Brochure URL"
-        value={sede.brochureUrl}
-        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
-      />
+      </WidgetConfigItemField>
+
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -208,26 +258,6 @@ function SelectorEditor({
         />
         Activa
       </label>
-      <div className="flex flex-wrap gap-2">
-        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-          Guardar
-        </Button>
-        {onDuplicate && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-            Duplicar
-          </Button>
-        )}
-        {onDelete && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-            Eliminar
-          </Button>
-        )}
-        {onCancel && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-      </div>
-    </div>
+    </WidgetConfigItemCard>
   );
 }

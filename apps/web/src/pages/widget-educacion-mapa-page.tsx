@@ -1,9 +1,15 @@
 import { useState } from 'react';
+import { MapPin } from 'lucide-react';
 import type { EducacionDistrictDto, EducacionSedeDto } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
+import {
+  WidgetConfigItemCard,
+  WidgetConfigItemField,
+  WidgetConfigItemMedia,
+} from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { formatCoordinates, parseCoordinates, slugify } from '@/lib/coordinates';
@@ -180,7 +186,7 @@ export function WidgetEducacionMapaPage() {
           />
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {state.sedes.map((sede) => (
             <SedeEditor
               key={sede.id}
@@ -238,58 +244,116 @@ function SedeEditor({
   onDuplicate?: () => void;
   title?: string;
 }) {
+  const districtName =
+    districts.find((d) => d.id === sede.districtId)?.name ?? 'Sin distrito';
+
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
-      {title && <p className="text-sm font-medium">{title}</p>}
-      <div className="grid gap-2 md:grid-cols-2">
-        <Input
-          placeholder="Slug (único)"
-          value={sede.slug}
-          disabled={Boolean(sede.id)}
-          onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+    <WidgetConfigItemCard
+      badge={title}
+      inactive={!sede.activo}
+      media={
+        <WidgetConfigItemMedia
+          placeholderIcon={MapPin}
+          placeholderLabel={sede.nombre.trim() || 'Sede en mapa'}
+          footer={
+            <div className="grid gap-3 sm:grid-cols-2">
+              <WidgetConfigItemField label="Coordenadas" hint="Formato: lat, lng">
+                <Input
+                  placeholder="Coordenadas (lat, lng)"
+                  value={sede.coords}
+                  onChange={(e) => onChange({ ...sede, coords: e.target.value })}
+                />
+              </WidgetConfigItemField>
+              <WidgetConfigItemField label="Distrito">
+                <select
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  value={sede.districtId ?? ''}
+                  onChange={(e) =>
+                    onChange({ ...sede, districtId: e.target.value || null })
+                  }
+                >
+                  <option value="">Sin distrito</option>
+                  {districts.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </WidgetConfigItemField>
+            </div>
+          }
         />
-        <Input
-          placeholder="Nombre"
-          value={sede.nombre}
-          onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-        />
+      }
+      actions={
+        <>
+          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+            Guardar
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
+              Duplicar
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
+              Eliminar
+            </Button>
+          )}
+          {onCancel && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
+              Cancelar
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <WidgetConfigItemField label="Título">
+          <Input
+            className="text-base font-semibold"
+            placeholder="Nombre de la sede"
+            value={sede.nombre}
+            onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
+          />
+        </WidgetConfigItemField>
+        <WidgetConfigItemField label="Slug">
+          <Input
+            className="font-mono text-sm"
+            placeholder="Slug (único)"
+            value={sede.slug}
+            disabled={Boolean(sede.id)}
+            onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
+          />
+        </WidgetConfigItemField>
       </div>
-      <Input
-        placeholder="Dirección"
-        value={sede.direccion ?? ''}
-        onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
-      />
-      <Input
-        placeholder="Coordenadas (lat, lng)"
-        value={sede.coords}
-        onChange={(e) => onChange({ ...sede, coords: e.target.value })}
-      />
-      <select
-        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-        value={sede.districtId ?? ''}
-        onChange={(e) =>
-          onChange({ ...sede, districtId: e.target.value || null })
-        }
-      >
-        <option value="">Sin distrito</option>
-        {districts.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-      <textarea
-        className="w-full rounded-lg border border-border bg-background p-2 text-sm"
-        rows={3}
-        placeholder="Horario HTML"
-        value={sede.horarioHtml ?? ''}
-        onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
-      />
-      <Input
-        placeholder="Brochure URL"
-        value={sede.brochureUrl}
-        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
-      />
+
+      <WidgetConfigItemField label="Subtítulo" hint={districtName}>
+        <Input
+          className="text-sm"
+          placeholder="Dirección"
+          value={sede.direccion ?? ''}
+          onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
+        />
+      </WidgetConfigItemField>
+
+      <WidgetConfigItemField label="Descripción">
+        <textarea
+          className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+          rows={3}
+          placeholder="Horario HTML"
+          value={sede.horarioHtml ?? ''}
+          onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
+        />
+      </WidgetConfigItemField>
+
+      <WidgetConfigItemField label="Brochure">
+        <Input
+          placeholder="Brochure URL"
+          value={sede.brochureUrl}
+          onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
+        />
+      </WidgetConfigItemField>
+
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input
@@ -308,26 +372,6 @@ function SedeEditor({
           Activa
         </label>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-          Guardar
-        </Button>
-        {onDuplicate && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-            Duplicar
-          </Button>
-        )}
-        {onDelete && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-            Eliminar
-          </Button>
-        )}
-        {onCancel && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-      </div>
-    </div>
+    </WidgetConfigItemCard>
   );
 }
