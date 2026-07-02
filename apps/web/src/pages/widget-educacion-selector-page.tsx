@@ -9,12 +9,13 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
+import { MaterialIconPicker } from '@/components/material-icon-picker';
 import { Button, Card, Input } from '@/components/ui';
-import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
+import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 
 const SELECTOR_PREVIEW = [
   {
@@ -241,10 +242,9 @@ function SelectorEditor({
         value={sede.nombre}
         onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
       />
-      <Input
-        placeholder="Icono Material Icons (nombre del glifo)"
+      <MaterialIconPicker
         value={sede.icon}
-        onChange={(e) => onChange({ ...sede, icon: e.target.value })}
+        onChange={(icon) => onChange({ ...sede, icon })}
       />
       <Input
         placeholder="Brochure URL"

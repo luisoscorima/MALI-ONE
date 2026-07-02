@@ -100,7 +100,8 @@ export function PopupVisualPreview({ popup }: { popup: PopupLike }) {
       </div>
 
       <ul className="space-y-1 border-t border-border px-4 py-3 text-xs text-muted">
-        <li>Delay al abrir: {popup.delayMs} ms</li>
+        <li>Espera antes de abrir: {(popup.delayMs / 1000).toFixed(1).replace(/\.0$/, '')} s</li>
+        <li>Duración al cerrar: {(popup.animationSpeedMs / 1000).toFixed(1).replace(/\.0$/, '')} s</li>
         {popup.showOnce && (
           <li>Se muestra una sola vez por visitante (localStorage)</li>
         )}
@@ -171,36 +172,63 @@ export function PopupSettingsFields({
         onChange={(e) => onChange({ titulo: e.target.value || null })}
       />
 
-      <div className="grid gap-2 md:grid-cols-2">
-        <Input
-          placeholder="Texto del botón"
-          value={popup.botonTexto}
-          onChange={(e) => onChange({ botonTexto: e.target.value })}
-        />
-        <Input
-          placeholder="URL del botón"
-          value={popup.botonUrl}
-          onChange={(e) => onChange({ botonUrl: e.target.value })}
-        />
+      <Input
+        placeholder="Texto del botón"
+        value={popup.botonTexto}
+        onChange={(e) => onChange({ botonTexto: e.target.value })}
+      />
+      <Input
+        placeholder="URL del botón"
+        value={popup.botonUrl}
+        onChange={(e) => onChange({ botonUrl: e.target.value })}
+      />
+
+      <div className="space-y-1">
+        <label className="text-sm" htmlFor="popup-delay-seconds">
+          Espera antes de mostrar el popup
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="popup-delay-seconds"
+            type="number"
+            min={0}
+            step={0.5}
+            className="max-w-[8rem]"
+            value={popup.delayMs / 1000}
+            onChange={(e) =>
+              onChange({ delayMs: Math.max(0, Math.round(Number(e.target.value) * 1000)) || 0 })
+            }
+          />
+          <span className="text-sm text-muted">segundos</span>
+        </div>
+        <p className="text-xs text-muted">
+          Tiempo tras cargar la página antes de que aparezca el overlay.
+        </p>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2">
-        <Input
-          placeholder="Delay (ms)"
-          type="number"
-          value={popup.delayMs}
-          onChange={(e) =>
-            onChange({ delayMs: Number(e.target.value) || 0 })
-          }
-        />
-        <Input
-          placeholder="Animación cierre (ms)"
-          type="number"
-          value={popup.animationSpeedMs}
-          onChange={(e) =>
-            onChange({ animationSpeedMs: Number(e.target.value) || 0 })
-          }
-        />
+      <div className="space-y-1">
+        <label className="text-sm" htmlFor="popup-close-seconds">
+          Duración al cerrar
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="popup-close-seconds"
+            type="number"
+            min={0}
+            step={0.1}
+            className="max-w-[8rem]"
+            value={popup.animationSpeedMs / 1000}
+            onChange={(e) =>
+              onChange({
+                animationSpeedMs: Math.max(0, Math.round(Number(e.target.value) * 1000)) || 0,
+              })
+            }
+          />
+          <span className="text-sm text-muted">segundos</span>
+        </div>
+        <p className="text-xs text-muted">
+          Velocidad de la animación cuando el visitante cierra el popup.
+        </p>
       </div>
 
       <label className="flex items-center gap-2 text-sm">

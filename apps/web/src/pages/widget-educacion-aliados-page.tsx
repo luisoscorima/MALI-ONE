@@ -7,6 +7,11 @@ import { Spinner } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
+import {
+  WidgetConfigItemCard,
+  WidgetConfigItemImageThumb,
+  WidgetConfigItemList,
+} from '@/components/widget-config-item-card';
 import { Button, Card, Input } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
@@ -189,15 +194,16 @@ export function WidgetEducacionAliadosPage() {
           onChange={setDraft}
           onSave={() => void persistAliado(draft)}
           onCancel={() => setDraft(null)}
-          title="Nuevo aliado"
+          title="Nuevo ítem"
         />
       )}
 
-      <div className="space-y-4">
-        {state.aliados.map((aliado) => (
+      <WidgetConfigItemList>
+        {state.aliados.map((aliado, index) => (
           <AliadoEditor
             key={aliado.id}
             aliado={aliado}
+            title={`Ítem ${index + 1}`}
             onChange={(next) =>
               setState({
                 ...state,
@@ -214,7 +220,7 @@ export function WidgetEducacionAliadosPage() {
             onDuplicate={() => duplicateAliado(aliado)}
           />
         ))}
-      </div>
+      </WidgetConfigItemList>
     </Card>
   );
 
@@ -247,43 +253,64 @@ function AliadoEditor({
   title?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border p-3 space-y-2">
-      {title && <p className="text-sm font-medium">{title}</p>}
-      <div className="grid gap-2 md:grid-cols-2">
-        <Input
-          placeholder="Nombre"
-          value={aliado.nombre}
-          onChange={(e) => onChange({ ...aliado, nombre: e.target.value })}
+    <WidgetConfigItemCard
+      badge={title}
+      inactive={!aliado.activo}
+      aside={
+        <WidgetConfigItemImageThumb
+          imageUrl={aliado.imageUrl}
+          alt={aliado.nombre}
         />
-        <select
-          className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-          value={aliado.categoria}
-          onChange={(e) =>
-            onChange({
-              ...aliado,
-              categoria: e.target.value as EducacionAliadoCategoria,
-            })
-          }
-        >
-          {CATEGORIAS.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      }
+      actions={
+        <>
+          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
+            Guardar
+          </Button>
+          {onDuplicate && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
+              Duplicar
+            </Button>
+          )}
+          {onDelete && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
+              Eliminar
+            </Button>
+          )}
+          {onCancel && (
+            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
+              Cancelar
+            </Button>
+          )}
+        </>
+      }
+    >
+      <Input
+        placeholder="Nombre"
+        value={aliado.nombre}
+        onChange={(e) => onChange({ ...aliado, nombre: e.target.value })}
+      />
+      <select
+        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        value={aliado.categoria}
+        onChange={(e) =>
+          onChange({
+            ...aliado,
+            categoria: e.target.value as EducacionAliadoCategoria,
+          })
+        }
+      >
+        {CATEGORIAS.map((c) => (
+          <option key={c.value} value={c.value}>
+            {c.label}
+          </option>
+        ))}
+      </select>
       <Input
         placeholder="URL del logo (S3 o externa)"
         value={aliado.imageUrl}
         onChange={(e) => onChange({ ...aliado, imageUrl: e.target.value })}
       />
-      {aliado.imageUrl && (
-        <img
-          src={aliado.imageUrl}
-          alt={aliado.nombre}
-          className="h-16 object-contain"
-        />
-      )}
       <Input
         placeholder="Sitio web (opcional)"
         value={aliado.url ?? ''}
@@ -291,44 +318,22 @@ function AliadoEditor({
           onChange({ ...aliado, url: e.target.value || null })
         }
       />
-      <div className="grid gap-2 md:grid-cols-2">
-        <Input
-          placeholder="Orden"
-          type="number"
-          value={aliado.sortOrder}
-          onChange={(e) =>
-            onChange({ ...aliado, sortOrder: Number(e.target.value) || 0 })
-          }
+      <Input
+        placeholder="Orden"
+        type="number"
+        value={aliado.sortOrder}
+        onChange={(e) =>
+          onChange({ ...aliado, sortOrder: Number(e.target.value) || 0 })
+        }
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={aliado.activo}
+          onChange={(e) => onChange({ ...aliado, activo: e.target.checked })}
         />
-        <label className="flex items-center gap-2 text-sm self-center">
-          <input
-            type="checkbox"
-            checked={aliado.activo}
-            onChange={(e) => onChange({ ...aliado, activo: e.target.checked })}
-          />
-          Activo
-        </label>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-          Guardar
-        </Button>
-        {onDuplicate && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-            Duplicar
-          </Button>
-        )}
-        {onDelete && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-            Eliminar
-          </Button>
-        )}
-        {onCancel && (
-          <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-            Cancelar
-          </Button>
-        )}
-      </div>
-    </div>
+        Activo
+      </label>
+    </WidgetConfigItemCard>
   );
 }
