@@ -6,7 +6,6 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemCardFull,
   WidgetConfigItemList,
   WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
@@ -247,23 +246,19 @@ function SelectorEditor({
         value={sede.icon}
         onChange={(e) => onChange({ ...sede, icon: e.target.value })}
       />
-      <WidgetConfigItemCardFull>
-        <Input
-          placeholder="Brochure URL"
-          value={sede.brochureUrl}
-          onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
+      <Input
+        placeholder="Brochure URL"
+        value={sede.brochureUrl}
+        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={sede.activo}
+          onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
         />
-      </WidgetConfigItemCardFull>
-      <WidgetConfigItemCardFull>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={sede.activo}
-            onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-          />
-          Activa
-        </label>
-      </WidgetConfigItemCardFull>
+        Activa
+      </label>
     </WidgetConfigItemCard>
   );
 }

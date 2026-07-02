@@ -7,7 +7,6 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemCardFull,
   WidgetConfigItemList,
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
@@ -183,7 +182,6 @@ export function WidgetEducacionMapaPage() {
           <SedeEditor
             sede={draft}
             districts={state.districts}
-            mapsApiKey={state.settings.mapsApiKey}
             onChange={setDraft}
             onSave={() => void persistSede(draft)}
             onCancel={() => setDraft(null)}
@@ -197,7 +195,6 @@ export function WidgetEducacionMapaPage() {
               key={sede.id}
               sede={withCoords(sede)}
               districts={state.districts}
-              mapsApiKey={state.settings.mapsApiKey}
               title={`Ítem ${index + 1}`}
               onChange={(next) => {
                 const { lat, lng } = parseCoordinates(next.coords);
@@ -235,7 +232,6 @@ export function WidgetEducacionMapaPage() {
 function SedeEditor({
   sede,
   districts,
-  mapsApiKey,
   onChange,
   onSave,
   onCancel,
@@ -245,7 +241,6 @@ function SedeEditor({
 }: {
   sede: SedeDraft;
   districts: EducacionDistrictDto[];
-  mapsApiKey?: string | null;
   onChange: (sede: SedeDraft) => void;
   onSave: () => void;
   onCancel?: () => void;
@@ -263,7 +258,6 @@ function SedeEditor({
         <WidgetConfigItemMapThumb
           lat={lat}
           lng={lng}
-          mapsApiKey={mapsApiKey}
           label={sede.nombre.trim() || 'Sede'}
           placeholderIcon={MapPin}
         />
@@ -312,58 +306,50 @@ function SedeEditor({
         value={sede.coords}
         onChange={(e) => onChange({ ...sede, coords: e.target.value })}
       />
-      <WidgetConfigItemCardFull>
-        <select
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          value={sede.districtId ?? ''}
-          onChange={(e) =>
-            onChange({ ...sede, districtId: e.target.value || null })
-          }
-        >
-          <option value="">Sin distrito</option>
-          {districts.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
-      </WidgetConfigItemCardFull>
-      <WidgetConfigItemCardFull>
-        <textarea
-          className="w-full rounded-lg border border-border bg-background p-2 text-sm"
-          rows={3}
-          placeholder="Horario HTML"
-          value={sede.horarioHtml ?? ''}
-          onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
-        />
-      </WidgetConfigItemCardFull>
-      <WidgetConfigItemCardFull>
-        <Input
-          placeholder="Brochure URL"
-          value={sede.brochureUrl}
-          onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
-        />
-      </WidgetConfigItemCardFull>
-      <WidgetConfigItemCardFull>
-        <div className="flex flex-wrap gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={sede.showOnMap}
-              onChange={(e) => onChange({ ...sede, showOnMap: e.target.checked })}
-            />
-            Visible en mapa
-          </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={sede.activo}
-              onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-            />
-            Activa
-          </label>
-        </div>
-      </WidgetConfigItemCardFull>
+      <select
+        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        value={sede.districtId ?? ''}
+        onChange={(e) =>
+          onChange({ ...sede, districtId: e.target.value || null })
+        }
+      >
+        <option value="">Sin distrito</option>
+        {districts.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+      <textarea
+        className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+        rows={3}
+        placeholder="Horario HTML"
+        value={sede.horarioHtml ?? ''}
+        onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
+      />
+      <Input
+        placeholder="Brochure URL"
+        value={sede.brochureUrl}
+        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
+      />
+      <div className="flex flex-wrap gap-4 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={sede.showOnMap}
+            onChange={(e) => onChange({ ...sede, showOnMap: e.target.checked })}
+          />
+          Visible en mapa
+        </label>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={sede.activo}
+            onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
+          />
+          Activa
+        </label>
+      </div>
     </WidgetConfigItemCard>
   );
 }

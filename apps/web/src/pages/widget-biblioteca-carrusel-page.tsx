@@ -9,7 +9,6 @@ import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
   WidgetConfigItemCard,
-  WidgetConfigItemCardFull,
   WidgetConfigItemImageThumb,
   WidgetConfigItemList,
 } from '@/components/widget-config-item-card';
@@ -324,22 +323,18 @@ function ItemEditor({
         value={item.backgroundSrc}
         onChange={(e) => onChange({ ...item, backgroundSrc: e.target.value })}
       />
-      <WidgetConfigItemCardFull>
-        <DescriptionHtmlField
-          value={item.descriptionHtml}
-          onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
+      <DescriptionHtmlField
+        value={item.descriptionHtml}
+        onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
+      />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={item.activo}
+          onChange={(e) => onChange({ ...item, activo: e.target.checked })}
         />
-      </WidgetConfigItemCardFull>
-      <WidgetConfigItemCardFull>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={item.activo}
-            onChange={(e) => onChange({ ...item, activo: e.target.checked })}
-          />
-          Activo
-        </label>
-      </WidgetConfigItemCardFull>
+        Activo
+      </label>
     </WidgetConfigItemCard>
   );
 }

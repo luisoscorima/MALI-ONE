@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { CircleHelp, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { googleStaticMapUrl } from '@/lib/google-static-map';
+import { googleEmbedMapUrl } from '@/lib/google-embed-map';
 
 const THUMB_CLASS = 'h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40';
 
@@ -52,7 +52,7 @@ export function WidgetConfigItemCard({
 
       <div className="flex gap-4 p-4">
         {aside}
-        <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">{children}</div>
+        <div className="min-w-0 flex-1 space-y-2">{children}</div>
       </div>
 
       <footer className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3">
@@ -69,7 +69,7 @@ export function WidgetConfigItemCardFull({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn('sm:col-span-2', className)}>{children}</div>;
+  return <div className={className}>{children}</div>;
 }
 
 export function WidgetConfigItemFields({
@@ -206,37 +206,34 @@ export function WidgetConfigItemIconThumb({
 export function WidgetConfigItemMapThumb({
   lat,
   lng,
-  mapsApiKey,
   label,
   placeholderIcon: PlaceholderIcon = ImageIcon,
 }: {
   lat: number | null;
   lng: number | null;
-  mapsApiKey?: string | null;
   label?: string;
   placeholderIcon?: LucideIcon;
 }) {
   const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
-  const apiKey = mapsApiKey?.trim();
 
-  if (!hasCoords || !apiKey) {
+  if (!hasCoords) {
     return (
       <WidgetConfigItemIconThumb
         icon={PlaceholderIcon}
-        label={label ?? (hasCoords ? 'Mapa' : 'Sin coordenadas')}
+        label={label ?? 'Sin coordenadas'}
       />
     );
   }
 
-  const mapUrl = googleStaticMapUrl(lat, lng, apiKey);
-
   return (
     <div className={THUMB_CLASS} title={label ?? `${lat}, ${lng}`}>
-      <img
-        src={mapUrl}
-        alt={label ?? 'Ubicación en mapa'}
-        className="h-full w-full object-cover"
+      <iframe
+        key={`${lat},${lng}`}
+        src={googleEmbedMapUrl(lat, lng)}
+        title={label ?? 'Ubicación en mapa'}
+        className="h-full w-full border-0 pointer-events-none"
         loading="lazy"
+        tabIndex={-1}
       />
     </div>
   );
