@@ -24,7 +24,7 @@ import {
   CreateEducacionAliadoDto,
   UpdateEducacionAliadoDto,
 } from '../dto/create-educacion-aliado.dto';
-import { buildPopupPublicConfig } from '../popup-schedule.util';
+import { buildPopupPublicConfig, POPUP_TIMING } from '../popup-schedule.util';
 import {
   EDUCACION_ASSET_URLS,
   resolveEducacionImage,
@@ -42,8 +42,8 @@ const DEFAULT_POPUP = {
   botonUrl: '',
   botonTarget: '_blank',
   showOnce: false,
-  delayMs: 800,
-  animationSpeedMs: 300,
+  delayMs: POPUP_TIMING.delayMs,
+  animationSpeedMs: POPUP_TIMING.animationSpeedMs,
   scheduleEnabled: false,
   scheduleDateStart: null as string | null,
   scheduleDateEnd: null as string | null,

@@ -1,3 +1,9 @@
+/** Tiempos fijos del popup — no editables desde el configurador. */
+export const POPUP_TIMING = {
+  delayMs: 800,
+  animationSpeedMs: 300,
+} as const;
+
 export type PopupScheduleFields = {
   scheduleEnabled: boolean;
   scheduleDateStart: string | null;
@@ -128,7 +134,7 @@ export function buildPopupPublicConfig(
     botonUrl: popup.botonUrl,
     botonTarget: popup.botonTarget,
     showOnce: popup.showOnce,
-    delayMs: popup.delayMs,
-    animationSpeedMs: popup.animationSpeedMs,
+    delayMs: POPUP_TIMING.delayMs,
+    animationSpeedMs: POPUP_TIMING.animationSpeedMs,
   };
 }

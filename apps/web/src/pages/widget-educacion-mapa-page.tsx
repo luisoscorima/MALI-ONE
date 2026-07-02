@@ -10,7 +10,7 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { formatCoordinates, parseCoordinates, slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
@@ -68,7 +68,7 @@ export function WidgetEducacionMapaPage() {
       horarioHtml: sede.horarioHtml?.trim() || null,
       brochureUrl: sede.brochureUrl.trim(),
       districtId: sede.districtId,
-      showOnMap: sede.showOnMap,
+      showOnMap: true,
       activo: sede.activo,
       sortOrder: sede.sortOrder,
     };
@@ -332,24 +332,12 @@ function SedeEditor({
         value={sede.brochureUrl}
         onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
       />
-      <div className="flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sede.showOnMap}
-            onChange={(e) => onChange({ ...sede, showOnMap: e.target.checked })}
-          />
-          Visible en mapa
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sede.activo}
-            onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-          />
-          Activa
-        </label>
-      </div>
+      <SettingSwitchInline
+        label="Sede activa"
+        description="Si está inactiva, no aparece en el mapa del sitio."
+        checked={sede.activo}
+        onCheckedChange={(activo) => onChange({ ...sede, activo })}
+      />
     </WidgetConfigItemCard>
   );
 }

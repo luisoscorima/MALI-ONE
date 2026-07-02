@@ -1,9 +1,7 @@
 import {
   IsBoolean,
-  IsInt,
   IsOptional,
   IsString,
-  Min,
 } from 'class-validator';
 
 export class UpdateEducacionPopupDto {
@@ -42,16 +40,6 @@ export class UpdateEducacionPopupDto {
   @IsOptional()
   @IsBoolean()
   showOnce?: boolean;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  delayMs?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  animationSpeedMs?: number;
 
   @IsOptional()
   @IsBoolean()

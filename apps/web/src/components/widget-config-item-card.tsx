@@ -37,25 +37,32 @@ export function WidgetConfigItemCard({
   children: React.ReactNode;
   actions: React.ReactNode;
 }) {
+  const dimmed = inactive ? 'opacity-60' : undefined;
+
   return (
-    <article
-      className={cn(
-        'overflow-hidden rounded-xl border border-border bg-card shadow-sm',
-        inactive && 'opacity-60',
-      )}
-    >
+    <article className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       {badge && (
-        <div className="border-b border-border bg-muted/30 px-4 py-2">
+        <div
+          className={cn(
+            'border-b border-border bg-muted/30 px-4 py-2',
+            dimmed,
+          )}
+        >
           <p className="text-sm font-medium">{badge}</p>
         </div>
       )}
 
       <div className="flex gap-4 p-4">
         {aside}
-        <div className="min-w-0 flex-1 space-y-2">{children}</div>
+        <div className={cn('min-w-0 flex-1 space-y-2', dimmed)}>{children}</div>
       </div>
 
-      <footer className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3">
+      <footer
+        className={cn(
+          'flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3',
+          dimmed,
+        )}
+      >
         {actions}
       </footer>
     </article>
@@ -119,19 +126,31 @@ export function WidgetConfigItemField({
 export function WidgetConfigItemImageThumb({
   imageUrl,
   alt = '',
+  fit = 'cover',
 }: {
   imageUrl?: string | null;
   alt?: string;
+  /** `contain` recomendado para logos; `cover` para fotos de carrusel */
+  fit?: 'cover' | 'contain';
 }) {
   const src = imageUrl?.trim();
 
   return (
-    <div className={THUMB_CLASS} title="Vista referencial">
+    <div
+      className={cn(
+        THUMB_CLASS,
+        fit === 'contain' ? 'bg-white' : 'bg-muted/40',
+      )}
+      title="Vista referencial"
+    >
       {src ? (
         <img
           src={src}
           alt={alt}
-          className="h-full w-full object-cover"
+          className={cn(
+            'h-full w-full',
+            fit === 'contain' ? 'object-contain p-1.5' : 'object-cover',
+          )}
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}

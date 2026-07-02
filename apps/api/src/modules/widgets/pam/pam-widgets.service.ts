@@ -14,7 +14,7 @@ import {
   UpdatePamSettingsDto,
 } from '../dto/pam.dto';
 import { UpdateMuseoPopupDto } from '../dto/update-museo-popup.dto';
-import { buildPopupPublicConfig } from '../popup-schedule.util';
+import { buildPopupPublicConfig, POPUP_TIMING } from '../popup-schedule.util';
 import { PamEmailService } from './pam-email.service';
 
 const MP_CONFIRMED: PamMpStatus[] = ['approved', 'authorized'];
@@ -29,8 +29,8 @@ const DEFAULT_MUSEO_POPUP = {
   botonUrl: '',
   botonTarget: '_blank',
   showOnce: false,
-  delayMs: 800,
-  animationSpeedMs: 300,
+  delayMs: POPUP_TIMING.delayMs,
+  animationSpeedMs: POPUP_TIMING.animationSpeedMs,
   scheduleEnabled: false,
   scheduleDateStart: null as string | null,
   scheduleDateEnd: null as string | null,

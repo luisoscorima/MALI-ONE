@@ -10,7 +10,7 @@ import {
   WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
 import { MaterialIconPicker } from '@/components/material-icon-picker';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -251,14 +251,12 @@ function SelectorEditor({
         value={sede.brochureUrl}
         onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
       />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={sede.activo}
-          onChange={(e) => onChange({ ...sede, activo: e.target.checked })}
-        />
-        Activa
-      </label>
+      <SettingSwitchInline
+        label="Sede activa"
+        description="Si está inactiva, no aparece en el selector del sitio."
+        checked={sede.activo}
+        onCheckedChange={(activo) => onChange({ ...sede, activo })}
+      />
     </WidgetConfigItemCard>
   );
 }

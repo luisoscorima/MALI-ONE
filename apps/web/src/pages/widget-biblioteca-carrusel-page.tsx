@@ -12,7 +12,7 @@ import {
   WidgetConfigItemImageThumb,
   WidgetConfigItemList,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { api } from '@/lib/api';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -276,7 +276,7 @@ function ItemEditor({
       inactive={!item.activo}
       aside={
         <WidgetConfigItemImageThumb
-          imageUrl={item.imageSrc}
+          imageUrl={item.backgroundSrc || item.imageSrc}
           alt={item.imageAlt || item.title}
         />
       }
@@ -327,14 +327,14 @@ function ItemEditor({
         value={item.descriptionHtml}
         onChange={(descriptionHtml) => onChange({ ...item, descriptionHtml })}
       />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={item.activo}
-          onChange={(e) => onChange({ ...item, activo: e.target.checked })}
-        />
-        Activo
-      </label>
+      <SettingSwitchInline
+        label="Ítem activo"
+        description="Si está inactivo, no aparece en el carrusel del sitio."
+        checked={item.activo}
+        onCheckedChange={(activo) => onChange({ ...item, activo })}
+        activeLabel="Activo"
+        inactiveLabel="Inactivo"
+      />
     </WidgetConfigItemCard>
   );
 }

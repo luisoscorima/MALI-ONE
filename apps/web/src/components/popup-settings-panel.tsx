@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { EducacionPopupSettingsDto } from '@mali-one/shared';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchRow } from '@/components/ui';
 
 type PopupLike = EducacionPopupSettingsDto;
 
@@ -100,8 +100,9 @@ export function PopupVisualPreview({ popup }: { popup: PopupLike }) {
       </div>
 
       <ul className="space-y-1 border-t border-border px-4 py-3 text-xs text-muted">
-        <li>Espera antes de abrir: {(popup.delayMs / 1000).toFixed(1).replace(/\.0$/, '')} s</li>
-        <li>Duración al cerrar: {(popup.animationSpeedMs / 1000).toFixed(1).replace(/\.0$/, '')} s</li>
+        {popup.scheduleEnabled && (
+          <li>Visibilidad controlada por horario programado</li>
+        )}
         {popup.showOnce && (
           <li>Se muestra una sola vez por visitante (localStorage)</li>
         )}
@@ -126,6 +127,16 @@ export function PopupSettingsFields({
   onChange: (patch: Partial<PopupLike>) => void;
   siteLabel: string;
 }) {
+  const scheduleControlsVisibility = popup.scheduleEnabled;
+
+  function handleScheduleToggle(enabled: boolean) {
+    if (enabled) {
+      onChange({ scheduleEnabled: true, activo: true });
+      return;
+    }
+    onChange({ scheduleEnabled: false });
+  }
+
   return (
     <Card className="space-y-4 p-4">
       <div>
@@ -135,172 +146,149 @@ export function PopupSettingsFields({
         </p>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+          Visibilidad
+        </p>
+
+        <SettingSwitchRow
+          label="Popup en el sitio"
+          description={
+            scheduleControlsVisibility
+              ? 'Desactiva el horario programado para usar este interruptor.'
+              : 'Muestra u oculta el popup de forma inmediata.'
+          }
           checked={popup.activo}
-          onChange={(e) => onChange({ activo: e.target.checked })}
+          disabled={scheduleControlsVisibility}
+          onCheckedChange={(activo) => onChange({ activo })}
         />
-        Popup activo (manual)
-      </label>
 
-      <Input
-        placeholder="URL de la imagen"
-        value={popup.imagenUrl}
-        onChange={(e) => onChange({ imagenUrl: e.target.value })}
-      />
-
-      {popup.imagenUrl && (
-        <img
-          src={popup.imagenUrl}
-          alt={popup.titulo ?? 'Vista previa popup'}
-          className="max-h-48 rounded border border-border object-contain"
+        <SettingSwitchRow
+          label="Programar por horario"
+          description="El popup solo aparece dentro del rango de fechas y horas configurado."
+          checked={popup.scheduleEnabled}
+          onCheckedChange={handleScheduleToggle}
         />
+      </div>
+
+      {scheduleControlsVisibility && (
+        <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+          <p className="text-xs text-muted">
+            Mientras el horario esté activado, la visibilidad la define el rango
+            inferior — no el interruptor «Popup en el sitio».
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted">Fecha de inicio</label>
+            <Input
+              type="date"
+              value={popup.scheduleDateStart ?? ''}
+              onChange={(e) =>
+                onChange({ scheduleDateStart: e.target.value || null })
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted">Fecha de fin</label>
+            <Input
+              type="date"
+              value={popup.scheduleDateEnd ?? ''}
+              onChange={(e) =>
+                onChange({ scheduleDateEnd: e.target.value || null })
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted">Hora de inicio</label>
+            <Input
+              type="time"
+              value={popup.scheduleTimeStart ?? ''}
+              onChange={(e) =>
+                onChange({ scheduleTimeStart: e.target.value || null })
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted">Hora de fin</label>
+            <Input
+              type="time"
+              value={popup.scheduleTimeEnd ?? ''}
+              onChange={(e) =>
+                onChange({ scheduleTimeEnd: e.target.value || null })
+              }
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-muted">Zona horaria</label>
+            <Input
+              placeholder="America/Lima"
+              value={popup.scheduleTimezone}
+              onChange={(e) => onChange({ scheduleTimezone: e.target.value })}
+            />
+          </div>
+        </div>
       )}
 
-      <Input
-        placeholder="URL al hacer clic en la imagen (opcional)"
-        value={popup.imagenLinkUrl ?? ''}
-        onChange={(e) =>
-          onChange({ imagenLinkUrl: e.target.value || null })
-        }
-      />
-
-      <Input
-        placeholder="Título / alt de la imagen"
-        value={popup.titulo ?? ''}
-        onChange={(e) => onChange({ titulo: e.target.value || null })}
-      />
-
-      <Input
-        placeholder="Texto del botón"
-        value={popup.botonTexto}
-        onChange={(e) => onChange({ botonTexto: e.target.value })}
-      />
-      <Input
-        placeholder="URL del botón"
-        value={popup.botonUrl}
-        onChange={(e) => onChange({ botonUrl: e.target.value })}
-      />
-
-      <div className="space-y-1">
-        <label className="text-sm" htmlFor="popup-delay-seconds">
-          Espera antes de mostrar el popup
-        </label>
-        <div className="flex items-center gap-2">
-          <Input
-            id="popup-delay-seconds"
-            type="number"
-            min={0}
-            step={0.5}
-            className="max-w-[8rem]"
-            value={popup.delayMs / 1000}
-            onChange={(e) =>
-              onChange({ delayMs: Math.max(0, Math.round(Number(e.target.value) * 1000)) || 0 })
-            }
-          />
-          <span className="text-sm text-muted">segundos</span>
-        </div>
-        <p className="text-xs text-muted">
-          Tiempo tras cargar la página antes de que aparezca el overlay.
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+          Contenido
         </p>
-      </div>
 
-      <div className="space-y-1">
-        <label className="text-sm" htmlFor="popup-close-seconds">
-          Duración al cerrar
-        </label>
-        <div className="flex items-center gap-2">
-          <Input
-            id="popup-close-seconds"
-            type="number"
-            min={0}
-            step={0.1}
-            className="max-w-[8rem]"
-            value={popup.animationSpeedMs / 1000}
-            onChange={(e) =>
-              onChange({
-                animationSpeedMs: Math.max(0, Math.round(Number(e.target.value) * 1000)) || 0,
-              })
-            }
-          />
-          <span className="text-sm text-muted">segundos</span>
-        </div>
-        <p className="text-xs text-muted">
-          Velocidad de la animación cuando el visitante cierra el popup.
-        </p>
-      </div>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={popup.showOnce}
-          onChange={(e) => onChange({ showOnce: e.target.checked })}
+        <Input
+          placeholder="URL de la imagen"
+          value={popup.imagenUrl}
+          onChange={(e) => onChange({ imagenUrl: e.target.value })}
         />
-        Mostrar solo una vez por visitante (localStorage)
-      </label>
 
-      <div className="space-y-3 rounded border border-border p-3">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={popup.scheduleEnabled}
-            onChange={(e) =>
-              onChange({ scheduleEnabled: e.target.checked })
-            }
+        {popup.imagenUrl && (
+          <img
+            src={popup.imagenUrl}
+            alt={popup.titulo ?? 'Vista previa popup'}
+            className="max-h-48 rounded border border-border object-contain"
           />
-          Activar por horario (fechas y horas)
-        </label>
-        <p className="text-xs text-muted">
-          Si está activo, el popup solo se muestra dentro del rango aunque el toggle
-          manual esté encendido. Fuera de ventana la API responde{' '}
-          <code>activo: false</code>.
+        )}
+
+        <Input
+          placeholder="URL al hacer clic en la imagen (opcional)"
+          value={popup.imagenLinkUrl ?? ''}
+          onChange={(e) =>
+            onChange({ imagenLinkUrl: e.target.value || null })
+          }
+        />
+
+        <Input
+          placeholder="Título / alt de la imagen"
+          value={popup.titulo ?? ''}
+          onChange={(e) => onChange({ titulo: e.target.value || null })}
+        />
+
+        <Input
+          placeholder="Texto del botón"
+          value={popup.botonTexto}
+          onChange={(e) => onChange({ botonTexto: e.target.value })}
+        />
+        <Input
+          placeholder="URL del botón"
+          value={popup.botonUrl}
+          onChange={(e) => onChange({ botonUrl: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+          Comportamiento
         </p>
 
-        <div className="grid gap-2 md:grid-cols-2">
-          <Input
-            type="date"
-            value={popup.scheduleDateStart ?? ''}
-            onChange={(e) =>
-              onChange({
-                scheduleDateStart: e.target.value || null,
-              })
-            }
-          />
-          <Input
-            type="date"
-            value={popup.scheduleDateEnd ?? ''}
-            onChange={(e) =>
-              onChange({ scheduleDateEnd: e.target.value || null })
-            }
-          />
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-3">
-          <Input
-            type="time"
-            value={popup.scheduleTimeStart ?? ''}
-            onChange={(e) =>
-              onChange({
-                scheduleTimeStart: e.target.value || null,
-              })
-            }
-          />
-          <Input
-            type="time"
-            value={popup.scheduleTimeEnd ?? ''}
-            onChange={(e) =>
-              onChange({ scheduleTimeEnd: e.target.value || null })
-            }
-          />
-          <Input
-            placeholder="Zona horaria"
-            value={popup.scheduleTimezone}
-            onChange={(e) =>
-              onChange({ scheduleTimezone: e.target.value })
-            }
-          />
-        </div>
+        <SettingSwitchRow
+          label="Una sola vez por visitante"
+          description="No vuelve a mostrarse si el visitante ya lo cerró (localStorage)."
+          checked={popup.showOnce}
+          onCheckedChange={(showOnce) => onChange({ showOnce })}
+        />
       </div>
     </Card>
   );
@@ -317,8 +305,6 @@ export function popupPayloadFromSettings(popup: PopupLike) {
     botonUrl: popup.botonUrl.trim(),
     botonTarget: popup.botonTarget,
     showOnce: popup.showOnce,
-    delayMs: popup.delayMs,
-    animationSpeedMs: popup.animationSpeedMs,
     scheduleEnabled: popup.scheduleEnabled,
     scheduleDateStart: popup.scheduleDateStart || null,
     scheduleDateEnd: popup.scheduleDateEnd || null,
