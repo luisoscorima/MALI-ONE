@@ -51,11 +51,7 @@ Sugerencias de evolución priorizadas por área. No constituyen compromiso de im
 
 ## Infraestructura y rendimiento
 
-- **Canvas en Docker** — Instalar dependencias nativas en `infra/docker/Dockerfile.api` y documentar en CI:
-  ```dockerfile
-  RUN apk add --no-cache cairo pango jpeg giflib librsvg pixman
-  ```
-  (o migrar a imagen Debian slim si Alpine da problemas con `canvas`.)
+- ~~**Canvas en Docker**~~ — Implementado: `infra/docker/Dockerfile.api` usa `node:20-bookworm-slim` + Cairo/Pango (build y runtime).
 - **Cache de QR** — Opcional: generar PNG/SVG una vez y guardar en S3 bajo `qr-exports/{linkId}/` para descargas repetidas.
 - **Cola para bulk** — Jobs en background (Redis/Bull) cuando lotes >100 enlaces para no bloquear la API.
 - **Rate limit en `/r/:slug`** — Mitigar abuso y bots sin perder métricas útiles.
@@ -81,7 +77,7 @@ Sugerencias de evolución priorizadas por área. No constituyen compromiso de im
 
 ## Priorización sugerida (corto plazo)
 
-1. Dependencias `canvas` en Docker de producción (evitar fallos silenciosos en export QR).
+1. ~~Dependencias `canvas` en Docker de producción~~ (hecho en Dockerfile.api).
 2. Informe Excel post-carga masiva.
 3. Carpetas/campañas para enlaces.
 4. Más formas de QR + validación de contraste.

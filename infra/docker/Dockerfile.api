@@ -1,14 +1,19 @@
-FROM node:20-alpine AS base
+# Debian slim: canvas (QR) no tiene prebuild para Alpine/musl; requiere Cairo en runtime.
+FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
 FROM base AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    libcairo2-dev libpango1.0-dev libjpeg62-turbo-dev libgif-dev librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/shared/package.json ./packages/shared/
 COPY apps/api/package.json ./apps/api/
 RUN pnpm install --frozen-lockfile || pnpm install
 
-FROM base AS builder
+FROM deps AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
@@ -17,7 +22,11 @@ RUN pnpm --filter @mali-one/shared build
 RUN pnpm --filter @mali-one/api prisma:generate
 RUN pnpm --filter @mali-one/api build
 
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 ENV NODE_ENV=production
@@ -31,6 +40,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 
 COPY infra/docker/entrypoint-api.sh /entrypoint-api.sh
+RUN chmod +x /entrypoint-api.sh
 
 WORKDIR /app/apps/api
 EXPOSE 3000

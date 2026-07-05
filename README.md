@@ -280,4 +280,9 @@ En Docker, al arrancar el contenedor `api` solo se aplican migraciones. El seed 
 
 ### QR en Docker (API)
 
-La generación de QR en el servidor usa el paquete nativo `canvas`. La imagen actual (`node:20-alpine`) puede requerir librerías adicionales en producción (`libcairo`, `pango`, etc.). Si la descarga de QR falla en el contenedor, revisa los logs del servicio `api` y considera añadir esas dependencias al [Dockerfile de la API](infra/docker/Dockerfile.api) o usar una imagen base `node:20-bookworm-slim`.
+La generación de QR en el servidor usa el paquete nativo `canvas`. La imagen de la API usa **`node:20-bookworm-slim`** (no Alpine) con librerías Cairo/Pango en runtime. Si actualizas desde una versión anterior Alpine, reconstruye la imagen:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache api
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d api web
+```
