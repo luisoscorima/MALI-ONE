@@ -9,7 +9,10 @@ export function AccentThemeSwatches({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn('flex flex-wrap gap-2 p-2', className)}
+      className={cn(
+        'grid grid-cols-6 gap-2 p-2 sm:flex sm:flex-wrap',
+        className,
+      )}
       role="listbox"
       aria-label="Color de interfaz"
     >

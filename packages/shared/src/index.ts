@@ -15,6 +15,18 @@ import { APP_PERMISSION_MODULES } from './permissions';
 export type { AppPermission, PermissionAppModule } from './permissions';
 export { APP_PERMISSION_MODULES };
 
+import type { QrStyleDto } from './qr-style';
+export type {
+  QrStyleDto,
+  QrBodyShape,
+  QrEyeFrameShape,
+  QrEyeShape,
+  LinkStatsDto,
+} from './qr-style';
+export { DEFAULT_QR_STYLE } from './qr-style';
+export type { QrLogoPresetId } from './qr-logo-presets';
+export { QR_LOGO_PRESETS } from './qr-logo-presets';
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -70,6 +82,8 @@ export interface ShortLinkDto {
   clickCount: number;
   createdAt: string;
   tags: string[];
+  qrStyle?: QrStyleDto | null;
+  qrLogoKey?: string | null;
   qrBase64?: string;
 }
 
@@ -78,6 +92,16 @@ export interface UpdateShortLinkDto {
   phone?: string;
   text?: string;
   tags?: string[];
+}
+
+export interface BulkLinkRowError {
+  row: number;
+  message: string;
+}
+
+export interface BulkLinksResultDto {
+  created: ShortLinkDto[];
+  errors: BulkLinkRowError[];
 }
 
 export interface GoogleWorkspaceUser {

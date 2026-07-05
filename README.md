@@ -6,13 +6,31 @@ Sistema de operaciones internas (backoffice) para **mali.pe**.
 
 - Login Google Workspace (`@mali.pe` únicamente)
 - Gestión manual de usuarios Google Admin
-- Acortador de URLs + códigos QR
-- Subida de archivos a S3 con URL corta y QR
+- **Enlaces y QR** (`/links`): acortador, WhatsApp, archivos S3, QR personalizable, carga masiva Excel y estadísticas
+- Gestor S3 (super admin)
+- Configuradores de widgets embebidos (educación, biblioteca, museo) y membresías PAM
+
+### Enlaces y QR (`/links`)
+
+| Función | Descripción |
+|---------|-------------|
+| URL / WhatsApp / Archivo | Creación individual con slug, tags y QR |
+| Carga masiva Excel | Hasta 100 filas (URL o WhatsApp); archivos vía selector múltiple (hasta 50) |
+| Diseño QR | Colores sólidos o degradado, fondo blanco/transparente, formas (cuadrados, círculos, redondeados), logo MALI preset o propio |
+| Export | PNG, SVG y EPS por enlace |
+| Estilo predeterminado | Por usuario; cada enlace nuevo hereda una copia editable |
+| Estadísticas | Clicks/escaneos por día, dispositivo, navegador y SO (`LinkClick`) |
+
+Ver sugerencias de evolución en [docs/MEJORAS-PROXIMAS.md](docs/MEJORAS-PROXIMAS.md).
 
 ## Stack
 
 - **API:** NestJS + Prisma + PostgreSQL + Redis
 - **Web:** React 19 + Vite + Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com) (Radix)
+- **QR (API):** `qr-code-styling-node` + `canvas`
+- **QR (Web):** `qr-code-styling` (preview en vivo)
+- **Gráficos:** Recharts (estadísticas de enlaces)
+- **Excel:** `xlsx` (importación masiva en enlaces)
 - **Infra:** Docker Compose en EC2, Nginx Proxy Manager en `dev.mali.pe`
 
 ### Frontend (admin `apps/web`)
@@ -208,7 +226,7 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 
 | Módulo | Ruta | Descripción |
 |--------|------|-------------|
-| `links` | `/links` | Enlaces cortos, QR y subida de archivos |
+| `links` | `/links` | Enlaces cortos, QR personalizable, carga masiva, estadísticas y subida de archivos |
 | `workspace_users` | `/admin/users` | Gestión de cuentas Google Workspace |
 | `s3_manager` | `/admin/s3` | Explorador de buckets y archivos en AWS |
 | `widget_educacion` | `/admin/widgets/educacion` | Mapa, selector, calendario, popup y aliados (educacion.mali.pe) |
@@ -217,6 +235,25 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | `pam_memberships` | `/admin/pam` | Planes, beneficios, registros y pagos PAM |
 
 Ver [docs/WIDGETS-EMBED.md](docs/WIDGETS-EMBED.md) para snippets iframe en sitios públicos.
+
+### API de enlaces (referencia rápida)
+
+| Método | Ruta | Uso |
+|--------|------|-----|
+| `POST` | `/api/links/shorten` | Acortar URL |
+| `POST` | `/api/links/whatsapp` | Enlace WhatsApp |
+| `POST` | `/api/links/upload` | Subir archivo a S3 |
+| `POST` | `/api/links/bulk/shorten` | Carga masiva URLs (JSON) |
+| `POST` | `/api/links/bulk/whatsapp` | Carga masiva WhatsApp |
+| `POST` | `/api/links/bulk/upload` | Carga masiva archivos (multipart) |
+| `GET` | `/api/links/:id/qr?format=png\|svg\|eps` | Descargar QR con estilo del enlace |
+| `PATCH` | `/api/links/:id/qr-style` | Guardar diseño QR (JSON o multipart con logo) |
+| `GET` | `/api/links/me/qr-default-style` | Leer estilo predeterminado del usuario |
+| `PUT` | `/api/links/me/qr-default-style` | Guardar estilo predeterminado |
+| `GET` | `/api/links/:id/stats?days=30` | Estadísticas de clicks |
+| `GET` | `/r/:slug` | Redirect público (registra click) |
+
+Presets de logo MALI: definidos en `packages/shared/src/qr-logo-presets.ts`.
 
 Los operadores solo ven en el menú los módulos que el super admin les habilita. La API también valida el acceso por módulo.
 
@@ -228,11 +265,19 @@ Los operadores solo ven en el menú los módulos que el super admin les habilita
 
 ### Migración de base de datos
 
-Tras desplegar, aplica la migración:
+Tras desplegar, aplica las migraciones:
 
 ```bash
 pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:widgets
 ```
 
+Migraciones recientes relevantes:
+
+- `20250705160000_qr_style_and_link_clicks` — campos `qrStyle` / `qrLogoKey` en enlaces, `qrDefaultStyle` en usuarios, tabla `LinkClick` para estadísticas.
+
 En Docker, al arrancar el contenedor `api` solo se aplican migraciones. El seed **no** corre por defecto (para no sobrescribir datos editados en el admin). Para un entorno vacío, define `WIDGET_SEED_ON_START=true` en `.env` o ejecuta el seed manualmente dentro del contenedor.
+
+### QR en Docker (API)
+
+La generación de QR en el servidor usa el paquete nativo `canvas`. La imagen actual (`node:20-alpine`) puede requerir librerías adicionales en producción (`libcairo`, `pango`, etc.). Si la descarga de QR falla en el contenedor, revisa los logs del servicio `api` y considera añadir esas dependencias al [Dockerfile de la API](infra/docker/Dockerfile.api) o usar una imagen base `node:20-bookworm-slim`.

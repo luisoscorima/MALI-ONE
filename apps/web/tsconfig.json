@@ -18,7 +18,8 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@mali-one/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["src"]

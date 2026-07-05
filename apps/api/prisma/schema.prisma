@@ -48,16 +48,17 @@ enum LinkType {
 }
 
 model User {
-  id         String      @id @default(cuid())
-  googleId   String      @unique
-  email      String      @unique
-  name       String
-  picture    String?
-  role         UserRole           @default(operator)
-  createdAt    DateTime           @default(now())
-  shortLinks   ShortLink[]
-  auditLogs    AdminAuditLog[]    @relation("ActorAuditLogs")
-  moduleAccess UserModuleAccess[]
+  id             String      @id @default(cuid())
+  googleId       String      @unique
+  email          String      @unique
+  name           String
+  picture        String?
+  role           UserRole           @default(operator)
+  qrDefaultStyle Json?
+  createdAt      DateTime           @default(now())
+  shortLinks     ShortLink[]
+  auditLogs      AdminAuditLog[]    @relation("ActorAuditLogs")
+  moduleAccess   UserModuleAccess[]
 }
 
 model UserModuleAccess {
@@ -82,21 +83,38 @@ model AdminAuditLog {
 }
 
 model ShortLink {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String      @id @default(cuid())
+  slug        String      @unique
   targetUrl   String
-  type        LinkType @default(URL)
+  type        LinkType    @default(URL)
   s3Key       String?
   fileName    String?
   mimeType    String?
+  qrStyle     Json?
+  qrLogoKey   String?
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  clickCount  Int      @default(0)
-  tags        String[] @default([])
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now())
+  clickCount  Int         @default(0)
+  tags        String[]    @default([])
+  clicks      LinkClick[]
 
   @@index([createdById])
   @@index([tags], type: Gin)
+}
+
+model LinkClick {
+  id         String    @id @default(cuid())
+  linkId     String
+  link       ShortLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  clickedAt  DateTime  @default(now())
+  userAgent  String?
+  deviceType String
+  os         String?
+  browser    String?
+
+  @@index([linkId, clickedAt])
+  @@index([linkId, deviceType])
 }
 
 model EducacionWidgetSettings {

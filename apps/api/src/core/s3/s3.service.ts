@@ -38,6 +38,15 @@ export class S3Service {
     return `uploads/${year}/${month}/${randomUUID()}-${safeName}`;
   }
 
+  buildQrLogoKey(linkId: string, fileName: string): string {
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `qr-logos/${linkId}/${randomUUID()}-${safeName}`;
+  }
+
+  getPublicUrl(key: string): string {
+    return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+  }
+
   async uploadFile(
     key: string,
     body: Buffer,

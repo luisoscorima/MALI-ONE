@@ -67,10 +67,11 @@ export function NavUser({ user, onLogout }: Props) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-            side={isMobile ? 'bottom' : 'right'}
-            align="end"
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 max-w-[calc(100vw-1rem)] rounded-lg"
+            side={isMobile ? 'top' : 'right'}
+            align={isMobile ? 'start' : 'end'}
             sideOffset={4}
+            collisionPadding={8}
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
@@ -95,15 +96,25 @@ export function NavUser({ user, onLogout }: Props) {
                 Super administrador
               </DropdownMenuItem>
             )}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Palette className="size-4" />
-                Color de interfaz
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-0 p-0">
-                <AccentThemeSwatches />
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
+            {isMobile ? (
+              <>
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <Palette className="size-3.5" />
+                  Color de interfaz
+                </div>
+                <AccentThemeSwatches className="justify-center px-3 pb-2" />
+              </>
+            ) : (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Palette className="size-4" />
+                  Color de interfaz
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="p-0" collisionPadding={8}>
+                  <AccentThemeSwatches />
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onLogout}>
               <LogOut className="size-4" />

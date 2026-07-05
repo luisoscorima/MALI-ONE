@@ -120,6 +120,47 @@ export const api = {
     });
   },
 
+  bulkShorten: (
+    items: Array<{ url: string; customSlug?: string; tags?: string[] }>,
+  ) =>
+    request<import('@mali-one/shared').BulkLinksResultDto>(
+      '/api/links/bulk/shorten',
+      {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      },
+    ),
+
+  bulkWhatsapp: (
+    items: Array<{
+      phone: string;
+      text?: string;
+      customSlug?: string;
+      tags?: string[];
+    }>,
+  ) =>
+    request<import('@mali-one/shared').BulkLinksResultDto>(
+      '/api/links/bulk/whatsapp',
+      {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      },
+    ),
+
+  bulkUpload: (files: File[]) => {
+    const form = new FormData();
+    for (const file of files) {
+      form.append('files', file);
+    }
+    return request<import('@mali-one/shared').BulkLinksResultDto>(
+      '/api/links/bulk/upload',
+      {
+        method: 'POST',
+        body: form,
+      },
+    );
+  },
+
   listLinks: (tag?: string) => {
     const params = new URLSearchParams();
     if (tag) params.set('tag', tag);
@@ -138,7 +179,57 @@ export const api = {
   deleteLink: (id: string) =>
     request(`/api/links/${id}`, { method: 'DELETE' }),
 
-  qrUrl: (id: string) => `/api/links/${id}/qr`,
+  getQrDefaultStyle: () =>
+    request<import('@mali-one/shared').QrStyleDto>(
+      '/api/links/me/qr-default-style',
+    ),
+
+  saveQrDefaultStyle: (style: import('@mali-one/shared').QrStyleDto) =>
+    request<import('@mali-one/shared').QrStyleDto>(
+      '/api/links/me/qr-default-style',
+      { method: 'PUT', body: JSON.stringify(style) },
+    ),
+
+  updateLinkQrStyle: (
+    id: string,
+    style: import('@mali-one/shared').QrStyleDto,
+    logoFile?: File,
+    saveAsDefault = false,
+  ) => {
+    const params = new URLSearchParams();
+    if (saveAsDefault) params.set('saveAsDefault', 'true');
+    const qs = params.toString();
+    if (logoFile) {
+      const form = new FormData();
+      form.append('payload', JSON.stringify(style));
+      form.append('logo', logoFile);
+      return request<import('@mali-one/shared').ShortLinkDto>(
+        `/api/links/${id}/qr-style${qs ? `?${qs}` : ''}`,
+        { method: 'PATCH', body: form },
+      );
+    }
+    return request<import('@mali-one/shared').ShortLinkDto>(
+      `/api/links/${id}/qr-style${qs ? `?${qs}` : ''}`,
+      { method: 'PATCH', body: JSON.stringify(style) },
+    );
+  },
+
+  removeLinkQrLogo: (id: string) =>
+    request<import('@mali-one/shared').ShortLinkDto>(
+      `/api/links/${id}/qr-logo`,
+      { method: 'DELETE' },
+    ),
+
+  getLinkStats: (id: string, days = 30) =>
+    request<import('@mali-one/shared').LinkStatsDto>(
+      `/api/links/${id}/stats?days=${days}`,
+    ),
+
+  qrUrl: (id: string, format: 'png' | 'svg' | 'eps' = 'png', width?: number) => {
+    const params = new URLSearchParams({ format });
+    if (width) params.set('width', String(width));
+    return `/api/links/${id}/qr?${params.toString()}`;
+  },
 
   async fetchLinkQrObjectUrl(id: string): Promise<string> {
     const res = await fetch(`${API_BASE}/api/links/${id}/qr`, {
