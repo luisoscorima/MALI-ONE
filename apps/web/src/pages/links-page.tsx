@@ -370,7 +370,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" className="w-fit" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Procesando...
@@ -413,7 +413,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" className="w-fit" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Procesando...
@@ -450,7 +450,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" disabled={submitting || !file}>
+            <Button type="submit" className="w-fit" disabled={submitting || !file}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Subiendo...
@@ -762,7 +762,7 @@ export function LinksPage() {
                 </p>
 
                 <div className="flex flex-wrap gap-2">
-                  <Button type="submit" disabled={editLink.saving}>
+                  <Button type="submit" className="w-fit" disabled={editLink.saving}>
                     {editLink.saving ? (
                       <span className="flex items-center gap-2">
                         <Spinner className="h-4 w-4" /> Guardando...

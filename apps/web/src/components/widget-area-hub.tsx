@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { ModuleCard } from '@/components/module-card';
 import type { WidgetAreaCatalog } from '@/lib/widget-catalog';
-import { Card } from '@/components/ui';
 
 type Props = {
   area: WidgetAreaCatalog;
@@ -15,35 +15,18 @@ export function WidgetAreaHub({ area }: Props) {
         <p className="mt-1 text-sm text-muted">{area.description}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {area.widgets.map((widget) => (
-          <Link
+          <ModuleCard
             key={widget.id}
             to={`${area.basePath}/${widget.path}`}
-            className="group block"
-          >
-            <Card className="h-full transition-colors hover:border-primary">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-lg bg-primary/15 p-2 text-primary">
-                    <widget.icon size={20} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{widget.label}</h3>
-                    <p className="text-xs text-muted">{widget.embedHost}</p>
-                  </div>
-                </div>
-                <ArrowRight
-                  size={18}
-                  className="text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-                />
-              </div>
-              <p className="text-sm text-muted">{widget.description}</p>
-              {widget.previewOnly && (
-                <p className="mt-2 text-xs text-muted">Solo vista previa</p>
-              )}
-            </Card>
-          </Link>
+            title={widget.label}
+            subtitle={widget.embedHost}
+            description={widget.description}
+            icon={widget.icon}
+            badge={widget.previewOnly ? 'Vista previa' : undefined}
+            accent="cyan"
+          />
         ))}
       </div>
     </div>

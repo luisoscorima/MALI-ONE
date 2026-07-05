@@ -1,5 +1,5 @@
 import { Inbox, Loader2 } from 'lucide-react';
-import { Skeleton } from '@/components/ui';
+import { Card, Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 export function Spinner({ className }: { className?: string }) {
@@ -8,6 +8,80 @@ export function Spinner({ className }: { className?: string }) {
       className={cn('h-5 w-5 animate-spin text-muted', className)}
       aria-hidden
     />
+  );
+}
+
+type PageLoadingVariant = 'default' | 'form' | 'table';
+
+export function PageLoading({
+  variant = 'default',
+}: {
+  variant?: PageLoadingVariant;
+}) {
+  return (
+    <div className="space-y-6" aria-busy aria-label="Cargando">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </div>
+
+      {variant === 'table' ? (
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-border p-4">
+            <Skeleton className="h-9 w-full max-w-xs" />
+          </div>
+          <div className="divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex gap-4 p-4">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-4 w-1/5" />
+                <Skeleton className="ml-auto h-4 w-16" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
+        <Card className="space-y-4 p-5">
+          {variant === 'form' ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-9 w-full" />
+                  </div>
+                ))}
+              </div>
+              <Skeleton className="h-9 w-32" />
+            </>
+          ) : (
+            <>
+              <Skeleton className="h-5 w-40" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                ))}
+              </div>
+            </>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/** Pantalla completa centrada (auth, login). */
+export function FullPageLoading() {
+  return (
+    <div
+      className="flex min-h-screen flex-col items-center justify-center gap-3"
+      aria-busy
+      aria-label="Cargando"
+    >
+      <Spinner className="h-7 w-7 text-primary" />
+      <p className="text-sm text-muted-foreground">Cargando…</p>
+    </div>
   );
 }
 

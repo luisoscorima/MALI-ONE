@@ -2,17 +2,14 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/lib/api';
 import { MaliLogo } from '@/components/mali-logo';
+import { FullPageLoading } from '@/components/feedback';
 import { Button, Card } from '@/components/ui';
 
 export function LoginPage() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-muted">
-        Cargando...
-      </div>
-    );
+    return <FullPageLoading />;
   }
 
   if (user) {

@@ -3,7 +3,7 @@ import type {
   BibliotecaCarouselItemDto,
   BibliotecaCarouselSettingsDto,
 } from '@mali-one/shared';
-import { Spinner } from '@/components/feedback';
+import { PageLoading } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
@@ -158,7 +158,7 @@ export function WidgetBibliotecaCarruselPage() {
     }
   }
 
-  if (loading || !settings) return <Spinner className="mx-auto mt-12" />;
+  if (loading || !settings) return <PageLoading variant="form" />;
 
   const config = (
     <div className="space-y-4">

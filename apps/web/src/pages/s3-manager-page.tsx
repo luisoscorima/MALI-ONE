@@ -15,7 +15,8 @@ import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format-bytes';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { AlertBanner, EmptyState, Spinner } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/page-header';
 import {
   Breadcrumb,
@@ -202,9 +203,13 @@ export function S3ManagerPage() {
             Buckets
           </p>
           {loadingBuckets ? (
-            <div className="flex justify-center py-6">
-              <Spinner />
-            </div>
+            <ul className="space-y-2 px-1">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li key={i}>
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                </li>
+              ))}
+            </ul>
           ) : (
             <ul className="space-y-1">
               {buckets.map((b) => (
@@ -286,11 +291,7 @@ export function S3ManagerPage() {
               </TableHeader>
               <TableBody>
                 {loadingObjects && items.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="p-8 text-center text-muted">
-                      <Spinner className="mx-auto" />
-                    </TableCell>
-                  </TableRow>
+                  <TableSkeleton rows={5} cols={4} />
                 ) : filteredItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4}>

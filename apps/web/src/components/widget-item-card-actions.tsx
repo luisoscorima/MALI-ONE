@@ -16,7 +16,7 @@ export function WidgetItemCardActions({
 }) {
   return (
     <>
-      <IconActionButton label="Guardar" onClick={onSave}>
+      <IconActionButton label="Guardar" variant="default" onClick={onSave}>
         <Save className="size-4" />
       </IconActionButton>
       {onDuplicate && (

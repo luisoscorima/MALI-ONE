@@ -1,8 +1,9 @@
-import { Spinner } from '@/components/feedback';
+import { PageLoading } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
-import { Button, Card, Input } from '@/components/ui';
+import { Card, Input } from '@/components/ui';
+import { WidgetSaveButton } from '@/components/widget-item-card-actions';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 
@@ -20,7 +21,7 @@ export function WidgetEducacionCalendarioPage() {
   const area = WIDGET_AREAS.educacion;
 
   if (loading || !state) {
-    return <Spinner className="mx-auto mt-12" />;
+    return <PageLoading variant="form" />;
   }
 
   const config = (
@@ -48,9 +49,9 @@ export function WidgetEducacionCalendarioPage() {
           }
         />
       </div>
-      <Button onClick={() => void saveSettings()} disabled={saving}>
+      <WidgetSaveButton onClick={() => void saveSettings()} disabled={saving}>
         Guardar calendario
-      </Button>
+      </WidgetSaveButton>
     </Card>
   );
 

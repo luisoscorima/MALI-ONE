@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MuseoPopupSettingsDto } from '@mali-one/shared';
-import { Spinner } from '@/components/feedback';
+import { PageLoading } from '@/components/feedback';
 import {
   PopupSettingsFields,
   PopupVisualPreview,
@@ -8,7 +8,8 @@ import {
 } from '@/components/popup-settings-panel';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
-import { Button, Card } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { WidgetSaveButton } from '@/components/widget-item-card-actions';
 import { api } from '@/lib/api';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -52,7 +53,7 @@ export function WidgetMuseoPopupPage() {
   }
 
   if (loading || !popup) {
-    return <Spinner className="mx-auto mt-12" />;
+    return <PageLoading variant="form" />;
   }
 
   const config = (
@@ -62,7 +63,7 @@ export function WidgetMuseoPopupPage() {
         onChange={(patch) => setPopup({ ...popup, ...patch })}
         siteLabel="mali.pe/es"
       />
-      <Button onClick={() => void savePopup()}>Guardar popup</Button>
+      <WidgetSaveButton onClick={() => void savePopup()}>Guardar popup</WidgetSaveButton>
     </>
   );
 

@@ -341,7 +341,7 @@ export function AdminUsersPage() {
               required
             />
             <div className="flex gap-2 md:col-span-2">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" className="w-fit" disabled={submitting}>
                 {submitting ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="h-4 w-4" /> Guardando...
@@ -401,7 +401,7 @@ export function AdminUsersPage() {
               minLength={8}
             />
             <div className="flex gap-2 md:col-span-2">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" className="w-fit" disabled={submitting}>
                 {submitting ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="h-4 w-4" /> Guardando...

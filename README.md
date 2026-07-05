@@ -12,8 +12,20 @@ Sistema de operaciones internas (backoffice) para **mali.pe**.
 ## Stack
 
 - **API:** NestJS + Prisma + PostgreSQL + Redis
-- **Web:** React + Vite + Tailwind
+- **Web:** React 19 + Vite + Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com) (Radix)
 - **Infra:** Docker Compose en EC2, Nginx Proxy Manager en `dev.mali.pe`
+
+### Frontend (admin `apps/web`)
+
+Interfaz oscura MALI ONE basada en shadcn/ui:
+
+- **Componentes:** button, input, card, table, dialog, tabs, sheet, select, breadcrumb, tooltip, sonner, etc. en `apps/web/src/components/ui/`
+- **Notificaciones:** Sonner (reemplaza el toast custom anterior)
+- **Confirmaciones:** `useConfirm()` con Alert Dialog
+- **Patrones UX:** `ModuleCard` en dashboard y hubs de widgets, `PageLoading` / `TableSkeleton` para estados de carga, acciones con iconos + tooltip, botones de guardado compactos (`WidgetSaveButton`)
+- **Navegación:** sidebar agrupado por secciones (General, Operaciones, Widgets, Administración)
+
+Los iframes embebidos en sitios públicos viven en `apps/web/public/widgets/` y no forman parte del admin.
 
 ## Desarrollo local
 

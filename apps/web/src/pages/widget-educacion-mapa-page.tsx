@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { MapPin } from 'lucide-react';
 import type { EducacionDistrictDto, EducacionSedeDto } from '@mali-one/shared';
-import { Spinner } from '@/components/feedback';
+import { PageLoading } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
@@ -127,7 +127,7 @@ export function WidgetEducacionMapaPage() {
   }
 
   if (loading || !state) {
-    return <Spinner className="mx-auto mt-12" />;
+    return <PageLoading variant="form" />;
   }
 
   const contactFields = [

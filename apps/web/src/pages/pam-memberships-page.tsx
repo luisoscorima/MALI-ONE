@@ -5,7 +5,7 @@ import type {
   PamRegistrationDto,
   UpdatePamRegistrationDto,
 } from '@mali-one/shared';
-import { Spinner } from '@/components/feedback';
+import { PageLoading } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
@@ -311,6 +311,7 @@ function RegistrationRow({
                 <div className="flex items-center gap-1">
                   <IconActionButton
                     label={saving ? 'Guardando…' : 'Guardar cambios'}
+                    variant="default"
                     onClick={() => void onSave()}
                     disabled={saving}
                   >
@@ -560,7 +561,7 @@ export function PamMembershipsPage() {
     }
   }
 
-  if (loading || !state) return <Spinner className="mx-auto mt-12" />;
+  if (loading || !state) return <PageLoading variant="table" />;
 
   const config = (
     <div className="space-y-6">

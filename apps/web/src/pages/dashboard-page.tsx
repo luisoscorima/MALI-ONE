@@ -1,24 +1,35 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, GraduationCap, HardDrive, Heart, KeyRound, Landmark, Link2, Users } from 'lucide-react';
+import { BookOpen, GraduationCap, HardDrive, Heart, KeyRound, Landmark, Link2, Users } from 'lucide-react';
 import { APP_MODULES } from '@/lib/app-modules';
 import { useAuth } from '@/contexts/auth-context';
 import { EmptyState } from '@/components/feedback';
+import { ModuleCard } from '@/components/module-card';
 import { PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui';
 import { hasModule } from '@/lib/user-modules';
 
-const moduleRoutes: Record<
+const moduleMeta: Record<
   (typeof APP_MODULES)[number]['id'],
-  { to: string; icon: typeof Link2 }
+  {
+    to: string;
+    icon: typeof Link2;
+    accent: 'blue' | 'violet' | 'emerald' | 'amber' | 'rose' | 'cyan';
+    group: 'operaciones' | 'widgets' | 'herramientas';
+  }
 > = {
-  links: { to: '/links', icon: Link2 },
-  workspace_users: { to: '/admin/users', icon: Users },
-  s3_manager: { to: '/admin/s3', icon: HardDrive },
-  password_vault: { to: '/vault', icon: KeyRound },
-  widget_educacion: { to: '/admin/widgets/educacion', icon: GraduationCap },
-  widget_biblioteca: { to: '/admin/widgets/biblioteca', icon: BookOpen },
-  widget_museo: { to: '/admin/widgets/museo', icon: Landmark },
-  pam_memberships: { to: '/admin/pam', icon: Heart },
+  links: { to: '/links', icon: Link2, accent: 'blue', group: 'operaciones' },
+  workspace_users: { to: '/admin/users', icon: Users, accent: 'violet', group: 'operaciones' },
+  s3_manager: { to: '/admin/s3', icon: HardDrive, accent: 'emerald', group: 'operaciones' },
+  password_vault: { to: '/vault', icon: KeyRound, accent: 'amber', group: 'herramientas' },
+  widget_educacion: { to: '/admin/widgets/educacion', icon: GraduationCap, accent: 'cyan', group: 'widgets' },
+  widget_biblioteca: { to: '/admin/widgets/biblioteca', icon: BookOpen, accent: 'blue', group: 'widgets' },
+  widget_museo: { to: '/admin/widgets/museo', icon: Landmark, accent: 'violet', group: 'widgets' },
+  pam_memberships: { to: '/admin/pam', icon: Heart, accent: 'rose', group: 'widgets' },
+};
+
+const groupLabels: Record<string, string> = {
+  operaciones: 'Operaciones',
+  widgets: 'Widgets y sitios',
+  herramientas: 'Herramientas',
 };
 
 export function DashboardPage() {
@@ -27,9 +38,11 @@ export function DashboardPage() {
   const cards = APP_MODULES.filter((mod) => hasModule(user, mod.id)).map(
     (mod) => ({
       ...mod,
-      ...moduleRoutes[mod.id],
+      ...moduleMeta[mod.id],
     }),
   );
+
+  const groups = ['operaciones', 'widgets', 'herramientas'] as const;
 
   return (
     <div>
@@ -50,26 +63,30 @@ export function DashboardPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {cards.map((card) => (
-            <Link key={card.to} to={card.to} className="group block">
-              <Card className="h-full transition-colors hover:border-primary">
-                <div className="mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/15 p-2 text-primary">
-                      <card.icon size={20} />
-                    </div>
-                    <h3 className="font-semibold">{card.label}</h3>
-                  </div>
-                  <ArrowRight
-                    size={18}
-                    className="text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-                  />
+        <div className="space-y-8">
+          {groups.map((group) => {
+            const groupCards = cards.filter((c) => c.group === group);
+            if (groupCards.length === 0) return null;
+            return (
+              <section key={group}>
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {groupLabels[group]}
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {groupCards.map((card) => (
+                    <ModuleCard
+                      key={card.to}
+                      to={card.to}
+                      title={card.label}
+                      description={card.description}
+                      icon={card.icon}
+                      accent={card.accent}
+                    />
+                  ))}
                 </div>
-                <p className="text-sm text-muted">{card.description}</p>
-              </Card>
-            </Link>
-          ))}
+              </section>
+            );
+          })}
         </div>
       )}
     </div>

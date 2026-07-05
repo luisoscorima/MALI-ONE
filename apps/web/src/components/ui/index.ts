@@ -102,4 +102,5 @@ export {
 } from './dropdown-menu';
 export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from './popover';
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+export { Toaster } from './sonner';
 export { Card, SettingSwitchRow, SettingSwitchInline } from './mali-wrappers';
