@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import type { QrLogoPresetId, QrStyleDto } from '@mali-one/shared';
 import {
   DEFAULT_QR_STYLE,
@@ -24,9 +24,19 @@ interface QrDesignerPanelProps {
   compact?: boolean;
   draftLogoFile?: File | null;
   onDraftLogoFileChange?: (file: File | null) => void;
+  savedStyle?: QrStyleDto;
+  initialPreview?: string | null;
 }
 
-export function QrDesignerPanel({
+function qrStylesEqual(a: QrStyleDto, b: QrStyleDto) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function isBlobPreviewUrl(url: string | null) {
+  return Boolean(url?.startsWith('blob:'));
+}
+
+export const QrDesignerPanel = memo(function QrDesignerPanel({
   shortUrl,
   style,
   onChange,
@@ -35,35 +45,65 @@ export function QrDesignerPanel({
   compact,
   draftLogoFile,
   onDraftLogoFileChange,
+  savedStyle,
+  initialPreview,
 }: QrDesignerPanelProps) {
   const toast = useToast();
   const previewSize = compact ? 200 : 260;
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewError, setPreviewError] = useState('');
   const [internalLogoFile, setInternalLogoFile] = useState<File | null>(null);
   const customLogoFile = draftLogoFile !== undefined ? draftLogoFile : internalLogoFile;
   const setCustomLogoFile = onDraftLogoFileChange ?? setInternalLogoFile;
+  const usesSavedStyle =
+    Boolean(linkId) &&
+    Boolean(savedStyle) &&
+    !customLogoFile &&
+    qrStylesEqual(style, savedStyle!);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(() =>
+    usesSavedStyle && initialPreview ? initialPreview : null,
+  );
+  const [previewLoading, setPreviewLoading] = useState(
+    () => !(usesSavedStyle && initialPreview),
+  );
+  const [previewError, setPreviewError] = useState('');
   const [useGradient, setUseGradient] = useState(Boolean(style.foregroundGradient));
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (usesSavedStyle && initialPreview) {
+      setPreviewUrl((prev) => {
+        if (prev === initialPreview) return prev;
+        if (prev && isBlobPreviewUrl(prev)) URL.revokeObjectURL(prev);
+        return initialPreview;
+      });
+      setPreviewLoading(false);
+      setPreviewError('');
+      return;
+    }
+
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
-      setPreviewLoading(true);
+      setPreviewLoading((prev) => prev || !previewUrl);
       setPreviewError('');
-      void api
-        .fetchQrPreview(shortUrl, style, {
-          linkId,
-          logoFile: customLogoFile ?? undefined,
-          signal: ctrl.signal,
-          width: previewSize,
-        })
+
+      const request =
+        usesSavedStyle && linkId
+          ? api.fetchLinkQrBlob(linkId, {
+              width: previewSize,
+              signal: ctrl.signal,
+            })
+          : api.fetchQrPreview(shortUrl, style, {
+              linkId,
+              logoFile: customLogoFile ?? undefined,
+              signal: ctrl.signal,
+              width: previewSize,
+            });
+
+      void request
         .then((blob) => {
           const url = URL.createObjectURL(blob);
           setPreviewUrl((prev) => {
-            if (prev) URL.revokeObjectURL(prev);
+            if (prev && isBlobPreviewUrl(prev)) URL.revokeObjectURL(prev);
             return url;
           });
         })
@@ -77,17 +117,26 @@ export function QrDesignerPanel({
         .finally(() => {
           if (!ctrl.signal.aborted) setPreviewLoading(false);
         });
-    }, 250);
+    }, usesSavedStyle ? 0 : 350);
 
     return () => {
       window.clearTimeout(timer);
       ctrl.abort();
     };
-  }, [shortUrl, style, customLogoFile, linkId, previewSize]);
+  }, [
+    shortUrl,
+    style,
+    customLogoFile,
+    linkId,
+    previewSize,
+    savedStyle,
+    initialPreview,
+    usesSavedStyle,
+  ]);
 
   useEffect(() => {
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrl && isBlobPreviewUrl(previewUrl)) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
 
@@ -425,7 +474,7 @@ export function QrDesignerPanel({
       </div>
     </div>
   );
-}
+});
 
 function Section({
   title,

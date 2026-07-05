@@ -432,6 +432,7 @@ export class LinksService {
       qrLogoKey,
       width,
       logoOverride,
+      { minRenderWidth: 280 },
     );
   }
 

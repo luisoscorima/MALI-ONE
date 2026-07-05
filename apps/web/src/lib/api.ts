@@ -279,8 +279,19 @@ export const api = {
   },
 
   async fetchLinkQrObjectUrl(id: string): Promise<string> {
-    const res = await fetch(`${API_BASE}/api/links/${id}/qr`, {
+    const blob = await api.fetchLinkQrBlob(id);
+    return URL.createObjectURL(blob);
+  },
+
+  async fetchLinkQrBlob(
+    id: string,
+    options?: { width?: number; signal?: AbortSignal },
+  ): Promise<Blob> {
+    const params = new URLSearchParams({ format: 'png' });
+    if (options?.width) params.set('width', String(options.width));
+    const res = await fetch(`${API_BASE}/api/links/${id}/qr?${params}`, {
       credentials: 'include',
+      signal: options?.signal,
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ message: res.statusText }));
@@ -288,8 +299,7 @@ export const api = {
         typeof error.message === 'string' ? error.message : 'No se pudo generar el QR',
       );
     }
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
+    return res.blob();
   },
 
   listS3Buckets: () =>

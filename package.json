@@ -11,5 +11,10 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "patchedDependencies": {
+      "@loskir/styled-qr-code-node@2.0.0": "patches/@loskir__styled-qr-code-node@2.0.0.patch"
+    }
+  }
 }

@@ -1,0 +1,44 @@
+diff --git a/dist/index.js b/dist/index.js
+index 3b13c604409ab8914224842986740a46008677e3..e4a07d5073012cdf820bab03a60486927e1bcdb2 100644
+--- a/dist/index.js
++++ b/dist/index.js	
+@@ -753,7 +753,7 @@ var QRCanvas = class {
+     this.drawBackground();
+     this.drawDots((i, j) => {
+       if (this._options.imageOptions.hideBackgroundDots) {
+-        if (j >= (count - drawImageSize.hideXDots) / 2 && j < (count + drawImageSize.hideXDots) / 2 && i >= (count - drawImageSize.hideYDots) / 2 && i < (count + drawImageSize.hideYDots) / 2) {
++        if (i >= (count - drawImageSize.hideXDots) / 2 && i < (count + drawImageSize.hideXDots) / 2 && j >= (count - drawImageSize.hideYDots) / 2 && j < (count + drawImageSize.hideYDots) / 2) {
+           return false;
+         }
+       }
+@@ -826,7 +826,7 @@ var QRCanvas = class {
+         dot.draw(x, y, dotSize, (xOffset, yOffset) => {
+           if (j + xOffset < 0 || i + yOffset < 0 || j + xOffset >= count || i + yOffset >= count)
+             return false;
+-          if (filter && !filter(j + xOffset, i + yOffset))
++          if (filter && !filter(i + yOffset, j + xOffset))
+             return false;
+           return !!this._qr && this._qr.isDark(i + yOffset, j + xOffset);
+         });
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 227976935c70804929f6e5f1279a57ad57f7f077..ab89e218e5183a79f33dc23de38b0510aae287f4 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs	
+@@ -713,7 +713,7 @@ var QRCanvas = class {
+     this.drawBackground();
+     this.drawDots((i, j) => {
+       if (this._options.imageOptions.hideBackgroundDots) {
+-        if (j >= (count - drawImageSize.hideXDots) / 2 && j < (count + drawImageSize.hideXDots) / 2 && i >= (count - drawImageSize.hideYDots) / 2 && i < (count + drawImageSize.hideYDots) / 2) {
++        if (i >= (count - drawImageSize.hideXDots) / 2 && i < (count + drawImageSize.hideXDots) / 2 && j >= (count - drawImageSize.hideYDots) / 2 && j < (count + drawImageSize.hideYDots) / 2) {
+           return false;
+         }
+       }
+@@ -786,7 +786,7 @@ var QRCanvas = class {
+         dot.draw(x, y, dotSize, (xOffset, yOffset) => {
+           if (j + xOffset < 0 || i + yOffset < 0 || j + xOffset >= count || i + yOffset >= count)
+             return false;
+-          if (filter && !filter(j + xOffset, i + yOffset))
++          if (filter && !filter(i + yOffset, j + xOffset))
+             return false;
+           return !!this._qr && this._qr.isDark(i + yOffset, j + xOffset);
+         });

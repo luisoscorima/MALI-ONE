@@ -1,10 +1,8 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { BarChart3, Copy, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { FilterChip, IconActionButton } from '@/components/icon-action-button';
-import { LinkStatsPanel } from '@/components/link-stats-panel';
-import { QrDesignerPanel } from '@/components/qr-designer-panel';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
 import {
@@ -38,6 +36,17 @@ import {
   TabsTrigger,
   Textarea,
 } from '@/components/ui';
+
+const QrDesignerPanel = lazy(() =>
+  import('@/components/qr-designer-panel').then((m) => ({
+    default: m.QrDesignerPanel,
+  })),
+);
+const LinkStatsPanel = lazy(() =>
+  import('@/components/link-stats-panel').then((m) => ({
+    default: m.LinkStatsPanel,
+  })),
+);
 
 type Tab = 'url' | 'file' | 'whatsapp';
 
@@ -93,6 +102,9 @@ export function LinksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [qrModalLink, setQrModalLink] = useState<ShortLinkDto | null>(null);
+  const [qrModalSavedStyle, setQrModalSavedStyle] = useState<QrStyleDto | null>(
+    null,
+  );
   const [editLink, setEditLink] = useState<EditLinkState | null>(null);
   const [statsLink, setStatsLink] = useState<ShortLinkDto | null>(null);
   const [defaultQrStyle, setDefaultQrStyle] = useState<QrStyleDto>({
@@ -113,11 +125,13 @@ export function LinksPage() {
   }, [loadDefaultQrStyle]);
 
   function openQrDesigner(link: ShortLinkDto) {
+    setQrModalSavedStyle(link.qrStyle ?? defaultQrStyle);
     setQrModalLink(link);
   }
 
   function closeQrDesigner() {
     setQrModalLink(null);
+    setQrModalSavedStyle(null);
   }
 
   const loadLinks = useCallback(async () => {
@@ -308,6 +322,7 @@ export function LinksPage() {
 
   function handleQrSaved(updated: ShortLinkDto) {
     setQrModalLink(updated);
+    setQrModalSavedStyle(updated.qrStyle ?? defaultQrStyle);
     void loadLinks();
   }
 
@@ -771,17 +786,28 @@ export function LinksPage() {
 
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
             {qrModalLink && (
-              <QrDesignerPanel
-                shortUrl={qrModalLink.shortUrl}
-                style={qrModalLink.qrStyle ?? defaultQrStyle}
-                onChange={(style) =>
-                  setQrModalLink((current) =>
-                    current ? { ...current, qrStyle: style } : null,
-                  )
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center py-16">
+                    <Spinner className="size-6" />
+                  </div>
                 }
-                linkId={qrModalLink.id}
-                onSaved={handleQrSaved}
-              />
+              >
+                <QrDesignerPanel
+                  key={qrModalLink.id}
+                  shortUrl={qrModalLink.shortUrl}
+                  style={qrModalLink.qrStyle ?? defaultQrStyle}
+                  savedStyle={qrModalSavedStyle ?? defaultQrStyle}
+                  initialPreview={qrModalLink.qrBase64}
+                  onChange={(style) =>
+                    setQrModalLink((current) =>
+                      current ? { ...current, qrStyle: style } : null,
+                    )
+                  }
+                  linkId={qrModalLink.id}
+                  onSaved={handleQrSaved}
+                />
+              </Suspense>
             )}
           </div>
         </DialogContent>
@@ -802,7 +828,15 @@ export function LinksPage() {
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
             {statsLink && (
-              <LinkStatsPanel linkId={statsLink.id} slug={statsLink.slug} />
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center py-16">
+                    <Spinner className="size-6" />
+                  </div>
+                }
+              >
+                <LinkStatsPanel linkId={statsLink.id} slug={statsLink.slug} />
+              </Suspense>
             )}
           </div>
         </DialogContent>

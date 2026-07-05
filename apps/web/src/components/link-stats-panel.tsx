@@ -1,17 +1,15 @@
-import { useEffect, useState } from 'react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { LinkStatsDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { getCachedLinkStats, setCachedLinkStats } from '@/lib/stats-cache';
 import { Spinner } from '@/components/feedback';
 import { Button, Card } from '@/components/ui';
+
+const LinkStatsChart = lazy(() =>
+  import('@/components/link-stats-chart').then((m) => ({
+    default: m.LinkStatsChart,
+  })),
+);
 
 interface LinkStatsPanelProps {
   linkId: string;
@@ -26,12 +24,23 @@ export function LinkStatsPanel({ linkId, slug }: LinkStatsPanelProps) {
 
   useEffect(() => {
     let cancelled = false;
+    const cached = getCachedLinkStats(linkId, days);
+    if (cached) {
+      setStats(cached);
+      setLoading(false);
+      setError('');
+      return;
+    }
+
     setLoading(true);
     setError('');
     void api
       .getLinkStats(linkId, days)
       .then((data) => {
-        if (!cancelled) setStats(data);
+        if (!cancelled) {
+          setCachedLinkStats(linkId, days, data);
+          setStats(data);
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -102,35 +111,18 @@ export function LinkStatsPanel({ linkId, slug }: LinkStatsPanelProps) {
 
       <Card className="p-4">
         <h4 className="mb-4 text-sm font-medium">Actividad por día</h4>
-        <div className="h-52 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis
-                dataKey="label"
-                tick={{ fontSize: 11 }}
-                interval="preserveStartEnd"
-              />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
-              <Tooltip
-                labelFormatter={(_, payload) =>
-                  payload?.[0]?.payload?.date ?? ''
-                }
-              />
-              <Line
-                type="monotone"
-                dataKey="count"
-                name="Clicks"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        <Suspense
+          fallback={
+            <div className="flex h-52 items-center justify-center">
+              <Spinner className="size-5" />
+            </div>
+          }
+        >
+          <LinkStatsChart data={chartData} />
+        </Suspense>
       </Card>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatsTable title="Dispositivos" rows={stats.devices} pct={pct} />
         <StatsTable
           title="Navegadores"

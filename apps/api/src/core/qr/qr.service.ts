@@ -37,6 +37,7 @@ export class QrService {
     qrLogoKey?: string | null,
     width = 512,
     logoOverride?: { buffer: Buffer; mimeType: string },
+    options?: { minRenderWidth?: number },
   ): Promise<Buffer> {
     const logoOverrideUrl = logoOverride
       ? `data:${logoOverride.mimeType};base64,${logoOverride.buffer.toString('base64')}`
@@ -48,6 +49,7 @@ export class QrService {
       'png',
       width,
       logoOverrideUrl,
+      options?.minRenderWidth ?? 512,
     );
   }
 
@@ -143,12 +145,14 @@ export class QrService {
     format: 'png' | 'svg',
     width: number,
     logoOverrideUrl?: string,
+    minPngWidth = 512,
   ): Promise<Buffer> {
+    const renderWidth = format === 'png' ? Math.max(width, minPngWidth) : width;
     const qr = this.buildQrInstance(
       url,
       style,
       qrLogoKey,
-      width,
+      renderWidth,
       logoOverrideUrl,
     );
     return qr.toBuffer(format);
