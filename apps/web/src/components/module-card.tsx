@@ -1,44 +1,10 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, type LucideIcon } from 'lucide-react';
+import {
+  moduleCardAccentStyles,
+  type ModuleCardAccent,
+} from '@/lib/module-card-accents';
 import { cn } from '@/lib/utils';
-
-type ModuleCardAccent = 'blue' | 'violet' | 'emerald' | 'amber' | 'rose' | 'cyan';
-
-const accentStyles: Record<
-  ModuleCardAccent,
-  { icon: string; ring: string; glow: string }
-> = {
-  blue: {
-    icon: 'bg-primary/20 text-primary',
-    ring: 'group-hover:ring-primary/40',
-    glow: 'group-hover:shadow-primary/10',
-  },
-  violet: {
-    icon: 'bg-violet-500/20 text-violet-400',
-    ring: 'group-hover:ring-violet-500/40',
-    glow: 'group-hover:shadow-violet-500/10',
-  },
-  emerald: {
-    icon: 'bg-emerald-500/20 text-emerald-400',
-    ring: 'group-hover:ring-emerald-500/40',
-    glow: 'group-hover:shadow-emerald-500/10',
-  },
-  amber: {
-    icon: 'bg-amber-500/20 text-amber-400',
-    ring: 'group-hover:ring-amber-500/40',
-    glow: 'group-hover:shadow-amber-500/10',
-  },
-  rose: {
-    icon: 'bg-rose-500/20 text-rose-400',
-    ring: 'group-hover:ring-rose-500/40',
-    glow: 'group-hover:shadow-rose-500/10',
-  },
-  cyan: {
-    icon: 'bg-cyan-500/20 text-cyan-400',
-    ring: 'group-hover:ring-cyan-500/40',
-    glow: 'group-hover:shadow-cyan-500/10',
-  },
-};
 
 type Props = {
   to: string;
@@ -59,7 +25,7 @@ export function ModuleCard({
   subtitle,
   badge,
 }: Props) {
-  const styles = accentStyles[accent];
+  const styles = moduleCardAccentStyles[accent];
 
   return (
     <Link to={to} className="group block h-full">
@@ -83,7 +49,7 @@ export function ModuleCard({
           </div>
           <ArrowRight
             size={18}
-            className="mt-1 shrink-0 text-muted transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground"
+            className="mt-1 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground"
           />
         </div>
 
@@ -107,3 +73,5 @@ export function ModuleCard({
     </Link>
   );
 }
+
+export type { ModuleCardAccent };

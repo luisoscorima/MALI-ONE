@@ -53,7 +53,7 @@ export function DashboardPage() {
                     title: card.label,
                     description: card.description,
                     icon: card.icon,
-                    groupLabel: groupLabels[group],
+                    accent: card.accent,
                   }))}
                 />
               </section>
