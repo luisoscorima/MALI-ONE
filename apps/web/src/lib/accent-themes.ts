@@ -63,6 +63,13 @@ export const accentThemes: AccentTheme[] = [
 
 export const defaultAccentThemeId: AccentThemeId = 'neutral';
 
+/** Colores decorativos del fondo del login (esmeralda, violeta, azul). */
+export const loginAmbientColors = {
+  emerald: accentThemes.find((t) => t.id === 'emerald')!.primary,
+  violet: accentThemes.find((t) => t.id === 'violet')!.primary,
+  blue: accentThemes.find((t) => t.id === 'blue')!.primary,
+} as const;
+
 export function getAccentTheme(id: AccentThemeId): AccentTheme {
   return accentThemes.find((t) => t.id === id) ?? accentThemes[0];
 }
@@ -79,6 +86,13 @@ export function readStoredAccentTheme(): AccentThemeId {
     /* localStorage no disponible */
   }
   return defaultAccentThemeId;
+}
+
+export function applyLoginAmbientColors() {
+  const root = document.documentElement;
+  root.style.setProperty('--login-ambient-emerald', loginAmbientColors.emerald);
+  root.style.setProperty('--login-ambient-violet', loginAmbientColors.violet);
+  root.style.setProperty('--login-ambient-blue', loginAmbientColors.blue);
 }
 
 export function applyAccentTheme(id: AccentThemeId) {

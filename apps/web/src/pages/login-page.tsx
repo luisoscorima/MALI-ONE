@@ -27,7 +27,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-shell relative flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+    <div className="login-shell relative flex h-svh max-h-svh flex-col items-center justify-center gap-6 overflow-hidden bg-muted p-6 md:p-10">
       {redirecting && (
         <div
           className="login-progress-track"
@@ -40,9 +40,10 @@ export function LoginPage() {
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-0" aria-hidden>
-        <div className="login-ambient login-ambient-a" />
-        <div className="login-ambient login-ambient-b" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="login-ambient login-ambient-emerald" />
+        <div className="login-ambient login-ambient-violet" />
+        <div className="login-ambient login-ambient-blue" />
         <div className="login-grid-overlay" />
       </div>
 

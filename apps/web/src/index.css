@@ -60,6 +60,9 @@
 .dark {
   --background: #0f1419;
   --foreground: #f4f4f5;
+  --login-ambient-emerald: #34d399;
+  --login-ambient-violet: #a78bfa;
+  --login-ambient-blue: #3b82f6;
   --card: #1a1f26;
   --card-foreground: #f4f4f5;
   --popover: #1a1f26;
@@ -131,27 +134,39 @@ body {
   }
 }
 
-@keyframes login-ambient-drift {
+@keyframes login-ambient-drift-emerald {
   0%,
   100% {
     transform: translate(0, 0) scale(1);
-    opacity: 0.45;
+    opacity: 0.4;
   }
   50% {
-    transform: translate(2%, -3%) scale(1.06);
-    opacity: 0.65;
+    transform: translate(3%, 2%) scale(1.05);
+    opacity: 0.55;
   }
 }
 
-@keyframes login-ambient-drift-alt {
+@keyframes login-ambient-drift-violet {
   0%,
   100% {
     transform: translate(0, 0) scale(1);
-    opacity: 0.35;
+    opacity: 0.38;
   }
   50% {
-    transform: translate(-3%, 2%) scale(1.08);
-    opacity: 0.55;
+    transform: translate(-2%, 3%) scale(1.04);
+    opacity: 0.52;
+  }
+}
+
+@keyframes login-ambient-drift-blue {
+  0%,
+  100% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 0.42;
+  }
+  50% {
+    transform: translate(-50%, -2%) scale(1.05);
+    opacity: 0.58;
   }
 }
 
@@ -203,30 +218,57 @@ body {
   animation: login-card-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.login-card-interactive {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.login-card-interactive:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+  box-shadow:
+    0 16px 32px -16px color-mix(in srgb, var(--primary) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.login-card-interactive:has(.login-google-btn:hover) {
+  transform: translateY(-2px);
+}
+
 .login-ambient {
   position: absolute;
   border-radius: 9999px;
   filter: blur(80px);
 }
 
-.login-ambient-a {
+.login-ambient-emerald {
   top: -12%;
-  left: 50%;
-  height: 28rem;
-  width: 28rem;
-  --tw-translate-x: -50%;
-  transform: translateX(-50%);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  animation: login-ambient-drift 9s ease-in-out infinite;
+  left: -8%;
+  height: min(26rem, 65vw);
+  width: min(26rem, 65vw);
+  background: color-mix(in srgb, var(--login-ambient-emerald) 16%, transparent);
+  animation: login-ambient-drift-emerald 10s ease-in-out infinite;
 }
 
-.login-ambient-b {
-  right: -8%;
+.login-ambient-violet {
+  top: 5%;
+  right: -10%;
+  height: min(24rem, 60vw);
+  width: min(24rem, 60vw);
+  background: color-mix(in srgb, var(--login-ambient-violet) 14%, transparent);
+  animation: login-ambient-drift-violet 12s ease-in-out infinite;
+}
+
+.login-ambient-blue {
   bottom: -10%;
-  height: 22rem;
-  width: 22rem;
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-  animation: login-ambient-drift-alt 11s ease-in-out infinite;
+  left: 50%;
+  height: min(22rem, 55vw);
+  width: min(22rem, 55vw);
+  transform: translate(-50%, 0);
+  background: color-mix(in srgb, var(--login-ambient-blue) 15%, transparent);
+  animation: login-ambient-drift-blue 11s ease-in-out infinite;
 }
 
 .login-grid-overlay {
