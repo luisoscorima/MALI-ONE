@@ -12,4 +12,3 @@ secrets
 .cursor
 .vscode
 **/*.tsbuildinfo
-apps/web/public/widgets
