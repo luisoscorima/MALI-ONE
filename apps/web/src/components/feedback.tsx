@@ -1,4 +1,5 @@
 import { Inbox, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 export function Spinner({ className }: { className?: string }) {
@@ -63,16 +64,16 @@ export function EmptyState({
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <tbody>
+    <>
       {Array.from({ length: rows }).map((_, row) => (
         <tr key={row} className="border-b border-border/40">
           {Array.from({ length: cols }).map((_, col) => (
             <td key={col} className="p-4">
-              <div className="h-4 animate-pulse rounded bg-border/60" />
+              <Skeleton className="h-4 w-full" />
             </td>
           ))}
         </tr>
       ))}
-    </tbody>
+    </>
   );
 }

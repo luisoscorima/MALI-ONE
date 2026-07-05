@@ -10,11 +10,12 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchInline, Textarea } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { formatCoordinates, parseCoordinates, slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 
 const MAPA_PREVIEW = [
@@ -52,6 +53,7 @@ function emptySede(districts: EducacionDistrictDto[]): SedeDraft {
 
 export function WidgetEducacionMapaPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { state, setState, loading, saving, saveSettings, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<SedeDraft | null>(null);
@@ -95,7 +97,12 @@ export function WidgetEducacionMapaPage() {
   }
 
   async function removeSede(sede: EducacionSedeDto) {
-    if (!confirm(`¿Eliminar la sede "${sede.nombre}"?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar la sede "${sede.nombre}"?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteEducacionSede(sede.id);
       toast.success('Sede eliminada');
@@ -320,8 +327,7 @@ function SedeEditor({
           </option>
         ))}
       </select>
-      <textarea
-        className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+      <Textarea
         rows={3}
         placeholder="Horario HTML"
         value={sede.horarioHtml ?? ''}

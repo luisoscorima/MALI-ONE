@@ -8,9 +8,30 @@ import {
   parseWhatsappTarget,
 } from '@/lib/parse-tags';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
-import { Button, Card, Input } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from '@/components/ui';
 
 type Tab = 'url' | 'file' | 'whatsapp';
 
@@ -58,6 +79,7 @@ function TagsField({
 
 export function LinksPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>('url');
   const [url, setUrl] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
@@ -92,24 +114,6 @@ export function LinksPage() {
   useEffect(() => {
     void loadLinks();
   }, [loadLinks]);
-
-  useEffect(() => {
-    if (!qrPreview) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') closeQrPreview();
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [qrPreview]);
-
-  useEffect(() => {
-    if (!editLink) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setEditLink(null);
-    }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [editLink]);
 
   function getTagsFromInput() {
     const tags = parseTagsInput(tagsInput);
@@ -254,7 +258,13 @@ export function LinksPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este enlace?')) return;
+    const ok = await confirm({
+      title: '¿Eliminar este enlace?',
+      description: 'Esta acción no se puede deshacer.',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteLink(id);
       if (result?.id === id) setResult(null);
@@ -318,33 +328,23 @@ export function LinksPage() {
         description="Acorta URLs, crea enlaces de WhatsApp, genera códigos QR y comparte archivos vía S3"
       />
 
-      <div className="mb-6 flex gap-2">
-        <Button
-          variant={tab === 'url' ? 'default' : 'outline'}
-          onClick={() => setTab('url')}
-        >
-          URL
-        </Button>
-        <Button
-          variant={tab === 'file' ? 'default' : 'outline'}
-          onClick={() => setTab('file')}
-        >
-          Archivo
-        </Button>
-        <Button
-          variant={tab === 'whatsapp' ? 'default' : 'outline'}
-          onClick={() => setTab('whatsapp')}
-        >
-          WhatsApp
-        </Button>
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as Tab)}
+        className="mb-6"
+      >
+        <TabsList>
+          <TabsTrigger value="url">URL</TabsTrigger>
+          <TabsTrigger value="file">Archivo</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+        </TabsList>
 
-      {error && (
-        <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
-      )}
+        {error && (
+          <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
+        )}
 
-      <Card className="mb-6">
-        {tab === 'url' ? (
+        <TabsContent value="url">
+          <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleShorten}>
             <Input
               placeholder="https://ejemplo.com/pagina"
@@ -372,7 +372,11 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-        ) : tab === 'whatsapp' ? (
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleWhatsapp}>
             <Input
               placeholder="Número con código de país (ej. 51987654321 o +51 987 654 321)"
@@ -384,8 +388,7 @@ export function LinksPage() {
               <span className="mb-2 block text-sm text-muted">
                 Mensaje prellenado (opcional)
               </span>
-              <textarea
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+              <Textarea
                 placeholder="Hola, me gustaría obtener más información..."
                 value={whatsappText}
                 onChange={(e) => setWhatsappText(e.target.value)}
@@ -412,7 +415,11 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-        ) : (
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="file">
+          <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleUpload}>
             <label className="block">
               <span className="mb-2 block text-sm text-muted">
@@ -445,8 +452,9 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-        )}
-      </Card>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {result && resultDest && (
         <Card className="mb-6">
@@ -539,23 +547,25 @@ export function LinksPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <thead className="border-b border-border text-muted">
-              <tr>
-                <th className="p-4">Slug</th>
-                <th className="p-4">Tipo</th>
-                <th className="p-4">Tags</th>
-                <th className="p-4">Destino</th>
-                <th className="p-4">Clicks</th>
-                <th className="p-4">Acciones</th>
-              </tr>
-            </thead>
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              <TableRow className="text-muted">
+                <TableHead className="p-4">Slug</TableHead>
+                <TableHead className="p-4">Tipo</TableHead>
+                <TableHead className="p-4">Tags</TableHead>
+                <TableHead className="p-4">Destino</TableHead>
+                <TableHead className="p-4">Clicks</TableHead>
+                <TableHead className="p-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
             {listLoading ? (
-              <TableSkeleton rows={4} cols={6} />
+              <TableBody>
+                <TableSkeleton rows={4} cols={6} />
+              </TableBody>
             ) : filteredLinks.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={6}>
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={6}>
                     <EmptyState
                       title={tagFilter ? 'Sin enlaces con ese tag' : 'Sin enlaces todavía'}
                       description={
@@ -564,16 +574,16 @@ export function LinksPage() {
                           : 'Acorta una URL, crea un enlace de WhatsApp o sube un archivo para empezar.'
                       }
                     />
-                  </td>
-                </tr>
-              </tbody>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
             ) : (
-              <tbody>
+              <TableBody>
                 {filteredLinks.map((link) => {
                   const dest = formatLinkDestination(link);
                   return (
-                    <tr key={link.id} className="border-b border-border/60">
-                      <td className="p-4">
+                    <TableRow key={link.id} className="border-border/60">
+                      <TableCell className="p-4">
                         <a
                           href={link.shortUrl}
                           className="font-medium text-primary underline"
@@ -582,8 +592,8 @@ export function LinksPage() {
                         >
                           {link.slug}
                         </a>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         <span
                           className={
                             link.type === 'FILE'
@@ -595,8 +605,8 @@ export function LinksPage() {
                         >
                           {link.type}
                         </span>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         {link.tags.length > 0 ? (
                           <div className="flex max-w-[10rem] flex-wrap gap-1">
                             {link.tags.map((tag) => (
@@ -613,17 +623,17 @@ export function LinksPage() {
                         ) : (
                           <span className="text-xs text-muted">—</span>
                         )}
-                      </td>
-                      <td className="max-w-xs p-4" title={dest.secondary ?? dest.primary}>
+                      </TableCell>
+                      <TableCell className="max-w-xs p-4" title={dest.secondary ?? dest.primary}>
                         <p className="truncate font-medium">{dest.primary}</p>
                         {dest.secondary && (
                           <p className="truncate text-xs text-muted">
                             {dest.secondary}
                           </p>
                         )}
-                      </td>
-                      <td className="p-4">{link.clickCount}</td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">{link.clickCount}</TableCell>
+                      <TableCell className="p-4">
                         <div className="flex flex-wrap gap-2">
                           <Button
                             variant="outline"
@@ -650,37 +660,32 @@ export function LinksPage() {
                             Eliminar
                           </Button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
+              </TableBody>
             )}
-          </table>
+          </Table>
         </div>
       </Card>
 
-      {editLink && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setEditLink(null)}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card className="w-full max-w-lg">
-              <h3 id="edit-dialog-title" className="mb-1 font-semibold">
-                Editar enlace
-              </h3>
-              <p className="mb-4 text-sm text-muted">
-                El slug, URL corta y QR no cambian. Solo se actualiza el destino
-                y los tags.
-              </p>
+      <Dialog
+        open={!!editLink}
+        onOpenChange={(open) => {
+          if (!open) setEditLink(null);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar enlace</DialogTitle>
+            <DialogDescription>
+              El slug, URL corta y QR no cambian. Solo se actualiza el destino y
+              los tags.
+            </DialogDescription>
+          </DialogHeader>
 
+          {editLink && (
               <form className="grid gap-3" onSubmit={handleSaveEdit}>
                 {editLink.link.type === 'WHATSAPP' && (
                   <>
@@ -700,8 +705,7 @@ export function LinksPage() {
                       <span className="mb-2 block text-sm text-muted">
                         Mensaje prellenado
                       </span>
-                      <textarea
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/40"
+                      <Textarea
                         value={editLink.text}
                         onChange={(e) =>
                           setEditLink((current) =>
@@ -770,31 +774,28 @@ export function LinksPage() {
                   </Button>
                 </div>
               </form>
-            </Card>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
-      {qrPreview && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closeQrPreview}
-          role="presentation"
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="qr-dialog-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Card className="w-full max-w-md">
-              <h3 id="qr-dialog-title" className="mb-1 font-semibold">
-                Código QR
-              </h3>
-              <p className="mb-4 break-all text-sm text-muted">
+      <Dialog
+        open={!!qrPreview}
+        onOpenChange={(open) => {
+          if (!open) closeQrPreview();
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Código QR</DialogTitle>
+            {qrPreview && (
+              <DialogDescription className="break-all">
                 {qrPreview.link.shortUrl}
-              </p>
+              </DialogDescription>
+            )}
+          </DialogHeader>
 
+          {qrPreview && (
+            <>
               <div className="mb-4 flex justify-center">
                 {qrPreview.loading ? (
                   <div className="flex h-48 w-48 items-center justify-center gap-2 text-sm text-muted">
@@ -836,10 +837,10 @@ export function LinksPage() {
                   Cerrar
                 </Button>
               </div>
-            </Card>
-          </div>
-        </div>
-      )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

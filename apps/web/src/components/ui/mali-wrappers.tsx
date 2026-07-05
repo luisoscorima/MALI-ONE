@@ -1,92 +1,18 @@
+import type { ComponentProps } from 'react';
+import { Card as ShadcnCard } from './card';
+import { Switch } from './switch';
 import { cn } from '@/lib/utils';
-import type { ButtonHTMLAttributes } from 'react';
 
-export function Button({
-  className,
-  variant = 'default',
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'default' | 'outline' | 'danger';
-}) {
-  return (
-    <button
-      className={cn(
-        'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50',
-        variant === 'default' && 'bg-primary text-primary-foreground hover:opacity-90',
-        variant === 'outline' &&
-          'border border-border bg-transparent hover:bg-border/40',
-        variant === 'danger' && 'bg-danger text-white hover:opacity-90',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
-export function Input({
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary',
-        className,
-      )}
-      {...props}
-    />
-  );
-}
-
+/** Card con padding horizontal para compatibilidad con el layout anterior */
 export function Card({
   className,
   children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
+  ...props
+}: ComponentProps<typeof ShadcnCard>) {
   return (
-    <div className={cn('rounded-xl border border-border bg-card p-6', className)}>
+    <ShadcnCard className={cn('px-(--card-spacing)', className)} {...props}>
       {children}
-    </div>
-  );
-}
-
-export function Switch({
-  checked,
-  onCheckedChange,
-  disabled,
-  id,
-  className,
-}: {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  disabled?: boolean;
-  id?: string;
-  className?: string;
-}) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      disabled={disabled}
-      onClick={() => onCheckedChange(!checked)}
-      className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors',
-        checked ? 'bg-primary' : 'bg-muted',
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-        className,
-      )}
-    >
-      <span
-        className={cn(
-          'pointer-events-none absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-          checked && 'translate-x-5',
-        )}
-      />
-    </button>
+    </ShadcnCard>
   );
 }
 

@@ -5,7 +5,18 @@ import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
-import { Button, Card } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 
 type DraftModules = Record<string, AppModule[]>;
 
@@ -98,45 +109,44 @@ export function AppUsersPage() {
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] text-left text-sm">
-            <thead className="border-b border-border text-muted">
-              <tr>
-                <th className="p-4">Usuario</th>
-                <th className="p-4">Rol</th>
+          <Table className="min-w-[880px]">
+            <TableHeader>
+              <TableRow className="text-muted">
+                <TableHead className="p-4">Usuario</TableHead>
+                <TableHead className="p-4">Rol</TableHead>
                 {APP_MODULES.map((mod) => (
-                  <th key={mod.id} className="p-4 text-center">
+                  <TableHead key={mod.id} className="p-4 text-center">
                     {mod.label}
-                  </th>
+                  </TableHead>
                 ))}
-                <th className="p-4">Acciones</th>
-              </tr>
-            </thead>
+                <TableHead className="p-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
             {loading ? (
-              <TableSkeleton
-                rows={5}
-                cols={3 + APP_MODULES.length}
-              />
+              <TableBody>
+                <TableSkeleton rows={5} cols={3 + APP_MODULES.length} />
+              </TableBody>
             ) : users.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={3 + APP_MODULES.length}>
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={3 + APP_MODULES.length}>
                     <EmptyState
                       title="Aún no hay usuarios"
                       description="Los usuarios aparecerán aquí después de su primer inicio de sesión con Google."
                     />
-                  </td>
-                </tr>
-              </tbody>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
             ) : (
-              <tbody>
+              <TableBody>
                 {users.map((user) => {
                   const isAdmin = user.role === 'admin';
                   const draft = drafts[user.id] ?? user.modules;
                   const changed = hasChanges(user);
 
                   return (
-                    <tr key={user.id} className="border-b border-border/60">
-                      <td className="p-4">
+                    <TableRow key={user.id} className="border-border/60">
+                      <TableCell className="p-4">
                         <div className="flex items-center gap-3">
                           {user.picture ? (
                             <img
@@ -154,35 +164,27 @@ export function AppUsersPage() {
                             <p className="text-muted">{user.email}</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         {isAdmin ? (
-                          <span className="rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">
+                          <Badge variant="secondary" className="bg-primary/15 text-primary">
                             Administrador
-                          </span>
+                          </Badge>
                         ) : (
-                          <span className="rounded bg-border px-2 py-0.5 text-xs text-muted">
-                            Operador
-                          </span>
+                          <Badge variant="secondary">Operador</Badge>
                         )}
-                      </td>
+                      </TableCell>
                       {APP_MODULES.map((mod) => (
-                        <td key={mod.id} className="p-4 text-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-border accent-primary"
-                            checked={
-                              isAdmin
-                                ? true
-                                : draft.includes(mod.id)
-                            }
+                        <TableCell key={mod.id} className="p-4 text-center">
+                          <Checkbox
+                            checked={isAdmin ? true : draft.includes(mod.id)}
                             disabled={isAdmin || savingId === user.id}
-                            onChange={() => toggleModule(user.id, mod.id)}
+                            onCheckedChange={() => toggleModule(user.id, mod.id)}
                             aria-label={`${mod.label} para ${user.email}`}
                           />
-                        </td>
+                        </TableCell>
                       ))}
-                      <td className="p-4">
+                      <TableCell className="p-4">
                         {isAdmin ? (
                           <span className="text-xs text-muted">Acceso total</span>
                         ) : (
@@ -200,13 +202,13 @@ export function AppUsersPage() {
                             )}
                           </Button>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
+              </TableBody>
             )}
-          </table>
+          </Table>
         </div>
       </Card>
     </div>

@@ -14,6 +14,7 @@ import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 
@@ -42,6 +43,7 @@ function emptySelectorSede(): EducacionSelectorSedeDto {
 
 export function WidgetEducacionSelectorPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { state, setState, loading, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<EducacionSelectorSedeDto | null>(null);
@@ -84,7 +86,12 @@ export function WidgetEducacionSelectorPage() {
   }
 
   async function removeSede(sede: EducacionSelectorSedeDto) {
-    if (!confirm(`¿Eliminar "${sede.nombre}" del selector?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar "${sede.nombre}" del selector?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteEducacionSelectorSede(sede.id);
       toast.success('Sede eliminada');

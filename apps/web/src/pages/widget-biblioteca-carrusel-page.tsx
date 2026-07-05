@@ -12,10 +12,11 @@ import {
   WidgetConfigItemImageThumb,
   WidgetConfigItemList,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
+import { Button, Card, Input, SettingSwitchInline, Textarea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 
 const CARRUSEL_PREVIEW = [
   {
@@ -43,6 +44,7 @@ function emptyItem(sortOrder: number): BibliotecaCarouselItemDto {
 
 export function WidgetBibliotecaCarruselPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [items, setItems] = useState<BibliotecaCarouselItemDto[]>([]);
   const [settings, setSettings] = useState<BibliotecaCarouselSettingsDto | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
@@ -104,7 +106,12 @@ export function WidgetBibliotecaCarruselPage() {
   }
 
   async function removeItem(item: BibliotecaCarouselItemDto) {
-    if (!confirm(`¿Eliminar "${item.title}"?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar "${item.title}"?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteBibliotecaCarouselItem(item.id);
       toast.success('Ítem eliminado');
@@ -415,9 +422,9 @@ function DescriptionHtmlField({
         </Button>
         <span className="text-xs text-muted">Selecciona el título y pulsa I para cursiva</span>
       </div>
-      <textarea
+      <Textarea
         ref={textareaRef}
-        className="w-full rounded-lg border border-border bg-background p-2 text-sm font-mono"
+        className="font-mono"
         rows={3}
         placeholder="Autor; Título del libro. Año."
         value={value}

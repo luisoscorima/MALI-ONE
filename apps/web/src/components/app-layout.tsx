@@ -13,11 +13,11 @@ import {
   Menu,
   Shield,
   Users,
-  X,
 } from 'lucide-react';
 import type { AppModule } from '@mali-one/shared';
 import { useAuth } from '@/contexts/auth-context';
 import { MaliLogo } from '@/components/mali-logo';
+import { Sheet, SheetContent } from '@/components/ui';
 import { hasModule } from '@/lib/user-modules';
 import { cn } from '@/lib/utils';
 
@@ -153,27 +153,11 @@ export function AppLayout() {
         <SidebarContent />
       </aside>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50"
-            aria-label="Cerrar menú"
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside className="relative flex h-full w-64 flex-col bg-card p-4 shadow-xl">
-            <button
-              type="button"
-              className="absolute top-4 right-4 text-muted hover:text-foreground"
-              onClick={() => setMobileOpen(false)}
-              aria-label="Cerrar"
-            >
-              <X size={20} />
-            </button>
-            <SidebarContent onNavigate={() => setMobileOpen(false)} />
-          </aside>
-        </div>
-      )}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-64 bg-card p-4">
+          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-border bg-card px-4 py-3 lg:hidden">

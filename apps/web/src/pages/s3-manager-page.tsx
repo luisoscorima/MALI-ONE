@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import * as React from 'react';
 import {
-  ChevronRight,
   Download,
   Folder,
   HardDrive,
@@ -12,13 +12,30 @@ import type { S3BucketInfo, S3ObjectItem } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format-bytes';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, Spinner } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
-import { Button, Card } from '@/components/ui';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  Button,
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 export function S3ManagerPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [buckets, setBuckets] = useState<S3BucketInfo[]>([]);
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [prefix, setPrefix] = useState('');
@@ -109,7 +126,12 @@ export function S3ManagerPage() {
 
   async function handleDelete(item: S3ObjectItem) {
     if (!selectedBucket || item.isFolder) return;
-    if (!confirm(`¿Eliminar ${item.name}?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar ${item.name}?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteS3Object(selectedBucket, item.key);
       toast.success('Archivo eliminado');
@@ -192,58 +214,69 @@ export function S3ManagerPage() {
         </Card>
 
         <Card className="overflow-hidden p-0">
-          <div className="flex flex-wrap items-center gap-1 border-b border-border px-4 py-3 text-sm">
-            <button
-              type="button"
-              className="rounded px-2 py-1 hover:bg-border/60"
-              onClick={() => navigateToPrefix('')}
-            >
-              {selectedBucket ?? '—'}
-            </button>
-            {breadcrumbs.map((crumb) => (
-              <span key={crumb.prefix} className="flex items-center gap-1">
-                <ChevronRight size={14} className="text-muted" />
-                <button
-                  type="button"
-                  className="rounded px-2 py-1 hover:bg-border/60"
-                  onClick={() => navigateToPrefix(crumb.prefix)}
-                >
-                  {crumb.label}
-                </button>
-              </span>
-            ))}
+          <div className="border-b border-border px-4 py-3">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <button type="button" onClick={() => navigateToPrefix('')}>
+                      {selectedBucket ?? '—'}
+                    </button>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                {breadcrumbs.map((crumb, index) => (
+                  <React.Fragment key={crumb.prefix}>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {index === breadcrumbs.length - 1 ? (
+                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <button
+                            type="button"
+                            onClick={() => navigateToPrefix(crumb.prefix)}
+                          >
+                            {crumb.label}
+                          </button>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </React.Fragment>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="border-b border-border text-muted">
-                <tr>
-                  <th className="p-4">Nombre</th>
-                  <th className="p-4">Tamaño</th>
-                  <th className="p-4">Modificado</th>
-                  <th className="p-4">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table className="min-w-[560px]">
+              <TableHeader>
+                <TableRow className="text-muted">
+                  <TableHead className="p-4">Nombre</TableHead>
+                  <TableHead className="p-4">Tamaño</TableHead>
+                  <TableHead className="p-4">Modificado</TableHead>
+                  <TableHead className="p-4">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {loadingObjects && items.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-muted">
+                  <TableRow>
+                    <TableCell colSpan={4} className="p-8 text-center text-muted">
                       <Spinner className="mx-auto" />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : items.length === 0 ? (
-                  <tr>
-                    <td colSpan={4}>
+                  <TableRow>
+                    <TableCell colSpan={4}>
                       <EmptyState
                         title="Carpeta vacía"
                         description="No hay archivos en esta ubicación."
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ) : (
                   items.map((item) => (
-                    <tr key={item.key} className="border-b border-border/60">
-                      <td className="p-4">
+                    <TableRow key={item.key} className="border-border/60">
+                      <TableCell className="p-4">
                         {item.isFolder ? (
                           <button
                             type="button"
@@ -259,14 +292,14 @@ export function S3ManagerPage() {
                             {item.name}
                           </span>
                         )}
-                      </td>
-                      <td className="p-4 text-muted">
+                      </TableCell>
+                      <TableCell className="p-4 text-muted">
                         {formatBytes(item.size)}
-                      </td>
-                      <td className="p-4 text-muted">
+                      </TableCell>
+                      <TableCell className="p-4 text-muted">
                         {formatDate(item.lastModified)}
-                      </td>
-                      <td className="p-4">
+                      </TableCell>
+                      <TableCell className="p-4">
                         {!item.isFolder && (
                           <div className="flex flex-wrap gap-2">
                             <Button
@@ -292,12 +325,12 @@ export function S3ManagerPage() {
                             </Button>
                           </div>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
 
           {nextToken && !loadingObjects && (

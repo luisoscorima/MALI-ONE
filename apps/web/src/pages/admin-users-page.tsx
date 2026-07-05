@@ -3,12 +3,25 @@ import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
-import { Button, Card, Input } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 
 export function AdminUsersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
@@ -86,7 +99,11 @@ export function AdminUsersPage() {
   }
 
   async function handleReset(email: string) {
-    if (!confirm(`¿Resetear contraseña de ${email}?`)) return;
+    const ok = await confirm({
+      title: `¿Resetear contraseña de ${email}?`,
+      confirmLabel: 'Resetear',
+    });
+    if (!ok) return;
     try {
       const result = await api.resetWorkspacePassword(email);
       setTempPassword(result.temporaryPassword);
@@ -130,9 +147,11 @@ export function AdminUsersPage() {
     const emailChanged =
       editForm.primaryEmail.trim() !== editingUser.primaryEmail;
     if (emailChanged) {
-      const ok = confirm(
-        `¿Renombrar ${editingUser.primaryEmail} a ${editForm.primaryEmail}? El correo anterior quedará como alias. El cambio puede tardar varios minutos.`,
-      );
+      const ok = await confirm({
+        title: '¿Renombrar cuenta de correo?',
+        description: `¿Renombrar ${editingUser.primaryEmail} a ${editForm.primaryEmail}? El correo anterior quedará como alias. El cambio puede tardar varios minutos.`,
+        confirmLabel: 'Renombrar',
+      });
       if (!ok) return;
     }
 
@@ -160,7 +179,12 @@ export function AdminUsersPage() {
   }
 
   async function handleSuspend(email: string) {
-    if (!confirm(`¿Suspender ${email}?`)) return;
+    const ok = await confirm({
+      title: `¿Suspender ${email}?`,
+      confirmLabel: 'Suspender',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.suspendWorkspaceUser(email);
       toast.success('Usuario suspendido');
@@ -173,7 +197,11 @@ export function AdminUsersPage() {
   }
 
   async function handleReactivate(email: string) {
-    if (!confirm(`¿Reactivar ${email}?`)) return;
+    const ok = await confirm({
+      title: `¿Reactivar ${email}?`,
+      confirmLabel: 'Reactivar',
+    });
+    if (!ok) return;
     try {
       await api.updateWorkspaceUser(email, { suspended: false });
       toast.success('Usuario reactivado');
@@ -186,13 +214,13 @@ export function AdminUsersPage() {
   }
 
   async function handleSignOut(email: string) {
-    if (
-      !confirm(
-        `¿Cerrar todas las sesiones de ${email}? Deberá volver a iniciar sesión en todos sus dispositivos.`,
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: `¿Cerrar todas las sesiones de ${email}?`,
+      description: 'Deberá volver a iniciar sesión en todos sus dispositivos.',
+      confirmLabel: 'Cerrar sesiones',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.signOutWorkspaceUser(email);
       toast.success('Sesiones cerradas');
@@ -380,50 +408,50 @@ export function AdminUsersPage() {
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[960px] text-left text-sm">
-            <thead className="border-b border-border text-muted">
-              <tr>
-                <th className="p-4">Email</th>
-                <th className="p-4">Nombre</th>
-                <th className="p-4">OU</th>
-                <th className="p-4">Estado</th>
-                <th className="p-4">Acciones</th>
-              </tr>
-            </thead>
+          <Table className="min-w-[960px]">
+            <TableHeader>
+              <TableRow className="text-muted">
+                <TableHead className="p-4">Email</TableHead>
+                <TableHead className="p-4">Nombre</TableHead>
+                <TableHead className="p-4">OU</TableHead>
+                <TableHead className="p-4">Estado</TableHead>
+                <TableHead className="p-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
             {loading && users.length === 0 ? (
-              <TableSkeleton rows={6} cols={5} />
+              <TableBody>
+                <TableSkeleton rows={6} cols={5} />
+              </TableBody>
             ) : users.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td colSpan={5}>
+              <TableBody>
+                <TableRow>
+                  <TableCell colSpan={5}>
                     <EmptyState
                       title="No se encontraron usuarios"
                       description="Prueba otra búsqueda o crea un usuario nuevo."
                     />
-                  </td>
-                </tr>
-              </tbody>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
             ) : (
-              <tbody>
+              <TableBody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b border-border/60">
-                    <td className="p-4">{u.primaryEmail}</td>
-                    <td className="p-4">
+                  <TableRow key={u.id} className="border-border/60">
+                    <TableCell className="p-4">{u.primaryEmail}</TableCell>
+                    <TableCell className="p-4">
                       {u.name.givenName} {u.name.familyName}
-                    </td>
-                    <td className="p-4 text-muted">{u.orgUnitPath}</td>
-                    <td className="p-4">
+                    </TableCell>
+                    <TableCell className="p-4 text-muted">{u.orgUnitPath}</TableCell>
+                    <TableCell className="p-4">
                       {u.suspended ? (
-                        <span className="rounded bg-danger/15 px-2 py-0.5 text-xs text-danger">
+                        <Badge variant="destructive" className="bg-danger/15 text-danger">
                           Suspendido
-                        </span>
+                        </Badge>
                       ) : (
-                        <span className="rounded bg-success/15 px-2 py-0.5 text-xs text-success">
-                          Activo
-                        </span>
+                        <Badge className="bg-success/15 text-success">Activo</Badge>
                       )}
-                    </td>
-                    <td className="p-4">
+                    </TableCell>
+                    <TableCell className="p-4">
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
@@ -467,12 +495,12 @@ export function AdminUsersPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
+              </TableBody>
             )}
-          </table>
+          </Table>
         </div>
         {loading && users.length > 0 && (
           <div className="flex items-center gap-2 border-t border-border p-4 text-sm text-muted">

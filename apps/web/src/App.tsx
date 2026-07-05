@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/auth-context';
 import { ToastProvider } from '@/contexts/toast-context';
+import { ConfirmProvider } from '@/hooks/use-confirm';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, ModuleGuard, SuperAdminGuard } from '@/components/auth-guard';
 import { AdminUsersPage } from '@/pages/admin-users-page';
@@ -27,6 +28,7 @@ export function App() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <ConfirmProvider>
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -76,6 +78,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+        </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
   );

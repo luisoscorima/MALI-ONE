@@ -16,6 +16,7 @@ import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 
 const ALIADOS_PREVIEW = [
@@ -48,6 +49,7 @@ function emptyAliado(sortOrder: number): EducacionAliadoDto {
 
 export function WidgetEducacionAliadosPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { state, setState, loading, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
   const [draft, setDraft] = useState<EducacionAliadoDto | null>(null);
@@ -83,7 +85,12 @@ export function WidgetEducacionAliadosPage() {
   }
 
   async function removeAliado(aliado: EducacionAliadoDto) {
-    if (!confirm(`¿Eliminar "${aliado.nombre}"?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar "${aliado.nombre}"?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteEducacionAliado(aliado.id);
       toast.success('Aliado eliminado');

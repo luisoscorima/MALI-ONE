@@ -12,7 +12,7 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemPamPlanThumb,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
+import { Button, Card, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SettingSwitchInline, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 
@@ -104,31 +104,31 @@ function RegistrationRow({
 
   return (
     <>
-      <tr
-        className="border-b border-border/60 cursor-pointer hover:bg-border/20"
+      <TableRow
+        className="cursor-pointer border-border/60 hover:bg-border/20"
         onClick={onToggle}
       >
-        <td className="py-2 pr-2">
+        <TableCell className="py-2 pr-2">
           <span className="mr-1 text-muted">{expanded ? '▾' : '▸'}</span>
           {formatDate(reg.createdAt)}
-        </td>
-        <td className="py-2 pr-2">
+        </TableCell>
+        <TableCell className="py-2 pr-2">
           {reg.nombres} {reg.apellidos}
           {pending && (
             <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-400">
               pendiente
             </span>
           )}
-        </td>
-        <td className="py-2 pr-2">{reg.correo}</td>
-        <td className="py-2 pr-2">
+        </TableCell>
+        <TableCell className="py-2 pr-2">{reg.correo}</TableCell>
+        <TableCell className="py-2 pr-2">
           {reg.plan} / {reg.frecuencia}
-        </td>
-        <td className="py-2">{reg.mpStatus ?? '—'}</td>
-      </tr>
+        </TableCell>
+        <TableCell className="py-2">{reg.mpStatus ?? '—'}</TableCell>
+      </TableRow>
       {expanded && (
-        <tr className="border-b border-border/60 bg-border/10">
-          <td colSpan={5} className="p-4">
+        <TableRow className="border-border/60 bg-border/10">
+          <TableCell colSpan={5} className="p-4">
             {editing ? (
               <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -234,31 +234,44 @@ function RegistrationRow({
                   </label>
                   <label className="space-y-1 text-sm">
                     <span className="text-muted">Estado Mercado Pago</span>
-                    <select
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                      value={editForm.mpStatus ?? ''}
-                      onChange={(e) => onChange({ mpStatus: e.target.value })}
+                    <Select
+                      value={editForm.mpStatus || '__none__'}
+                      onValueChange={(value) =>
+                        onChange({ mpStatus: value === '__none__' ? '' : value })
+                      }
                     >
-                      {MP_STATUSES.map((s) => (
-                        <option key={s.value || 'empty'} value={s.value}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="— Sin estado —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MP_STATUSES.map((s) => (
+                          <SelectItem
+                            key={s.value || 'empty'}
+                            value={s.value || '__none__'}
+                          >
+                            {s.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </label>
                   <label className="space-y-1 text-sm">
                     <span className="text-muted">Mensaje bienvenida</span>
-                    <select
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                    <Select
                       value={editForm.welcomeEmail ?? 'PENDIENTE'}
-                      onChange={(e) => onChange({ welcomeEmail: e.target.value })}
+                      onValueChange={(value) => onChange({ welcomeEmail: value })}
                     >
-                      {EMAIL_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EMAIL_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </label>
                   <label className="space-y-1 text-sm">
                     <span className="text-muted">Fecha caducidad</span>
@@ -270,17 +283,21 @@ function RegistrationRow({
                   </label>
                   <label className="space-y-1 text-sm">
                     <span className="text-muted">Aviso caducidad</span>
-                    <select
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                    <Select
                       value={editForm.expiryNotice ?? 'PENDIENTE'}
-                      onChange={(e) => onChange({ expiryNotice: e.target.value })}
+                      onValueChange={(value) => onChange({ expiryNotice: value })}
                     >
-                      {EMAIL_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EMAIL_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </label>
                 </div>
                 <p className="text-xs text-muted">
@@ -347,8 +364,8 @@ function RegistrationRow({
                 </div>
               </div>
             )}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -543,8 +560,7 @@ export function PamMembershipsPage() {
     <div className="space-y-6">
       <Card className="space-y-3 p-4">
         <h2 className="font-semibold">Beneficios y notas</h2>
-        <textarea
-          className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+        <Textarea
           rows={6}
           value={state.settings.benefits.join('\n')}
           onChange={(e) =>
@@ -557,8 +573,7 @@ export function PamMembershipsPage() {
             })
           }
         />
-        <textarea
-          className="w-full rounded-lg border border-border bg-background p-2 text-sm"
+        <Textarea
           rows={4}
           value={state.settings.notes.join('\n')}
           onChange={(e) =>
@@ -613,17 +628,17 @@ export function PamMembershipsPage() {
           Haz clic en una fila para ver el detalle. Los registros sin pago confirmado aparecen
           como pendientes; puedes marcar MP como approved para activar bienvenida y caducidad.
         </p>
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border text-muted">
-              <th className="py-2 pr-2">Fecha</th>
-              <th className="py-2 pr-2">Nombre</th>
-              <th className="py-2 pr-2">Correo</th>
-              <th className="py-2 pr-2">Plan</th>
-              <th className="py-2">MP</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="min-w-[640px]">
+          <TableHeader>
+            <TableRow className="border-border text-muted">
+              <TableHead className="py-2 pr-2">Fecha</TableHead>
+              <TableHead className="py-2 pr-2">Nombre</TableHead>
+              <TableHead className="py-2 pr-2">Correo</TableHead>
+              <TableHead className="py-2 pr-2">Plan</TableHead>
+              <TableHead className="py-2">MP</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {state.registrations.map((r) => (
               <RegistrationRow
                 key={r.id}
@@ -645,8 +660,8 @@ export function PamMembershipsPage() {
                 onResendWelcome={() => void resendWelcome(r.id)}
               />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </Card>
     </div>
   );
