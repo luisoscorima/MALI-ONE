@@ -2,6 +2,18 @@
 
 MALI ONE sirve los shells HTML en `{APP_URL}/widgets/**` y la configuración en `{APP_URL}/api/widgets/**`.
 
+## Política de cambios
+
+Los widgets embebidos (`apps/web/public/widgets/**`) están en producción en sitios públicos (WordPress, Koha, iframes). **No deben modificarse** — HTML, CSS, JS, loaders ni rutas públicas — salvo que exista un **requisito explícito** solicitado (bug en producción, cambio de diseño acordado, nueva integración, etc.).
+
+Antes de tocar un widget:
+
+1. Confirma que el cambio es necesario y está pedido.
+2. Prueba en la pestaña **Vista previa** del admin y en el sitio destino real.
+3. Verifica que `apps/web/public/widgets` **no** esté excluido del build Docker (`.dockerignore`); si falta, nginx servirá la app admin dentro del iframe.
+
+La configuración editable desde MALI ONE (popups, carrusel, calendario, mapa, etc.) vive en la API y el panel admin; eso sí puede cambiar sin editar los shells, salvo que el requisito implique alterar el embed.
+
 ## Dominios destino
 
 | Sitio | Widget | URL iframe |
@@ -88,7 +100,7 @@ Activa el plugin y usa los shortcodes:
 | `[mali_aliados]` | iframe de aliados |
 | `[mali_popup]` | flag: carga popup-loader.js (`ctx=educacion`) |
 
-El **selector flotante** se carga globalmente en todas las páginas (filtro `mali_one_embed_selector_global`).
+El **selector flotante** se carga globalmente en todas las páginas (filtro `mali_one_embed_selector_global`). El plugin obtiene las sedes **desde PHP** (`wp_remote_get` → `MALI_ONE_EMBED.selectorConfig`); el loader usa esa config y, si falta, hace `fetch` a la API como respaldo.
 
 ### Museo (`web-mali-wp`)
 
