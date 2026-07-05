@@ -41,12 +41,6 @@ import {
 
 type Tab = 'url' | 'file' | 'whatsapp';
 
-interface QrPreview {
-  link: ShortLinkDto;
-  objectUrl: string;
-  loading?: boolean;
-}
-
 interface EditLinkState {
   link: ShortLinkDto;
   url: string;
@@ -83,42 +77,6 @@ function TagsField({
   );
 }
 
-function QrDraftSection({
-  open,
-  onToggle,
-  shortUrl,
-  style,
-  onChange,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  shortUrl: string;
-  style: QrStyleDto;
-  onChange: (style: QrStyleDto) => void;
-}) {
-  return (
-    <div className="mt-4 border-t border-border pt-4">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mb-3"
-        onClick={onToggle}
-      >
-        {open ? 'Ocultar' : 'Personalizar'} diseño QR
-      </Button>
-      {open && (
-        <QrDesignerPanel
-          shortUrl={shortUrl}
-          style={style}
-          onChange={onChange}
-          compact
-        />
-      )}
-    </div>
-  );
-}
-
 export function LinksPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -130,30 +88,23 @@ export function LinksPage() {
   const [tagsInput, setTagsInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<ShortLinkDto | null>(null);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [qrPreview, setQrPreview] = useState<QrPreview | null>(null);
+  const [qrModalLink, setQrModalLink] = useState<ShortLinkDto | null>(null);
   const [editLink, setEditLink] = useState<EditLinkState | null>(null);
   const [statsLink, setStatsLink] = useState<ShortLinkDto | null>(null);
-  const [draftQrStyle, setDraftQrStyle] = useState<QrStyleDto>({
+  const [defaultQrStyle, setDefaultQrStyle] = useState<QrStyleDto>({
     ...DEFAULT_QR_STYLE,
   });
-  const [showDraftDesigner, setShowDraftDesigner] = useState(false);
-
-  const previewShortUrl =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/r/vista-previa`
-      : 'https://mali.pe/r/vista-previa';
 
   const loadDefaultQrStyle = useCallback(async () => {
     try {
       const style = await api.getQrDefaultStyle();
-      setDraftQrStyle(style);
+      setDefaultQrStyle(style);
     } catch {
-      setDraftQrStyle({ ...DEFAULT_QR_STYLE });
+      setDefaultQrStyle({ ...DEFAULT_QR_STYLE });
     }
   }, []);
 
@@ -161,12 +112,12 @@ export function LinksPage() {
     void loadDefaultQrStyle();
   }, [loadDefaultQrStyle]);
 
-  async function applyDraftStyleToLink(linkId: string) {
-    try {
-      await api.updateLinkQrStyle(linkId, draftQrStyle);
-    } catch {
-      // El enlace ya se creó; fallo de estilo no es crítico
-    }
+  function openQrDesigner(link: ShortLinkDto) {
+    setQrModalLink(link);
+  }
+
+  function closeQrDesigner() {
+    setQrModalLink(null);
   }
 
   const loadLinks = useCallback(async () => {
@@ -197,20 +148,18 @@ export function LinksPage() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
-    setResult(null);
     try {
       const data = await api.shortenUrl(
         url,
         customSlug || undefined,
         getTagsFromInput(),
       );
-      setResult(data);
       setUrl('');
       setCustomSlug('');
       setTagsInput('');
-      await applyDraftStyleToLink(data.id);
-      toast.success('Enlace acortado correctamente');
       await loadLinks();
+      toast.success('Enlace acortado correctamente');
+      openQrDesigner(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al acortar';
       setError(msg);
@@ -224,7 +173,6 @@ export function LinksPage() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
-    setResult(null);
     try {
       const data = await api.createWhatsappLink(
         whatsappPhone,
@@ -232,14 +180,13 @@ export function LinksPage() {
         customSlug || undefined,
         getTagsFromInput(),
       );
-      setResult(data);
       setWhatsappPhone('');
       setWhatsappText('');
       setCustomSlug('');
       setTagsInput('');
-      await applyDraftStyleToLink(data.id);
-      toast.success('Enlace de WhatsApp creado correctamente');
       await loadLinks();
+      toast.success('Enlace de WhatsApp creado correctamente');
+      openQrDesigner(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al crear enlace de WhatsApp';
       setError(msg);
@@ -254,20 +201,18 @@ export function LinksPage() {
     if (!file) return;
     setSubmitting(true);
     setError('');
-    setResult(null);
     try {
       const data = await api.uploadFile(
         file,
         customSlug || undefined,
         getTagsFromInput(),
       );
-      setResult(data);
       setFile(null);
       setCustomSlug('');
       setTagsInput('');
-      await applyDraftStyleToLink(data.id);
-      toast.success('Archivo subido y QR generado');
       await loadLinks();
+      toast.success('Archivo subido correctamente');
+      openQrDesigner(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al subir archivo';
       setError(msg);
@@ -320,8 +265,7 @@ export function LinksPage() {
     }
 
     try {
-      const updated = await api.updateLink(editLink.link.id, body);
-      if (result?.id === updated.id) setResult(updated);
+      await api.updateLink(editLink.link.id, body);
       toast.success('Enlace actualizado (URL corta y QR sin cambios)');
       setEditLink(null);
       await loadLinks();
@@ -343,7 +287,7 @@ export function LinksPage() {
     if (!ok) return;
     try {
       await api.deleteLink(id);
-      if (result?.id === id) setResult(null);
+      if (qrModalLink?.id === id) closeQrDesigner();
       toast.success('Enlace eliminado');
       await loadLinks();
     } catch (e) {
@@ -362,34 +306,11 @@ export function LinksPage() {
     }
   }
 
-  function closeQrPreview() {
-    setQrPreview((current) => {
-      if (current?.objectUrl) URL.revokeObjectURL(current.objectUrl);
-      return null;
-    });
-  }
-
-  async function handleRegenerateQr(link: ShortLinkDto) {
-    setError('');
-    if (qrPreview?.objectUrl) URL.revokeObjectURL(qrPreview.objectUrl);
-    setQrPreview({ link, objectUrl: '', loading: false });
-  }
-
   function handleQrSaved(updated: ShortLinkDto) {
-    setQrPreview((current) =>
-      current ? { ...current, link: updated } : null,
-    );
-    if (result?.id === updated.id) setResult(updated);
+    setQrModalLink(updated);
     void loadLinks();
   }
 
-  useEffect(() => {
-    return () => {
-      if (qrPreview?.objectUrl) URL.revokeObjectURL(qrPreview.objectUrl);
-    };
-  }, [qrPreview?.objectUrl]);
-
-  const resultDest = result ? formatLinkDestination(result) : null;
   const allTags = [...new Set(links.flatMap((link) => link.tags))].sort();
   const filteredLinks = tagFilter
     ? links.filter((link) => link.tags.includes(tagFilter))
@@ -459,13 +380,6 @@ export function LinksPage() {
               onSuccess={() => void loadLinks()}
             />
           </div>
-          <QrDraftSection
-            open={showDraftDesigner}
-            onToggle={() => setShowDraftDesigner((v) => !v)}
-            shortUrl={previewShortUrl}
-            style={draftQrStyle}
-            onChange={setDraftQrStyle}
-          />
           </Card>
         </TabsContent>
 
@@ -516,13 +430,6 @@ export function LinksPage() {
               onSuccess={() => void loadLinks()}
             />
           </div>
-          <QrDraftSection
-            open={showDraftDesigner}
-            onToggle={() => setShowDraftDesigner((v) => !v)}
-            shortUrl={previewShortUrl}
-            style={draftQrStyle}
-            onChange={setDraftQrStyle}
-          />
           </Card>
         </TabsContent>
 
@@ -571,86 +478,9 @@ export function LinksPage() {
               onSuccess={() => void loadLinks()}
             />
           </div>
-          <QrDraftSection
-            open={showDraftDesigner}
-            onToggle={() => setShowDraftDesigner((v) => !v)}
-            shortUrl={previewShortUrl}
-            style={draftQrStyle}
-            onChange={setDraftQrStyle}
-          />
           </Card>
         </TabsContent>
       </Tabs>
-
-      {result && resultDest && (
-        <Card className="mb-6">
-          <h3 className="mb-4 font-semibold">Resultado</h3>
-          <div className="flex flex-wrap gap-6">
-            {result.qrBase64 && (
-              <img
-                src={result.qrBase64}
-                alt="QR"
-                className="h-40 w-40 rounded-lg bg-white p-2"
-              />
-            )}
-            <div className="min-w-0 flex-1 space-y-3 text-sm">
-              <div>
-                <p className="mb-1 text-muted">Enlace corto</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href={result.shortUrl}
-                    className="break-all text-primary underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {result.shortUrl}
-                  </a>
-                  <Button
-                    variant="outline"
-                    onClick={() => void copyText(result.shortUrl)}
-                  >
-                    Copiar
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-muted">Destino</p>
-                <p className="font-medium">{resultDest.primary}</p>
-                {resultDest.secondary && (
-                  <p className="mt-1 text-xs text-muted">{resultDest.secondary}</p>
-                )}
-              </div>
-              {result.tags.length > 0 && (
-                <div>
-                  <p className="mb-1 text-muted">Tags</p>
-                  <div className="flex flex-wrap gap-1">
-                    {result.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded bg-border px-2 py-0.5 text-xs"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {(['png', 'svg', 'eps'] as const).map((fmt) => (
-                  <a
-                    key={fmt}
-                    href={api.qrUrl(result.id, fmt)}
-                    className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium uppercase hover:bg-muted"
-                    download={`qr-${result.slug}.${fmt}`}
-                  >
-                    Descargar {fmt}
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-border px-4 py-3">
@@ -785,7 +615,7 @@ export function LinksPage() {
                           </IconActionButton>
                           <IconActionButton
                             label="Ver QR"
-                            onClick={() => void handleRegenerateQr(link)}
+                            onClick={() => openQrDesigner(link)}
                           >
                             <QrCode className="size-4" />
                           </IconActionButton>
@@ -922,36 +752,38 @@ export function LinksPage() {
       </Dialog>
 
       <Dialog
-        open={!!qrPreview}
+        open={!!qrModalLink}
         onOpenChange={(open) => {
-          if (!open) closeQrPreview();
+          if (!open) closeQrDesigner();
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col overflow-hidden p-0 sm:max-w-none">
+          <DialogHeader className="shrink-0 px-4 pt-4">
             <DialogTitle>Código QR personalizable</DialogTitle>
-            {qrPreview && (
+            {qrModalLink && (
               <DialogDescription className="break-all">
-                {qrPreview.link.shortUrl}
+                {qrModalLink.shortUrl}
+                {' · '}
+                Personaliza el diseño y pulsa «Guardar diseño» para aplicarlo.
               </DialogDescription>
             )}
           </DialogHeader>
 
-          {qrPreview && (
-            <QrDesignerPanel
-              shortUrl={qrPreview.link.shortUrl}
-              style={qrPreview.link.qrStyle ?? draftQrStyle}
-              onChange={(style) =>
-                setQrPreview((current) =>
-                  current
-                    ? { ...current, link: { ...current.link, qrStyle: style } }
-                    : null,
-                )
-              }
-              linkId={qrPreview.link.id}
-              onSaved={handleQrSaved}
-            />
-          )}
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
+            {qrModalLink && (
+              <QrDesignerPanel
+                shortUrl={qrModalLink.shortUrl}
+                style={qrModalLink.qrStyle ?? defaultQrStyle}
+                onChange={(style) =>
+                  setQrModalLink((current) =>
+                    current ? { ...current, qrStyle: style } : null,
+                  )
+                }
+                linkId={qrModalLink.id}
+                onSaved={handleQrSaved}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -961,16 +793,18 @@ export function LinksPage() {
           if (!open) setStatsLink(null);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),48rem)] max-w-none flex-col overflow-hidden p-0 sm:max-w-none">
+          <DialogHeader className="shrink-0 px-4 pt-4">
             <DialogTitle>Estadísticas del enlace</DialogTitle>
             <DialogDescription>
               Clicks y escaneos por día, dispositivos y navegadores
             </DialogDescription>
           </DialogHeader>
-          {statsLink && (
-            <LinkStatsPanel linkId={statsLink.id} slug={statsLink.slug} />
-          )}
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
+            {statsLink && (
+              <LinkStatsPanel linkId={statsLink.id} slug={statsLink.slug} />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

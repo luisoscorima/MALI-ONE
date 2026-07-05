@@ -36,8 +36,19 @@ export class QrService {
     style: QrStyleDto,
     qrLogoKey?: string | null,
     width = 512,
+    logoOverride?: { buffer: Buffer; mimeType: string },
   ): Promise<Buffer> {
-    return this.generateBuffer(url, style, qrLogoKey, 'png', width);
+    const logoOverrideUrl = logoOverride
+      ? `data:${logoOverride.mimeType};base64,${logoOverride.buffer.toString('base64')}`
+      : undefined;
+    return this.generateBuffer(
+      url,
+      style,
+      qrLogoKey,
+      'png',
+      width,
+      logoOverrideUrl,
+    );
   }
 
   async generateExport(
@@ -65,10 +76,11 @@ export class QrService {
     style: QrStyleDto,
     qrLogoKey: string | null | undefined,
     width: number,
+    logoOverrideUrl?: string,
   ) {
-    const logoUrl = getLogoUrl(style, qrLogoKey, (key) =>
-      this.buildS3PublicUrl(key),
-    );
+    const logoUrl =
+      logoOverrideUrl ??
+      getLogoUrl(style, qrLogoKey, (key) => this.buildS3PublicUrl(key));
     const withLogo = hasLogo(style, qrLogoKey);
 
     const fgColor = style.foregroundGradient
@@ -130,8 +142,15 @@ export class QrService {
     qrLogoKey: string | null | undefined,
     format: 'png' | 'svg',
     width: number,
+    logoOverrideUrl?: string,
   ): Promise<Buffer> {
-    const qr = this.buildQrInstance(url, style, qrLogoKey, width);
+    const qr = this.buildQrInstance(
+      url,
+      style,
+      qrLogoKey,
+      width,
+      logoOverrideUrl,
+    );
     return qr.toBuffer(format);
   }
 

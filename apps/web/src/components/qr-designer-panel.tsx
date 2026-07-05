@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { QrLogoPresetId, QrStyleDto } from '@mali-one/shared';
 import {
   DEFAULT_QR_STYLE,
@@ -9,7 +9,6 @@ import {
   BODY_SHAPES,
   EYE_FRAME_SHAPES,
   EYE_SHAPES,
-  createQrStyling,
 } from '@/lib/qr-styling';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
@@ -23,6 +22,8 @@ interface QrDesignerPanelProps {
   linkId?: string;
   onSaved?: (link: import('@mali-one/shared').ShortLinkDto) => void;
   compact?: boolean;
+  draftLogoFile?: File | null;
+  onDraftLogoFileChange?: (file: File | null) => void;
 }
 
 export function QrDesignerPanel({
@@ -32,56 +33,80 @@ export function QrDesignerPanel({
   linkId,
   onSaved,
   compact,
+  draftLogoFile,
+  onDraftLogoFileChange,
 }: QrDesignerPanelProps) {
   const toast = useToast();
-  const previewRef = useRef<HTMLDivElement>(null);
-  const qrRef = useRef<ReturnType<typeof createQrStyling> | null>(null);
-  const [customLogoUrl, setCustomLogoUrl] = useState<string | null>(null);
-  const [customLogoFile, setCustomLogoFile] = useState<File | null>(null);
+  const previewSize = compact ? 200 : 260;
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const [internalLogoFile, setInternalLogoFile] = useState<File | null>(null);
+  const customLogoFile = draftLogoFile !== undefined ? draftLogoFile : internalLogoFile;
+  const setCustomLogoFile = onDraftLogoFileChange ?? setInternalLogoFile;
   const [useGradient, setUseGradient] = useState(Boolean(style.foregroundGradient));
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPreviewLoading(true);
+      setPreviewError('');
+      void api
+        .fetchQrPreview(shortUrl, style, {
+          linkId,
+          logoFile: customLogoFile ?? undefined,
+          signal: ctrl.signal,
+          width: previewSize,
+        })
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          setPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
+        })
+        .catch((e) => {
+          if (!ctrl.signal.aborted) {
+            setPreviewError(
+              e instanceof Error ? e.message : 'No se pudo generar la vista previa',
+            );
+          }
+        })
+        .finally(() => {
+          if (!ctrl.signal.aborted) setPreviewLoading(false);
+        });
+    }, 250);
+
     return () => {
-      if (customLogoUrl) URL.revokeObjectURL(customLogoUrl);
+      window.clearTimeout(timer);
+      ctrl.abort();
     };
-  }, [customLogoUrl]);
+  }, [shortUrl, style, customLogoFile, linkId, previewSize]);
 
   useEffect(() => {
-    if (!previewRef.current) return;
-    previewRef.current.innerHTML = '';
-    const qr = createQrStyling(shortUrl, style, customLogoUrl, compact ? 200 : 260);
-    qrRef.current = qr;
-    qr.append(previewRef.current);
-  }, [shortUrl, style, customLogoUrl, compact]);
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function patchStyle(partial: Partial<QrStyleDto>) {
     onChange({ ...style, ...partial });
   }
 
   function selectPreset(preset: QrLogoPresetId) {
-    if (customLogoUrl) {
-      URL.revokeObjectURL(customLogoUrl);
-      setCustomLogoUrl(null);
-    }
     setCustomLogoFile(null);
     patchStyle({ logoPreset: preset });
   }
 
   function clearLogo() {
-    if (customLogoUrl) {
-      URL.revokeObjectURL(customLogoUrl);
-      setCustomLogoUrl(null);
-    }
     setCustomLogoFile(null);
     patchStyle({ logoPreset: null });
   }
 
   function handleCustomLogo(file: File | undefined) {
     if (!file) return;
-    if (customLogoUrl) URL.revokeObjectURL(customLogoUrl);
-    setCustomLogoUrl(URL.createObjectURL(file));
     setCustomLogoFile(file);
     patchStyle({ logoPreset: null });
   }
@@ -137,13 +162,45 @@ export function QrDesignerPanel({
     }
   }
 
+  const transparentBg = (style.backgroundColor ?? '#ffffff') === 'transparent';
+
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-[260px_1fr]')}>
+    <div
+      className={cn(
+        'grid min-w-0 gap-4',
+        compact
+          ? 'grid-cols-1'
+          : 'grid-cols-1 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]',
+      )}
+    >
       <div className="flex flex-col items-center gap-3">
         <div
-          ref={previewRef}
-          className="rounded-xl border border-border bg-white p-2"
-        />
+          className={cn(
+            'relative flex min-h-[calc(var(--qr-preview-size)+16px)] min-w-[calc(var(--qr-preview-size)+16px)] items-center justify-center rounded-xl border border-border p-2',
+            transparentBg &&
+              'bg-[length:16px_16px] bg-[position:0_0,8px_8px] bg-[image:linear-gradient(45deg,#d1d5db_25%,transparent_25%),linear-gradient(-45deg,#d1d5db_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#d1d5db_75%),linear-gradient(-45deg,transparent_75%,#d1d5db_75%)]',
+            !transparentBg && 'bg-white',
+          )}
+          style={{ '--qr-preview-size': `${previewSize}px` } as React.CSSProperties}
+        >
+          {previewLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+              <Spinner className="size-6" />
+            </div>
+          )}
+          {previewUrl && !previewError && (
+            <img
+              src={previewUrl}
+              alt="Vista previa del código QR"
+              width={previewSize}
+              height={previewSize}
+              className="block max-w-full"
+            />
+          )}
+          {previewError && (
+            <p className="px-3 text-center text-xs text-destructive">{previewError}</p>
+          )}
+        </div>
         {linkId && (
           <div className="flex flex-wrap justify-center gap-2">
             {(['png', 'svg', 'eps'] as const).map((fmt) => (
@@ -160,9 +217,9 @@ export function QrDesignerPanel({
         )}
       </div>
 
-      <div className="space-y-4 text-sm">
+      <div className="min-w-0 space-y-4 text-sm">
         <Section title="Color del QR">
-          <div className="mb-2 flex gap-2">
+          <div className="mb-2 flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -294,7 +351,7 @@ export function QrDesignerPanel({
                 title={QR_LOGO_PRESETS[id].label}
                 className={cn(
                   'rounded-lg border p-1 transition-colors',
-                  style.logoPreset === id && !customLogoUrl
+                  style.logoPreset === id && !customLogoFile
                     ? 'border-primary ring-2 ring-primary/30'
                     : 'border-border hover:border-primary/40',
                 )}
@@ -404,12 +461,12 @@ function ColorInput({
           type="color"
           value={value.startsWith('#') ? value : '#000000'}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-10 cursor-pointer rounded border border-border"
+          className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border"
         />
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 font-mono text-xs"
+          className="h-8 min-w-0 font-mono text-xs"
         />
       </div>
     </label>

@@ -231,6 +231,53 @@ export const api = {
     return `/api/links/${id}/qr?${params.toString()}`;
   },
 
+  async fetchQrPreview(
+    data: string,
+    style: import('@mali-one/shared').QrStyleDto,
+    options?: {
+      linkId?: string;
+      logoFile?: File;
+      signal?: AbortSignal;
+      width?: number;
+    },
+  ): Promise<Blob> {
+    const form = new FormData();
+    form.append(
+      'payload',
+      JSON.stringify({
+        data,
+        style,
+        linkId: options?.linkId,
+      }),
+    );
+    if (options?.logoFile) {
+      form.append('logo', options.logoFile);
+    }
+    const params = new URLSearchParams();
+    if (options?.width) params.set('width', String(options.width));
+    const qs = params.toString();
+    const res = await fetch(
+      `${API_BASE}/api/links/qr-preview${qs ? `?${qs}` : ''}`,
+      {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+        signal: options?.signal,
+      },
+    );
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: res.statusText }));
+      const message = error.message;
+      const text = Array.isArray(message)
+        ? message.join(', ')
+        : typeof message === 'string'
+          ? message
+          : res.statusText;
+      throw new Error(text || 'Error al generar vista previa');
+    }
+    return res.blob();
+  },
+
   async fetchLinkQrObjectUrl(id: string): Promise<string> {
     const res = await fetch(`${API_BASE}/api/links/${id}/qr`, {
       credentials: 'include',

@@ -26,6 +26,7 @@ import { SaveQrDefaultStyleDto } from './dto/save-qr-default-style.dto';
 import { ShortenUrlDto } from './dto/shorten-url.dto';
 import { UpdateLinkDto } from './dto/update-link.dto';
 import { UpdateQrStyleDto } from './dto/update-qr-style.dto';
+import { parseQrPreviewPayload } from './dto/qr-preview.dto';
 import { LinksService } from './links.service';
 import type { QrExportFormat } from '../../core/qr/qr.service';
 
@@ -107,6 +108,30 @@ export class LinksController {
     @Body() body: SaveQrDefaultStyleDto,
   ) {
     return this.links.saveQrDefaultStyle(req.user as User, body);
+  }
+
+  @Post('qr-preview')
+  @UseInterceptors(FileInterceptor('logo'))
+  async qrPreview(
+    @Req() req: Request,
+    @Body('payload') payloadRaw: string | undefined,
+    @UploadedFile() logo: Express.Multer.File | undefined,
+    @Res() res: Response,
+  ) {
+    if (!payloadRaw) {
+      throw new BadRequestException('Payload de vista previa requerido');
+    }
+    const { data, style, linkId } = parseQrPreviewPayload(payloadRaw);
+    const buffer = await this.links.generateQrPreview(
+      req.user as User,
+      data,
+      style,
+      linkId,
+      logo,
+    );
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
   }
 
   @Get()

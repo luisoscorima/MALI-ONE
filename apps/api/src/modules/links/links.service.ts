@@ -6,6 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { LinkType, Prisma, User, UserRole } from '@prisma/client';
 import type { LinkStatsDto, QrStyleDto } from '@mali-one/shared';
+import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { customAlphabet } from 'nanoid';
 import UAParserPkg from 'ua-parser-js';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -404,6 +405,34 @@ export class LinksService {
     };
 
     return { buffer, ...meta[format] };
+  }
+
+  async generateQrPreview(
+    user: User,
+    data: string,
+    input: UpdateQrStyleDto,
+    linkId?: string,
+    logoFile?: Express.Multer.File,
+    width = 260,
+  ): Promise<Buffer> {
+    const style = this.mergeQrStyle({ ...DEFAULT_QR_STYLE }, input);
+    let qrLogoKey: string | null = null;
+    let logoOverride: { buffer: Buffer; mimeType: string } | undefined;
+
+    if (logoFile) {
+      logoOverride = { buffer: logoFile.buffer, mimeType: logoFile.mimetype };
+    } else if (linkId) {
+      const link = await this.findOwnedLink(user, linkId);
+      qrLogoKey = link.qrLogoKey;
+    }
+
+    return this.qr.generatePngBuffer(
+      data,
+      style,
+      qrLogoKey,
+      width,
+      logoOverride,
+    );
   }
 
   async getQrDefaultStyle(user: User): Promise<QrStyleDto> {
