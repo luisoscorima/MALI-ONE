@@ -11,6 +11,7 @@ import {
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input, SettingSwitchInline, Textarea } from '@/components/ui';
+import { WidgetItemCardActions, WidgetSaveButton } from '@/components/widget-item-card-actions';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
 import { formatCoordinates, parseCoordinates, slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
@@ -164,9 +165,9 @@ export function WidgetEducacionMapaPage() {
             </div>
           ))}
         </div>
-        <Button onClick={() => void saveSettings()} disabled={saving}>
+        <WidgetSaveButton onClick={() => void saveSettings()} disabled={saving}>
           Guardar contactos
-        </Button>
+        </WidgetSaveButton>
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -270,26 +271,12 @@ function SedeEditor({
         />
       }
       actions={
-        <>
-          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-            Guardar
-          </Button>
-          {onDuplicate && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-              Duplicar
-            </Button>
-          )}
-          {onDelete && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-              Eliminar
-            </Button>
-          )}
-          {onCancel && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-              Cancelar
-            </Button>
-          )}
-        </>
+        <WidgetItemCardActions
+          onSave={onSave}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onCancel={onCancel}
+        />
       }
     >
       <Input

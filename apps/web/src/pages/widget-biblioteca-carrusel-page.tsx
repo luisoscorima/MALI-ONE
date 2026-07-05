@@ -13,6 +13,7 @@ import {
   WidgetConfigItemList,
 } from '@/components/widget-config-item-card';
 import { Button, Card, Input, SettingSwitchInline, Textarea } from '@/components/ui';
+import { WidgetItemCardActions, WidgetSaveButton } from '@/components/widget-item-card-actions';
 import { api } from '@/lib/api';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -199,7 +200,7 @@ export function WidgetBibliotecaCarruselPage() {
             Vista previa
           </span>
         </div>
-        <Button onClick={() => void saveSettings()}>Guardar encabezado</Button>
+        <WidgetSaveButton onClick={() => void saveSettings()}>Guardar encabezado</WidgetSaveButton>
       </Card>
 
       <Card className="space-y-4 p-4">
@@ -288,26 +289,12 @@ function ItemEditor({
         />
       }
       actions={
-        <>
-          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-            Guardar
-          </Button>
-          {onDuplicate && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-              Duplicar
-            </Button>
-          )}
-          {onDelete && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-              Eliminar
-            </Button>
-          )}
-          {onCancel && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-              Cancelar
-            </Button>
-          )}
-        </>
+        <WidgetItemCardActions
+          onSave={onSave}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onCancel={onCancel}
+        />
       }
     >
       <Input

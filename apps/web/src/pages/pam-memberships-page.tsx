@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Mail, Pencil, Save, X } from 'lucide-react';
 import type {
   PamPlanDto,
   PamRegistrationDto,
   UpdatePamRegistrationDto,
 } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
+import { IconActionButton } from '@/components/icon-action-button';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import {
@@ -12,7 +14,8 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemPamPlanThumb,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SettingSwitchInline, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from '@/components/ui';
+import { WidgetItemCardActions, WidgetSaveButton } from '@/components/widget-item-card-actions';
+import { Card, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SettingSwitchInline, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 
@@ -305,13 +308,17 @@ function RegistrationRow({
                   calculará la fecha de caducidad y se enviará el correo de bienvenida si aún está
                   pendiente.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button disabled={saving} onClick={() => void onSave()}>
-                    {saving ? 'Guardando…' : 'Guardar cambios'}
-                  </Button>
-                  <Button variant="outline" onClick={onCancelEdit}>
-                    Cancelar
-                  </Button>
+                <div className="flex items-center gap-1">
+                  <IconActionButton
+                    label={saving ? 'Guardando…' : 'Guardar cambios'}
+                    onClick={() => void onSave()}
+                    disabled={saving}
+                  >
+                    <Save className="size-4" />
+                  </IconActionButton>
+                  <IconActionButton label="Cancelar" onClick={onCancelEdit}>
+                    <X className="size-4" />
+                  </IconActionButton>
                 </div>
               </div>
             ) : (
@@ -352,14 +359,17 @@ function RegistrationRow({
                   <DetailField label="Fecha caducidad" value={formatDate(reg.expiryDate)} />
                   <DetailField label="Aviso caducidad" value={reg.expiryNotice} />
                 </dl>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={onStartEdit}>
-                    Editar
-                  </Button>
+                <div className="mt-4 flex items-center gap-1">
+                  <IconActionButton label="Editar registro" onClick={onStartEdit}>
+                    <Pencil className="size-4" />
+                  </IconActionButton>
                   {reg.mpStatus && CONFIRMED_MP.includes(reg.mpStatus) && (
-                    <Button variant="outline" onClick={() => void onResendWelcome()}>
-                      Reenviar bienvenida
-                    </Button>
+                    <IconActionButton
+                      label="Reenviar bienvenida"
+                      onClick={() => void onResendWelcome()}
+                    >
+                      <Mail className="size-4" />
+                    </IconActionButton>
                   )}
                 </div>
               </div>
@@ -393,11 +403,7 @@ function PlanEditor({
           monthlyPrice={plan.monthlyPrice}
         />
       }
-      actions={
-        <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-          Guardar
-        </Button>
-      }
+      actions={<WidgetItemCardActions onSave={onSave} />}
     >
       <Input
         placeholder="Nombre del plan"
@@ -586,7 +592,9 @@ export function PamMembershipsPage() {
             })
           }
         />
-        <Button onClick={() => void saveSettings()}>Guardar textos PAM</Button>
+        <WidgetSaveButton onClick={() => void saveSettings()}>
+          Guardar textos PAM
+        </WidgetSaveButton>
       </Card>
 
       <Card className="space-y-4 p-4">

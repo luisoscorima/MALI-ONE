@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { Copy, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
+import { FilterChip, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
 import {
@@ -333,10 +335,16 @@ export function LinksPage() {
         onValueChange={(value) => setTab(value as Tab)}
         className="mb-6"
       >
-        <TabsList>
-          <TabsTrigger value="url">URL</TabsTrigger>
-          <TabsTrigger value="file">Archivo</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+        <TabsList className="w-fit">
+          <TabsTrigger value="url" className="flex-none px-4">
+            URL
+          </TabsTrigger>
+          <TabsTrigger value="file" className="flex-none px-4">
+            Archivo
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex-none px-4">
+            WhatsApp
+          </TabsTrigger>
         </TabsList>
 
         {error && (
@@ -526,21 +534,18 @@ export function LinksPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold">Historial</h3>
             {allTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant={tagFilter ? 'outline' : 'default'}
-                  onClick={() => setTagFilter('')}
-                >
+              <div className="flex flex-wrap items-center gap-1.5">
+                <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
                   Todos
-                </Button>
+                </FilterChip>
                 {allTags.map((tag) => (
-                  <Button
+                  <FilterChip
                     key={tag}
-                    variant={tagFilter === tag ? 'default' : 'outline'}
+                    active={tagFilter === tag}
                     onClick={() => setTagFilter(tag)}
                   >
                     #{tag}
-                  </Button>
+                  </FilterChip>
                 ))}
               </div>
             )}
@@ -613,7 +618,7 @@ export function LinksPage() {
                               <button
                                 key={tag}
                                 type="button"
-                                className="rounded bg-border px-2 py-0.5 text-xs hover:bg-border/70"
+                                className="rounded-full border border-border bg-muted/30 px-2 py-0.5 text-xs hover:border-primary/40 hover:bg-muted/50"
                                 onClick={() => setTagFilter(tag)}
                               >
                                 #{tag}
@@ -634,31 +639,32 @@ export function LinksPage() {
                       </TableCell>
                       <TableCell className="p-4">{link.clickCount}</TableCell>
                       <TableCell className="p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
+                        <div className="flex items-center gap-1">
+                          <IconActionButton
+                            label="Editar"
                             onClick={() => openEdit(link)}
                           >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
+                            <Pencil className="size-4" />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Ver QR"
                             onClick={() => void handleRegenerateQr(link)}
                           >
-                            Ver QR
-                          </Button>
-                          <Button
-                            variant="outline"
+                            <QrCode className="size-4" />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Copiar enlace"
                             onClick={() => void copyText(link.shortUrl)}
                           >
-                            Copiar
-                          </Button>
-                          <Button
+                            <Copy className="size-4" />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Eliminar"
                             variant="danger"
                             onClick={() => void handleDelete(link.id)}
                           >
-                            Eliminar
-                          </Button>
+                            <Trash2 className="size-4" />
+                          </IconActionButton>
                         </div>
                       </TableCell>
                     </TableRow>

@@ -11,6 +11,7 @@ import {
 } from '@/components/widget-config-item-card';
 import { MaterialIconPicker } from '@/components/material-icon-picker';
 import { Button, Card, Input, SettingSwitchInline } from '@/components/ui';
+import { WidgetItemCardActions } from '@/components/widget-item-card-actions';
 import { slugify } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -208,26 +209,12 @@ function SelectorEditor({
         />
       }
       actions={
-        <>
-          <Button className="text-sm px-3 py-1.5" onClick={onSave}>
-            Guardar
-          </Button>
-          {onDuplicate && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDuplicate}>
-              Duplicar
-            </Button>
-          )}
-          {onDelete && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onDelete}>
-              Eliminar
-            </Button>
-          )}
-          {onCancel && (
-            <Button variant="outline" className="text-sm px-3 py-1.5" onClick={onCancel}>
-              Cancelar
-            </Button>
-          )}
-        </>
+        <WidgetItemCardActions
+          onSave={onSave}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onCancel={onCancel}
+        />
       }
     >
       <Input

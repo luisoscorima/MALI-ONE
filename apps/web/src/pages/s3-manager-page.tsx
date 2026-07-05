@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as React from 'react';
 import {
   Download,
@@ -6,9 +6,11 @@ import {
   HardDrive,
   Link2,
   RefreshCw,
+  Search,
   Trash2,
 } from 'lucide-react';
 import type { S3BucketInfo, S3ObjectItem } from '@mali-one/shared';
+import { IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format-bytes';
 import { useToast } from '@/contexts/toast-context';
@@ -24,6 +26,7 @@ import {
   BreadcrumbSeparator,
   Button,
   Card,
+  Input,
   Table,
   TableBody,
   TableCell,
@@ -44,6 +47,7 @@ export function S3ManagerPage() {
   const [loadingBuckets, setLoadingBuckets] = useState(true);
   const [loadingObjects, setLoadingObjects] = useState(false);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadBuckets = useCallback(async () => {
     setLoadingBuckets(true);
@@ -92,8 +96,13 @@ export function S3ManagerPage() {
   useEffect(() => {
     if (selectedBucket) {
       setPrefix('');
+      setSearchQuery('');
     }
   }, [selectedBucket]);
+
+  useEffect(() => {
+    setSearchQuery('');
+  }, [prefix]);
 
   useEffect(() => {
     if (selectedBucket) {
@@ -112,6 +121,12 @@ export function S3ManagerPage() {
   }
 
   const breadcrumbs = buildBreadcrumbs(prefix);
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => item.name.toLowerCase().includes(q));
+  }, [items, searchQuery]);
 
   async function handleDownload(item: S3ObjectItem) {
     if (!selectedBucket || item.isFolder) return;
@@ -214,7 +229,7 @@ export function S3ManagerPage() {
         </Card>
 
         <Card className="overflow-hidden p-0">
-          <div className="border-b border-border px-4 py-3">
+          <div className="space-y-3 border-b border-border px-4 py-3">
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -245,6 +260,18 @@ export function S3ManagerPage() {
                 ))}
               </BreadcrumbList>
             </Breadcrumb>
+            <div className="relative max-w-md">
+              <Search
+                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted"
+                aria-hidden
+              />
+              <Input
+                className="pl-8"
+                placeholder="Buscar archivos o carpetas en esta ubicación…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -264,17 +291,25 @@ export function S3ManagerPage() {
                       <Spinner className="mx-auto" />
                     </TableCell>
                   </TableRow>
-                ) : items.length === 0 ? (
+                ) : filteredItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4}>
                       <EmptyState
-                        title="Carpeta vacía"
-                        description="No hay archivos en esta ubicación."
+                        title={
+                          searchQuery.trim()
+                            ? 'Sin coincidencias'
+                            : 'Carpeta vacía'
+                        }
+                        description={
+                          searchQuery.trim()
+                            ? `No hay archivos ni carpetas que coincidan con "${searchQuery.trim()}".`
+                            : 'No hay archivos en esta ubicación.'
+                        }
                       />
                     </TableCell>
                   </TableRow>
                 ) : (
-                  items.map((item) => (
+                  filteredItems.map((item) => (
                     <TableRow key={item.key} className="border-border/60">
                       <TableCell className="p-4">
                         {item.isFolder ? (
@@ -301,28 +336,26 @@ export function S3ManagerPage() {
                       </TableCell>
                       <TableCell className="p-4">
                         {!item.isFolder && (
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              variant="outline"
+                          <div className="flex items-center gap-1">
+                            <IconActionButton
+                              label="Descargar"
                               onClick={() => void handleDownload(item)}
                             >
-                              <Download size={14} className="mr-1 inline" />
-                              Descargar
-                            </Button>
-                            <Button
-                              variant="outline"
+                              <Download className="size-4" />
+                            </IconActionButton>
+                            <IconActionButton
+                              label="Copiar enlace público"
                               onClick={() => void handleCopyPublicUrl(item)}
                             >
-                              <Link2 size={14} className="mr-1 inline" />
-                              Enlace público
-                            </Button>
-                            <Button
+                              <Link2 className="size-4" />
+                            </IconActionButton>
+                            <IconActionButton
+                              label="Eliminar"
                               variant="danger"
                               onClick={() => void handleDelete(item)}
                             >
-                              <Trash2 size={14} className="mr-1 inline" />
-                              Eliminar
-                            </Button>
+                              <Trash2 className="size-4" />
+                            </IconActionButton>
                           </div>
                         )}
                       </TableCell>

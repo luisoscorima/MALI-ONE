@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { KeyRound, LogOut, Pencil } from 'lucide-react';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
+import { GoogleAdminIcon, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
 import { useToast } from '@/contexts/toast-context';
@@ -7,10 +9,10 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import {
-  Badge,
   Button,
   Card,
   Input,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -34,6 +36,7 @@ export function AdminUsersPage() {
     null,
   );
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     primaryEmail: '',
@@ -228,6 +231,19 @@ export function AdminUsersPage() {
       const msg = e instanceof Error ? e.message : 'Error al cerrar sesiones';
       setError(msg);
       toast.error(msg);
+    }
+  }
+
+  async function handleToggleActive(user: GoogleWorkspaceUser, active: boolean) {
+    setTogglingStatus(user.primaryEmail);
+    try {
+      if (active) {
+        await handleReactivate(user.primaryEmail);
+      } else {
+        await handleSuspend(user.primaryEmail);
+      }
+    } finally {
+      setTogglingStatus(null);
     }
   }
 
@@ -443,57 +459,50 @@ export function AdminUsersPage() {
                     </TableCell>
                     <TableCell className="p-4 text-muted">{u.orgUnitPath}</TableCell>
                     <TableCell className="p-4">
-                      {u.suspended ? (
-                        <Badge variant="destructive" className="bg-danger/15 text-danger">
-                          Suspendido
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-success/15 text-success">Activo</Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={!u.suspended}
+                          disabled={togglingStatus === u.primaryEmail}
+                          onCheckedChange={(active) =>
+                            void handleToggleActive(u, active)
+                          }
+                          aria-label={
+                            u.suspended
+                              ? `Reactivar ${u.primaryEmail}`
+                              : `Suspender ${u.primaryEmail}`
+                          }
+                        />
+                        <span className="text-xs text-muted">
+                          {u.suspended ? 'Inactivo' : 'Activo'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="p-4">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
+                      <div className="flex items-center gap-1">
+                        <IconActionButton
+                          label="Editar usuario"
                           onClick={() => startEdit(u)}
                         >
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
+                          <Pencil className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Resetear contraseña"
                           onClick={() => void handleReset(u.primaryEmail)}
                         >
-                          Reset pass
-                        </Button>
-                        <Button
-                          variant="outline"
+                          <KeyRound className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Cerrar sesiones"
                           onClick={() => void handleSignOut(u.primaryEmail)}
                         >
-                          Cerrar sesiones
-                        </Button>
-                        <a
+                          <LogOut className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Abrir en Google Admin"
                           href={googleAdminUserSecurityUrl(u.id)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-border/40"
                         >
-                          Consola
-                        </a>
-                        {u.suspended ? (
-                          <Button
-                            variant="outline"
-                            onClick={() => void handleReactivate(u.primaryEmail)}
-                          >
-                            Reactivar
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="danger"
-                            onClick={() => void handleSuspend(u.primaryEmail)}
-                          >
-                            Suspender
-                          </Button>
-                        )}
+                          <GoogleAdminIcon />
+                        </IconActionButton>
                       </div>
                     </TableCell>
                   </TableRow>

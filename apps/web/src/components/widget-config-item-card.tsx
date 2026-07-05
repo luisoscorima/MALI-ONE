@@ -65,7 +65,7 @@ export function WidgetConfigItemCard({
 
       <footer
         className={cn(
-          'flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 px-4 py-3',
+          'flex flex-wrap items-center justify-end gap-1 border-t border-border bg-muted/20 px-4 py-3',
           dimmed,
         )}
       >
