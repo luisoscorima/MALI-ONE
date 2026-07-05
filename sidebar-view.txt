@@ -1,0 +1,34 @@
+﻿node.exe : - Resolving items.
+En C:\Users\LUIS GUSTAVO\AppData\Roaming\npm\pnpm.ps1: 24 Carácter: 5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (- Resolving items.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Ôöî shadcn add sidebar, avatar (dry run)
+Ôöé
+Ôö£ src\hooks\use-mobile.ts (create) 20 lines
+Ôöé ÔöîÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+Ôöé Ôöé import * as React from "react"
+Ôöé Ôöé 
+Ôöé Ôöé const MOBILE_BREAKPOINT = 768
+Ôöé Ôöé 
+Ôöé Ôöé export function useIsMobile() {
+Ôöé Ôöé   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+Ôöé Ôöé 
+Ôöé Ôöé   React.useEffect(() => {
+Ôöé Ôöé     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+Ôöé Ôöé     const onChange = () => {
+Ôöé Ôöé       setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+Ôöé Ôöé     }
+Ôöé Ôöé     mql.addEventListener("change", onChange)
+Ôöé Ôöé     setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+Ôöé Ôöé     return () => mql.removeEventListener("change", onChange)
+Ôöé Ôöé   }, [])
+Ôöé Ôöé 
+Ôöé Ôöé   return !!isMobile
+Ôöé Ôöé }
+Ôöé Ôöé 
+Ôöé ÔööÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+Ôöé
+Ôöö Run without --dry-run to apply.

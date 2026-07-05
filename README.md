@@ -23,7 +23,8 @@ Interfaz oscura MALI ONE basada en shadcn/ui:
 - **Notificaciones:** Sonner (reemplaza el toast custom anterior)
 - **Confirmaciones:** `useConfirm()` con Alert Dialog
 - **Patrones UX:** `ModuleCard` en dashboard y hubs de widgets, `PageLoading` / `TableSkeleton` para estados de carga, acciones con iconos + tooltip, botones de guardado compactos (`WidgetSaveButton`)
-- **Navegación:** sidebar agrupado por secciones (General, Operaciones, Widgets, Administración)
+- **Navegación:** sidebar shadcn (`SidebarProvider`, `AppSidebar`, `NavUser` con dropdown) agrupado por secciones; header con `SidebarTrigger`
+- **Dashboard:** cards estilo `SectionCards` de shadcn (gradiente + grid responsivo con `@container`)
 
 Los iframes embebidos en sitios públicos viven en `apps/web/public/widgets/` y no forman parte del admin.
 

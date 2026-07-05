@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/auth-context';
+import { AccentThemeProvider } from '@/contexts/accent-theme-context';
 import { ToastProvider } from '@/contexts/toast-context';
 import { ConfirmProvider } from '@/hooks/use-confirm';
 import { TooltipProvider } from '@/components/ui';
@@ -27,6 +28,7 @@ import { WidgetMuseoPopupPage } from '@/pages/widget-museo-popup-page';
 
 export function App() {
   return (
+    <AccentThemeProvider>
     <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
@@ -84,5 +86,6 @@ export function App() {
         </ConfirmProvider>
       </ToastProvider>
     </AuthProvider>
+    </AccentThemeProvider>
   );
 }

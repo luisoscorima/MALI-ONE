@@ -1,12 +1,14 @@
-import { Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/lib/api';
-import { MaliLogo } from '@/components/mali-logo';
+import { MALI_LOGO_URL } from '@/components/mali-logo';
+import { LoginForm } from '@/components/login-form';
 import { FullPageLoading } from '@/components/feedback';
-import { Button, Card } from '@/components/ui';
 
 export function LoginPage() {
   const { user, loading } = useAuth();
+  const [redirecting, setRedirecting] = useState(false);
 
   if (loading) {
     return <FullPageLoading />;
@@ -16,27 +18,58 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
+  function handleGoogleLogin() {
+    if (redirecting) return;
+    setRedirecting(true);
+    window.setTimeout(() => {
+      window.location.href = api.googleLoginUrl();
+    }, 600);
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md text-center">
-        <div className="mb-6 flex flex-col items-center">
-          <MaliLogo showSubtitle={false} imageClassName="h-14" className="px-0" />
-          <p className="mt-3 text-sm font-medium tracking-wide text-muted">
-            MALI ONE
-          </p>
-        </div>
-        <p className="mb-8 text-sm text-muted">
-          Acceso exclusivo para cuentas <strong>@mali.pe</strong>
-        </p>
-        <Button
-          className="w-full"
-          onClick={() => {
-            window.location.href = api.googleLoginUrl();
-          }}
+    <div className="login-shell relative flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+      {redirecting && (
+        <div
+          className="login-progress-track"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Conectando con Google"
         >
-          Continuar con Google
-        </Button>
-      </Card>
+          <div className="login-progress-fill" />
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <div className="login-ambient login-ambient-a" />
+        <div className="login-ambient login-ambient-b" />
+        <div className="login-grid-overlay" />
+      </div>
+
+      <div className="relative flex w-full max-w-sm flex-col gap-6">
+        <Link
+          to="/"
+          className="login-fade-up login-stagger-1 flex items-center gap-3 self-center font-medium"
+        >
+          <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
+            <img
+              src={MALI_LOGO_URL}
+              alt=""
+              className="h-6 w-auto object-contain"
+            />
+          </div>
+          <div className="text-left leading-tight">
+            <span className="block text-sm font-semibold tracking-wide">MALI ONE</span>
+            <span className="block text-xs text-muted-foreground">
+              Operaciones internas
+            </span>
+          </div>
+        </Link>
+
+        <div className="login-card-enter login-stagger-2">
+          <LoginForm onGoogleLogin={handleGoogleLogin} redirecting={redirecting} />
+        </div>
+      </div>
     </div>
   );
 }
