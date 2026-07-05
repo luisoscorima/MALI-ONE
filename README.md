@@ -27,7 +27,7 @@ Ver sugerencias de evolución en [docs/MEJORAS-PROXIMAS.md](docs/MEJORAS-PROXIMA
 
 - **API:** NestJS + Prisma + PostgreSQL + Redis
 - **Web:** React 19 + Vite + Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com) (Radix)
-- **QR (API):** `qr-code-styling-node` + `canvas`
+- **QR (API):** `@loskir/styled-qr-code-node` (skia-canvas, prebuilds Linux)
 - **QR (Web):** `qr-code-styling` (preview en vivo)
 - **Gráficos:** Recharts (estadísticas de enlaces)
 - **Excel:** `xlsx` (importación masiva en enlaces)
@@ -280,7 +280,7 @@ En Docker, al arrancar el contenedor `api` solo se aplican migraciones. El seed 
 
 ### QR en Docker (API)
 
-La generación de QR en el servidor usa el paquete nativo `canvas`. La imagen de la API usa **`node:20-bookworm-slim`** (no Alpine) con librerías Cairo/Pango en runtime. Si actualizas desde una versión anterior Alpine, reconstruye la imagen:
+La generación de QR usa `@loskir/styled-qr-code-node` (skia-canvas con binarios precompilados). La imagen API usa **`node:20-bookworm-slim`**. Reconstruir sin caché tras cambios de dependencias nativas:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml build --no-cache api

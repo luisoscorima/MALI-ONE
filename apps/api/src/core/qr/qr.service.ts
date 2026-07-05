@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import QRCodeStyling from 'qr-code-styling-node';
+import { QRCodeCanvas } from '@loskir/styled-qr-code-node';
 import type { QrStyleDto } from '@mali-one/shared';
 import { getLogoUrl, hasLogo } from './qr-style.util';
 
@@ -60,14 +60,12 @@ export class QrService {
     return this.generateBuffer(url, style, qrLogoKey, format, width);
   }
 
-  private async generateBuffer(
+  private buildQrInstance(
     url: string,
     style: QrStyleDto,
     qrLogoKey: string | null | undefined,
-    format: 'png' | 'svg',
     width: number,
-  ): Promise<Buffer> {
-    const drawType = format === 'svg' ? 'svg' : 'canvas';
+  ) {
     const logoUrl = getLogoUrl(style, qrLogoKey, (key) =>
       this.buildS3PublicUrl(key),
     );
@@ -82,16 +80,23 @@ export class QrService {
         ? 'rgba(255,255,255,0)'
         : (style.backgroundColor ?? '#ffffff');
 
-    const qr = new QRCodeStyling({
+    const gradient = style.foregroundGradient
+      ? {
+          type: style.foregroundGradient.type,
+          rotation: style.foregroundGradient.rotation ?? 0,
+          colorStops: style.foregroundGradient.colorStops,
+        }
+      : undefined;
+
+    return new QRCodeCanvas({
       width,
       height: width,
-      type: drawType,
       data: url,
       margin: style.margin ?? 8,
+      image: logoUrl,
       qrOptions: {
         errorCorrectionLevel: withLogo ? 'H' : 'M',
       },
-      image: logoUrl,
       imageOptions: {
         hideBackgroundDots: true,
         imageSize: style.logoSize ?? 0.25,
@@ -101,51 +106,33 @@ export class QrService {
       dotsOptions: {
         type: style.bodyShape,
         color: fgColor,
-        gradient: style.foregroundGradient
-          ? {
-              type: style.foregroundGradient.type,
-              rotation: style.foregroundGradient.rotation ?? 0,
-              colorStops: style.foregroundGradient.colorStops,
-            }
-          : undefined,
+        gradient,
       },
       cornersSquareOptions: {
         type: style.eyeFrameShape,
         color: fgColor,
-        gradient: style.foregroundGradient
-          ? {
-              type: style.foregroundGradient.type,
-              rotation: style.foregroundGradient.rotation ?? 0,
-              colorStops: style.foregroundGradient.colorStops,
-            }
-          : undefined,
+        gradient,
       },
       cornersDotOptions: {
         type: style.eyeShape,
         color: fgColor,
-        gradient: style.foregroundGradient
-          ? {
-              type: style.foregroundGradient.type,
-              rotation: style.foregroundGradient.rotation ?? 0,
-              colorStops: style.foregroundGradient.colorStops,
-            }
-          : undefined,
+        gradient,
       },
       backgroundOptions: {
         color: bg,
       },
     });
+  }
 
-    const raw = await qr.getRawData(format === 'svg' ? 'svg' : 'png');
-    if (!raw) {
-      throw new Error('No se pudo generar el QR');
-    }
-    if (Buffer.isBuffer(raw)) return raw;
-    if (raw instanceof Blob) {
-      const ab = await raw.arrayBuffer();
-      return Buffer.from(ab);
-    }
-    return Buffer.from(raw as ArrayBuffer);
+  private async generateBuffer(
+    url: string,
+    style: QrStyleDto,
+    qrLogoKey: string | null | undefined,
+    format: 'png' | 'svg',
+    width: number,
+  ): Promise<Buffer> {
+    const qr = this.buildQrInstance(url, style, qrLogoKey, width);
+    return qr.toBuffer(format);
   }
 
   private svgToEps(svg: string): string {

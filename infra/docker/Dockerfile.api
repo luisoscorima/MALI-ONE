@@ -1,12 +1,11 @@
-# Debian slim: canvas (QR) no tiene prebuild para Alpine/musl; requiere Cairo en runtime.
+# Debian slim: skia-canvas (@loskir/styled-qr-code-node) trae prebuilds glibc.
 FROM node:20-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 
 FROM base AS deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 make g++ \
-    libcairo2-dev libpango1.0-dev libjpeg62-turbo-dev libgif-dev librsvg2-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages/shared/package.json ./packages/shared/
@@ -25,7 +24,8 @@ RUN pnpm --filter @mali-one/api build
 FROM node:20-bookworm-slim AS runner
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
+    ca-certificates \
+    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
