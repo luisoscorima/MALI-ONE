@@ -19,6 +19,13 @@ import { RedisService } from '../../core/redis/redis.service';
 import { S3Service } from '../../core/s3/s3.service';
 import { UpdateQrStyleDto } from './dto/update-qr-style.dto';
 
+type UploadedFile = {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+};
+
 const generateSlug = customAlphabet(
   'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
   8,
@@ -139,7 +146,7 @@ export class LinksService {
     return { created, errors };
   }
 
-  async bulkUploadFiles(user: User, files: Express.Multer.File[]) {
+  async bulkUploadFiles(user: User, files: UploadedFile[]) {
     const created: Awaited<ReturnType<typeof this.toDto>>[] = [];
     const errors: Array<{ row: number; message: string }> = [];
 
@@ -203,7 +210,7 @@ export class LinksService {
 
   async uploadFile(
     user: User,
-    file: Express.Multer.File,
+    file: UploadedFile,
     customSlug?: string,
     tags?: string[],
   ) {
@@ -218,7 +225,7 @@ export class LinksService {
 
   private async createUploadedFileLink(
     user: User,
-    file: Express.Multer.File,
+    file: UploadedFile,
     customSlug?: string,
     tags?: string[],
   ) {
@@ -412,7 +419,7 @@ export class LinksService {
     data: string,
     input: UpdateQrStyleDto,
     linkId?: string,
-    logoFile?: Express.Multer.File,
+    logoFile?: UploadedFile,
     width = 260,
   ): Promise<Buffer> {
     const style = this.mergeQrStyle({ ...DEFAULT_QR_STYLE }, input);
@@ -458,7 +465,7 @@ export class LinksService {
     user: User,
     id: string,
     input: UpdateQrStyleDto,
-    logoFile?: Express.Multer.File,
+    logoFile?: UploadedFile,
     saveAsDefault = false,
   ) {
     const link = await this.findOwnedLink(user, id);

@@ -30,6 +30,13 @@ import { parseQrPreviewPayload } from './dto/qr-preview.dto';
 import { LinksService } from './links.service';
 import type { QrExportFormat } from '../../core/qr/qr.service';
 
+type UploadedFile = {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+  size: number;
+};
+
 function parseTagsInput(raw?: string | string[]): string[] | undefined {
   if (raw === undefined || raw === '') return undefined;
   const values = Array.isArray(raw) ? raw : raw.split(',');
@@ -76,7 +83,7 @@ export class LinksController {
   @UseInterceptors(FilesInterceptor('files', 50))
   bulkUpload(
     @Req() req: Request,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles() files: UploadedFile[],
   ) {
     return this.links.bulkUploadFiles(req.user as User, files ?? []);
   }
@@ -85,7 +92,7 @@ export class LinksController {
   @UseInterceptors(FileInterceptor('file'))
   upload(
     @Req() req: Request,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedFile,
     @Body('customSlug') customSlug?: string,
     @Body('tags') tagsRaw?: string,
   ) {
@@ -115,12 +122,19 @@ export class LinksController {
   async qrPreview(
     @Req() req: Request,
     @Body('payload') payloadRaw: string | undefined,
-    @UploadedFile() logo: Express.Multer.File | undefined,
+    @UploadedFile() logo: UploadedFile | undefined,
     @Res() res: Response,
+    @Query('width') width?: string,
   ) {
     if (!payloadRaw) {
       throw new BadRequestException('Payload de vista previa requerido');
     }
+
+    const parsedWidth = width ? Number(width) : 260;
+    const safeWidth = Number.isFinite(parsedWidth)
+      ? Math.min(Math.max(parsedWidth, 128), 1024)
+      : 260;
+
     const { data, style, linkId } = parseQrPreviewPayload(payloadRaw);
     const buffer = await this.links.generateQrPreview(
       req.user as User,
@@ -128,6 +142,7 @@ export class LinksController {
       style,
       linkId,
       logo,
+      safeWidth,
     );
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'no-store');
@@ -169,7 +184,7 @@ export class LinksController {
     @Param('id') id: string,
     @Body('payload') payloadRaw: string | undefined,
     @Body() body: UpdateQrStyleDto,
-    @UploadedFile() logo?: Express.Multer.File,
+    @UploadedFile() logo?: UploadedFile,
     @Query('saveAsDefault') saveAsDefault?: string,
   ) {
     let input: UpdateQrStyleDto = body;
@@ -207,8 +222,9 @@ export class LinksController {
     @Query('format') format?: string,
     @Query('width') width?: string,
   ) {
-    const fmt = (['png', 'svg', 'eps'].includes(format ?? '')
-      ? format
+    const normalizedFormat = format?.toLowerCase();
+    const fmt = (['png', 'svg', 'eps'].includes(normalizedFormat ?? '')
+      ? normalizedFormat
       : 'png') as QrExportFormat;
     const parsedWidth = width ? Number(width) : 512;
     const safeWidth = Number.isFinite(parsedWidth)
@@ -223,6 +239,7 @@ export class LinksController {
     );
 
     res.setHeader('Content-Type', mimeType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader(
       'Content-Disposition',
       `attachment; filename="qr-${id.slice(-8)}.${extension}"`,
