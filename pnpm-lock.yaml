@@ -6,7 +6,7 @@ settings:
 
 patchedDependencies:
   '@loskir/styled-qr-code-node@2.0.0':
-    hash: wcpfwxa4ukbam6w7kpqcilbhoq
+    hash: lve6db4pkbaxxdqzn3rqj4k56m
     path: patches/@loskir__styled-qr-code-node@2.0.0.patch
 
 importers:
@@ -23,7 +23,7 @@ importers:
         version: 3.1075.0
       '@loskir/styled-qr-code-node':
         specifier: ^2.0.0
-        version: 2.0.0(patch_hash=wcpfwxa4ukbam6w7kpqcilbhoq)
+        version: 2.0.0(patch_hash=lve6db4pkbaxxdqzn3rqj4k56m)
       '@mali-one/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -5529,7 +5529,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@loskir/styled-qr-code-node@2.0.0(patch_hash=wcpfwxa4ukbam6w7kpqcilbhoq)':
+  '@loskir/styled-qr-code-node@2.0.0(patch_hash=lve6db4pkbaxxdqzn3rqj4k56m)':
     dependencies:
       qrcode-generator: 2.0.4
       skia-canvas: 3.0.8
