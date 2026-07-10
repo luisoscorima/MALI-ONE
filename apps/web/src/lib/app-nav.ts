@@ -8,6 +8,7 @@ import {
   Landmark,
   LayoutDashboard,
   Link2,
+  MonitorPlay,
   Shield,
   Users,
 } from 'lucide-react';
@@ -48,6 +49,12 @@ export const appNavSections: AppNavSection[] = [
         label: 'Gestor S3',
         icon: HardDrive,
         module: 's3_manager',
+      },
+      {
+        to: '/admin/screen-cast',
+        label: 'Transmisión a pantallas',
+        icon: MonitorPlay,
+        module: 'screen_cast',
       },
       {
         to: '/vault',

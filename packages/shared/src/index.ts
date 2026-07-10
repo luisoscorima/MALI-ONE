@@ -8,7 +8,58 @@ export type AppModule =
   | 'widget_educacion'
   | 'widget_biblioteca'
   | 'widget_museo'
-  | 'pam_memberships';
+  | 'pam_memberships'
+  | 'screen_cast';
+
+export type ScreenCastMediaType = 'image' | 'video' | 'gif';
+
+export interface ScreenCastPlaylistItemDto {
+  id: string;
+  playlistId: string;
+  mediaUrl: string;
+  mediaType: ScreenCastMediaType;
+  durationMs: number;
+  sortOrder: number;
+  activo: boolean;
+}
+
+export interface ScreenCastPlaylistDto {
+  id: string;
+  name: string;
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+  items?: ScreenCastPlaylistItemDto[];
+  monitorCount?: number;
+}
+
+export interface ScreenCastMonitorDto {
+  id: string;
+  screenKey: string;
+  name: string;
+  location: string | null;
+  playlistId: string | null;
+  playlistName?: string | null;
+  lastSeenAt: string | null;
+  online: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScreenCastPublicItemDto {
+  mediaUrl: string;
+  mediaType: ScreenCastMediaType;
+  durationMs: number;
+}
+
+export interface ScreenCastPublicConfigDto {
+  screenKey: string;
+  name: string;
+  empty: boolean;
+  playlistId: string | null;
+  playlistName: string | null;
+  items: ScreenCastPublicItemDto[];
+}
 
 import { APP_PERMISSION_MODULES } from './permissions';
 

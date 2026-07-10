@@ -7,6 +7,7 @@ import {
   KeyRound,
   Landmark,
   Link2,
+  MonitorPlay,
   Users,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
@@ -32,6 +33,12 @@ export const moduleMeta: Record<
     icon: HardDrive,
     group: 'operaciones',
     accent: 'emerald',
+  },
+  screen_cast: {
+    to: '/admin/screen-cast',
+    icon: MonitorPlay,
+    group: 'operaciones',
+    accent: 'cyan',
   },
   password_vault: {
     to: '/vault',

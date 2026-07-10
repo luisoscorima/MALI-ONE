@@ -9,6 +9,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.widget_biblioteca,
   AppModule.widget_museo,
   AppModule.pam_memberships,
+  AppModule.screen_cast,
 ];
 
 type UserWithModules = User & {

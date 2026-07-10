@@ -45,4 +45,9 @@ export const APP_MODULES: {
     label: 'Membresías PAM',
     description: 'Planes, beneficios, registros y pagos del programa.',
   },
+  {
+    id: 'screen_cast',
+    label: 'Transmisión a pantallas',
+    description: 'Playlists y monitores para tótems y quioscos.',
+  },
 ];

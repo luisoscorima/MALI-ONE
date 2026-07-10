@@ -5,5 +5,6 @@ import { S3ManagerService } from './s3-manager.service';
 @Module({
   controllers: [S3ManagerController],
   providers: [S3ManagerService],
+  exports: [S3ManagerService],
 })
 export class S3ManagerModule {}

@@ -21,6 +21,13 @@ enum AppModule {
   widget_biblioteca
   widget_museo
   pam_memberships
+  screen_cast
+}
+
+enum ScreenCastMediaType {
+  image
+  video
+  gif
 }
 
 enum PamEmailStatus {
@@ -294,4 +301,41 @@ model PamRegistration {
 
   @@index([correo])
   @@index([mpStatus])
+}
+
+model ScreenCastPlaylist {
+  id        String                   @id @default(cuid())
+  name      String
+  activo    Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+  items     ScreenCastPlaylistItem[]
+  monitors  ScreenCastMonitor[]
+}
+
+model ScreenCastPlaylistItem {
+  id         String              @id @default(cuid())
+  playlistId String
+  playlist   ScreenCastPlaylist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  mediaUrl   String
+  mediaType  ScreenCastMediaType
+  durationMs Int                 @default(10000)
+  sortOrder  Int                 @default(0)
+  activo     Boolean             @default(true)
+
+  @@index([playlistId, sortOrder])
+}
+
+model ScreenCastMonitor {
+  id         String              @id @default(cuid())
+  screenKey  String              @unique
+  name       String
+  location   String?
+  playlistId String?
+  playlist   ScreenCastPlaylist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  lastSeenAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([playlistId])
 }

@@ -318,3 +318,9 @@ body {
     @apply font-sans;
   }
 }
+
+/* Kiosk player: hide mouse cursor on physical screens */
+.screen-cast-player,
+.screen-cast-player * {
+  cursor: none !important;
+}

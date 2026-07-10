@@ -496,4 +496,145 @@ export const api = {
     request<import('@mali-one/shared').MuseoPopupSettingsDto>(
       '/api/widgets/museo/popup',
     ),
+
+  // --- Screen Cast ---
+
+  listScreenCastPlaylists: () =>
+    request<
+      (import('@mali-one/shared').ScreenCastPlaylistDto & {
+        _count?: { monitors: number; items: number };
+      })[]
+    >('/api/screen-cast/playlists'),
+
+  getScreenCastPlaylist: (id: string) =>
+    request<
+      import('@mali-one/shared').ScreenCastPlaylistDto & {
+        items: import('@mali-one/shared').ScreenCastPlaylistItemDto[];
+        _count?: { monitors: number };
+      }
+    >(`/api/screen-cast/playlists/${id}`),
+
+  createScreenCastPlaylist: (body: { name: string; activo?: boolean }) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistDto>(
+      '/api/screen-cast/playlists',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateScreenCastPlaylist: (
+    id: string,
+    body: { name?: string; activo?: boolean },
+  ) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistDto>(
+      `/api/screen-cast/playlists/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteScreenCastPlaylist: (id: string) =>
+    request<{ ok: boolean }>(`/api/screen-cast/playlists/${id}`, {
+      method: 'DELETE',
+    }),
+
+  createScreenCastPlaylistItem: (
+    playlistId: string,
+    body: {
+      mediaUrl: string;
+      mediaType: import('@mali-one/shared').ScreenCastMediaType;
+      durationMs?: number;
+      sortOrder?: number;
+      activo?: boolean;
+    },
+  ) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistItemDto>(
+      `/api/screen-cast/playlists/${playlistId}/items`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateScreenCastPlaylistItem: (
+    id: string,
+    body: Partial<{
+      mediaUrl: string;
+      mediaType: import('@mali-one/shared').ScreenCastMediaType;
+      durationMs: number;
+      sortOrder: number;
+      activo: boolean;
+    }>,
+  ) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistItemDto>(
+      `/api/screen-cast/items/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteScreenCastPlaylistItem: (id: string) =>
+    request<{ ok: boolean }>(`/api/screen-cast/items/${id}`, {
+      method: 'DELETE',
+    }),
+
+  listScreenCastMonitors: () =>
+    request<import('@mali-one/shared').ScreenCastMonitorDto[]>(
+      '/api/screen-cast/monitors',
+    ),
+
+  getScreenCastMonitor: (id: string) =>
+    request<import('@mali-one/shared').ScreenCastMonitorDto>(
+      `/api/screen-cast/monitors/${id}`,
+    ),
+
+  createScreenCastMonitor: (body: {
+    screenKey: string;
+    name: string;
+    location?: string;
+    playlistId?: string | null;
+  }) =>
+    request<import('@mali-one/shared').ScreenCastMonitorDto>(
+      '/api/screen-cast/monitors',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateScreenCastMonitor: (
+    id: string,
+    body: Partial<{
+      screenKey: string;
+      name: string;
+      location: string | null;
+      playlistId: string | null;
+    }>,
+  ) =>
+    request<import('@mali-one/shared').ScreenCastMonitorDto>(
+      `/api/screen-cast/monitors/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteScreenCastMonitor: (id: string) =>
+    request<{ ok: boolean }>(`/api/screen-cast/monitors/${id}`, {
+      method: 'DELETE',
+    }),
+
+  getScreenCastPublicConfig: (screenKey: string) =>
+    request<import('@mali-one/shared').ScreenCastPublicConfigDto>(
+      `/api/screen-cast/screens/${encodeURIComponent(screenKey)}/config`,
+    ),
+
+  listScreenCastS3Buckets: () =>
+    request<import('@mali-one/shared').S3BucketInfo[]>(
+      '/api/screen-cast/s3/buckets',
+    ),
+
+  listScreenCastS3Objects: (
+    bucket: string,
+    prefix?: string,
+    continuationToken?: string,
+  ) => {
+    const params = new URLSearchParams();
+    if (prefix) params.set('prefix', prefix);
+    if (continuationToken) params.set('continuationToken', continuationToken);
+    const qs = params.toString();
+    return request<import('@mali-one/shared').S3ListObjectsResult>(
+      `/api/screen-cast/s3/buckets/${encodeURIComponent(bucket)}/objects${qs ? `?${qs}` : ''}`,
+    );
+  },
+
+  getScreenCastS3PublicUrl: (bucket: string, key: string) =>
+    request<import('@mali-one/shared').S3PublicUrlResult>(
+      `/api/screen-cast/s3/buckets/${encodeURIComponent(bucket)}/public-url?key=${encodeURIComponent(key)}`,
+    ),
 };

@@ -13,6 +13,11 @@ import { LinksPage } from '@/pages/links-page';
 import { LoginPage } from '@/pages/login-page';
 import { PasswordVaultPage } from '@/pages/password-vault-page';
 import { S3ManagerPage } from '@/pages/s3-manager-page';
+import { ScreenCastHubPage } from '@/pages/screen-cast-hub-page';
+import { ScreenCastMonitorsPage } from '@/pages/screen-cast-monitors-page';
+import { ScreenCastPlaylistsPage } from '@/pages/screen-cast-playlists-page';
+import { ScreenCastPlaylistDetailPage } from '@/pages/screen-cast-playlist-detail-page';
+import { ScreenCastPlayerPage } from '@/pages/screen-cast-player-page';
 import { WidgetBibliotecaCarruselPage } from '@/pages/widget-biblioteca-carrusel-page';
 import { WidgetBibliotecaHubPage } from '@/pages/widget-biblioteca-hub-page';
 import { WidgetEducacionAliadosPage } from '@/pages/widget-educacion-aliados-page';
@@ -36,6 +41,7 @@ export function App() {
         <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
           <Route element={<AuthGuard />}>
             <Route element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
@@ -47,6 +53,21 @@ export function App() {
               </Route>
               <Route element={<ModuleGuard module="s3_manager" />}>
                 <Route path="admin/s3" element={<S3ManagerPage />} />
+              </Route>
+              <Route element={<ModuleGuard module="screen_cast" />}>
+                <Route path="admin/screen-cast" element={<ScreenCastHubPage />} />
+                <Route
+                  path="admin/screen-cast/monitors"
+                  element={<ScreenCastMonitorsPage />}
+                />
+                <Route
+                  path="admin/screen-cast/playlists"
+                  element={<ScreenCastPlaylistsPage />}
+                />
+                <Route
+                  path="admin/screen-cast/playlists/:id"
+                  element={<ScreenCastPlaylistDetailPage />}
+                />
               </Route>
               <Route element={<ModuleGuard module="password_vault" />}>
                 <Route path="vault" element={<PasswordVaultPage />} />

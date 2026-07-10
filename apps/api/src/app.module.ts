@@ -19,6 +19,7 @@ import { LinksModule } from './modules/links/links.module';
 import { S3ManagerModule } from './modules/s3-manager/s3-manager.module';
 import { WidgetsModule } from './modules/widgets/widgets.module';
 import { PamModule } from './modules/pam/pam.module';
+import { ScreenCastModule } from './modules/screen-cast/screen-cast.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PamModule } from './modules/pam/pam.module';
     AppUsersModule,
     WidgetsModule,
     PamModule,
+    ScreenCastModule,
   ],
   controllers: [HealthController],
   providers: [
