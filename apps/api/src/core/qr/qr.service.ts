@@ -173,7 +173,45 @@ export class QrService {
     );
     const qr = new QRCodeCanvas(options);
     const output = await qr.toBuffer(format);
-    return Buffer.isBuffer(output) ? output : Buffer.from(String(output), 'utf8');
+    const buffer = Buffer.isBuffer(output)
+      ? output
+      : Buffer.from(String(output), 'utf8');
+
+    // skia-canvas serializa subpaths con "ZM{origen}L{siguiente}" (líneas al
+    // primer punto). Adobe Illustrator/Photoshop las dibujan como un estallido.
+    if (format === 'svg') {
+      return this.sanitizeSvgForVectorEditors(buffer);
+    }
+
+    return buffer;
+  }
+
+  /**
+   * Corrige paths SVG generados por skia-canvas: tras cada Z, en lugar de un
+   * moveto limpio al siguiente módulo, inserta M al origen del path + L al
+   * destino. Eso produce las líneas radiales al abrir en Illustrator/Photoshop.
+   */
+  private sanitizeSvgForVectorEditors(svg: Buffer): Buffer {
+    const source = svg.toString('utf8');
+    const cleaned = source.replace(/\bd="([^"]*)"/g, (full, d: string) => {
+      const first = d.match(/^M\s*([-\d.]+)[\s,]+([-\d.]+)/);
+      if (!first) {
+        return full;
+      }
+
+      const originX = first[1];
+      const originY = first[2];
+      const escape = (value: string) =>
+        value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const connector = new RegExp(
+        `Z\\s*M\\s*${escape(originX)}[\\s,]+${escape(originY)}\\s*L`,
+        'g',
+      );
+
+      return `d="${d.replace(connector, 'ZM')}"`;
+    });
+
+    return Buffer.from(cleaned, 'utf8');
   }
 
   private async toEmbeddedImageUrl(imageUrl: string): Promise<string> {
