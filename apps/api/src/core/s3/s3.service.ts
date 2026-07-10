@@ -38,6 +38,14 @@ export class S3Service {
     return `uploads/${year}/${month}/${randomUUID()}-${safeName}`;
   }
 
+  buildScreenCastKey(fileName: string): string {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `screen-cast/${year}/${month}/${randomUUID()}-${safeName}`;
+  }
+
   buildQrLogoKey(linkId: string, fileName: string): string {
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     return `qr-logos/${linkId}/${randomUUID()}-${safeName}`;

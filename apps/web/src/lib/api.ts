@@ -639,4 +639,18 @@ export const api = {
     request<import('@mali-one/shared').S3PublicUrlResult>(
       `/api/screen-cast/s3/buckets/${encodeURIComponent(bucket)}/public-url?key=${encodeURIComponent(key)}`,
     ),
+
+  uploadScreenCastMedia: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<{
+      url: string;
+      key: string;
+      mediaType: import('@mali-one/shared').ScreenCastMediaType;
+      fileName: string;
+    }>('/api/screen-cast/s3/upload', {
+      method: 'POST',
+      body: form,
+    });
+  },
 };

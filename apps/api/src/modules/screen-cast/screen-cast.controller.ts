@@ -7,7 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule } from '@prisma/client';
 import { Public } from '../../core/guards/public.decorator';
 import { RequireModule } from '../../core/guards/module.decorator';
@@ -22,6 +25,13 @@ import {
 } from './dto/screen-cast.dto';
 import { ScreenCastGateway } from './screen-cast.gateway';
 import { ScreenCastService } from './screen-cast.service';
+
+type UploadedMediaFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
 
 @Controller('screen-cast')
 export class ScreenCastController {
@@ -156,7 +166,14 @@ export class ScreenCastController {
     return this.service.deleteMonitor(id);
   }
 
-  // --- S3 picker (reuses S3 manager, gated by screen_cast) ---
+  // --- S3 picker + upload (gated by screen_cast) ---
+
+  @Post('s3/upload')
+  @RequireModule(AppModule.screen_cast)
+  @UseInterceptors(FileInterceptor('file'))
+  uploadMedia(@UploadedFile() file: UploadedMediaFile) {
+    return this.service.uploadMedia(file);
+  }
 
   @Get('s3/buckets')
   @RequireModule(AppModule.screen_cast)

@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ScreenCastMediaType,
   ScreenCastMonitor,
@@ -10,6 +12,7 @@ import {
   ScreenCastPlaylistItem,
 } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { S3Service } from '../../core/s3/s3.service';
 import {
   CreateScreenCastMonitorDto,
   CreateScreenCastPlaylistDto,
@@ -21,9 +24,58 @@ import {
 
 const ONLINE_THRESHOLD_MS = 90_000;
 
+const ALLOWED_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'video/mp4',
+]);
+
+type UploadedFile = {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+};
+
 @Injectable()
 export class ScreenCastService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3: S3Service,
+    private readonly config: ConfigService,
+  ) {}
+
+  async uploadMedia(file: UploadedFile | undefined) {
+    if (!file) {
+      throw new BadRequestException('Archivo requerido');
+    }
+
+    const mime = (file.mimetype || '').toLowerCase();
+    if (!ALLOWED_MIME.has(mime)) {
+      throw new BadRequestException(
+        'Formato no permitido. Usa JPG, PNG, GIF o MP4.',
+      );
+    }
+
+    const maxMb = Number(
+      this.config.get('SCREEN_CAST_UPLOAD_MAX_MB') ??
+        this.config.get('UPLOAD_MAX_MB') ??
+        50,
+    );
+    if (file.size > maxMb * 1024 * 1024) {
+      throw new BadRequestException(`El archivo supera ${maxMb} MB`);
+    }
+
+    const key = this.s3.buildScreenCastKey(file.originalname);
+    const url = await this.s3.uploadFile(key, file.buffer, file.mimetype);
+
+    let mediaType: ScreenCastMediaType = ScreenCastMediaType.image;
+    if (mime === 'video/mp4') mediaType = ScreenCastMediaType.video;
+    else if (mime === 'image/gif') mediaType = ScreenCastMediaType.gif;
+
+    return { url, key, mediaType, fileName: file.originalname };
+  }
 
   // --- Playlists ---
 
