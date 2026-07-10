@@ -35,6 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Public kiosk player — never call /api/auth/me (avoids 401 noise in console)
+    if (window.location.pathname === '/screen-cast') {
+      setLoading(false);
+      return;
+    }
     void refresh();
   }, [refresh]);
 

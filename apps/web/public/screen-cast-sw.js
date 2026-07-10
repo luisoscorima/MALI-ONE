@@ -1,9 +1,22 @@
-/* Screen-cast offline cache for kiosk players (v2 — CORS-safe) */
-const CONFIG_CACHE = 'screen-cast-config-v2';
-const MEDIA_CACHE = 'screen-cast-media-v2';
-const SHELL_CACHE = 'screen-cast-shell-v2';
+/* Screen-cast offline cache for kiosk players (v3 — skip external CORS) */
+const CONFIG_CACHE = 'screen-cast-config-v3';
+const MEDIA_CACHE = 'screen-cast-media-v3';
+const SHELL_CACHE = 'screen-cast-shell-v3';
 
 const SHELL_URLS = ['/screen-cast', '/index.html'];
+
+function isCorsCacheableMediaUrl(urlString) {
+  try {
+    const url = new URL(urlString);
+    if (url.origin === self.location.origin) return true;
+    const host = url.hostname.toLowerCase();
+    if (host.endsWith('.amazonaws.com')) return true;
+    if (host.endsWith('.cloudfront.net')) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -54,8 +67,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cross-origin media: never reject — cache hit, or soft network, or opaque fallback
+  // Cross-origin: only intercept cacheable origins (S3 / same-site CDN).
+  // External hosts (WordPress mali.pe, etc.) pass through to the browser —
+  // no CORS fetch attempts, so the console stays clean. Those assets need
+  // network and are not available offline.
   if (url.origin !== self.location.origin) {
+    if (!isCorsCacheableMediaUrl(request.url)) return;
     event.respondWith(mediaCacheFirstSafe(request, MEDIA_CACHE));
   }
 });
@@ -75,7 +92,6 @@ async function networkFirstSafe(request, cacheName) {
   } catch {
     const cached = await cache.match(request);
     if (cached) return cached;
-    // Do not throw — return a soft offline response
     return new Response(JSON.stringify({ empty: true, offline: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -84,11 +100,10 @@ async function networkFirstSafe(request, cacheName) {
 }
 
 /**
- * Media strategy:
- * 1) Serve from Cache API if present
- * 2) Try CORS fetch and cache on success
- * 3) On CORS/network failure: try no-cors (opaque) so <img>/<video> can still paint
- * 4) Never throw — avoids "Uncaught (in promise) TypeError: Failed to fetch"
+ * Media strategy for CORS-capable origins only:
+ * 1) Cache hit
+ * 2) CORS network fetch + cache
+ * 3) Soft 504 — never throw
  */
 async function mediaCacheFirstSafe(request, cacheName) {
   const cache = await caches.open(cacheName);
@@ -109,26 +124,9 @@ async function mediaCacheFirstSafe(request, cacheName) {
     }
     return fresh;
   } catch {
-    // CORS or network blocked — try opaque response (browser can still display in <img>)
-    try {
-      const opaque = await fetch(request.url, {
-        method: 'GET',
-        mode: 'no-cors',
-        credentials: 'omit',
-      });
-      // Opaque responses (status 0) can be cached for offline replay
-      try {
-        await cache.put(request, opaque.clone());
-      } catch {
-        // ignore
-      }
-      return opaque;
-    } catch {
-      // Last resort: empty body with 504 — player onError advances; no uncaught rejection
-      return new Response('', {
-        status: 504,
-        statusText: 'Media unavailable',
-      });
-    }
+    return new Response('', {
+      status: 504,
+      statusText: 'Media unavailable',
+    });
   }
 }

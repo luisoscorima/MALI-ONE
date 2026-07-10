@@ -9,6 +9,7 @@ import type {
 import { api } from '@/lib/api';
 import {
   cacheScreenCastPlaylist,
+  isCorsCacheableMediaUrl,
   registerScreenCastServiceWorker,
 } from '@/lib/screen-cast-offline';
 
@@ -29,11 +30,18 @@ function destroyVideo(video: HTMLVideoElement | null) {
   }
 }
 
+/**
+ * Socket.IO over WebSocket only (no long-polling).
+ * Uses the page origin so https → wss and http → ws automatically via /socket.io/.
+ */
 function connectScreenCastSocket(screenKey: string): Socket {
-  return io('/screen-cast', {
-    path: '/socket.io',
-    transports: ['polling', 'websocket'],
+  const isSecure = window.location.protocol === 'https:';
+  return io(`${window.location.origin}/screen-cast`, {
+    path: '/socket.io/',
+    transports: ['websocket'],
+    upgrade: false,
     withCredentials: true,
+    secure: isSecure,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 2000,
@@ -56,7 +64,6 @@ export function ScreenCastPlayerPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const indexRef = useRef(0);
   const itemsRef = useRef<ScreenCastPublicItemDto[]>([]);
-  const corsRetryRef = useRef(false);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -68,13 +75,11 @@ export function ScreenCastPlayerPage() {
   const cleanupMedia = useCallback(() => {
     clearTimer();
     destroyVideo(videoRef.current);
-    corsRetryRef.current = false;
   }, [clearTimer]);
 
   const advance = useCallback(() => {
     const len = itemsRef.current.length;
     if (len === 0) return;
-    corsRetryRef.current = false;
     const next = (indexRef.current + 1) % len;
     indexRef.current = next;
     setIndex(next);
@@ -160,19 +165,14 @@ export function ScreenCastPlayerPage() {
       if (!video) return;
 
       const onEnded = () => advance();
-      const onError = () => {
-        if (!corsRetryRef.current && video.crossOrigin) {
-          corsRetryRef.current = true;
-          video.removeAttribute('crossorigin');
-          video.src = item.mediaUrl;
-          void video.play().catch(() => advance());
-          return;
-        }
-        advance();
-      };
+      const onError = () => advance();
 
-      corsRetryRef.current = false;
-      video.crossOrigin = 'anonymous';
+      const useCors = isCorsCacheableMediaUrl(item.mediaUrl);
+      if (useCors) {
+        video.crossOrigin = 'anonymous';
+      } else {
+        video.removeAttribute('crossorigin');
+      }
       video.src = item.mediaUrl;
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
@@ -208,18 +208,14 @@ export function ScreenCastPlayerPage() {
   const showImage =
     !!current &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
+  const imageUsesCors =
+    !!current && isCorsCacheableMediaUrl(current.mediaUrl);
 
   const orientation: ScreenCastOrientation =
     config?.orientation === 'PORTRAIT' ? 'PORTRAIT' : 'LANDSCAPE';
   const isPortrait = orientation === 'PORTRAIT';
 
-  function handleImageError(e: SyntheticEvent<HTMLImageElement>) {
-    const el = e.currentTarget;
-    if (el.crossOrigin && current) {
-      el.removeAttribute('crossorigin');
-      el.src = current.mediaUrl;
-      return;
-    }
+  function handleImageError(_e: SyntheticEvent<HTMLImageElement>) {
     advance();
   }
 
@@ -276,7 +272,6 @@ export function ScreenCastPlayerPage() {
           playsInline
           loop={false}
           preload="auto"
-          crossOrigin="anonymous"
         />
 
         {showImage && current && (
@@ -286,7 +281,7 @@ export function ScreenCastPlayerPage() {
             alt=""
             className="h-full w-full object-contain"
             draggable={false}
-            crossOrigin="anonymous"
+            {...(imageUsesCors ? { crossOrigin: 'anonymous' as const } : {})}
             onError={handleImageError}
           />
         )}

@@ -43,7 +43,7 @@ function isAllowedSocketOrigin(origin: string | undefined): boolean {
     },
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
+  transports: ['websocket'],
   allowEIO3: true,
 })
 export class ScreenCastGateway implements OnGatewayConnection {
