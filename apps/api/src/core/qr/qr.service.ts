@@ -8,6 +8,7 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { buildAdobeSafeQrSvg } from './qr-adobe-svg';
 import { getLogoUrl } from './qr-style.util';
 
 const execFileAsync = promisify(execFile);
@@ -35,7 +36,12 @@ export class QrService {
     qrLogoKey?: string | null,
     width = 320,
   ): Promise<string> {
-    const buffer = await this.generateBuffer(url, style, qrLogoKey, 'png', width);
+    const buffer = await this.generatePngFromStyled(
+      url,
+      style,
+      qrLogoKey,
+      width,
+    );
     return `data:image/png;base64,${buffer.toString('base64')}`;
   }
 
@@ -50,11 +56,10 @@ export class QrService {
     const logoOverrideUrl = logoOverride
       ? `data:${logoOverride.mimeType};base64,${logoOverride.buffer.toString('base64')}`
       : undefined;
-    return this.generateBuffer(
+    return this.generatePngFromStyled(
       url,
       style,
       qrLogoKey,
-      'png',
       width,
       logoOverrideUrl,
       options?.minRenderWidth ?? 512,
@@ -68,17 +73,37 @@ export class QrService {
     qrLogoKey?: string | null,
     width = 512,
   ): Promise<Buffer> {
+    if (format === 'png') {
+      return this.generatePngFromStyled(url, style, qrLogoKey, width);
+    }
+
+    const svg = await this.generateAdobeSafeSvg(url, style, qrLogoKey, width);
     if (format === 'eps') {
-      const svg = await this.generateBuffer(
-        url,
-        style,
-        qrLogoKey,
-        'svg',
-        width,
-      );
       return this.convertSvgToEps(svg);
     }
-    return this.generateBuffer(url, style, qrLogoKey, format, width);
+    return svg;
+  }
+
+  private async generateAdobeSafeSvg(
+    url: string,
+    style: QrStyleDto,
+    qrLogoKey: string | null | undefined,
+    width: number,
+  ): Promise<Buffer> {
+    const rawLogoUrl = getLogoUrl(style, qrLogoKey, (key) =>
+      this.buildS3PublicUrl(key),
+    );
+    const logoDataUrl = rawLogoUrl
+      ? await this.toEmbeddedImageUrl(rawLogoUrl)
+      : undefined;
+
+    const svg = buildAdobeSafeQrSvg({
+      data: url,
+      width,
+      style,
+      logoDataUrl,
+    });
+    return Buffer.from(svg, 'utf8');
   }
 
   private async buildQrOptions(
@@ -87,15 +112,11 @@ export class QrService {
     qrLogoKey: string | null | undefined,
     width: number,
     logoOverrideUrl?: string,
-    options?: { embedLogoAsBase64?: boolean },
   ): Promise<QrCodeOptions> {
     const rawLogoUrl =
       logoOverrideUrl ??
       getLogoUrl(style, qrLogoKey, (key) => this.buildS3PublicUrl(key));
-    const logoUrl =
-      options?.embedLogoAsBase64 && rawLogoUrl
-        ? await this.toEmbeddedImageUrl(rawLogoUrl)
-        : rawLogoUrl;
+    const logoUrl = rawLogoUrl;
     const withLogo = Boolean(logoUrl);
 
     const fgColor = style.foregroundGradient
@@ -153,65 +174,25 @@ export class QrService {
     };
   }
 
-  private async generateBuffer(
+  private async generatePngFromStyled(
     url: string,
     style: QrStyleDto,
     qrLogoKey: string | null | undefined,
-    format: 'png' | 'svg',
     width: number,
     logoOverrideUrl?: string,
     minPngWidth = 512,
   ): Promise<Buffer> {
-    const renderWidth = format === 'png' ? Math.max(width, minPngWidth) : width;
+    const renderWidth = Math.max(width, minPngWidth);
     const options = await this.buildQrOptions(
       url,
       style,
       qrLogoKey,
       renderWidth,
       logoOverrideUrl,
-      { embedLogoAsBase64: format === 'svg' },
     );
     const qr = new QRCodeCanvas(options);
-    const output = await qr.toBuffer(format);
-    const buffer = Buffer.isBuffer(output)
-      ? output
-      : Buffer.from(String(output), 'utf8');
-
-    // skia-canvas serializa subpaths con "ZM{origen}L{siguiente}" (líneas al
-    // primer punto). Adobe Illustrator/Photoshop las dibujan como un estallido.
-    if (format === 'svg') {
-      return this.sanitizeSvgForVectorEditors(buffer);
-    }
-
-    return buffer;
-  }
-
-  /**
-   * Corrige paths SVG generados por skia-canvas: tras cada Z, en lugar de un
-   * moveto limpio al siguiente módulo, inserta M al origen del path + L al
-   * destino. Eso produce las líneas radiales al abrir en Illustrator/Photoshop.
-   */
-  private sanitizeSvgForVectorEditors(svg: Buffer): Buffer {
-    const source = svg.toString('utf8');
-    const cleaned = source.replace(/\bd="([^"]*)"/g, (full, d: string) => {
-      const first = d.match(/^M\s*([-\d.]+)[\s,]+([-\d.]+)/);
-      if (!first) {
-        return full;
-      }
-
-      const originX = first[1];
-      const originY = first[2];
-      const escape = (value: string) =>
-        value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const connector = new RegExp(
-        `Z\\s*M\\s*${escape(originX)}[\\s,]+${escape(originY)}\\s*L`,
-        'g',
-      );
-
-      return `d="${d.replace(connector, 'ZM')}"`;
-    });
-
-    return Buffer.from(cleaned, 'utf8');
+    const output = await qr.toBuffer('png');
+    return Buffer.isBuffer(output) ? output : Buffer.from(String(output), 'utf8');
   }
 
   private async toEmbeddedImageUrl(imageUrl: string): Promise<string> {
