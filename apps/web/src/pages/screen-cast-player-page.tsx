@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import type {
+  ScreenCastOrientation,
   ScreenCastPublicConfigDto,
   ScreenCastPublicItemDto,
 } from '@mali-one/shared';
@@ -18,6 +19,7 @@ function destroyVideo(video: HTMLVideoElement | null) {
   try {
     video.pause();
     video.removeAttribute('src');
+    video.removeAttribute('crossorigin');
     while (video.firstChild) {
       video.removeChild(video.firstChild);
     }
@@ -25,6 +27,19 @@ function destroyVideo(video: HTMLVideoElement | null) {
   } catch {
     // ignore cleanup errors on Tizen
   }
+}
+
+function connectScreenCastSocket(screenKey: string): Socket {
+  return io('/screen-cast', {
+    path: '/socket.io',
+    transports: ['polling', 'websocket'],
+    withCredentials: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 2000,
+    timeout: 20000,
+    auth: { screenKey },
+  });
 }
 
 export function ScreenCastPlayerPage() {
@@ -41,6 +56,7 @@ export function ScreenCastPlayerPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const indexRef = useRef(0);
   const itemsRef = useRef<ScreenCastPublicItemDto[]>([]);
+  const corsRetryRef = useRef(false);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -52,11 +68,13 @@ export function ScreenCastPlayerPage() {
   const cleanupMedia = useCallback(() => {
     clearTimer();
     destroyVideo(videoRef.current);
+    corsRetryRef.current = false;
   }, [clearTimer]);
 
   const advance = useCallback(() => {
     const len = itemsRef.current.length;
     if (len === 0) return;
+    corsRetryRef.current = false;
     const next = (indexRef.current + 1) % len;
     indexRef.current = next;
     setIndex(next);
@@ -94,10 +112,7 @@ export function ScreenCastPlayerPage() {
   useEffect(() => {
     if (!screenKey) return;
 
-    const socket = io('/screen-cast', {
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
+    const socket = connectScreenCastSocket(screenKey);
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -145,7 +160,19 @@ export function ScreenCastPlayerPage() {
       if (!video) return;
 
       const onEnded = () => advance();
-      const onError = () => advance();
+      const onError = () => {
+        if (!corsRetryRef.current && video.crossOrigin) {
+          corsRetryRef.current = true;
+          video.removeAttribute('crossorigin');
+          video.src = item.mediaUrl;
+          void video.play().catch(() => advance());
+          return;
+        }
+        advance();
+      };
+
+      corsRetryRef.current = false;
+      video.crossOrigin = 'anonymous';
       video.src = item.mediaUrl;
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
@@ -182,51 +209,88 @@ export function ScreenCastPlayerPage() {
     !!current &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
 
+  const orientation: ScreenCastOrientation =
+    config?.orientation === 'PORTRAIT' ? 'PORTRAIT' : 'LANDSCAPE';
+  const isPortrait = orientation === 'PORTRAIT';
+
+  function handleImageError(e: SyntheticEvent<HTMLImageElement>) {
+    const el = e.currentTarget;
+    if (el.crossOrigin && current) {
+      el.removeAttribute('crossorigin');
+      el.src = current.mediaUrl;
+      return;
+    }
+    advance();
+  }
+
   return (
-    <div className="screen-cast-player fixed inset-0 z-100 bg-black text-white">
-      {loading && (
-        <div className="flex h-full items-center justify-center text-sm opacity-70">
-          Cargando…
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-lg font-medium">No se pudo cargar la pantalla</p>
-          <p className="text-sm opacity-70">{error}</p>
-        </div>
-      )}
-
-      {!loading && !error && config?.empty && (
-        <div className="flex h-full items-center justify-center px-6 text-center">
-          <p className="text-2xl font-medium tracking-wide">
-            Sin contenido asignado
-          </p>
-        </div>
-      )}
-
-      {/* Keep a single video element mounted to allow strict cleanup */}
-      <video
-        ref={videoRef}
-        className={
-          showVideo ? 'h-full w-full object-contain' : 'pointer-events-none hidden'
+    <div className="screen-cast-player fixed inset-0 z-100 overflow-hidden bg-black text-white">
+      <div
+        className="flex items-center justify-center"
+        style={
+          isPortrait
+            ? {
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '100vh',
+                height: '100vw',
+                transform: 'translate(-50%, -50%) rotate(90deg)',
+              }
+            : {
+                width: '100%',
+                height: '100%',
+              }
         }
-        autoPlay
-        muted
-        playsInline
-        loop={false}
-        preload="auto"
-      />
+      >
+        {loading && (
+          <div className="flex h-full w-full items-center justify-center text-sm opacity-70">
+            Cargando…
+          </div>
+        )}
 
-      {showImage && current && (
-        <img
-          key={`${current.mediaUrl}-${index}`}
-          src={current.mediaUrl}
-          alt=""
-          className="h-full w-full object-contain"
-          draggable={false}
+        {!loading && error && (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center">
+            <p className="text-lg font-medium">No se pudo cargar la pantalla</p>
+            <p className="text-sm opacity-70">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && config?.empty && (
+          <div className="flex h-full w-full items-center justify-center px-6 text-center">
+            <p className="text-2xl font-medium tracking-wide">
+              Sin contenido asignado
+            </p>
+          </div>
+        )}
+
+        <video
+          ref={videoRef}
+          className={
+            showVideo
+              ? 'h-full w-full object-contain'
+              : 'pointer-events-none hidden'
+          }
+          autoPlay
+          muted
+          playsInline
+          loop={false}
+          preload="auto"
+          crossOrigin="anonymous"
         />
-      )}
+
+        {showImage && current && (
+          <img
+            key={`${current.mediaUrl}-${index}`}
+            src={current.mediaUrl}
+            alt=""
+            className="h-full w-full object-contain"
+            draggable={false}
+            crossOrigin="anonymous"
+            onError={handleImageError}
+          />
+        )}
+      </div>
     </div>
   );
 }

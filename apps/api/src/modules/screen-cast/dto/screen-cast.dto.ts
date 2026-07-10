@@ -8,7 +8,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ScreenCastMediaType } from '@prisma/client';
+import { ScreenCastMediaType, ScreenCastOrientation } from '@prisma/client';
 
 export class CreateScreenCastPlaylistDto {
   @IsString()
@@ -96,6 +96,10 @@ export class CreateScreenCastMonitorDto {
   location?: string;
 
   @IsOptional()
+  @IsEnum(ScreenCastOrientation)
+  orientation?: ScreenCastOrientation;
+
+  @IsOptional()
   @IsString()
   playlistId?: string | null;
 }
@@ -117,6 +121,10 @@ export class UpdateScreenCastMonitorDto {
   @IsOptional()
   @IsString()
   location?: string | null;
+
+  @IsOptional()
+  @IsEnum(ScreenCastOrientation)
+  orientation?: ScreenCastOrientation;
 
   @IsOptional()
   @IsString()

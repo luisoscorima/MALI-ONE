@@ -1,13 +1,17 @@
 import type { ScreenCastPublicConfigDto } from '@mali-one/shared';
 
 const SW_URL = '/screen-cast-sw.js';
-const CONFIG_CACHE = 'screen-cast-config-v1';
-const MEDIA_CACHE = 'screen-cast-media-v1';
+const CONFIG_CACHE = 'screen-cast-config-v2';
+const MEDIA_CACHE = 'screen-cast-media-v2';
 
 export async function registerScreenCastServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    await navigator.serviceWorker.register(SW_URL, { scope: '/screen-cast' });
+    const reg = await navigator.serviceWorker.register(SW_URL, {
+      scope: '/screen-cast',
+    });
+    // Force activate updated SW after deploy
+    void reg.update();
   } catch {
     // SW optional — player still works online
   }
@@ -33,12 +37,32 @@ export async function cacheScreenCastPlaylist(
         try {
           const existing = await mediaCache.match(item.mediaUrl);
           if (existing) return;
-          const res = await fetch(item.mediaUrl, { mode: 'cors' });
-          if (res.ok) {
-            await mediaCache.put(item.mediaUrl, res.clone());
+
+          // Prefer CORS (cacheable + readable). Fall back to no-cors opaque.
+          try {
+            const res = await fetch(item.mediaUrl, {
+              mode: 'cors',
+              credentials: 'omit',
+            });
+            if (res.ok) {
+              await mediaCache.put(item.mediaUrl, res.clone());
+              return;
+            }
+          } catch {
+            // CORS blocked — try opaque
+          }
+
+          try {
+            const opaque = await fetch(item.mediaUrl, {
+              mode: 'no-cors',
+              credentials: 'omit',
+            });
+            await mediaCache.put(item.mediaUrl, opaque.clone());
+          } catch {
+            // Skip — <img>/<video> will load natively
           }
         } catch {
-          // CORS or network — skip this asset
+          // ignore per-item failures
         }
       }),
     );

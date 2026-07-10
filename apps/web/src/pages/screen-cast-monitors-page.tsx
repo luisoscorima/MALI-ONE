@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import type {
   ScreenCastMonitorDto,
+  ScreenCastOrientation,
   ScreenCastPlaylistDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
@@ -36,6 +37,7 @@ type Draft = {
   screenKey: string;
   name: string;
   location: string;
+  orientation: ScreenCastOrientation;
   playlistId: string;
 };
 
@@ -43,6 +45,7 @@ const emptyDraft = (): Draft => ({
   screenKey: '',
   name: '',
   location: '',
+  orientation: 'LANDSCAPE',
   playlistId: '',
 });
 
@@ -97,6 +100,7 @@ export function ScreenCastMonitorsPage() {
       screenKey,
       name,
       location: draft.location.trim() || undefined,
+      orientation: draft.orientation,
       playlistId: draft.playlistId || null,
     };
     try {
@@ -197,6 +201,26 @@ export function ScreenCastMonitorsPage() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label>Orientación</Label>
+                  <Select
+                    value={draft.orientation}
+                    onValueChange={(v) =>
+                      setDraft({
+                        ...draft,
+                        orientation: v as ScreenCastOrientation,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="LANDSCAPE">Horizontal (Landscape)</SelectItem>
+                      <SelectItem value="PORTRAIT">Vertical (Portrait)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label>Playlist</Label>
                   <Select
                     value={draft.playlistId || '__none__'}
@@ -246,6 +270,7 @@ export function ScreenCastMonitorsPage() {
                     <TableHead>Estado</TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>ID</TableHead>
+                    <TableHead>Orientación</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Playlist</TableHead>
                     <TableHead className="w-36" />
@@ -262,6 +287,9 @@ export function ScreenCastMonitorsPage() {
                       <TableCell className="font-medium">{m.name}</TableCell>
                       <TableCell className="font-mono text-sm">
                         {m.screenKey}
+                      </TableCell>
+                      <TableCell>
+                        {m.orientation === 'PORTRAIT' ? 'Vertical' : 'Horizontal'}
                       </TableCell>
                       <TableCell>{m.location || '—'}</TableCell>
                       <TableCell>
@@ -298,6 +326,7 @@ export function ScreenCastMonitorsPage() {
                                 screenKey: m.screenKey,
                                 name: m.name,
                                 location: m.location ?? '',
+                                orientation: m.orientation ?? 'LANDSCAPE',
                                 playlistId: m.playlistId ?? '',
                               })
                             }

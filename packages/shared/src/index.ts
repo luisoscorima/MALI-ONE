@@ -13,6 +13,8 @@ export type AppModule =
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
 
+export type ScreenCastOrientation = 'LANDSCAPE' | 'PORTRAIT';
+
 export interface ScreenCastPlaylistItemDto {
   id: string;
   playlistId: string;
@@ -38,6 +40,7 @@ export interface ScreenCastMonitorDto {
   screenKey: string;
   name: string;
   location: string | null;
+  orientation: ScreenCastOrientation;
   playlistId: string | null;
   playlistName?: string | null;
   lastSeenAt: string | null;
@@ -55,6 +58,7 @@ export interface ScreenCastPublicItemDto {
 export interface ScreenCastPublicConfigDto {
   screenKey: string;
   name: string;
+  orientation: ScreenCastOrientation;
   empty: boolean;
   playlistId: string | null;
   playlistName: string | null;

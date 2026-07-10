@@ -30,6 +30,11 @@ enum ScreenCastMediaType {
   gif
 }
 
+enum ScreenCastOrientation {
+  LANDSCAPE
+  PORTRAIT
+}
+
 enum PamEmailStatus {
   PENDIENTE
   ENVIADO
@@ -327,15 +332,16 @@ model ScreenCastPlaylistItem {
 }
 
 model ScreenCastMonitor {
-  id         String              @id @default(cuid())
-  screenKey  String              @unique
-  name       String
-  location   String?
-  playlistId String?
-  playlist   ScreenCastPlaylist? @relation(fields: [playlistId], references: [id], onDelete: SetNull)
-  lastSeenAt DateTime?
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  id          String                @id @default(cuid())
+  screenKey   String                @unique
+  name        String
+  location    String?
+  orientation ScreenCastOrientation @default(LANDSCAPE)
+  playlistId  String?
+  playlist    ScreenCastPlaylist?   @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  lastSeenAt  DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([playlistId])
 }

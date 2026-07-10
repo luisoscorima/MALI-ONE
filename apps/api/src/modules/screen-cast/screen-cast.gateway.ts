@@ -11,10 +11,40 @@ import { Server, Socket } from 'socket.io';
 import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
+function isAllowedSocketOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  try {
+    const { hostname } = new URL(origin);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    if (hostname === 'mali.pe' || hostname.endsWith('.mali.pe')) return true;
+    const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+    if (appUrl && origin.replace(/\/$/, '') === appUrl) return true;
+    const extra = process.env.CORS_ORIGINS?.split(',') ?? [];
+    for (const raw of extra) {
+      const allowed = raw.trim().replace(/\/$/, '');
+      if (allowed && origin.replace(/\/$/, '') === allowed) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 @Public()
 @WebSocketGateway({
   namespace: '/screen-cast',
-  cors: { origin: true, credentials: true },
+  path: '/socket.io',
+  cors: {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      callback(null, isAllowedSocketOrigin(origin));
+    },
+    credentials: true,
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
 })
 export class ScreenCastGateway implements OnGatewayConnection {
   private readonly logger = new Logger(ScreenCastGateway.name);

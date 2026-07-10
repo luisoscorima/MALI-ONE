@@ -583,6 +583,7 @@ export const api = {
     screenKey: string;
     name: string;
     location?: string;
+    orientation?: import('@mali-one/shared').ScreenCastOrientation;
     playlistId?: string | null;
   }) =>
     request<import('@mali-one/shared').ScreenCastMonitorDto>(
@@ -596,6 +597,7 @@ export const api = {
       screenKey: string;
       name: string;
       location: string | null;
+      orientation: import('@mali-one/shared').ScreenCastOrientation;
       playlistId: string | null;
     }>,
   ) =>

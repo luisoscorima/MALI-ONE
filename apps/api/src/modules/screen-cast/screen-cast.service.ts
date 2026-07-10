@@ -146,6 +146,7 @@ export class ScreenCastService {
         screenKey: dto.screenKey.trim().toLowerCase(),
         name: dto.name.trim(),
         location: dto.location?.trim() || null,
+        orientation: dto.orientation ?? 'LANDSCAPE',
         playlistId: dto.playlistId || null,
       },
       include: { playlist: { select: { id: true, name: true } } },
@@ -169,6 +170,9 @@ export class ScreenCastService {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.location !== undefined
           ? { location: dto.location?.trim() || null }
+          : {}),
+        ...(dto.orientation !== undefined
+          ? { orientation: dto.orientation }
           : {}),
         ...(dto.playlistId !== undefined
           ? { playlistId: dto.playlistId || null }
@@ -212,6 +216,7 @@ export class ScreenCastService {
     return {
       screenKey: monitor.screenKey,
       name: monitor.name,
+      orientation: monitor.orientation,
       empty,
       playlistId: playlist?.id ?? null,
       playlistName: playlist?.name ?? null,
@@ -249,6 +254,7 @@ export class ScreenCastService {
       screenKey: row.screenKey,
       name: row.name,
       location: row.location,
+      orientation: row.orientation,
       playlistId: row.playlistId,
       playlistName: row.playlist?.name ?? null,
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
