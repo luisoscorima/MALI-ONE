@@ -99,3 +99,10 @@ export class UpdateQrStyleDto {
   @IsOptional()
   clearCustomLogo?: boolean;
 }
+
+/** Body híbrido: JSON directo o multipart con `payload` + archivo `logo`. */
+export class UpdateQrStyleRequestDto extends UpdateQrStyleDto {
+  @IsOptional()
+  @IsString()
+  payload?: string;
+}

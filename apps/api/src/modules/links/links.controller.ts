@@ -25,10 +25,15 @@ import { CreateWhatsappLinkDto } from './dto/create-whatsapp.dto';
 import { SaveQrDefaultStyleDto } from './dto/save-qr-default-style.dto';
 import { ShortenUrlDto } from './dto/shorten-url.dto';
 import { UpdateLinkDto } from './dto/update-link.dto';
-import { UpdateQrStyleDto } from './dto/update-qr-style.dto';
+import {
+  UpdateQrStyleDto,
+  UpdateQrStyleRequestDto,
+} from './dto/update-qr-style.dto';
 import { parseQrPreviewPayload } from './dto/qr-preview.dto';
 import { LinksService } from './links.service';
 import type { QrExportFormat } from '../../core/qr/qr.service';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 
 type UploadedFile = {
   buffer: Buffer;
@@ -179,22 +184,14 @@ export class LinksController {
 
   @Patch(':id/qr-style')
   @UseInterceptors(FileInterceptor('logo'))
-  updateQrStyle(
+  async updateQrStyle(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body('payload') payloadRaw: string | undefined,
-    @Body() body: UpdateQrStyleDto,
+    @Body() body: UpdateQrStyleRequestDto,
     @UploadedFile() logo?: UploadedFile,
     @Query('saveAsDefault') saveAsDefault?: string,
   ) {
-    let input: UpdateQrStyleDto = body;
-    if (payloadRaw) {
-      try {
-        input = JSON.parse(payloadRaw) as UpdateQrStyleDto;
-      } catch {
-        throw new BadRequestException('Payload de estilo inválido');
-      }
-    }
+    const input = await this.resolveQrStyleInput(body);
     return this.links.updateLinkQrStyle(
       req.user as User,
       id,
@@ -202,6 +199,33 @@ export class LinksController {
       logo,
       saveAsDefault === 'true' || saveAsDefault === '1',
     );
+  }
+
+  private async resolveQrStyleInput(
+    body: UpdateQrStyleRequestDto,
+  ): Promise<UpdateQrStyleDto> {
+    if (body.payload) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(body.payload);
+      } catch {
+        throw new BadRequestException('Payload de estilo inválido');
+      }
+      const input = plainToInstance(UpdateQrStyleDto, parsed);
+      const errors = await validate(input, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      if (errors.length > 0) {
+        throw new BadRequestException(
+          errors.flatMap((e) => Object.values(e.constraints ?? {})),
+        );
+      }
+      return input;
+    }
+
+    const { payload: _payload, ...style } = body;
+    return style;
   }
 
   @Delete(':id/qr-logo')
