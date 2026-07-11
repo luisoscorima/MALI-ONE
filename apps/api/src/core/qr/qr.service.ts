@@ -8,8 +8,9 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { S3Service } from '../s3/s3.service';
 import { buildAdobeSafeQrSvg } from './qr-adobe-svg';
-import { getLogoUrl } from './qr-style.util';
+import { getLogoUrl, sanitizeQrStyleForRender } from './qr-style.util';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,17 +18,14 @@ export type QrExportFormat = 'png' | 'svg' | 'eps';
 
 @Injectable()
 export class QrService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly s3: S3Service,
+  ) {}
 
   buildShortUrl(slug: string): string {
     const appUrl = this.config.getOrThrow<string>('APP_URL').replace(/\/$/, '');
     return `${appUrl}/r/${slug}`;
-  }
-
-  buildS3PublicUrl(key: string): string {
-    const region = this.config.getOrThrow<string>('AWS_REGION');
-    const bucket = this.config.getOrThrow<string>('AWS_S3_BUCKET');
-    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
   }
 
   async generateForUrl(
@@ -90,17 +88,13 @@ export class QrService {
     qrLogoKey: string | null | undefined,
     width: number,
   ): Promise<Buffer> {
-    const rawLogoUrl = getLogoUrl(style, qrLogoKey, (key) =>
-      this.buildS3PublicUrl(key),
-    );
-    const logoDataUrl = rawLogoUrl
-      ? await this.toEmbeddedImageUrl(rawLogoUrl)
-      : undefined;
+    const safeStyle = sanitizeQrStyleForRender(style);
+    const logoDataUrl = await this.resolveLogoDataUrl(safeStyle, qrLogoKey);
 
     const svg = buildAdobeSafeQrSvg({
       data: url,
       width,
-      style,
+      style: safeStyle,
       logoDataUrl,
     });
     return Buffer.from(svg, 'utf8');
@@ -113,26 +107,26 @@ export class QrService {
     width: number,
     logoOverrideUrl?: string,
   ): Promise<QrCodeOptions> {
-    const rawLogoUrl =
+    const safeStyle = sanitizeQrStyleForRender(style);
+    const logoUrl =
       logoOverrideUrl ??
-      getLogoUrl(style, qrLogoKey, (key) => this.buildS3PublicUrl(key));
-    const logoUrl = rawLogoUrl;
+      (await this.resolveLogoDataUrl(safeStyle, qrLogoKey));
     const withLogo = Boolean(logoUrl);
 
-    const fgColor = style.foregroundGradient
+    const fgColor = safeStyle.foregroundGradient
       ? undefined
-      : (style.foregroundColor ?? '#000000');
+      : (safeStyle.foregroundColor ?? '#000000');
 
     const bg =
-      style.backgroundColor === 'transparent'
+      safeStyle.backgroundColor === 'transparent'
         ? 'rgba(255,255,255,0)'
-        : (style.backgroundColor ?? '#ffffff');
+        : (safeStyle.backgroundColor ?? '#ffffff');
 
-    const gradient = style.foregroundGradient
+    const gradient = safeStyle.foregroundGradient
       ? {
-          type: style.foregroundGradient.type,
-          rotation: style.foregroundGradient.rotation ?? 0,
-          colorStops: style.foregroundGradient.colorStops,
+          type: safeStyle.foregroundGradient.type,
+          rotation: safeStyle.foregroundGradient.rotation ?? 0,
+          colorStops: safeStyle.foregroundGradient.colorStops,
         }
       : undefined;
 
@@ -142,29 +136,29 @@ export class QrService {
       width,
       height: width,
       data: url,
-      margin: style.margin ?? 8,
+      margin: safeStyle.margin ?? 8,
       image: logoUrl,
       qrOptions: {
         errorCorrectionLevel,
       },
       imageOptions: {
         hideBackgroundDots: true,
-        imageSize: style.logoSize ?? 0.25,
+        imageSize: safeStyle.logoSize ?? 0.25,
         margin: 4,
         crossOrigin: 'anonymous',
       },
       dotsOptions: {
-        type: style.bodyShape,
+        type: safeStyle.bodyShape,
         color: fgColor,
         gradient,
       },
       cornersSquareOptions: {
-        type: style.eyeFrameShape,
+        type: safeStyle.eyeFrameShape,
         color: fgColor,
         gradient,
       },
       cornersDotOptions: {
-        type: style.eyeShape,
+        type: safeStyle.eyeShape,
         color: fgColor,
         gradient,
       },
@@ -172,6 +166,31 @@ export class QrService {
         color: bg,
       },
     };
+  }
+
+  private async resolveLogoDataUrl(
+    style: QrStyleDto,
+    qrLogoKey?: string | null,
+  ): Promise<string | undefined> {
+    if (qrLogoKey) {
+      try {
+        const { buffer, contentType } = await this.s3.getFileBuffer(qrLogoKey);
+        const mime = contentType.startsWith('image/')
+          ? contentType
+          : 'image/png';
+        return `data:${mime};base64,${buffer.toString('base64')}`;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Error desconocido';
+        throw new InternalServerErrorException(
+          `No se pudo leer el logo del QR desde S3. Detalle: ${message}`,
+        );
+      }
+    }
+
+    const presetUrl = getLogoUrl(style, null);
+    if (!presetUrl) return undefined;
+    return this.toEmbeddedImageUrl(presetUrl);
   }
 
   private async generatePngFromStyled(

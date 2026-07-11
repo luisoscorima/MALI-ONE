@@ -502,19 +502,31 @@ function ColorInput({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const pickerValue = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000';
+
   return (
     <label className="block">
       <span className="mb-1 block text-xs text-muted">{label}</span>
       <div className="flex items-center gap-2">
         <input
           type="color"
-          value={value.startsWith('#') ? value : '#000000'}
+          value={pickerValue}
           onChange={(e) => onChange(e.target.value)}
           className="h-8 w-10 shrink-0 cursor-pointer rounded border border-border"
         />
         <Input
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value.trim();
+            if (/^#[0-9a-fA-F]{0,6}$/.test(next)) {
+              onChange(next.length === 7 ? next.toLowerCase() : next);
+            }
+          }}
+          onBlur={() => {
+            if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+              onChange(pickerValue);
+            }
+          }}
           className="h-8 min-w-0 font-mono text-xs"
         />
       </div>

@@ -56,3 +56,72 @@ export function hasLogo(
 ): boolean {
   return Boolean(customLogoKey || style.logoPreset);
 }
+
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const RGB_COLOR_RE = /^rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+(?:\s*,\s*[\d.]+\s*)?\)$/i;
+
+/** Normaliza colores a un formato que skia-canvas pueda parsear. */
+export function normalizeCssColor(
+  color: string | undefined | null,
+  fallback: string,
+): string {
+  if (!color || typeof color !== 'string') return fallback;
+  const trimmed = color.trim();
+  if (!trimmed) return fallback;
+  if (trimmed === 'transparent') return 'rgba(255,255,255,0)';
+  if (HEX_COLOR_RE.test(trimmed)) {
+    if (trimmed.length === 4) {
+      const [, r, g, b] = trimmed;
+      return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+    }
+    return trimmed.toLowerCase();
+  }
+  if (RGB_COLOR_RE.test(trimmed)) return trimmed;
+  return fallback;
+}
+
+export function sanitizeQrStyleForRender(style: QrStyleDto): QrStyleDto {
+  const backgroundColor =
+    style.backgroundColor === 'transparent'
+      ? 'transparent'
+      : normalizeCssColor(style.backgroundColor, '#ffffff');
+
+  const gradient = style.foregroundGradient;
+  if (gradient?.colorStops?.length) {
+    const colorStops = gradient.colorStops
+      .map((stop, index) => ({
+        offset: clamp01(Number(stop.offset)),
+        color: normalizeCssColor(
+          stop.color,
+          index === 0 ? '#000000' : '#333333',
+        ),
+      }))
+      .filter((stop) => Number.isFinite(stop.offset))
+      .sort((a, b) => a.offset - b.offset);
+
+    if (colorStops.length >= 2) {
+      return {
+        ...style,
+        backgroundColor,
+        foregroundColor: undefined,
+        foregroundGradient: {
+          type: gradient.type === 'radial' ? 'radial' : 'linear',
+          rotation: Number(gradient.rotation) || 0,
+          colorStops,
+        },
+      };
+    }
+  }
+
+  return {
+    ...style,
+    backgroundColor,
+    foregroundColor: normalizeCssColor(style.foregroundColor, '#000000'),
+    foregroundGradient: undefined,
+  };
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
+}

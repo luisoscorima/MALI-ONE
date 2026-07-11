@@ -98,4 +98,20 @@ export class S3Service {
       { expiresIn: 60 * 60 * 24 * 7 },
     );
   }
+
+  async getFileBuffer(
+    key: string,
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const result = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    const bytes = await result.Body?.transformToByteArray();
+    if (!bytes) {
+      throw new Error(`Objeto S3 vacío: ${key}`);
+    }
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: result.ContentType ?? 'application/octet-stream',
+    };
+  }
 }
