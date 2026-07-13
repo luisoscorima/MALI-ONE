@@ -101,6 +101,7 @@ export function ScreenCastAdminPage() {
   const [previewKey, setPreviewKey] = useState(0);
   const [syncingMonitors, setSyncingMonitors] = useState(false);
   const [previewMonitorId, setPreviewMonitorId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config');
 
   const loadLists = useCallback(async () => {
     try {
@@ -361,6 +362,7 @@ export function ScreenCastAdminPage() {
   function selectMonitorForPreview(monitorId: string) {
     setPreviewMonitorId(monitorId);
     setPreviewKey((k) => k + 1);
+    setActiveTab('preview');
   }
 
   if (loading) return <PageLoading />;
@@ -373,6 +375,8 @@ export function ScreenCastAdminPage() {
     <WidgetToolLayout
       title="Transmisión a pantallas"
       description="Configura listas de reproducción y monitores quiosco desde un solo panel."
+      activeTab={activeTab}
+      onActiveTabChange={setActiveTab}
       config={
         <div className="space-y-10">
           {error && <AlertBanner>{error}</AlertBanner>}

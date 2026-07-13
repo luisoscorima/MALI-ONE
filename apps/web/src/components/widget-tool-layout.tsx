@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 
+export type WidgetToolTab = 'config' | 'preview';
+
 type Props = {
   title: string;
   description?: string;
@@ -8,6 +10,9 @@ type Props = {
   config?: React.ReactNode;
   preview: React.ReactNode;
   previewOnly?: boolean;
+  /** Controlled tab. When set with onActiveTabChange, parent owns the selection. */
+  activeTab?: WidgetToolTab;
+  onActiveTabChange?: (tab: WidgetToolTab) => void;
 };
 
 export function WidgetToolLayout({
@@ -17,10 +22,19 @@ export function WidgetToolLayout({
   config,
   preview,
   previewOnly = false,
+  activeTab,
+  onActiveTabChange,
 }: Props) {
-  const [tab, setTab] = useState<'config' | 'preview'>(
+  const [uncontrolledTab, setUncontrolledTab] = useState<WidgetToolTab>(
     previewOnly ? 'preview' : 'config',
   );
+  const controlled = activeTab !== undefined && onActiveTabChange !== undefined;
+  const tab = controlled ? activeTab : uncontrolledTab;
+
+  function setTab(next: WidgetToolTab) {
+    if (controlled) onActiveTabChange(next);
+    else setUncontrolledTab(next);
+  }
 
   return (
     <div>
@@ -35,7 +49,7 @@ export function WidgetToolLayout({
       ) : (
         <Tabs
           value={tab}
-          onValueChange={(value) => setTab(value as 'config' | 'preview')}
+          onValueChange={(value) => setTab(value as WidgetToolTab)}
         >
           <TabsList className="mb-6 w-fit">
             <TabsTrigger value="config" className="flex-none px-4">
