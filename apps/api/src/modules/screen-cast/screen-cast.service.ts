@@ -22,8 +22,6 @@ import {
   UpdateScreenCastPlaylistItemDto,
 } from './dto/screen-cast.dto';
 
-const ONLINE_THRESHOLD_MS = 90_000;
-
 const ALLOWED_MIME = new Set([
   'image/jpeg',
   'image/png',
@@ -305,9 +303,6 @@ export class ScreenCastService {
       playlist?: { id: string; name: string } | null;
     },
   ) {
-    const online =
-      !!row.lastSeenAt &&
-      Date.now() - row.lastSeenAt.getTime() < ONLINE_THRESHOLD_MS;
     return {
       id: row.id,
       screenKey: row.screenKey,
@@ -317,7 +312,8 @@ export class ScreenCastService {
       playlistId: row.playlistId,
       playlistName: row.playlist?.name ?? null,
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
-      online,
+      // Live Online/Offline comes from WebSocket presence in the controller.
+      online: false,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

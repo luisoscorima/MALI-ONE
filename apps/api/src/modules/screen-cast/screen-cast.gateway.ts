@@ -2,6 +2,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -45,9 +46,16 @@ function isAllowedSocketOrigin(origin: string | undefined): boolean {
   },
   transports: ['websocket'],
   allowEIO3: true,
+  // Detect dead clients faster (laptop off / network drop).
+  pingInterval: 10_000,
+  pingTimeout: 10_000,
 })
-export class ScreenCastGateway implements OnGatewayConnection {
+export class ScreenCastGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(ScreenCastGateway.name);
+  /** Live player sockets per screenKey (excludes preview tabs). */
+  private readonly connections = new Map<string, Set<string>>();
 
   @WebSocketServer()
   server!: Server;
@@ -56,6 +64,14 @@ export class ScreenCastGateway implements OnGatewayConnection {
 
   handleConnection(client: Socket) {
     this.logger.debug(`WS connected: ${client.id}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    const key = client.data.screenKey as string | undefined;
+    if (key) {
+      this.removeConnection(key, client.id);
+    }
+    this.logger.debug(`WS disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('join')
@@ -69,6 +85,12 @@ export class ScreenCastGateway implements OnGatewayConnection {
       return { ok: false, error: 'screenKey requerido' };
     }
     const key = screenKey.toLowerCase();
+    const previous = client.data.screenKey as string | undefined;
+    if (previous && previous !== key) {
+      this.removeConnection(previous, client.id);
+    }
+    client.data.screenKey = key;
+    this.addConnection(key, client.id);
     await client.join(this.room(key));
     await this.service.recordHeartbeat(key);
     return { ok: true, screenKey: key };
@@ -76,7 +98,7 @@ export class ScreenCastGateway implements OnGatewayConnection {
 
   @SubscribeMessage('heartbeat')
   async handleHeartbeat(
-    @ConnectedSocket() _client: Socket,
+    @ConnectedSocket() client: Socket,
     @MessageBody() body: { screenKey?: string } | string,
   ) {
     const screenKey =
@@ -84,13 +106,42 @@ export class ScreenCastGateway implements OnGatewayConnection {
     if (!screenKey) {
       return { ok: false };
     }
-    const result = await this.service.recordHeartbeat(screenKey);
+    const key = screenKey.toLowerCase();
+    if (!client.data.screenKey) {
+      client.data.screenKey = key;
+      this.addConnection(key, client.id);
+      await client.join(this.room(key));
+    }
+    const result = await this.service.recordHeartbeat(key);
     return result;
+  }
+
+  isScreenConnected(screenKey: string): boolean {
+    const set = this.connections.get(screenKey.trim().toLowerCase());
+    return !!set && set.size > 0;
   }
 
   notifyPlaylistUpdated(screenKeys: string[]) {
     for (const key of screenKeys) {
       this.server.to(this.room(key)).emit('playlist:updated');
+    }
+  }
+
+  private addConnection(screenKey: string, socketId: string) {
+    let set = this.connections.get(screenKey);
+    if (!set) {
+      set = new Set();
+      this.connections.set(screenKey, set);
+    }
+    set.add(socketId);
+  }
+
+  private removeConnection(screenKey: string, socketId: string) {
+    const set = this.connections.get(screenKey);
+    if (!set) return;
+    set.delete(socketId);
+    if (set.size === 0) {
+      this.connections.delete(screenKey);
     }
   }
 

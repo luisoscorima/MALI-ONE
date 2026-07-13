@@ -127,8 +127,9 @@ export class ScreenCastController {
 
   @Get('monitors')
   @RequireModule(AppModule.screen_cast)
-  listMonitors() {
-    return this.service.listMonitors();
+  async listMonitors() {
+    const monitors = await this.service.listMonitors();
+    return monitors.map((m) => this.withLivePresence(m));
   }
 
   @Post('monitors/sync')
@@ -141,8 +142,9 @@ export class ScreenCastController {
 
   @Get('monitors/:id')
   @RequireModule(AppModule.screen_cast)
-  getMonitor(@Param('id') id: string) {
-    return this.service.getMonitor(id);
+  async getMonitor(@Param('id') id: string) {
+    const monitor = await this.service.getMonitor(id);
+    return this.withLivePresence(monitor);
   }
 
   @Post('monitors')
@@ -206,5 +208,14 @@ export class ScreenCastController {
     @Query('key') key: string,
   ) {
     return this.s3Manager.getPublicUrl(bucket, key);
+  }
+
+  private withLivePresence<T extends { screenKey: string; online: boolean }>(
+    monitor: T,
+  ): T {
+    return {
+      ...monitor,
+      online: this.gateway.isScreenConnected(monitor.screenKey),
+    };
   }
 }

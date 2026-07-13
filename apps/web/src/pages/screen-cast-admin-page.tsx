@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type {
   ScreenCastMediaType,
   ScreenCastMonitorDto,
@@ -100,6 +100,7 @@ export function ScreenCastAdminPage() {
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const [syncingMonitors, setSyncingMonitors] = useState(false);
+  const [previewMonitorId, setPreviewMonitorId] = useState<string | null>(null);
 
   const loadLists = useCallback(async () => {
     try {
@@ -149,9 +150,20 @@ export function ScreenCastAdminPage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       void api.listScreenCastMonitors().then(setMonitors).catch(() => undefined);
-    }, 15_000);
+    }, 5_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (monitors.length === 0) {
+      setPreviewMonitorId(null);
+      return;
+    }
+    setPreviewMonitorId((current) => {
+      if (current && monitors.some((m) => m.id === current)) return current;
+      return monitors[0]!.id;
+    });
+  }, [monitors]);
 
   async function createPlaylist() {
     const trimmed = newPlaylistName.trim();
@@ -346,10 +358,16 @@ export function ScreenCastAdminPage() {
     setSelectedPlaylistId(playlistId);
   }
 
+  function selectMonitorForPreview(monitorId: string) {
+    setPreviewMonitorId(monitorId);
+    setPreviewKey((k) => k + 1);
+  }
+
   if (loading) return <PageLoading />;
 
-  const previewScreenKey =
-    monitorDraft?.screenKey || monitors[0]?.screenKey;
+  const previewMonitor =
+    monitors.find((m) => m.id === previewMonitorId) ?? monitors[0] ?? null;
+  const previewScreenKey = previewMonitor?.screenKey;
 
   return (
     <WidgetToolLayout
@@ -709,7 +727,7 @@ export function ScreenCastAdminPage() {
                 <h2 className="text-lg font-medium">Monitores</h2>
                 <p className="mt-1 text-sm text-muted">
                   Registra pantallas físicas y asigna una playlist. El estado
-                  Online/Offline se actualiza con el latido cada 30s.
+                  Online/Offline refleja la conexión WebSocket en vivo.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -861,7 +879,7 @@ export function ScreenCastAdminPage() {
                       <TableHead>Orientación</TableHead>
                       <TableHead>Ubicación</TableHead>
                       <TableHead>Playlist</TableHead>
-                      <TableHead className="w-36" />
+                      <TableHead className="w-44" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -903,6 +921,15 @@ export function ScreenCastAdminPage() {
                               type="button"
                               size="icon"
                               variant="ghost"
+                              title="Previsualizar"
+                              onClick={() => selectMonitorForPreview(m.id)}
+                            >
+                              <Eye size={16} />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
                               title="Copiar URL"
                               onClick={() => copyUrl(m.screenKey)}
                             >
@@ -913,7 +940,8 @@ export function ScreenCastAdminPage() {
                               size="icon"
                               variant="ghost"
                               title="Editar"
-                              onClick={() =>
+                              onClick={() => {
+                                setPreviewMonitorId(m.id);
                                 setMonitorDraft({
                                   id: m.id,
                                   screenKey: m.screenKey,
@@ -921,8 +949,8 @@ export function ScreenCastAdminPage() {
                                   location: m.location ?? '',
                                   orientation: m.orientation ?? 'LANDSCAPE',
                                   playlistId: m.playlistId ?? '',
-                                })
-                              }
+                                });
+                              }}
                             >
                               <Pencil size={16} />
                             </Button>
@@ -947,18 +975,46 @@ export function ScreenCastAdminPage() {
         </div>
       }
       preview={
-        previewScreenKey ? (
-          <WidgetPreviewFrame
-            key={previewKey}
-            tabs={[
-              {
-                id: 'player',
-                label: `Pantalla ${previewScreenKey}`,
-                src: `/screen-cast?id=${encodeURIComponent(previewScreenKey)}`,
-                height: '540px',
-              },
-            ]}
-          />
+        previewScreenKey && previewMonitor ? (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="w-full max-w-sm space-y-2">
+                <Label htmlFor="sc-preview-monitor">Monitor a previsualizar</Label>
+                <Select
+                  value={previewMonitor.id}
+                  onValueChange={(id) => selectMonitorForPreview(id)}
+                >
+                  <SelectTrigger id="sc-preview-monitor">
+                    <SelectValue placeholder="Elige un monitor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monitors.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} ({m.screenKey})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted">
+                {previewMonitor.playlistName
+                  ? `Playlist: ${previewMonitor.playlistName}`
+                  : 'Sin playlist asignada'}
+              </p>
+            </div>
+            <WidgetPreviewFrame
+              key={`${previewKey}-${previewMonitor.id}`}
+              tabs={[
+                {
+                  id: 'player',
+                  label: previewMonitor.name,
+                  src: `/screen-cast?id=${encodeURIComponent(previewScreenKey)}`,
+                  height: '540px',
+                  previewMode: true,
+                },
+              ]}
+            />
+          </div>
         ) : (
           <EmptyState
             title="Sin vista previa"

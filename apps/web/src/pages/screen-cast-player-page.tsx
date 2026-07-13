@@ -53,6 +53,7 @@ function connectScreenCastSocket(screenKey: string): Socket {
 export function ScreenCastPlayerPage() {
   const [params] = useSearchParams();
   const screenKey = (params.get('id') ?? '').trim().toLowerCase();
+  const isPreview = params.get('preview') === '1';
   const [config, setConfig] = useState<ScreenCastPublicConfigDto | null>(null);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -115,7 +116,7 @@ export function ScreenCastPlayerPage() {
   }, [loadConfig]);
 
   useEffect(() => {
-    if (!screenKey) return;
+    if (!screenKey || isPreview) return;
 
     const socket = connectScreenCastSocket(screenKey);
     socketRef.current = socket;
@@ -134,6 +135,8 @@ export function ScreenCastPlayerPage() {
       }
     };
 
+    // Immediate heartbeat so presence is fresh without waiting for the interval.
+    sendHeartbeat();
     heartbeatRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
 
     return () => {
@@ -145,7 +148,7 @@ export function ScreenCastPlayerPage() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [screenKey, loadConfig]);
+  }, [screenKey, isPreview, loadConfig]);
 
   useEffect(() => {
     clearTimer();
