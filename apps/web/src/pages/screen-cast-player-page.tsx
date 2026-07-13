@@ -167,8 +167,9 @@ export function ScreenCastPlayerPage() {
       const onEnded = () => advance();
       const onError = () => advance();
 
-      const useCors = isCorsCacheableMediaUrl(item.mediaUrl);
-      if (useCors) {
+      // Only same-origin media may use crossOrigin. S3 signed URLs typically
+      // lack bucket CORS; setting anonymous would block the video from loading.
+      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
         video.crossOrigin = 'anonymous';
       } else {
         video.removeAttribute('crossorigin');

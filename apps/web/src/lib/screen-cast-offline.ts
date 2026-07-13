@@ -1,15 +1,30 @@
 import type { ScreenCastPublicConfigDto } from '@mali-one/shared';
 
 const SW_URL = '/screen-cast-sw.js';
-const CONFIG_CACHE = 'screen-cast-config-v3';
-const MEDIA_CACHE = 'screen-cast-media-v3';
+const CONFIG_CACHE = 'screen-cast-config-v4';
+const MEDIA_CACHE = 'screen-cast-media-v4';
 
 /**
- * Same-origin and S3/CloudFront URLs support CORS and can be cached offline.
- * External hosts (e.g. mali.pe WordPress) lack CORS headers — load without
- * crossOrigin; they only display while the monitor has internet.
+ * True only for same-origin URLs. Safe to set crossOrigin="anonymous".
+ * S3 signed URLs usually lack bucket CORS — do NOT set crossOrigin on them
+ * or the browser (and service worker) will fail the load.
  */
 export function isCorsCacheableMediaUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Origins we can cache for offline via Cache API.
+ * Cross-origin (S3/CloudFront) are fetched with mode: 'no-cors' (opaque
+ * responses) so display works without bucket CORS configuration.
+ * External hosts (e.g. mali.pe WordPress) are skipped — no offline cache.
+ */
+export function isOfflineCacheableMediaUrl(url: string): boolean {
   try {
     const parsed = new URL(url, window.location.origin);
     if (parsed.origin === window.location.origin) return true;
@@ -52,18 +67,19 @@ export async function cacheScreenCastPlaylist(
     const mediaCache = await caches.open(MEDIA_CACHE);
     await Promise.all(
       config.items.map(async (item) => {
-        // External non-S3 media: skip Cache API (no CORS). Browser loads natively.
-        if (!isCorsCacheableMediaUrl(item.mediaUrl)) return;
+        if (!isOfflineCacheableMediaUrl(item.mediaUrl)) return;
 
         try {
           const existing = await mediaCache.match(item.mediaUrl);
           if (existing) return;
 
+          const sameOrigin = isCorsCacheableMediaUrl(item.mediaUrl);
           const res = await fetch(item.mediaUrl, {
-            mode: 'cors',
+            mode: sameOrigin ? 'cors' : 'no-cors',
             credentials: 'omit',
           });
-          if (res.ok) {
+          // CORS: check ok. no-cors: opaque (status 0) — still cacheable for <img>/<video>.
+          if (res.ok || res.type === 'opaque') {
             await mediaCache.put(item.mediaUrl, res.clone());
           }
         } catch {
