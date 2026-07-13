@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import type {
   ScreenCastMediaType,
   ScreenCastMonitorDto,
@@ -99,6 +99,7 @@ export function ScreenCastAdminPage() {
 
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
+  const [syncingMonitors, setSyncingMonitors] = useState(false);
 
   const loadLists = useCallback(async () => {
     try {
@@ -308,6 +309,27 @@ export function ScreenCastAdminPage() {
       await loadLists();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+    }
+  }
+
+  async function syncAllMonitors() {
+    if (monitors.length === 0) {
+      toast.error('No hay monitores para sincronizar');
+      return;
+    }
+    setSyncingMonitors(true);
+    try {
+      const result = await api.syncAllScreenCastMonitors();
+      toast.success(
+        result.notified === 1
+          ? '1 pantalla notificada'
+          : `${result.notified} pantallas notificadas`,
+      );
+      setPreviewKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al sincronizar');
+    } finally {
+      setSyncingMonitors(false);
     }
   }
 
@@ -690,13 +712,27 @@ export function ScreenCastAdminPage() {
                   Online/Offline se actualiza con el latido cada 30s.
                 </p>
               </div>
-              <Button
-                type="button"
-                onClick={() => setMonitorDraft(emptyMonitorDraft())}
-              >
-                <Plus size={16} />
-                Nuevo monitor
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={syncingMonitors || monitors.length === 0}
+                  onClick={() => void syncAllMonitors()}
+                >
+                  <RefreshCw
+                    size={16}
+                    className={syncingMonitors ? 'animate-spin' : undefined}
+                  />
+                  Sincronizar todos
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setMonitorDraft(emptyMonitorDraft())}
+                >
+                  <Plus size={16} />
+                  Nuevo monitor
+                </Button>
+              </div>
             </div>
 
             {monitorDraft && (

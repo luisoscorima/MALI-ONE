@@ -171,6 +171,13 @@ export class ScreenCastService {
     return monitors.map((m) => m.screenKey);
   }
 
+  async getAllScreenKeys(): Promise<string[]> {
+    const monitors = await this.prisma.screenCastMonitor.findMany({
+      select: { screenKey: true },
+    });
+    return monitors.map((m) => m.screenKey);
+  }
+
   // --- Monitors ---
 
   async listMonitors() {

@@ -131,6 +131,14 @@ export class ScreenCastController {
     return this.service.listMonitors();
   }
 
+  @Post('monitors/sync')
+  @RequireModule(AppModule.screen_cast)
+  async syncAllMonitors() {
+    const keys = await this.service.getAllScreenKeys();
+    this.gateway.notifyPlaylistUpdated(keys);
+    return { ok: true, notified: keys.length };
+  }
+
   @Get('monitors/:id')
   @RequireModule(AppModule.screen_cast)
   getMonitor(@Param('id') id: string) {

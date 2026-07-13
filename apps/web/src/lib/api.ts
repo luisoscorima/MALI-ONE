@@ -611,6 +611,12 @@ export const api = {
       method: 'DELETE',
     }),
 
+  syncAllScreenCastMonitors: () =>
+    request<{ ok: boolean; notified: number }>(
+      '/api/screen-cast/monitors/sync',
+      { method: 'POST' },
+    ),
+
   getScreenCastPublicConfig: (screenKey: string) =>
     request<import('@mali-one/shared').ScreenCastPublicConfigDto>(
       `/api/screen-cast/screens/${encodeURIComponent(screenKey)}/config`,
