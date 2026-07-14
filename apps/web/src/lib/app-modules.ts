@@ -50,4 +50,9 @@ export const APP_MODULES: {
     label: 'Transmisión a pantallas',
     description: 'Playlists y monitores para tótems y quioscos.',
   },
+  {
+    id: 'bsale_reports',
+    label: 'Reportes Bsale',
+    description: 'Kardex consolidado de stock por almacén y período.',
+  },
 ];

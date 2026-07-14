@@ -22,6 +22,7 @@ enum AppModule {
   widget_museo
   pam_memberships
   screen_cast
+  bsale_reports
 }
 
 enum ScreenCastMediaType {

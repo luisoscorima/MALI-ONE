@@ -8,6 +8,7 @@ import {
   Landmark,
   Link2,
   MonitorPlay,
+  PackageSearch,
   Users,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
@@ -39,6 +40,12 @@ export const moduleMeta: Record<
     icon: MonitorPlay,
     group: 'operaciones',
     accent: 'cyan',
+  },
+  bsale_reports: {
+    to: '/bsale/kardex',
+    icon: PackageSearch,
+    group: 'operaciones',
+    accent: 'emerald',
   },
   password_vault: {
     to: '/vault',

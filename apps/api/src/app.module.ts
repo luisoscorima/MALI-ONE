@@ -20,6 +20,7 @@ import { S3ManagerModule } from './modules/s3-manager/s3-manager.module';
 import { WidgetsModule } from './modules/widgets/widgets.module';
 import { PamModule } from './modules/pam/pam.module';
 import { ScreenCastModule } from './modules/screen-cast/screen-cast.module';
+import { BsaleModule } from './modules/bsale/bsale.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ScreenCastModule } from './modules/screen-cast/screen-cast.module';
     WidgetsModule,
     PamModule,
     ScreenCastModule,
+    BsaleModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Link2,
   MonitorPlay,
+  PackageSearch,
   Shield,
   Users,
 } from 'lucide-react';
@@ -61,6 +62,12 @@ export const appNavSections: AppNavSection[] = [
         label: 'Bóveda de Contraseñas',
         icon: KeyRound,
         module: 'password_vault',
+      },
+      {
+        to: '/bsale/kardex',
+        label: 'Kardex Bsale',
+        icon: PackageSearch,
+        module: 'bsale_reports',
       },
     ],
   },

@@ -659,4 +659,48 @@ export const api = {
       body: form,
     });
   },
+
+  getBsaleOffices: () =>
+    request<import('@mali-one/shared').BsaleOfficeDto[]>('/api/bsale/offices'),
+
+  getBsaleKardex: (body: import('@mali-one/shared').BsaleKardexQueryDto) =>
+    request<import('@mali-one/shared').BsaleKardexResultDto>(
+      '/api/bsale/kardex',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  exportBsaleKardex: async (
+    body: import('@mali-one/shared').BsaleKardexExportDto,
+  ) => {
+    const res = await fetch(`${API_BASE}/api/bsale/kardex/export`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: res.statusText }));
+      const message = error.message;
+      const text = Array.isArray(message)
+        ? message.join(', ')
+        : typeof message === 'string'
+          ? message
+          : res.statusText;
+      throw new Error(text || 'Error al exportar');
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename =
+      match?.[1] ??
+      `kardex_bsale_${body.from}_${body.to}.${body.format === 'xlsx' ? 'xlsx' : 'csv'}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

@@ -27,6 +27,7 @@ import { WidgetMuseoHubPage } from '@/pages/widget-museo-hub-page';
 import { WidgetMuseoInterfazPage } from '@/pages/widget-museo-interfaz-page';
 import { PamMembershipsPage } from '@/pages/pam-memberships-page';
 import { WidgetMuseoPopupPage } from '@/pages/widget-museo-popup-page';
+import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -126,6 +127,9 @@ function AuthenticatedApp() {
                   </Route>
                   <Route element={<ModuleGuard module="pam_memberships" />}>
                     <Route path="admin/pam" element={<PamMembershipsPage />} />
+                  </Route>
+                  <Route element={<ModuleGuard module="bsale_reports" />}>
+                    <Route path="bsale/kardex" element={<BsaleKardexPage />} />
                   </Route>
                   <Route element={<SuperAdminGuard />}>
                     <Route path="admin/app-users" element={<AppUsersPage />} />

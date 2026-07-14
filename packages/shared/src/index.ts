@@ -9,7 +9,8 @@ export type AppModule =
   | 'widget_biblioteca'
   | 'widget_museo'
   | 'pam_memberships'
-  | 'screen_cast';
+  | 'screen_cast'
+  | 'bsale_reports';
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
 
@@ -374,4 +375,53 @@ export interface PamAdminStateDto {
   plans: PamPlanDto[];
   registrations: PamRegistrationDto[];
   popup: MuseoPopupSettingsDto;
+}
+
+export type BsaleKardexMovementType =
+  | 'document'
+  | 'reception'
+  | 'consumption';
+
+export interface BsaleOfficeDto {
+  id: number;
+  name: string;
+  address: string;
+  isVirtual: boolean;
+  state: number;
+}
+
+export interface BsaleKardexQueryDto {
+  from: string;
+  to: string;
+  officeIds?: number[];
+}
+
+export interface BsaleKardexExportDto extends BsaleKardexQueryDto {
+  format: 'csv' | 'xlsx';
+}
+
+export interface BsaleKardexMovementDto {
+  date: number;
+  dateIso: string;
+  officeId: number;
+  officeName: string;
+  movementType: BsaleKardexMovementType;
+  documentLabel: string;
+  documentNumber: string;
+  documentId: number | null;
+  variantId: number;
+  sku: string;
+  productName: string;
+  entryQty: number;
+  exitQty: number;
+  balanceQty: number;
+  unitCost: number | null;
+}
+
+export interface BsaleKardexResultDto {
+  from: string;
+  to: string;
+  officeIds: number[];
+  totalMovements: number;
+  movements: BsaleKardexMovementDto[];
 }
