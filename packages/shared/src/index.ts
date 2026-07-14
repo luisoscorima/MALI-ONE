@@ -380,7 +380,8 @@ export interface PamAdminStateDto {
 export type BsaleKardexMovementType =
   | 'document'
   | 'reception'
-  | 'consumption';
+  | 'consumption'
+  | 'opening';
 
 export interface BsaleOfficeDto {
   id: number;

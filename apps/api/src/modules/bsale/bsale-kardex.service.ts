@@ -86,7 +86,18 @@ type RawConsumption = {
   details?: { items?: RawDetail[] } | RawDetail[];
 };
 
+type RawStock = {
+  quantity?: number;
+  quantityAvailable?: number;
+  variant?: RawVariant;
+  office?: { id?: number | string };
+};
+
 type PendingMovement = Omit<BsaleKardexMovementDto, 'balanceQty'>;
+
+function balanceKey(variantId: number, officeId: number): string {
+  return `${variantId}:${officeId}`;
+}
 
 @Injectable()
 export class BsaleKardexService {
@@ -115,6 +126,10 @@ export class BsaleKardexService {
     this.validateRange(params.from, params.to);
     const fromTs = dateToUnixStart(params.from);
     const toTs = dateToUnixEnd(params.to);
+    const todayIso = new Date().toISOString().slice(0, 10);
+    // Para saldo inicial: stock_hoy - movimientos[from..hoy]
+    const reverseToIso = todayIso > params.to ? todayIso : params.to;
+    const reverseToTs = dateToUnixEnd(reverseToIso);
 
     const allOffices = await this.listOffices();
     const officeMap = new Map(allOffices.map((o) => [o.id, o]));
@@ -131,53 +146,122 @@ export class BsaleKardexService {
 
     const documentTypes = await this.loadDocumentTypes();
     const variantCache = new Map<number, VariantInfo>();
-    const pending: PendingMovement[] = [];
+    const sinceFrom: PendingMovement[] = [];
 
     for (const officeId of selectedIds) {
       const officeName = officeMap.get(officeId)?.name ?? `Oficina ${officeId}`;
-      this.logger.log(`Kardex oficina ${officeId} (${officeName})`);
+      this.logger.log(
+        `Kardex oficina ${officeId} (${officeName}) ${params.from}→${reverseToIso}`,
+      );
 
-      pending.push(
+      sinceFrom.push(
         ...(await this.collectDocuments(
           officeId,
           officeName,
           params.from,
-          params.to,
+          reverseToIso,
           documentTypes,
           variantCache,
         )),
       );
-      pending.push(
+      sinceFrom.push(
         ...(await this.collectReceptions(
           officeId,
           officeName,
           fromTs,
-          toTs,
+          reverseToTs,
           variantCache,
         )),
       );
-      pending.push(
+      sinceFrom.push(
         ...(await this.collectConsumptions(
           officeId,
           officeName,
           fromTs,
-          toTs,
+          reverseToTs,
           variantCache,
         )),
       );
     }
 
-    await this.enrichVariantFields(pending, variantCache);
+    await this.enrichVariantFields(sinceFrom, variantCache);
+
+    const periodRows = sinceFrom.filter((row) => row.date <= toTs);
+    const stocksByKey = await this.loadStocksByOffice(
+      selectedIds,
+      variantCache,
+    );
+
+    const netSinceFrom = new Map<string, number>();
+    for (const row of sinceFrom) {
+      const key = balanceKey(row.variantId, row.officeId);
+      netSinceFrom.set(
+        key,
+        (netSinceFrom.get(key) ?? 0) + row.entryQty - row.exitQty,
+      );
+    }
+
+    const periodKeys = new Set(
+      periodRows.map((row) => balanceKey(row.variantId, row.officeId)),
+    );
+
+    const openings: PendingMovement[] = [];
+    const openingQtyByKey = new Map<string, number>();
+    for (const key of periodKeys) {
+      const [variantIdRaw, officeIdRaw] = key.split(':');
+      const variantId = Number(variantIdRaw);
+      const officeId = Number(officeIdRaw);
+      const stockNow = stocksByKey.get(key) ?? 0;
+      const openingQty = stockNow - (netSinceFrom.get(key) ?? 0);
+      openingQtyByKey.set(key, openingQty);
+      const sample = periodRows.find(
+        (row) => row.variantId === variantId && row.officeId === officeId,
+      );
+      const info = variantCache.get(variantId);
+      openings.push({
+        date: fromTs,
+        dateIso: params.from,
+        officeId,
+        officeName:
+          officeMap.get(officeId)?.name ??
+          sample?.officeName ??
+          `Oficina ${officeId}`,
+        movementType: 'opening',
+        documentLabel: 'Saldo inicial',
+        documentNumber: '',
+        documentId: null,
+        variantId,
+        sku: info?.sku || sample?.sku || '',
+        productName: info?.productName || sample?.productName || '',
+        entryQty: 0,
+        exitQty: 0,
+        unitCost: null,
+      });
+    }
+
+    const pending: PendingMovement[] = [...openings, ...periodRows];
 
     pending.sort((a, b) => {
       if (a.date !== b.date) return a.date - b.date;
       if (a.officeId !== b.officeId) return a.officeId - b.officeId;
-      return a.variantId - b.variantId;
+      if (a.variantId !== b.variantId) return a.variantId - b.variantId;
+      if (a.movementType === 'opening' && b.movementType !== 'opening') {
+        return -1;
+      }
+      if (b.movementType === 'opening' && a.movementType !== 'opening') {
+        return 1;
+      }
+      return 0;
     });
 
     const balances = new Map<string, number>();
     const movements: BsaleKardexMovementDto[] = pending.map((row) => {
-      const key = `${row.variantId}:${row.officeId}`;
+      const key = balanceKey(row.variantId, row.officeId);
+      if (row.movementType === 'opening') {
+        const openingQty = openingQtyByKey.get(key) ?? 0;
+        balances.set(key, openingQty);
+        return { ...row, balanceQty: openingQty };
+      }
       const prev = balances.get(key) ?? 0;
       const next = prev + row.entryQty - row.exitQty;
       balances.set(key, next);
@@ -191,6 +275,29 @@ export class BsaleKardexService {
       totalMovements: movements.length,
       movements,
     };
+  }
+
+  private async loadStocksByOffice(
+    officeIds: number[],
+    variantCache: Map<number, VariantInfo>,
+  ): Promise<Map<string, number>> {
+    const stocks = new Map<string, number>();
+    for (const officeId of officeIds) {
+      const items = await this.client.getAllPages<RawStock>('/v1/stocks.json', {
+        officeid: officeId,
+        expand: 'variant',
+      });
+      for (const item of items) {
+        const variantId = Number(item.variant?.id ?? 0);
+        if (!variantId) continue;
+        this.rememberVariant(variantCache, item.variant);
+        stocks.set(
+          balanceKey(variantId, officeId),
+          Number(item.quantity ?? 0),
+        );
+      }
+    }
+    return stocks;
   }
 
   private validateRange(from: string, to: string): void {

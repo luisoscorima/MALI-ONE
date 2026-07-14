@@ -35,6 +35,7 @@ function defaultTo(): string {
 }
 
 const MOVEMENT_LABELS: Record<BsaleKardexMovementDto['movementType'], string> = {
+  opening: 'Saldo inicial',
   document: 'Documento',
   reception: 'Recepción',
   consumption: 'Consumo',
@@ -148,7 +149,7 @@ export function BsaleKardexPage() {
     <div>
       <PageHeader
         title="Kardex Bsale"
-        description="Consolida entradas y salidas de stock (documentos, recepciones y consumos) por almacén. Rango máximo: 12 meses."
+        description="Consolida entradas y salidas de stock (documentos, recepciones y consumos) por almacén, con saldo inicial del periodo. Rango máximo: 12 meses."
         actions={
           <Button
             variant="outline"
