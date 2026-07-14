@@ -95,8 +95,32 @@ type RawStock = {
 
 type PendingMovement = Omit<BsaleKardexMovementDto, 'balanceQty'>;
 
+type CostState = {
+  qty: number;
+  avg: number;
+};
+
 function balanceKey(variantId: number, officeId: number): string {
   return `${variantId}:${officeId}`;
+}
+
+const MOVEMENT_SORT_ORDER: Record<PendingMovement['movementType'], number> = {
+  opening: 0,
+  document: 1,
+  consumption: 2,
+  reception: 3,
+};
+
+function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
+  if (a.date !== b.date) return a.date - b.date;
+  if (a.officeId !== b.officeId) return a.officeId - b.officeId;
+  if (a.variantId !== b.variantId) return a.variantId - b.variantId;
+  const orderA = MOVEMENT_SORT_ORDER[a.movementType] ?? 99;
+  const orderB = MOVEMENT_SORT_ORDER[b.movementType] ?? 99;
+  if (orderA !== orderB) return orderA - orderB;
+  // Salidas antes que entradas el mismo día (como el kardex nativo Bsale)
+  if (a.exitQty !== b.exitQty) return b.exitQty - a.exitQty;
+  return (a.documentId ?? 0) - (b.documentId ?? 0);
 }
 
 @Injectable()
@@ -186,6 +210,11 @@ export class BsaleKardexService {
 
     await this.enrichVariantFields(sinceFrom, variantCache);
 
+    // En salidas no usar precio de documento: el costo lo calcula el promedio ponderado.
+    for (const row of sinceFrom) {
+      if (row.exitQty > 0) row.unitCost = null;
+    }
+
     const periodRows = sinceFrom.filter((row) => row.date <= toTs);
     const stocksByKey = await this.loadStocksByOffice(
       selectedIds,
@@ -204,9 +233,16 @@ export class BsaleKardexService {
     const periodKeys = new Set(
       periodRows.map((row) => balanceKey(row.variantId, row.officeId)),
     );
+    const periodVariantIds = [
+      ...new Set(
+        [...periodKeys].map((key) => Number(key.split(':')[0])),
+      ),
+    ];
+    const currentAvgByVariant =
+      await this.loadVariantAverageCosts(periodVariantIds);
 
-    const openings: PendingMovement[] = [];
     const openingQtyByKey = new Map<string, number>();
+    const openingAvgByKey = new Map<string, number>();
     for (const key of periodKeys) {
       const [variantIdRaw, officeIdRaw] = key.split(':');
       const variantId = Number(variantIdRaw);
@@ -214,6 +250,26 @@ export class BsaleKardexService {
       const stockNow = stocksByKey.get(key) ?? 0;
       const openingQty = stockNow - (netSinceFrom.get(key) ?? 0);
       openingQtyByKey.set(key, openingQty);
+
+      const officeMoves = sinceFrom
+        .filter(
+          (row) => row.variantId === variantId && row.officeId === officeId,
+        )
+        .sort((a, b) => -sortKardexRows(a, b));
+
+      const openingAvg = this.reverseOpeningAverage(
+        stockNow,
+        currentAvgByVariant.get(variantId) ?? 0,
+        officeMoves,
+      );
+      openingAvgByKey.set(key, openingAvg);
+    }
+
+    const openings: PendingMovement[] = [];
+    for (const key of periodKeys) {
+      const [variantIdRaw, officeIdRaw] = key.split(':');
+      const variantId = Number(variantIdRaw);
+      const officeId = Number(officeIdRaw);
       const sample = periodRows.find(
         (row) => row.variantId === variantId && row.officeId === officeId,
       );
@@ -235,24 +291,13 @@ export class BsaleKardexService {
         productName: info?.productName || sample?.productName || '',
         entryQty: 0,
         exitQty: 0,
-        unitCost: null,
+        unitCost: openingAvgByKey.get(key) ?? null,
       });
     }
 
     const pending: PendingMovement[] = [...openings, ...periodRows];
-
-    pending.sort((a, b) => {
-      if (a.date !== b.date) return a.date - b.date;
-      if (a.officeId !== b.officeId) return a.officeId - b.officeId;
-      if (a.variantId !== b.variantId) return a.variantId - b.variantId;
-      if (a.movementType === 'opening' && b.movementType !== 'opening') {
-        return -1;
-      }
-      if (b.movementType === 'opening' && a.movementType !== 'opening') {
-        return 1;
-      }
-      return 0;
-    });
+    pending.sort(sortKardexRows);
+    this.applyWeightedAverageCosts(pending, openingQtyByKey, openingAvgByKey);
 
     const balances = new Map<string, number>();
     const movements: BsaleKardexMovementDto[] = pending.map((row) => {
@@ -298,6 +343,121 @@ export class BsaleKardexService {
       }
     }
     return stocks;
+  }
+
+  private async loadVariantAverageCosts(
+    variantIds: number[],
+  ): Promise<Map<number, number>> {
+    const averages = new Map<number, number>();
+    const concurrency = 8;
+    for (let i = 0; i < variantIds.length; i += concurrency) {
+      const chunk = variantIds.slice(i, i + concurrency);
+      await Promise.all(
+        chunk.map(async (id) => {
+          try {
+            const data = await this.client.getJson<{
+              averageCost?: string | number;
+            }>(`/v1/variants/${id}/costs.json`);
+            const avg = Number(data.averageCost ?? 0);
+            averages.set(id, Number.isFinite(avg) ? avg : 0);
+          } catch (err) {
+            this.logger.warn(
+              `No se pudo leer costo promedio variante ${id}: ${err instanceof Error ? err.message : err}`,
+            );
+            averages.set(id, 0);
+          }
+        }),
+      );
+    }
+    return averages;
+  }
+
+  /**
+   * Retrocede movimientos desde el stock/costo actual hasta el inicio del periodo
+   * para obtener el costo promedio de apertura (promedio ponderado).
+   */
+  private reverseOpeningAverage(
+    stockNow: number,
+    avgNow: number,
+    movesNewestFirst: PendingMovement[],
+  ): number {
+    const state: CostState = {
+      qty: stockNow,
+      avg: Number.isFinite(avgNow) ? avgNow : 0,
+    };
+
+    for (const row of movesNewestFirst) {
+      if (row.entryQty > 0) {
+        const entryCost =
+          row.unitCost != null && Number.isFinite(row.unitCost)
+            ? row.unitCost
+            : state.avg;
+        const qtyAfter = state.qty;
+        const qtyBefore = qtyAfter - row.entryQty;
+        if (qtyBefore <= 1e-9) {
+          state.qty = Math.max(0, qtyBefore);
+          // Sin stock previo: el promedio de apertura queda el vigente tras vaciar.
+          continue;
+        }
+        const totalAfter = qtyAfter * state.avg;
+        const totalBefore = totalAfter - row.entryQty * entryCost;
+        state.qty = qtyBefore;
+        state.avg =
+          qtyBefore > 0 && Number.isFinite(totalBefore)
+            ? Math.max(0, totalBefore / qtyBefore)
+            : state.avg;
+      } else if (row.exitQty > 0) {
+        // Deshacer salida: vuelve la cantidad; el promedio no cambia.
+        state.qty += row.exitQty;
+      }
+    }
+
+    return Number.isFinite(state.avg) ? state.avg : 0;
+  }
+
+  /** Aplica costo promedio ponderado sobre el kardex del periodo (mutates unitCost). */
+  private applyWeightedAverageCosts(
+    rows: PendingMovement[],
+    openingQtyByKey: Map<string, number>,
+    openingAvgByKey: Map<string, number>,
+  ): void {
+    const states = new Map<string, CostState>();
+
+    for (const row of rows) {
+      const key = balanceKey(row.variantId, row.officeId);
+
+      if (row.movementType === 'opening') {
+        const avg = openingAvgByKey.get(key) ?? 0;
+        const qty = openingQtyByKey.get(key) ?? 0;
+        states.set(key, { qty, avg });
+        row.unitCost = qty > 0 || avg > 0 ? avg : null;
+        continue;
+      }
+
+      const state = states.get(key) ?? {
+        qty: openingQtyByKey.get(key) ?? 0,
+        avg: openingAvgByKey.get(key) ?? 0,
+      };
+
+      if (row.entryQty > 0) {
+        const entryCost =
+          row.unitCost != null && Number.isFinite(row.unitCost)
+            ? row.unitCost
+            : state.avg;
+        row.unitCost = entryCost;
+        const newQty = state.qty + row.entryQty;
+        if (newQty > 1e-9) {
+          state.avg =
+            (state.qty * state.avg + row.entryQty * entryCost) / newQty;
+        }
+        state.qty = newQty;
+      } else if (row.exitQty > 0) {
+        row.unitCost = state.avg;
+        state.qty = Math.max(0, state.qty - row.exitQty);
+      }
+
+      states.set(key, state);
+    }
   }
 
   private validateRange(from: string, to: string): void {
@@ -401,12 +561,9 @@ export class BsaleKardexService {
             productName: info.productName,
             entryQty: isEntry ? qty : 0,
             exitQty: isEntry ? 0 : qty,
+            // Solo costo de inventario en entradas; salidas usan promedio ponderado.
             unitCost:
-              detail.cost != null
-                ? Number(detail.cost)
-                : detail.netUnitValue != null
-                  ? Number(detail.netUnitValue)
-                  : null,
+              isEntry && detail.cost != null ? Number(detail.cost) : null,
           });
         }
       }
@@ -514,7 +671,7 @@ export class BsaleKardexService {
           productName: info.productName,
           entryQty: 0,
           exitQty: qty,
-          unitCost: detail.cost != null ? Number(detail.cost) : null,
+          unitCost: null,
         });
       }
     }
