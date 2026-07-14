@@ -126,6 +126,12 @@ function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
 @Injectable()
 export class BsaleKardexService {
   private readonly logger = new Logger(BsaleKardexService.name);
+  private readonly resultCache = new Map<
+    string,
+    { at: number; data: BsaleKardexResultDto }
+  >();
+  private readonly inflight = new Map<string, Promise<BsaleKardexResultDto>>();
+  private readonly cacheTtlMs = 10 * 60 * 1000;
 
   constructor(private readonly client: BsaleClientService) {}
 
@@ -148,6 +154,45 @@ export class BsaleKardexService {
     officeIds?: number[];
   }): Promise<BsaleKardexResultDto> {
     this.validateRange(params.from, params.to);
+    const cacheKey = this.cacheKey(params);
+    const cached = this.resultCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < this.cacheTtlMs) {
+      this.logger.log(`Kardex cache hit (${cacheKey})`);
+      return cached.data;
+    }
+
+    const existing = this.inflight.get(cacheKey);
+    if (existing) {
+      this.logger.log(`Kardex reutiliza request en curso (${cacheKey})`);
+      return existing;
+    }
+
+    const promise = this.buildKardexUncached(params)
+      .then((data) => {
+        this.resultCache.set(cacheKey, { at: Date.now(), data });
+        return data;
+      })
+      .finally(() => {
+        this.inflight.delete(cacheKey);
+      });
+    this.inflight.set(cacheKey, promise);
+    return promise;
+  }
+
+  private cacheKey(params: {
+    from: string;
+    to: string;
+    officeIds?: number[];
+  }): string {
+    const offices = [...(params.officeIds ?? [])].sort((a, b) => a - b);
+    return `${params.from}|${params.to}|${offices.join(',') || 'all'}`;
+  }
+
+  private async buildKardexUncached(params: {
+    from: string;
+    to: string;
+    officeIds?: number[];
+  }): Promise<BsaleKardexResultDto> {
     const fromTs = dateToUnixStart(params.from);
     const toTs = dateToUnixEnd(params.to);
     const todayIso = new Date().toISOString().slice(0, 10);
@@ -170,6 +215,8 @@ export class BsaleKardexService {
 
     const documentTypes = await this.loadDocumentTypes();
     const variantCache = new Map<number, VariantInfo>();
+    await this.prefetchVariants(variantCache);
+
     const sinceFrom: PendingMovement[] = [];
 
     for (const officeId of selectedIds) {
@@ -349,7 +396,7 @@ export class BsaleKardexService {
     variantIds: number[],
   ): Promise<Map<number, number>> {
     const averages = new Map<number, number>();
-    const concurrency = 8;
+    const concurrency = 20;
     for (let i = 0; i < variantIds.length; i += concurrency) {
       const chunk = variantIds.slice(i, i + concurrency);
       await Promise.all(
@@ -579,18 +626,17 @@ export class BsaleKardexService {
     toTs: number,
     variantCache: Map<number, VariantInfo>,
   ): Promise<PendingMovement[]> {
-    const receptions = await this.client.getAllPages<RawReception>(
+    const receptions = await this.client.getAllPagesInDateWindow<RawReception>(
       '/v1/stocks/receptions.json',
-      {
-        officeid: officeId,
-        expand: 'details,office',
-      },
+      { officeid: officeId, expand: 'details,office' },
+      (rec) => Number(rec.admissionDate ?? 0),
+      fromTs,
+      toTs,
     );
 
     const rows: PendingMovement[] = [];
     for (const rec of receptions) {
       const date = Number(rec.admissionDate ?? 0);
-      if (date < fromTs || date > toTs) continue;
       const details = await this.resolveDetails(
         rec.details,
         `/v1/stocks/receptions/${rec.id}/details.json`,
@@ -632,18 +678,18 @@ export class BsaleKardexService {
     toTs: number,
     variantCache: Map<number, VariantInfo>,
   ): Promise<PendingMovement[]> {
-    const consumptions = await this.client.getAllPages<RawConsumption>(
-      '/v1/stocks/consumptions.json',
-      {
-        officeid: officeId,
-        expand: 'details,office',
-      },
-    );
+    const consumptions =
+      await this.client.getAllPagesInDateWindow<RawConsumption>(
+        '/v1/stocks/consumptions.json',
+        { officeid: officeId, expand: 'details,office' },
+        (cons) => Number(cons.consumptionDate ?? 0),
+        fromTs,
+        toTs,
+      );
 
     const rows: PendingMovement[] = [];
     for (const cons of consumptions) {
       const date = Number(cons.consumptionDate ?? 0);
-      if (date < fromTs || date > toTs) continue;
       const details = await this.resolveDetails(
         cons.details,
         `/v1/stocks/consumptions/${cons.id}/details.json`,
@@ -676,6 +722,34 @@ export class BsaleKardexService {
       }
     }
     return rows;
+  }
+
+  private async prefetchVariants(
+    cache: Map<number, VariantInfo>,
+  ): Promise<void> {
+    this.logger.log('Precargando catálogo de variantes Bsale…');
+    try {
+      const variants = await this.client.getAllPages<RawVariant>(
+        '/v1/variants.json',
+        { expand: 'product' },
+      );
+      for (const variant of variants) {
+        this.rememberVariant(cache, variant);
+        const id = Number(variant.id ?? 0);
+        if (!id) continue;
+        if (!cache.has(id)) {
+          cache.set(id, {
+            sku: String(variant.code ?? '').trim(),
+            productName: this.formatProductName(variant),
+          });
+        }
+      }
+      this.logger.log(`Variantes en cache: ${cache.size}`);
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo precargar variantes: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   private rememberVariant(
@@ -741,7 +815,7 @@ export class BsaleKardexService {
     this.logger.log(
       `Enriqueciendo ${missingIds.length} variantes sin SKU/nombre…`,
     );
-    const concurrency = 8;
+    const concurrency = 16;
     for (let i = 0; i < missingIds.length; i += concurrency) {
       const chunk = missingIds.slice(i, i + concurrency);
       await Promise.all(

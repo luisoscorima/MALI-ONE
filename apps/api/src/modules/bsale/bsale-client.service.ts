@@ -123,6 +123,91 @@ export class BsaleClientService {
 
     return items;
   }
+
+  /**
+   * Lista páginas y filtra por ventana de fechas, con corte temprano
+   * según se detecte orden reciente→antiguo o antiguo→reciente.
+   */
+  async getAllPagesInDateWindow<T>(
+    path: string,
+    query: Record<string, string | number | undefined>,
+    getDate: (item: T) => number,
+    fromTs: number,
+    toTs: number,
+    pageSize = 50,
+  ): Promise<T[]> {
+    const items: T[] = [];
+    let offset = 0;
+    let total = Number.POSITIVE_INFINITY;
+    let pagesScanned = 0;
+    let mode: 'unknown' | 'newest' | 'oldest' = 'unknown';
+    let seenInRange = false;
+    let emptyAfterRange = 0;
+
+    while (offset < total) {
+      const page = await this.getJson<BsaleListResponse<T>>(path, {
+        ...query,
+        limit: pageSize,
+        offset,
+      });
+      const batch = page.items ?? [];
+      pagesScanned += 1;
+      if (batch.length === 0) break;
+
+      let inRange = 0;
+      let older = 0;
+      let newer = 0;
+      for (const item of batch) {
+        const date = Number(getDate(item) || 0);
+        if (date >= fromTs && date <= toTs) {
+          items.push(item);
+          inRange += 1;
+        } else if (date > 0 && date < fromTs) {
+          older += 1;
+        } else if (date > toTs) {
+          newer += 1;
+        }
+      }
+
+      if (mode === 'unknown' && batch.length > 0) {
+        if (newer + inRange >= older) mode = 'newest';
+        else mode = 'oldest';
+      }
+
+      if (inRange > 0) {
+        seenInRange = true;
+        emptyAfterRange = 0;
+      } else if (seenInRange) {
+        emptyAfterRange += 1;
+      }
+
+      total = typeof page.count === 'number' ? page.count : offset + batch.length;
+      offset += page.limit || pageSize;
+
+      // Orden reciente→antiguo: página completa más vieja que from → fin.
+      if (mode === 'newest' && older === batch.length) {
+        this.logger.log(
+          `${path} early-stop newest-first (${pagesScanned} págs, ${items.length} ítems)`,
+        );
+        break;
+      }
+      // Orden antiguo→reciente: ya pasamos el rango hacia el futuro → fin.
+      if (mode === 'oldest' && seenInRange && newer === batch.length) {
+        this.logger.log(
+          `${path} early-stop oldest-first (${pagesScanned} págs, ${items.length} ítems)`,
+        );
+        break;
+      }
+      if (seenInRange && emptyAfterRange >= 3) {
+        this.logger.log(
+          `${path} early-stop empty-after-range (${pagesScanned} págs, ${items.length} ítems)`,
+        );
+        break;
+      }
+    }
+
+    return items;
+  }
 }
 
 export function dateToUnixStart(isoDate: string): number {

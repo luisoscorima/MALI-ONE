@@ -10,6 +10,10 @@ import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import {
+  downloadKardexCsv,
+  downloadKardexXlsx,
+} from '@/lib/bsale-kardex-export';
+import {
   Button,
   Checkbox,
   Input,
@@ -52,6 +56,7 @@ export function BsaleKardexPage() {
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
   const [error, setError] = useState('');
   const [result, setResult] = useState<BsaleKardexResultDto | null>(null);
+  const [resultQueryKey, setResultQueryKey] = useState('');
   const [page, setPage] = useState(0);
 
   const loadOffices = useCallback(async () => {
@@ -95,6 +100,11 @@ export function BsaleKardexPage() {
     [from, to, selectedOfficeIds],
   );
 
+  const queryKey = useMemo(() => {
+    const offices = [...selectedOfficeIds].sort((a, b) => a - b).join(',');
+    return `${from}|${to}|${offices}`;
+  }, [from, to, selectedOfficeIds]);
+
   const runPreview = async () => {
     if (selectedOfficeIds.length === 0) {
       toast.error('Selecciona al menos un almacén.');
@@ -106,6 +116,7 @@ export function BsaleKardexPage() {
     try {
       const data = await api.getBsaleKardex(queryBody);
       setResult(data);
+      setResultQueryKey(queryKey);
       toast.success(`${data.totalMovements} movimientos consolidados`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al consultar Kardex';
@@ -124,6 +135,16 @@ export function BsaleKardexPage() {
     setExporting(format);
     setError('');
     try {
+      // Si ya hay vista previa del mismo filtro, exporta en el navegador (evita 504).
+      if (result && resultQueryKey === queryKey) {
+        if (format === 'csv') {
+          downloadKardexCsv(result.movements, from, to);
+        } else {
+          downloadKardexXlsx(result.movements, from, to);
+        }
+        toast.success(`Kardex exportado (${format.toUpperCase()})`);
+        return;
+      }
       await api.exportBsaleKardex({ ...queryBody, format });
       toast.success(`Kardex exportado (${format.toUpperCase()})`);
     } catch (e) {
@@ -149,7 +170,7 @@ export function BsaleKardexPage() {
     <div>
       <PageHeader
         title="Kardex Bsale"
-        description="Consolida entradas y salidas de stock (documentos, recepciones y consumos) por almacén, con saldo inicial del periodo. Rango máximo: 12 meses."
+        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos; luego usa Vista previa y exporta CSV/Excel desde esos datos."
         actions={
           <Button
             variant="outline"
