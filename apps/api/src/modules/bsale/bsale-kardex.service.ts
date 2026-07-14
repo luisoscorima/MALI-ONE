@@ -38,6 +38,16 @@ type RawVariant = {
   id?: number | string;
   description?: string;
   code?: string;
+  product?: {
+    id?: number | string;
+    name?: string;
+    description?: string;
+  };
+};
+
+type VariantInfo = {
+  sku: string;
+  productName: string;
 };
 
 type RawDetail = {
@@ -120,6 +130,7 @@ export class BsaleKardexService {
     }
 
     const documentTypes = await this.loadDocumentTypes();
+    const variantCache = new Map<number, VariantInfo>();
     const pending: PendingMovement[] = [];
 
     for (const officeId of selectedIds) {
@@ -133,10 +144,17 @@ export class BsaleKardexService {
           params.from,
           params.to,
           documentTypes,
+          variantCache,
         )),
       );
       pending.push(
-        ...(await this.collectReceptions(officeId, officeName, fromTs, toTs)),
+        ...(await this.collectReceptions(
+          officeId,
+          officeName,
+          fromTs,
+          toTs,
+          variantCache,
+        )),
       );
       pending.push(
         ...(await this.collectConsumptions(
@@ -144,9 +162,12 @@ export class BsaleKardexService {
           officeName,
           fromTs,
           toTs,
+          variantCache,
         )),
       );
     }
+
+    await this.enrichVariantFields(pending, variantCache);
 
     pending.sort((a, b) => {
       if (a.date !== b.date) return a.date - b.date;
@@ -219,6 +240,7 @@ export class BsaleKardexService {
     fromIso: string,
     toIso: string,
     documentTypes: Map<number, RawDocumentType>,
+    variantCache: Map<number, VariantInfo>,
   ): Promise<PendingMovement[]> {
     const rows: PendingMovement[] = [];
 
@@ -255,6 +277,9 @@ export class BsaleKardexService {
           const variantId = Number(detail.variant?.id ?? 0);
           if (!variantId) continue;
 
+          this.rememberVariant(variantCache, detail.variant);
+          const info = this.variantLabel(variantCache, variantId, detail.variant);
+
           rows.push({
             date,
             dateIso: unixToIsoDate(date),
@@ -265,8 +290,8 @@ export class BsaleKardexService {
             documentNumber: String(doc.number ?? ''),
             documentId: doc.id,
             variantId,
-            sku: detail.variant?.code ?? '',
-            productName: detail.variant?.description ?? '',
+            sku: info.sku,
+            productName: info.productName,
             entryQty: isEntry ? qty : 0,
             exitQty: isEntry ? 0 : qty,
             unitCost:
@@ -288,6 +313,7 @@ export class BsaleKardexService {
     officeName: string,
     fromTs: number,
     toTs: number,
+    variantCache: Map<number, VariantInfo>,
   ): Promise<PendingMovement[]> {
     const receptions = await this.client.getAllPages<RawReception>(
       '/v1/stocks/receptions.json',
@@ -310,6 +336,10 @@ export class BsaleKardexService {
         if (!qty) continue;
         const variantId = Number(detail.variant?.id ?? 0);
         if (!variantId) continue;
+
+        this.rememberVariant(variantCache, detail.variant);
+        const info = this.variantLabel(variantCache, variantId, detail.variant);
+
         rows.push({
           date,
           dateIso: unixToIsoDate(date),
@@ -320,8 +350,8 @@ export class BsaleKardexService {
           documentNumber: String(rec.documentNumber ?? rec.id),
           documentId: rec.id,
           variantId,
-          sku: detail.variant?.code ?? '',
-          productName: detail.variant?.description ?? '',
+          sku: info.sku,
+          productName: info.productName,
           entryQty: qty,
           exitQty: 0,
           unitCost: detail.cost != null ? Number(detail.cost) : null,
@@ -336,6 +366,7 @@ export class BsaleKardexService {
     officeName: string,
     fromTs: number,
     toTs: number,
+    variantCache: Map<number, VariantInfo>,
   ): Promise<PendingMovement[]> {
     const consumptions = await this.client.getAllPages<RawConsumption>(
       '/v1/stocks/consumptions.json',
@@ -358,6 +389,10 @@ export class BsaleKardexService {
         if (!qty) continue;
         const variantId = Number(detail.variant?.id ?? 0);
         if (!variantId) continue;
+
+        this.rememberVariant(variantCache, detail.variant);
+        const info = this.variantLabel(variantCache, variantId, detail.variant);
+
         rows.push({
           date,
           dateIso: unixToIsoDate(date),
@@ -368,8 +403,8 @@ export class BsaleKardexService {
           documentNumber: String(cons.id),
           documentId: cons.id,
           variantId,
-          sku: detail.variant?.code ?? '',
-          productName: detail.variant?.description ?? '',
+          sku: info.sku,
+          productName: info.productName,
           entryQty: 0,
           exitQty: qty,
           unitCost: detail.cost != null ? Number(detail.cost) : null,
@@ -377,6 +412,116 @@ export class BsaleKardexService {
       }
     }
     return rows;
+  }
+
+  private rememberVariant(
+    cache: Map<number, VariantInfo>,
+    variant?: RawVariant,
+  ): void {
+    const id = Number(variant?.id ?? 0);
+    if (!id) return;
+    const sku = String(variant?.code ?? '').trim();
+    const productName = this.formatProductName(variant);
+    if (!sku && !productName) return;
+    const prev = cache.get(id);
+    cache.set(id, {
+      sku: sku || prev?.sku || '',
+      productName: productName || prev?.productName || '',
+    });
+  }
+
+  private formatProductName(variant?: RawVariant): string {
+    if (!variant) return '';
+    const productName = String(
+      variant.product?.name ?? variant.product?.description ?? '',
+    ).trim();
+    const description = String(variant.description ?? '').trim();
+    if (productName && description && productName !== description) {
+      return `${productName} — ${description}`;
+    }
+    return productName || description;
+  }
+
+  private variantLabel(
+    cache: Map<number, VariantInfo>,
+    variantId: number,
+    partial?: RawVariant,
+  ): VariantInfo {
+    const cached = cache.get(variantId);
+    const sku = String(partial?.code ?? cached?.sku ?? '').trim();
+    const productName =
+      this.formatProductName(partial) || cached?.productName || '';
+    return { sku, productName };
+  }
+
+  private async enrichVariantFields(
+    rows: PendingMovement[],
+    cache: Map<number, VariantInfo>,
+  ): Promise<void> {
+    const missingIds = [
+      ...new Set(
+        rows
+          .filter((row) => row.variantId && (!row.sku || !row.productName))
+          .map((row) => row.variantId),
+      ),
+    ].filter((id) => {
+      const cached = cache.get(id);
+      return !cached?.sku || !cached?.productName;
+    });
+
+    if (missingIds.length === 0) {
+      this.applyVariantCache(rows, cache);
+      return;
+    }
+
+    this.logger.log(
+      `Enriqueciendo ${missingIds.length} variantes sin SKU/nombre…`,
+    );
+    const concurrency = 8;
+    for (let i = 0; i < missingIds.length; i += concurrency) {
+      const chunk = missingIds.slice(i, i + concurrency);
+      await Promise.all(
+        chunk.map(async (id) => {
+          try {
+            const variant = await this.client.getJson<RawVariant>(
+              `/v1/variants/${id}.json`,
+              { expand: 'product' },
+            );
+            this.rememberVariant(cache, { ...variant, id });
+            // Ensure id is cached even if remember skipped empty fields
+            if (!cache.has(id)) {
+              cache.set(id, {
+                sku: String(variant.code ?? '').trim(),
+                productName: this.formatProductName(variant),
+              });
+            }
+          } catch (err) {
+            this.logger.warn(
+              `No se pudo resolver variante ${id}: ${err instanceof Error ? err.message : err}`,
+            );
+            if (!cache.has(id)) {
+              cache.set(id, { sku: '', productName: '' });
+            }
+          }
+        }),
+      );
+    }
+
+    this.applyVariantCache(rows, cache);
+  }
+
+  private applyVariantCache(
+    rows: PendingMovement[],
+    cache: Map<number, VariantInfo>,
+  ): void {
+    for (const row of rows) {
+      const info = cache.get(row.variantId);
+      if (!info) continue;
+      if (!row.sku && info.sku) row.sku = info.sku;
+      if (!row.productName && info.productName) {
+        row.productName = info.productName;
+      }
+    }
   }
 
   private unwrapDetails(
