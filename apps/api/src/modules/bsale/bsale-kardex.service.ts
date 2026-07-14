@@ -107,20 +107,41 @@ function balanceKey(variantId: number, officeId: number): string {
 const MOVEMENT_SORT_ORDER: Record<PendingMovement['movementType'], number> = {
   opening: 0,
   document: 1,
-  consumption: 2,
-  reception: 3,
+  transfer: 2,
+  consumption: 3,
+  reception: 4,
 };
 
 function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
+  // Vista: SKU → fecha → almacén → tipo
+  const skuA = (a.sku || `\uffff${a.variantId}`).localeCompare(
+    b.sku || `\uffff${b.variantId}`,
+    'es',
+    { sensitivity: 'base', numeric: true },
+  );
+  if (skuA !== 0) return skuA;
+  if (a.variantId !== b.variantId) return a.variantId - b.variantId;
   if (a.date !== b.date) return a.date - b.date;
   if (a.officeId !== b.officeId) return a.officeId - b.officeId;
-  if (a.variantId !== b.variantId) return a.variantId - b.variantId;
   const orderA = MOVEMENT_SORT_ORDER[a.movementType] ?? 99;
   const orderB = MOVEMENT_SORT_ORDER[b.movementType] ?? 99;
   if (orderA !== orderB) return orderA - orderB;
-  // Salidas antes que entradas el mismo día (como el kardex nativo Bsale)
+  // Salidas antes que entradas el mismo día
   if (a.exitQty !== b.exitQty) return b.exitQty - a.exitQty;
   return (a.documentId ?? 0) - (b.documentId ?? 0);
+}
+
+function isInternalDispatchLabel(label: string): boolean {
+  const normalized = label
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+  return (
+    normalized.includes('despacho interno') ||
+    normalized.includes('traslado interno') ||
+    normalized.includes('guia de traslado') ||
+    normalized.includes('guia traslado')
+  );
 }
 
 @Injectable()
@@ -256,8 +277,10 @@ export class BsaleKardexService {
     }
 
     await this.enrichVariantFields(sinceFrom, variantCache);
+    this.tagInternalTransfers(sinceFrom);
 
-    // En salidas no usar precio de documento: el costo lo calcula el promedio ponderado.
+    // En salidas no usar precio de documento: el costo lo calcula el promedio ponderado
+    // (el unitCost de la API en recepciones/traslados de entrada se conserva).
     for (const row of sinceFrom) {
       if (row.exitQty > 0) row.unitCost = null;
     }
@@ -722,6 +745,61 @@ export class BsaleKardexService {
       }
     }
     return rows;
+  }
+
+  /**
+   * Marca como "transfer" los pares salida/entrada de despacho interno
+   * (mismo folio + variante + cantidad, distintos almacenes).
+   */
+  private tagInternalTransfers(rows: PendingMovement[]): void {
+    const exits = rows.filter(
+      (row) =>
+        row.exitQty > 0 &&
+        (row.movementType === 'document' || row.movementType === 'transfer') &&
+        isInternalDispatchLabel(row.documentLabel),
+    );
+    const entries = rows.filter(
+      (row) =>
+        row.entryQty > 0 &&
+        (row.movementType === 'reception' || row.movementType === 'transfer') &&
+        isInternalDispatchLabel(row.documentLabel),
+    );
+
+    const usedEntries = new Set<PendingMovement>();
+    let tagged = 0;
+
+    for (const exit of exits) {
+      const match = entries.find(
+        (entry) =>
+          !usedEntries.has(entry) &&
+          entry.variantId === exit.variantId &&
+          String(entry.documentNumber) === String(exit.documentNumber) &&
+          Math.abs(entry.entryQty - exit.exitQty) < 1e-9 &&
+          entry.officeId !== exit.officeId,
+      );
+      if (!match) continue;
+      usedEntries.add(match);
+      exit.movementType = 'transfer';
+      match.movementType = 'transfer';
+      if (!isInternalDispatchLabel(exit.documentLabel) || !exit.documentLabel) {
+        exit.documentLabel = 'Traslado interno';
+      }
+      if (!isInternalDispatchLabel(match.documentLabel) || !match.documentLabel) {
+        match.documentLabel = 'Traslado interno';
+      }
+      // Etiqueta clara sin perder el documento original
+      if (!exit.documentLabel.toLowerCase().includes('traslado')) {
+        exit.documentLabel = `Traslado — ${exit.documentLabel}`;
+      }
+      if (!match.documentLabel.toLowerCase().includes('traslado')) {
+        match.documentLabel = `Traslado — ${match.documentLabel}`;
+      }
+      tagged += 2;
+    }
+
+    if (tagged > 0) {
+      this.logger.log(`Marcados ${tagged} movimientos como traslado interno`);
+    }
   }
 
   private async prefetchVariants(

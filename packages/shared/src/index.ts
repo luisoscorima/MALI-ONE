@@ -381,7 +381,8 @@ export type BsaleKardexMovementType =
   | 'document'
   | 'reception'
   | 'consumption'
-  | 'opening';
+  | 'opening'
+  | 'transfer';
 
 export interface BsaleOfficeDto {
   id: number;
