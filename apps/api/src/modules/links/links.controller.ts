@@ -19,6 +19,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { AppModule, User } from '@prisma/client';
 import { Request, Response } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
+import { BulkQrExportDto } from './dto/bulk-qr-export.dto';
 import { BulkShortenDto } from './dto/bulk-shorten.dto';
 import { BulkWhatsappDto } from './dto/bulk-whatsapp.dto';
 import { CreateWhatsappLinkDto } from './dto/create-whatsapp.dto';
@@ -159,6 +160,40 @@ export class LinksController {
     return this.links.listLinks(req.user as User, tag);
   }
 
+  @Post('qr/bulk')
+  async qrBulk(
+    @Req() req: Request,
+    @Body() body: BulkQrExportDto,
+    @Res() res: Response,
+  ) {
+    const format = body.format ?? 'png';
+    const width = body.width ?? 512;
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `qrs-${format}-${stamp}.zip`;
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"`,
+    );
+
+    try {
+      await this.links.streamQrExportBulk(
+        req.user as User,
+        body.ids,
+        format,
+        width,
+        res,
+      );
+    } catch (error) {
+      if (!res.headersSent) {
+        throw error;
+      }
+      res.destroy(error instanceof Error ? error : undefined);
+    }
+  }
+
   @Get(':id/stats')
   stats(
     @Req() req: Request,
@@ -255,7 +290,7 @@ export class LinksController {
       ? Math.min(Math.max(parsedWidth, 128), 2048)
       : 512;
 
-    const { buffer, mimeType, extension } = await this.links.getQrExport(
+    const { buffer, mimeType, filename } = await this.links.getQrExport(
       id,
       req.user as User,
       fmt,
@@ -266,7 +301,7 @@ export class LinksController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="qr-${id.slice(-8)}.${extension}"`,
+      `attachment; filename="${filename}"`,
     );
     res.send(buffer);
   }

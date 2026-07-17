@@ -10,6 +10,7 @@ import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { customAlphabet } from 'nanoid';
 import UAParserPkg from 'ua-parser-js';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { buildQrFilename } from '../../core/qr/qr-filename.util';
 import {
   cloneQrStyleForCreate,
   resolveEffectiveQrStyle,
@@ -18,6 +19,8 @@ import { QrExportFormat, QrService } from '../../core/qr/qr.service';
 import { RedisService } from '../../core/redis/redis.service';
 import { S3Service } from '../../core/s3/s3.service';
 import { UpdateQrStyleDto } from './dto/update-qr-style.dto';
+import archiver from 'archiver';
+import type { Writable } from 'node:stream';
 
 type UploadedFile = {
   buffer: Buffer;
@@ -383,7 +386,13 @@ export class LinksService {
     user: User,
     format: QrExportFormat = 'png',
     width = 512,
-  ): Promise<{ buffer: Buffer; mimeType: string; extension: string }> {
+  ): Promise<{
+    buffer: Buffer;
+    mimeType: string;
+    extension: string;
+    slug: string;
+    filename: string;
+  }> {
     const link = await this.findOwnedLink(user, id);
     const creator = await this.prisma.user.findUnique({
       where: { id: link.createdById },
@@ -411,7 +420,60 @@ export class LinksService {
       eps: { mimeType: 'application/postscript', extension: 'eps' },
     };
 
-    return { buffer, ...meta[format] };
+    const { mimeType, extension } = meta[format];
+    return {
+      buffer,
+      mimeType,
+      extension,
+      slug: link.slug,
+      filename: buildQrFilename(link.slug, link.id, extension),
+    };
+  }
+
+  async streamQrExportBulk(
+    user: User,
+    ids: string[],
+    format: Extract<QrExportFormat, 'png' | 'svg'> = 'png',
+    width = 512,
+    output: Writable,
+  ): Promise<void> {
+    const uniqueIds = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException('Selecciona al menos un enlace');
+    }
+    if (uniqueIds.length > 50) {
+      throw new BadRequestException('Máximo 50 QR por descarga');
+    }
+
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    const done = new Promise<void>((resolve, reject) => {
+      archive.on('error', reject);
+      archive.on('end', () => resolve());
+      output.on('error', reject);
+    });
+    archive.pipe(output);
+
+    const usedNames = new Set<string>();
+    for (const id of uniqueIds) {
+      const { buffer, extension, filename } = await this.getQrExport(
+        id,
+        user,
+        format,
+        width,
+      );
+      let name = filename;
+      let suffix = 2;
+      while (usedNames.has(name)) {
+        const base = filename.slice(0, -(extension.length + 1));
+        name = `${base}-${suffix}.${extension}`;
+        suffix += 1;
+      }
+      usedNames.add(name);
+      archive.append(buffer, { name });
+    }
+
+    await archive.finalize();
+    await done;
   }
 
   async generateQrPreview(

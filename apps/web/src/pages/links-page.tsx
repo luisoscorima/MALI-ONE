@@ -1,5 +1,5 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { BarChart3, Copy, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { BarChart3, Copy, Download, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { FilterChip, IconActionButton } from '@/components/icon-action-button';
@@ -18,12 +18,18 @@ import { PageHeader } from '@/components/page-header';
 import {
   Button,
   Card,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -110,6 +116,9 @@ export function LinksPage() {
   const [defaultQrStyle, setDefaultQrStyle] = useState<QrStyleDto>({
     ...DEFAULT_QR_STYLE,
   });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkQrFormat, setBulkQrFormat] = useState<'png' | 'svg'>('png');
+  const [bulkDownloading, setBulkDownloading] = useState(false);
 
   const loadDefaultQrStyle = useCallback(async () => {
     try {
@@ -140,6 +149,9 @@ export function LinksPage() {
     try {
       const data = await api.listLinks();
       setLinks(data);
+      setSelectedIds((prev) =>
+        prev.filter((id) => data.some((link) => link.id === id)),
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al cargar enlaces';
       setError(msg);
@@ -302,6 +314,7 @@ export function LinksPage() {
     try {
       await api.deleteLink(id);
       if (qrModalLink?.id === id) closeQrDesigner();
+      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
       toast.success('Enlace eliminado');
       await loadLinks();
     } catch (e) {
@@ -317,6 +330,44 @@ export function LinksPage() {
       toast.success(`${label} copiado al portapapeles`);
     } catch {
       toast.error('No se pudo copiar al portapapeles');
+    }
+  }
+
+  function toggleLinkSelection(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function toggleAllVisibleLinks(visibleIds: string[]) {
+    setSelectedIds((prev) => {
+      const allSelected =
+        visibleIds.length > 0 && visibleIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !visibleIds.includes(id));
+      }
+      return [...new Set([...prev, ...visibleIds])];
+    });
+  }
+
+  async function handleBulkQrDownload() {
+    if (selectedIds.length === 0) {
+      toast.error('Selecciona al menos un enlace');
+      return;
+    }
+    if (selectedIds.length > 50) {
+      toast.error('Máximo 50 QR por descarga. Reduce la selección.');
+      return;
+    }
+    setBulkDownloading(true);
+    try {
+      await api.downloadQrBulk(selectedIds, bulkQrFormat);
+      toast.success(`ZIP con ${selectedIds.length} QR descargado`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al descargar QR';
+      toast.error(msg);
+    } finally {
+      setBulkDownloading(false);
     }
   }
 
@@ -518,11 +569,87 @@ export function LinksPage() {
               </div>
             )}
           </div>
+          {selectedIds.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <span className="text-sm text-muted">
+                {selectedIds.length} seleccionado
+                {selectedIds.length === 1 ? '' : 's'}
+              </span>
+              <Select
+                value={bulkQrFormat}
+                onValueChange={(value) =>
+                  setBulkQrFormat(value as 'png' | 'svg')
+                }
+                disabled={bulkDownloading}
+              >
+                <SelectTrigger className="h-8 w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="png">PNG</SelectItem>
+                  <SelectItem value="svg">SVG</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                size="sm"
+                disabled={bulkDownloading || selectedIds.length > 50}
+                onClick={() => void handleBulkQrDownload()}
+              >
+                {bulkDownloading ? (
+                  <>
+                    <Spinner className="size-3.5" />
+                    Generando ZIP…
+                  </>
+                ) : (
+                  <>
+                    <Download className="size-3.5" />
+                    Descargar QR
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={bulkDownloading}
+                onClick={() => setSelectedIds([])}
+              >
+                Limpiar
+              </Button>
+              {selectedIds.length > 50 && (
+                <span className="text-xs text-destructive">
+                  Máximo 50 QR por descarga
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="overflow-x-auto">
           <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow className="text-muted">
+                <TableHead className="w-10 p-4">
+                  <Checkbox
+                    checked={
+                      filteredLinks.length > 0 &&
+                      filteredLinks.every((link) =>
+                        selectedIds.includes(link.id),
+                      )
+                        ? true
+                        : filteredLinks.some((link) =>
+                              selectedIds.includes(link.id),
+                            )
+                          ? 'indeterminate'
+                          : false
+                    }
+                    onCheckedChange={() =>
+                      toggleAllVisibleLinks(filteredLinks.map((l) => l.id))
+                    }
+                    aria-label="Seleccionar todos los visibles"
+                    disabled={listLoading || filteredLinks.length === 0}
+                  />
+                </TableHead>
                 <TableHead className="p-4">Slug</TableHead>
                 <TableHead className="p-4">Tipo</TableHead>
                 <TableHead className="p-4">Tags</TableHead>
@@ -533,12 +660,12 @@ export function LinksPage() {
             </TableHeader>
             {listLoading ? (
               <TableBody>
-                <TableSkeleton rows={4} cols={6} />
+                <TableSkeleton rows={4} cols={7} />
               </TableBody>
             ) : filteredLinks.length === 0 ? (
               <TableBody>
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={7}>
                     <EmptyState
                       title={tagFilter ? 'Sin enlaces con ese tag' : 'Sin enlaces todavía'}
                       description={
@@ -556,6 +683,13 @@ export function LinksPage() {
                   const dest = formatLinkDestination(link);
                   return (
                     <TableRow key={link.id} className="border-border/60">
+                      <TableCell className="p-4">
+                        <Checkbox
+                          checked={selectedIds.includes(link.id)}
+                          onCheckedChange={() => toggleLinkSelection(link.id)}
+                          aria-label={`Seleccionar ${link.slug}`}
+                        />
+                      </TableCell>
                       <TableCell className="p-4">
                         <a
                           href={link.shortUrl}

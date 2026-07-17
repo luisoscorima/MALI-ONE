@@ -231,6 +231,42 @@ export const api = {
     return `/api/links/${id}/qr?${params.toString()}`;
   },
 
+  downloadQrBulk: async (
+    ids: string[],
+    format: 'png' | 'svg' = 'png',
+    width?: number,
+  ) => {
+    const res = await fetch(`${API_BASE}/api/links/qr/bulk`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, format, width }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: res.statusText }));
+      const message = error.message;
+      const text = Array.isArray(message)
+        ? message.join(', ')
+        : typeof message === 'string'
+          ? message
+          : res.statusText;
+      throw new Error(text || 'Error al descargar QR');
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = match?.[1] ?? `qrs-${format}-${stamp}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
   async fetchQrPreview(
     data: string,
     style: import('@mali-one/shared').QrStyleDto,
