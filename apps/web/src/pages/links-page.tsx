@@ -1,10 +1,11 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { BarChart3, Copy, Download, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { BarChart3, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { FilterChip, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
+import { downloadLinksExcel } from '@/lib/links-export';
 import {
   formatTagsInput,
   parseTagsInput,
@@ -119,6 +120,7 @@ export function LinksPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkQrFormat, setBulkQrFormat] = useState<'png' | 'svg'>('png');
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [excelExporting, setExcelExporting] = useState(false);
 
   const loadDefaultQrStyle = useCallback(async () => {
     try {
@@ -350,24 +352,55 @@ export function LinksPage() {
     });
   }
 
-  async function handleBulkQrDownload() {
-    if (selectedIds.length === 0) {
-      toast.error('Selecciona al menos un enlace');
+  function getExportTargets(visibleLinks: ShortLinkDto[]) {
+    if (selectedIds.length > 0) {
+      return visibleLinks.filter((link) => selectedIds.includes(link.id));
+    }
+    return visibleLinks;
+  }
+
+  async function handleBulkQrDownload(visibleLinks: ShortLinkDto[]) {
+    const targets = getExportTargets(visibleLinks);
+    if (targets.length === 0) {
+      toast.error('No hay enlaces para descargar');
       return;
     }
-    if (selectedIds.length > 50) {
+    if (targets.length > 50) {
       toast.error('Máximo 50 QR por descarga. Reduce la selección.');
       return;
     }
     setBulkDownloading(true);
     try {
-      await api.downloadQrBulk(selectedIds, bulkQrFormat);
-      toast.success(`ZIP con ${selectedIds.length} QR descargado`);
+      await api.downloadQrBulk(
+        targets.map((link) => link.id),
+        bulkQrFormat,
+      );
+      toast.success(`ZIP con ${targets.length} QR descargado`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al descargar QR';
       toast.error(msg);
     } finally {
       setBulkDownloading(false);
+    }
+  }
+
+  function handleExcelExport(visibleLinks: ShortLinkDto[]) {
+    const targets = getExportTargets(visibleLinks);
+    if (targets.length === 0) {
+      toast.error('No hay enlaces para exportar');
+      return;
+    }
+    setExcelExporting(true);
+    try {
+      downloadLinksExcel(targets);
+      toast.success(
+        `Excel con ${targets.length} enlace${targets.length === 1 ? '' : 's'} descargado`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error al exportar Excel';
+      toast.error(msg);
+    } finally {
+      setExcelExporting(false);
     }
   }
 
@@ -381,6 +414,11 @@ export function LinksPage() {
   const filteredLinks = tagFilter
     ? links.filter((link) => link.tags.includes(tagFilter))
     : links;
+  const exportTargets = getExportTargets(filteredLinks);
+  const exportScopeLabel =
+    selectedIds.length > 0
+      ? `${exportTargets.length} seleccionado${exportTargets.length === 1 ? '' : 's'}`
+      : `todos los visibles: ${exportTargets.length}`;
 
   return (
     <div>
@@ -569,18 +607,34 @@ export function LinksPage() {
               </div>
             )}
           </div>
-          {selectedIds.length > 0 && (
+          {filteredLinks.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-              <span className="text-sm text-muted">
-                {selectedIds.length} seleccionado
-                {selectedIds.length === 1 ? '' : 's'}
-              </span>
+              <span className="text-sm text-muted">{exportScopeLabel}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={excelExporting || bulkDownloading || exportTargets.length === 0}
+                onClick={() => handleExcelExport(filteredLinks)}
+              >
+                {excelExporting ? (
+                  <>
+                    <Spinner className="size-3.5" />
+                    Exportando…
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="size-3.5" />
+                    Excel
+                  </>
+                )}
+              </Button>
               <Select
                 value={bulkQrFormat}
                 onValueChange={(value) =>
                   setBulkQrFormat(value as 'png' | 'svg')
                 }
-                disabled={bulkDownloading}
+                disabled={bulkDownloading || excelExporting}
               >
                 <SelectTrigger className="h-8 w-28">
                   <SelectValue />
@@ -593,8 +647,13 @@ export function LinksPage() {
               <Button
                 type="button"
                 size="sm"
-                disabled={bulkDownloading || selectedIds.length > 50}
-                onClick={() => void handleBulkQrDownload()}
+                disabled={
+                  bulkDownloading ||
+                  excelExporting ||
+                  exportTargets.length === 0 ||
+                  exportTargets.length > 50
+                }
+                onClick={() => void handleBulkQrDownload(filteredLinks)}
               >
                 {bulkDownloading ? (
                   <>
@@ -608,16 +667,18 @@ export function LinksPage() {
                   </>
                 )}
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={bulkDownloading}
-                onClick={() => setSelectedIds([])}
-              >
-                Limpiar
-              </Button>
-              {selectedIds.length > 50 && (
+              {selectedIds.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={bulkDownloading || excelExporting}
+                  onClick={() => setSelectedIds([])}
+                >
+                  Limpiar
+                </Button>
+              )}
+              {exportTargets.length > 50 && (
                 <span className="text-xs text-destructive">
                   Máximo 50 QR por descarga
                 </span>
