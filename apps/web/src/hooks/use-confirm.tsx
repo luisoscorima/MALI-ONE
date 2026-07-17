@@ -26,69 +26,79 @@ export type ConfirmOptions = {
   variant?: 'default' | 'destructive' | 'danger';
 };
 
-type ConfirmState = ConfirmOptions & { open: boolean };
-
 type ConfirmContextValue = {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 };
 
 const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
+const EMPTY_OPTIONS: ConfirmOptions = {
+  title: '',
+};
+
 export function ConfirmProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ConfirmState | null>(null);
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<ConfirmOptions>(EMPTY_OPTIONS);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
-  const confirm = useCallback((options: ConfirmOptions) => {
+  const confirm = useCallback((next: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
       resolveRef.current = resolve;
-      setState({ open: true, ...options });
+      setOptions(next);
+      // Diferir la apertura para que el click del trigger (p. ej. Tooltip)
+      // termine antes de montar el overlay; evita overlay huérfano en SPA.
+      queueMicrotask(() => setOpen(true));
     });
   }, []);
 
-  const close = useCallback((result: boolean) => {
+  const settle = useCallback((result: boolean) => {
     resolveRef.current?.(result);
     resolveRef.current = null;
-    setState(null);
+    setOpen(false);
   }, []);
 
   const value = useMemo(() => ({ confirm }), [confirm]);
 
   const actionVariant =
-    state?.variant === 'danger' || state?.variant === 'destructive'
+    options.variant === 'danger' || options.variant === 'destructive'
       ? 'destructive'
       : 'default';
 
   return (
     <ConfirmContext.Provider value={value}>
       {children}
-      {state && (
-        <AlertDialog
-          open={state.open}
-          onOpenChange={(open) => {
-            if (!open) close(false);
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{state.title}</AlertDialogTitle>
-              {state.description && (
-                <AlertDialogDescription>{state.description}</AlertDialogDescription>
-              )}
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => close(false)}>
-                {state.cancelLabel ?? 'Cancelar'}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                variant={actionVariant}
-                onClick={() => close(true)}
-              >
-                {state.confirmLabel ?? 'Confirmar'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) settle(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{options.title}</AlertDialogTitle>
+            {options.description ? (
+              <AlertDialogDescription>
+                {options.description}
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription className="sr-only">
+                Confirmar acción
+              </AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => settle(false)}>
+              {options.cancelLabel ?? 'Cancelar'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant={actionVariant}
+              onClick={() => settle(true)}
+            >
+              {options.confirmLabel ?? 'Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ConfirmContext.Provider>
   );
 }
