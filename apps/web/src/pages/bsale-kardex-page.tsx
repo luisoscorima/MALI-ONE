@@ -47,7 +47,6 @@ function defaultTo(): string {
 const MOVEMENT_LABELS: Record<BsaleKardexMovementDto['movementType'], string> = {
   opening: 'Saldo inicial',
   document: 'Documento',
-  transfer: 'Traslado',
   reception: 'Recepción',
   consumption: 'Consumo',
   ending: 'Saldo final',
