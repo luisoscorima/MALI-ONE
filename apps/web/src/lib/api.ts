@@ -18,6 +18,11 @@ async function request<T>(
   });
 
   if (!res.ok) {
+    if (res.status === 504 || res.status === 502 || res.status === 524) {
+      throw new Error(
+        'La solicitud tardó demasiado (timeout del proxy). Si es Kardex, espera unos segundos y vuelve a intentar: el servidor puede seguir procesando en segundo plano.',
+      );
+    }
     const error = await res.json().catch(() => ({ message: res.statusText }));
     const message = error.message;
     const text = Array.isArray(message)
@@ -25,7 +30,7 @@ async function request<T>(
       : typeof message === 'string'
         ? message
         : res.statusText;
-    throw new Error(text || 'Error de solicitud');
+    throw new Error(text || `Error de solicitud (${res.status})`);
   }
 
   if (res.status === 204) {
@@ -700,7 +705,7 @@ export const api = {
     request<import('@mali-one/shared').BsaleOfficeDto[]>('/api/bsale/offices'),
 
   getBsaleKardex: (body: import('@mali-one/shared').BsaleKardexQueryDto) =>
-    request<import('@mali-one/shared').BsaleKardexResultDto>(
+    request<import('@mali-one/shared').BsaleKardexJobDto>(
       '/api/bsale/kardex',
       { method: 'POST', body: JSON.stringify(body) },
     ),

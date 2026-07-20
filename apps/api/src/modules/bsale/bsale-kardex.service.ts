@@ -110,6 +110,7 @@ const MOVEMENT_SORT_ORDER: Record<PendingMovement['movementType'], number> = {
   transfer: 2,
   consumption: 3,
   reception: 4,
+  ending: 5,
 };
 
 function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
@@ -367,7 +368,11 @@ export class BsaleKardexService {
 
     const pending: PendingMovement[] = [...openings, ...periodRows];
     pending.sort(sortKardexRows);
-    this.applyWeightedAverageCosts(pending, openingQtyByKey, openingAvgByKey);
+    const endingCostByKey = this.applyWeightedAverageCosts(
+      pending,
+      openingQtyByKey,
+      openingAvgByKey,
+    );
 
     const balances = new Map<string, number>();
     const movements: BsaleKardexMovementDto[] = pending.map((row) => {
@@ -383,12 +388,49 @@ export class BsaleKardexService {
       return { ...row, balanceQty: next };
     });
 
+    const endings: BsaleKardexMovementDto[] = [];
+    for (const key of periodKeys) {
+      const [variantIdRaw, officeIdRaw] = key.split(':');
+      const variantId = Number(variantIdRaw);
+      const officeId = Number(officeIdRaw);
+      const sample = periodRows.find(
+        (row) => row.variantId === variantId && row.officeId === officeId,
+      );
+      const info = variantCache.get(variantId);
+      const endingQty = balances.get(key) ?? 0;
+      const endingAvg =
+        endingCostByKey.get(key)?.avg ?? openingAvgByKey.get(key) ?? 0;
+      endings.push({
+        date: toTs,
+        dateIso: params.to,
+        officeId,
+        officeName:
+          officeMap.get(officeId)?.name ??
+          sample?.officeName ??
+          `Oficina ${officeId}`,
+        movementType: 'ending',
+        documentLabel: 'Saldo final',
+        documentNumber: '',
+        documentId: null,
+        variantId,
+        sku: info?.sku || sample?.sku || '',
+        productName: info?.productName || sample?.productName || '',
+        entryQty: 0,
+        exitQty: 0,
+        balanceQty: endingQty,
+        unitCost: endingQty > 0 || endingAvg > 0 ? endingAvg : null,
+      });
+    }
+
+    const allMovements = [...movements, ...endings];
+    allMovements.sort(sortKardexRows);
+
     return {
       from: params.from,
       to: params.to,
       officeIds: selectedIds,
-      totalMovements: movements.length,
-      movements,
+      totalMovements: allMovements.length,
+      movements: allMovements,
     };
   }
 
@@ -485,12 +527,15 @@ export class BsaleKardexService {
     return Number.isFinite(state.avg) ? state.avg : 0;
   }
 
-  /** Aplica costo promedio ponderado sobre el kardex del periodo (mutates unitCost). */
+  /**
+   * Aplica costo promedio ponderado sobre el kardex del periodo (mutates unitCost).
+   * Devuelve el estado final por variante/almacén (saldo y promedio de cierre).
+   */
   private applyWeightedAverageCosts(
     rows: PendingMovement[],
     openingQtyByKey: Map<string, number>,
     openingAvgByKey: Map<string, number>,
-  ): void {
+  ): Map<string, CostState> {
     const states = new Map<string, CostState>();
 
     for (const row of rows) {
@@ -501,6 +546,15 @@ export class BsaleKardexService {
         const qty = openingQtyByKey.get(key) ?? 0;
         states.set(key, { qty, avg });
         row.unitCost = qty > 0 || avg > 0 ? avg : null;
+        continue;
+      }
+
+      if (row.movementType === 'ending') {
+        const state = states.get(key) ?? {
+          qty: openingQtyByKey.get(key) ?? 0,
+          avg: openingAvgByKey.get(key) ?? 0,
+        };
+        row.unitCost = state.qty > 0 || state.avg > 0 ? state.avg : null;
         continue;
       }
 
@@ -528,6 +582,8 @@ export class BsaleKardexService {
 
       states.set(key, state);
     }
+
+    return states;
   }
 
   private validateRange(from: string, to: string): void {

@@ -21,7 +21,7 @@ export class BsaleController {
 
   @Post('kardex')
   buildKardex(@Body() body: KardexQueryDto) {
-    return this.kardex.buildKardex({
+    return this.kardex.startOrPollKardex({
       from: body.from,
       to: body.to,
       officeIds: body.officeIds,

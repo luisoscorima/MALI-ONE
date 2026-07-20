@@ -44,6 +44,7 @@ const MOVEMENT_LABELS: Record<BsaleKardexMovementDto['movementType'], string> = 
   transfer: 'Traslado',
   reception: 'Recepción',
   consumption: 'Consumo',
+  ending: 'Saldo final',
 };
 
 export function BsaleKardexPage() {
@@ -171,7 +172,7 @@ export function BsaleKardexPage() {
     <div>
       <PageHeader
         title="Kardex Bsale"
-        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos; luego usa Vista previa y exporta CSV/Excel desde esos datos."
+        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos (no cierres la pestaña); si un proxy corta la conexión, se reintenta sola hasta obtener la caché. Luego exporta CSV/Excel desde esos datos."
         actions={
           <Button
             variant="outline"
