@@ -27,6 +27,12 @@ import {
 } from '@/components/ui';
 
 const PREVIEW_PAGE_SIZE = 50;
+const KARDEX_POLL_MS = 2_000;
+const KARDEX_MAX_WAIT_MS = 15 * 60 * 1000;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function defaultFrom(): string {
   const d = new Date();
@@ -60,6 +66,7 @@ export function BsaleKardexPage() {
   const [result, setResult] = useState<BsaleKardexResultDto | null>(null);
   const [resultQueryKey, setResultQueryKey] = useState('');
   const [page, setPage] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);
 
   const loadOffices = useCallback(async () => {
     setLoadingOffices(true);
@@ -115,11 +122,30 @@ export function BsaleKardexPage() {
     setLoadingKardex(true);
     setError('');
     setPage(0);
+    setElapsedSec(0);
     try {
-      const data = await api.getBsaleKardex(queryBody);
-      setResult(data);
-      setResultQueryKey(queryKey);
-      toast.success(`${data.totalMovements} movimientos consolidados`);
+      const deadline = Date.now() + KARDEX_MAX_WAIT_MS;
+      while (true) {
+        const job = await api.getBsaleKardex(queryBody);
+        if (job.status === 'ready') {
+          setResult(job.data);
+          setResultQueryKey(queryKey);
+          toast.success(`${job.data.totalMovements} movimientos consolidados`);
+          return;
+        }
+        if (job.status === 'error') {
+          throw new Error(job.message);
+        }
+        setElapsedSec(
+          Math.max(1, Math.round((Date.now() - job.startedAt) / 1000)),
+        );
+        if (Date.now() >= deadline) {
+          throw new Error(
+            'La consulta supera el tiempo máximo de espera. Intenta de nuevo en unos minutos.',
+          );
+        }
+        await sleep(KARDEX_POLL_MS);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al consultar Kardex';
       setError(msg);
@@ -172,7 +198,7 @@ export function BsaleKardexPage() {
     <div>
       <PageHeader
         title="Kardex Bsale"
-        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos (no cierres la pestaña); si un proxy corta la conexión, se reintenta sola hasta obtener la caché. Luego exporta CSV/Excel desde esos datos."
+        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos (se consulta en segundo plano); luego exporta CSV/Excel desde esos datos."
         actions={
           <Button
             variant="outline"
@@ -298,7 +324,14 @@ export function BsaleKardexPage() {
       </div>
 
       {loadingKardex ? (
-        <TableSkeleton rows={8} cols={8} />
+        <div className="space-y-3">
+          <p className="text-sm text-muted">
+            Generando kardex desde Bsale
+            {elapsedSec > 0 ? ` · ${elapsedSec}s` : ''}
+            … Esto puede tardar varios minutos la primera vez.
+          </p>
+          <TableSkeleton rows={8} cols={8} />
+        </div>
       ) : !result ? (
         <EmptyState
           title="Sin consulta aún"

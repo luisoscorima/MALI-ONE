@@ -428,3 +428,9 @@ export interface BsaleKardexResultDto {
   totalMovements: number;
   movements: BsaleKardexMovementDto[];
 }
+
+/** Respuesta corta de POST /api/bsale/kardex (polling; evita 504 en proxies). */
+export type BsaleKardexJobDto =
+  | { status: 'ready'; data: BsaleKardexResultDto }
+  | { status: 'pending'; startedAt: number }
+  | { status: 'error'; message: string };

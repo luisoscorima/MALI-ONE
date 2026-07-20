@@ -1,9 +1,11 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
 } from '@nestjs/common';
 import type {
+  BsaleKardexJobDto,
   BsaleKardexMovementDto,
   BsaleKardexResultDto,
   BsaleOfficeDto,
@@ -145,6 +147,20 @@ function isInternalDispatchLabel(label: string): boolean {
   );
 }
 
+function exceptionMessage(err: unknown): string {
+  if (err instanceof HttpException) {
+    const res = err.getResponse();
+    if (typeof res === 'string') return res;
+    if (typeof res === 'object' && res && 'message' in res) {
+      const message = (res as { message: string | string[] }).message;
+      return Array.isArray(message) ? message.join(', ') : String(message);
+    }
+    return err.message;
+  }
+  if (err instanceof Error) return err.message;
+  return 'Error al generar Kardex';
+}
+
 @Injectable()
 export class BsaleKardexService {
   private readonly logger = new Logger(BsaleKardexService.name);
@@ -152,7 +168,12 @@ export class BsaleKardexService {
     string,
     { at: number; data: BsaleKardexResultDto }
   >();
+  private readonly errorCache = new Map<
+    string,
+    { at: number; message: string }
+  >();
   private readonly inflight = new Map<string, Promise<BsaleKardexResultDto>>();
+  private readonly inflightStarted = new Map<string, number>();
   private readonly cacheTtlMs = 10 * 60 * 1000;
 
   constructor(private readonly client: BsaleClientService) {}
@@ -168,6 +189,43 @@ export class BsaleKardexService {
       isVirtual: Boolean(o.isVirtual),
       state: Number(o.state ?? 0),
     }));
+  }
+
+  /**
+   * Inicia el kardex en background o reporta estado (pending/ready/error).
+   * Pensado para polling desde el cliente y evitar 504 en proxies (~60s).
+   */
+  async startOrPollKardex(params: {
+    from: string;
+    to: string;
+    officeIds?: number[];
+  }): Promise<BsaleKardexJobDto> {
+    this.validateRange(params.from, params.to);
+    const cacheKey = this.cacheKey(params);
+
+    const cached = this.resultCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < this.cacheTtlMs) {
+      return { status: 'ready', data: cached.data };
+    }
+
+    if (this.inflight.has(cacheKey)) {
+      return {
+        status: 'pending',
+        startedAt: this.inflightStarted.get(cacheKey) ?? Date.now(),
+      };
+    }
+
+    const failed = this.errorCache.get(cacheKey);
+    if (failed && Date.now() - failed.at < this.cacheTtlMs) {
+      this.errorCache.delete(cacheKey);
+      return { status: 'error', message: failed.message };
+    }
+
+    this.ensureKardexRunning(cacheKey, params);
+    return {
+      status: 'pending',
+      startedAt: this.inflightStarted.get(cacheKey) ?? Date.now(),
+    };
   }
 
   async buildKardex(params: {
@@ -189,15 +247,40 @@ export class BsaleKardexService {
       return existing;
     }
 
+    return this.ensureKardexRunning(cacheKey, params);
+  }
+
+  private ensureKardexRunning(
+    cacheKey: string,
+    params: { from: string; to: string; officeIds?: number[] },
+  ): Promise<BsaleKardexResultDto> {
+    const existing = this.inflight.get(cacheKey);
+    if (existing) return existing;
+
+    this.errorCache.delete(cacheKey);
+    this.inflightStarted.set(cacheKey, Date.now());
+    this.logger.log(`Kardex inicia build (${cacheKey})`);
+
     const promise = this.buildKardexUncached(params)
       .then((data) => {
         this.resultCache.set(cacheKey, { at: Date.now(), data });
         return data;
       })
+      .catch((err) => {
+        this.errorCache.set(cacheKey, {
+          at: Date.now(),
+          message: exceptionMessage(err),
+        });
+        throw err;
+      })
       .finally(() => {
         this.inflight.delete(cacheKey);
+        this.inflightStarted.delete(cacheKey);
       });
+
     this.inflight.set(cacheKey, promise);
+    // Evita unhandledRejection si solo se usa startOrPoll (sin await).
+    promise.catch(() => undefined);
     return promise;
   }
 
