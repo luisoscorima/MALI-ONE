@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, Loader2, PackageSearch, RefreshCw } from 'lucide-react';
+import { FileSpreadsheet, Loader2, PackageSearch, RefreshCw } from 'lucide-react';
 import type {
   BsaleKardexMovementDto,
   BsaleKardexResultDto,
@@ -9,10 +9,7 @@ import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
-import {
-  downloadKardexCsv,
-  downloadKardexXlsx,
-} from '@/lib/bsale-kardex-export';
+import { downloadKardexXlsx } from '@/lib/bsale-kardex-export';
 import {
   Button,
   Checkbox,
@@ -47,9 +44,11 @@ function defaultTo(): string {
 const MOVEMENT_LABELS: Record<BsaleKardexMovementDto['movementType'], string> = {
   opening: 'Saldo inicial',
   document: 'Documento',
+  transfer: 'Traslado',
   reception: 'Recepción',
   consumption: 'Consumo',
   ending: 'Saldo final',
+  omission: 'Por omisión',
 };
 
 export function BsaleKardexPage() {
@@ -58,9 +57,13 @@ export function BsaleKardexPage() {
   const [selectedOfficeIds, setSelectedOfficeIds] = useState<number[]>([]);
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
+  const [includeOpening, setIncludeOpening] = useState(true);
+  const [includeEnding, setIncludeEnding] = useState(true);
+  const [includeTransfer, setIncludeTransfer] = useState(true);
+  const [forceOmission, setForceOmission] = useState(false);
   const [loadingOffices, setLoadingOffices] = useState(true);
   const [loadingKardex, setLoadingKardex] = useState(false);
-  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<BsaleKardexResultDto | null>(null);
   const [resultQueryKey, setResultQueryKey] = useState('');
@@ -104,16 +107,44 @@ export function BsaleKardexPage() {
       from,
       to,
       officeIds: selectedOfficeIds,
+      includeOpening,
+      includeEnding,
+      includeTransfer,
+      forceOmission,
     }),
-    [from, to, selectedOfficeIds],
+    [
+      from,
+      to,
+      selectedOfficeIds,
+      includeOpening,
+      includeEnding,
+      includeTransfer,
+      forceOmission,
+    ],
   );
 
   const queryKey = useMemo(() => {
     const offices = [...selectedOfficeIds].sort((a, b) => a - b).join(',');
-    return `${from}|${to}|${offices}`;
-  }, [from, to, selectedOfficeIds]);
+    return [
+      from,
+      to,
+      offices,
+      includeOpening ? '1' : '0',
+      includeEnding ? '1' : '0',
+      includeTransfer ? '1' : '0',
+      forceOmission ? '1' : '0',
+    ].join('|');
+  }, [
+    from,
+    to,
+    selectedOfficeIds,
+    includeOpening,
+    includeEnding,
+    includeTransfer,
+    forceOmission,
+  ]);
 
-  const runPreview = async () => {
+  const runPreview = async (refresh = false) => {
     if (selectedOfficeIds.length === 0) {
       toast.error('Selecciona al menos un almacén.');
       return;
@@ -124,12 +155,21 @@ export function BsaleKardexPage() {
     setElapsedSec(0);
     try {
       const deadline = Date.now() + KARDEX_MAX_WAIT_MS;
+      let sendRefresh = refresh;
       while (true) {
-        const job = await api.getBsaleKardex(queryBody);
+        const job = await api.getBsaleKardex({
+          ...queryBody,
+          refresh: sendRefresh || undefined,
+        });
+        sendRefresh = false;
         if (job.status === 'ready') {
           setResult(job.data);
           setResultQueryKey(queryKey);
-          toast.success(`${job.data.totalMovements} movimientos consolidados`);
+          toast.success(
+            refresh
+              ? `${job.data.totalMovements} movimientos actualizados desde Bsale`
+              : `${job.data.totalMovements} movimientos consolidados`,
+          );
           return;
         }
         if (job.status === 'error') {
@@ -154,32 +194,28 @@ export function BsaleKardexPage() {
     }
   };
 
-  const runExport = async (format: 'csv' | 'xlsx') => {
+  const runExport = async () => {
     if (selectedOfficeIds.length === 0) {
       toast.error('Selecciona al menos un almacén.');
       return;
     }
-    setExporting(format);
+    setExporting(true);
     setError('');
     try {
       // Si ya hay vista previa del mismo filtro, exporta en el navegador (evita 504).
       if (result && resultQueryKey === queryKey) {
-        if (format === 'csv') {
-          downloadKardexCsv(result.movements, from, to);
-        } else {
-          downloadKardexXlsx(result.movements, from, to);
-        }
-        toast.success(`Kardex exportado (${format.toUpperCase()})`);
+        downloadKardexXlsx(result.movements, from, to);
+        toast.success('Kardex exportado (XLSX)');
         return;
       }
-      await api.exportBsaleKardex({ ...queryBody, format });
-      toast.success(`Kardex exportado (${format.toUpperCase()})`);
+      await api.exportBsaleKardex({ ...queryBody, format: 'xlsx' });
+      toast.success('Kardex exportado (XLSX)');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al exportar';
       setError(msg);
       toast.error(msg);
     } finally {
-      setExporting(null);
+      setExporting(false);
     }
   };
 
@@ -197,7 +233,7 @@ export function BsaleKardexPage() {
     <div>
       <PageHeader
         title="Kardex Bsale"
-        description="Consolida entradas y salidas de stock por almacén, con saldo inicial. Rango máx. 12 meses. La primera consulta puede tardar varios minutos (se consulta en segundo plano); luego exporta CSV/Excel desde esos datos."
+        description="Consolida entradas y salidas de stock por almacén. Vista previa usa caché (~10 min); usa «Actualizar desde Bsale» si corregiste datos allá y quieres verlos aquí."
         actions={
           <Button
             variant="outline"
@@ -283,10 +319,64 @@ export function BsaleKardexPage() {
           )}
         </div>
 
+        <div>
+          <Label className="mb-2 block">Incluir en el kardex</Label>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <Checkbox
+                checked={includeOpening}
+                onCheckedChange={(v) => setIncludeOpening(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Saldo inicial</span>
+                <span className="block text-xs text-muted">opening</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <Checkbox
+                checked={includeEnding}
+                onCheckedChange={(v) => setIncludeEnding(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Saldo final</span>
+                <span className="block text-xs text-muted">ending</span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <Checkbox
+                checked={includeTransfer}
+                onCheckedChange={(v) => setIncludeTransfer(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Traslados</span>
+                <span className="block text-xs text-muted">
+                  etiquetar despachos internos
+                </span>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <Checkbox
+                checked={forceOmission}
+                onCheckedChange={(v) => setForceOmission(v === true)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Forzar por omisión</span>
+                <span className="block text-xs text-muted">
+                  salidas sin recepción pareja
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <Button
-            onClick={() => void runPreview()}
-            disabled={loadingKardex || !!exporting}
+            onClick={() => void runPreview(false)}
+            disabled={loadingKardex || exporting}
           >
             {loadingKardex ? (
               <Loader2 className="size-4 animate-spin" />
@@ -297,22 +387,23 @@ export function BsaleKardexPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => void runExport('csv')}
-            disabled={loadingKardex || !!exporting}
+            onClick={() => void runPreview(true)}
+            disabled={loadingKardex || exporting}
+            title="Ignora la caché y vuelve a consultar Bsale"
           >
-            {exporting === 'csv' ? (
+            {loadingKardex ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Download className="size-4" />
+              <RefreshCw className="size-4" />
             )}
-            Exportar CSV
+            Actualizar desde Bsale
           </Button>
           <Button
             variant="outline"
-            onClick={() => void runExport('xlsx')}
-            disabled={loadingKardex || !!exporting}
+            onClick={() => void runExport()}
+            disabled={loadingKardex || exporting}
           >
-            {exporting === 'xlsx' ? (
+            {exporting ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <FileSpreadsheet className="size-4" />

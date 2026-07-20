@@ -382,7 +382,9 @@ export type BsaleKardexMovementType =
   | 'reception'
   | 'consumption'
   | 'opening'
-  | 'ending';
+  | 'ending'
+  | 'transfer'
+  | 'omission';
 
 export interface BsaleOfficeDto {
   id: number;
@@ -396,6 +398,23 @@ export interface BsaleKardexQueryDto {
   from: string;
   to: string;
   officeIds?: number[];
+  /** Incluir filas sintéticas de saldo inicial. Default true. */
+  includeOpening?: boolean;
+  /** Incluir filas sintéticas de saldo final. Default true. */
+  includeEnding?: boolean;
+  /** Etiquetar pares despacho interno como traslado. Default true. */
+  includeTransfer?: boolean;
+  /**
+   * Añade filas por salidas de despacho interno sin recepción pareja
+   * (olvidaron registrar la entrada). Al sumar endings + omisiones se
+   * obtiene el saldo real del producto. Default false.
+   */
+  forceOmission?: boolean;
+  /**
+   * Invalida la caché del servidor y vuelve a consultar Bsale.
+   * Solo debe enviarse en el primer poll de una sincronización forzada.
+   */
+  refresh?: boolean;
 }
 
 export interface BsaleKardexExportDto extends BsaleKardexQueryDto {

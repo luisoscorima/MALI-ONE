@@ -25,6 +25,11 @@ export class BsaleController {
       from: body.from,
       to: body.to,
       officeIds: body.officeIds,
+      includeOpening: body.includeOpening,
+      includeEnding: body.includeEnding,
+      includeTransfer: body.includeTransfer,
+      forceOmission: body.forceOmission,
+      refresh: body.refresh,
     });
   }
 
@@ -34,6 +39,11 @@ export class BsaleController {
       from: body.from,
       to: body.to,
       officeIds: body.officeIds,
+      includeOpening: body.includeOpening,
+      includeEnding: body.includeEnding,
+      includeTransfer: body.includeTransfer,
+      forceOmission: body.forceOmission,
+      refresh: body.refresh,
     });
 
     const stamp = `${body.from}_${body.to}`;

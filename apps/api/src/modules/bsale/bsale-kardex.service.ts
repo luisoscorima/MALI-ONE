@@ -106,12 +106,42 @@ function balanceKey(variantId: number, officeId: number): string {
   return `${variantId}:${officeId}`;
 }
 
+type KardexBuildParams = {
+  from: string;
+  to: string;
+  officeIds?: number[];
+  includeOpening?: boolean;
+  includeEnding?: boolean;
+  includeTransfer?: boolean;
+  forceOmission?: boolean;
+  /** Invalida caché y fuerza nueva consulta a Bsale. No forma parte del cacheKey. */
+  refresh?: boolean;
+};
+
+type ResolvedKardexOptions = {
+  includeOpening: boolean;
+  includeEnding: boolean;
+  includeTransfer: boolean;
+  forceOmission: boolean;
+};
+
+function resolveKardexOptions(params: KardexBuildParams): ResolvedKardexOptions {
+  return {
+    includeOpening: params.includeOpening !== false,
+    includeEnding: params.includeEnding !== false,
+    includeTransfer: params.includeTransfer !== false,
+    forceOmission: params.forceOmission === true,
+  };
+}
+
 const MOVEMENT_SORT_ORDER: Record<PendingMovement['movementType'], number> = {
   opening: 0,
   document: 1,
-  consumption: 2,
-  reception: 3,
-  ending: 4,
+  transfer: 2,
+  consumption: 3,
+  reception: 4,
+  ending: 5,
+  omission: 6,
 };
 
 function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
@@ -131,6 +161,19 @@ function sortKardexRows(a: PendingMovement, b: PendingMovement): number {
   // Salidas antes que entradas el mismo día
   if (a.exitQty !== b.exitQty) return b.exitQty - a.exitQty;
   return (a.documentId ?? 0) - (b.documentId ?? 0);
+}
+
+function isInternalDispatchLabel(label: string): boolean {
+  const normalized = label
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+  return (
+    normalized.includes('despacho interno') ||
+    normalized.includes('traslado interno') ||
+    normalized.includes('guia de traslado') ||
+    normalized.includes('guia traslado')
+  );
 }
 
 function exceptionMessage(err: unknown): string {
@@ -160,6 +203,8 @@ export class BsaleKardexService {
   >();
   private readonly inflight = new Map<string, Promise<BsaleKardexResultDto>>();
   private readonly inflightStarted = new Map<string, number>();
+  /** Generación por cacheKey: al forzar refresh se incrementa para no cachear builds viejos. */
+  private readonly cacheGeneration = new Map<string, number>();
   private readonly cacheTtlMs = 10 * 60 * 1000;
 
   constructor(private readonly client: BsaleClientService) {}
@@ -180,14 +225,16 @@ export class BsaleKardexService {
   /**
    * Inicia el kardex en background o reporta estado (pending/ready/error).
    * Pensado para polling desde el cliente y evitar 504 en proxies (~60s).
+   * Con `refresh: true` invalida caché y fuerza una nueva consulta a Bsale.
    */
-  async startOrPollKardex(params: {
-    from: string;
-    to: string;
-    officeIds?: number[];
-  }): Promise<BsaleKardexJobDto> {
+  async startOrPollKardex(params: KardexBuildParams): Promise<BsaleKardexJobDto> {
     this.validateRange(params.from, params.to);
     const cacheKey = this.cacheKey(params);
+
+    if (params.refresh) {
+      this.invalidateCache(cacheKey);
+      this.logger.log(`Kardex refresh forzado (${cacheKey})`);
+    }
 
     const cached = this.resultCache.get(cacheKey);
     if (cached && Date.now() - cached.at < this.cacheTtlMs) {
@@ -214,13 +261,15 @@ export class BsaleKardexService {
     };
   }
 
-  async buildKardex(params: {
-    from: string;
-    to: string;
-    officeIds?: number[];
-  }): Promise<BsaleKardexResultDto> {
+  async buildKardex(params: KardexBuildParams): Promise<BsaleKardexResultDto> {
     this.validateRange(params.from, params.to);
     const cacheKey = this.cacheKey(params);
+
+    if (params.refresh) {
+      this.invalidateCache(cacheKey);
+      this.logger.log(`Kardex refresh forzado (${cacheKey})`);
+    }
+
     const cached = this.resultCache.get(cacheKey);
     if (cached && Date.now() - cached.at < this.cacheTtlMs) {
       this.logger.log(`Kardex cache hit (${cacheKey})`);
@@ -236,27 +285,45 @@ export class BsaleKardexService {
     return this.ensureKardexRunning(cacheKey, params);
   }
 
+  private invalidateCache(cacheKey: string): void {
+    const next = (this.cacheGeneration.get(cacheKey) ?? 0) + 1;
+    this.cacheGeneration.set(cacheKey, next);
+    this.resultCache.delete(cacheKey);
+    this.errorCache.delete(cacheKey);
+  }
+
   private ensureKardexRunning(
     cacheKey: string,
-    params: { from: string; to: string; officeIds?: number[] },
+    params: KardexBuildParams,
   ): Promise<BsaleKardexResultDto> {
     const existing = this.inflight.get(cacheKey);
     if (existing) return existing;
 
+    const genAtStart = this.cacheGeneration.get(cacheKey) ?? 0;
     this.errorCache.delete(cacheKey);
     this.inflightStarted.set(cacheKey, Date.now());
-    this.logger.log(`Kardex inicia build (${cacheKey})`);
+    this.logger.log(`Kardex inicia build (${cacheKey}) gen=${genAtStart}`);
 
     const promise = this.buildKardexUncached(params)
       .then((data) => {
-        this.resultCache.set(cacheKey, { at: Date.now(), data });
+        const currentGen = this.cacheGeneration.get(cacheKey) ?? 0;
+        if (currentGen === genAtStart) {
+          this.resultCache.set(cacheKey, { at: Date.now(), data });
+        } else {
+          this.logger.log(
+            `Kardex descarta caché obsoleta (${cacheKey}) gen=${genAtStart}→${currentGen}`,
+          );
+        }
         return data;
       })
       .catch((err) => {
-        this.errorCache.set(cacheKey, {
-          at: Date.now(),
-          message: exceptionMessage(err),
-        });
+        const currentGen = this.cacheGeneration.get(cacheKey) ?? 0;
+        if (currentGen === genAtStart) {
+          this.errorCache.set(cacheKey, {
+            at: Date.now(),
+            message: exceptionMessage(err),
+          });
+        }
         throw err;
       })
       .finally(() => {
@@ -270,20 +337,24 @@ export class BsaleKardexService {
     return promise;
   }
 
-  private cacheKey(params: {
-    from: string;
-    to: string;
-    officeIds?: number[];
-  }): string {
+  private cacheKey(params: KardexBuildParams): string {
     const offices = [...(params.officeIds ?? [])].sort((a, b) => a - b);
-    return `${params.from}|${params.to}|${offices.join(',') || 'all'}`;
+    const opts = resolveKardexOptions(params);
+    return [
+      params.from,
+      params.to,
+      offices.join(',') || 'all',
+      opts.includeOpening ? '1' : '0',
+      opts.includeEnding ? '1' : '0',
+      opts.includeTransfer ? '1' : '0',
+      opts.forceOmission ? '1' : '0',
+    ].join('|');
   }
 
-  private async buildKardexUncached(params: {
-    from: string;
-    to: string;
-    officeIds?: number[];
-  }): Promise<BsaleKardexResultDto> {
+  private async buildKardexUncached(
+    params: KardexBuildParams,
+  ): Promise<BsaleKardexResultDto> {
+    const options = resolveKardexOptions(params);
     const fromTs = dateToUnixStart(params.from);
     const toTs = dateToUnixEnd(params.to);
     const todayIso = new Date().toISOString().slice(0, 10);
@@ -347,9 +418,13 @@ export class BsaleKardexService {
     }
 
     await this.enrichVariantFields(sinceFrom, variantCache);
+    const orphanExits = this.resolveInternalTransfers(
+      sinceFrom,
+      options.includeTransfer,
+    );
 
     // En salidas no usar precio de documento: el costo lo calcula el promedio ponderado
-    // (el unitCost de la API en recepciones de entrada se conserva).
+    // (el unitCost de la API en recepciones/traslados de entrada se conserva).
     for (const row of sinceFrom) {
       if (row.exitQty > 0) row.unitCost = null;
     }
@@ -490,7 +565,18 @@ export class BsaleKardexService {
       });
     }
 
-    const allMovements = [...movements, ...endings];
+    const periodOrphans = orphanExits.filter((row) => row.date <= toTs);
+    const omissions = options.forceOmission
+      ? this.buildOmissionRows(periodOrphans, toTs, params.to, endingCostByKey)
+      : [];
+
+    const allMovements = [
+      ...movements.filter(
+        (row) => options.includeOpening || row.movementType !== 'opening',
+      ),
+      ...(options.includeEnding ? endings : []),
+      ...omissions,
+    ];
     allMovements.sort(sortKardexRows);
 
     return {
@@ -617,7 +703,7 @@ export class BsaleKardexService {
         continue;
       }
 
-      if (row.movementType === 'ending') {
+      if (row.movementType === 'ending' || row.movementType === 'omission') {
         const state = states.get(key) ?? {
           qty: openingQtyByKey.get(key) ?? 0,
           avg: openingAvgByKey.get(key) ?? 0,
@@ -867,6 +953,147 @@ export class BsaleKardexService {
           unitCost: null,
         });
       }
+    }
+    return rows;
+  }
+
+  /**
+   * Empareja salidas/entradas de despacho interno (mismo folio + variante + cantidad,
+   * distintos almacenes). Si tagAsTransfer, las marca como "transfer".
+   * Devuelve las salidas huérfanas (sin recepción pareja).
+   */
+  private resolveInternalTransfers(
+    rows: PendingMovement[],
+    tagAsTransfer: boolean,
+  ): PendingMovement[] {
+    const exits = rows.filter(
+      (row) =>
+        row.exitQty > 0 &&
+        (row.movementType === 'document' || row.movementType === 'transfer') &&
+        isInternalDispatchLabel(row.documentLabel),
+    );
+    const entries = rows.filter(
+      (row) =>
+        row.entryQty > 0 &&
+        (row.movementType === 'reception' || row.movementType === 'transfer') &&
+        isInternalDispatchLabel(row.documentLabel),
+    );
+
+    const usedEntries = new Set<PendingMovement>();
+    const matchedExits = new Set<PendingMovement>();
+    let tagged = 0;
+
+    for (const exit of exits) {
+      const match = entries.find(
+        (entry) =>
+          !usedEntries.has(entry) &&
+          entry.variantId === exit.variantId &&
+          String(entry.documentNumber) === String(exit.documentNumber) &&
+          Math.abs(entry.entryQty - exit.exitQty) < 1e-9 &&
+          entry.officeId !== exit.officeId,
+      );
+      if (!match) continue;
+      usedEntries.add(match);
+      matchedExits.add(exit);
+
+      if (!tagAsTransfer) continue;
+
+      exit.movementType = 'transfer';
+      match.movementType = 'transfer';
+      if (!isInternalDispatchLabel(exit.documentLabel) || !exit.documentLabel) {
+        exit.documentLabel = 'Traslado interno';
+      }
+      if (!isInternalDispatchLabel(match.documentLabel) || !match.documentLabel) {
+        match.documentLabel = 'Traslado interno';
+      }
+      if (!exit.documentLabel.toLowerCase().includes('traslado')) {
+        exit.documentLabel = `Traslado — ${exit.documentLabel}`;
+      }
+      if (!match.documentLabel.toLowerCase().includes('traslado')) {
+        match.documentLabel = `Traslado — ${match.documentLabel}`;
+      }
+      tagged += 2;
+    }
+
+    if (tagged > 0) {
+      this.logger.log(`Marcados ${tagged} movimientos como traslado interno`);
+    }
+
+    const orphans = exits.filter((exit) => !matchedExits.has(exit));
+    if (orphans.length > 0) {
+      this.logger.log(
+        `${orphans.length} salidas de despacho interno sin recepción pareja`,
+      );
+    }
+    return orphans;
+  }
+
+  /**
+   * Filas sintéticas por variante: cantidad despachada sin recepción registrada.
+   * Sumar endings (todos los almacenes) + omisión ≈ saldo real del producto.
+   */
+  private buildOmissionRows(
+    orphans: PendingMovement[],
+    toTs: number,
+    toIso: string,
+    endingCostByKey: Map<string, CostState>,
+  ): BsaleKardexMovementDto[] {
+    type Agg = {
+      qty: number;
+      sample: PendingMovement;
+      folios: string[];
+      avgCost: number;
+      avgWeight: number;
+    };
+    const byVariant = new Map<number, Agg>();
+
+    for (const orphan of orphans) {
+      const prev = byVariant.get(orphan.variantId);
+      const key = balanceKey(orphan.variantId, orphan.officeId);
+      const avg = endingCostByKey.get(key)?.avg ?? orphan.unitCost ?? 0;
+      if (!prev) {
+        byVariant.set(orphan.variantId, {
+          qty: orphan.exitQty,
+          sample: orphan,
+          folios: orphan.documentNumber ? [String(orphan.documentNumber)] : [],
+          avgCost: avg * orphan.exitQty,
+          avgWeight: orphan.exitQty,
+        });
+        continue;
+      }
+      prev.qty += orphan.exitQty;
+      if (orphan.documentNumber) {
+        prev.folios.push(String(orphan.documentNumber));
+      }
+      prev.avgCost += avg * orphan.exitQty;
+      prev.avgWeight += orphan.exitQty;
+    }
+
+    const rows: BsaleKardexMovementDto[] = [];
+    for (const [variantId, agg] of byVariant) {
+      const uniqueFolios = [...new Set(agg.folios)];
+      const unitCost =
+        agg.avgWeight > 0 ? agg.avgCost / agg.avgWeight : null;
+      rows.push({
+        date: toTs,
+        dateIso: toIso,
+        officeId: 0,
+        officeName: 'Por omisión',
+        movementType: 'omission',
+        documentLabel: 'Forzado por omisión',
+        documentNumber: uniqueFolios.slice(0, 8).join(', '),
+        documentId: null,
+        variantId,
+        sku: agg.sample.sku,
+        productName: agg.sample.productName,
+        entryQty: 0,
+        exitQty: 0,
+        balanceQty: agg.qty,
+        unitCost:
+          unitCost != null && Number.isFinite(unitCost) && unitCost > 0
+            ? unitCost
+            : null,
+      });
     }
     return rows;
   }
