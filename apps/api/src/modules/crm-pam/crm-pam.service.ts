@@ -61,6 +61,13 @@ export class CrmPamService {
     return this.crm.fetchAttributeDefinitions('pam');
   }
 
+  listSegments() {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    return this.crm.fetchSegments('pam');
+  }
+
   createAttributeDefinition(dto: {
     scope: 'area' | 'segment';
     segment_slug?: string;

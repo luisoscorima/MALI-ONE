@@ -186,7 +186,7 @@ export function NewslettersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Boletines"
-        description="Editor visual drag & drop (GrapesJS). Publica y comparte la URL; el envío masivo se hace desde CRM PAM."
+        description="Bloques al estilo Mailchimp MALI: texto|imagen, imagen|texto, colores y CTAs. El envío masivo se hace desde CRM PAM."
         actions={
           mode === 'closed' ? (
             <Button type="button" onClick={openCreate}>
@@ -266,8 +266,9 @@ export function NewslettersPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Arrastra bloques al lienzo. Usa Escritorio / Móvil arriba para
-            previsualizar. El HTML se genera al guardar (compatible con email).
+            En el panel izquierdo usa la categoría <strong>MALI</strong>: Texto |
+            Imagen, Imagen | Texto, bloque de color, barra CTA. Selecciona un
+            elemento y cambia color / alineación en Estilos a la derecha.
           </p>
 
           <NewsletterEditor

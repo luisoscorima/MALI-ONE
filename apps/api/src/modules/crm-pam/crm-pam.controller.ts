@@ -56,6 +56,11 @@ export class CrmPamController {
     return this.crmPam.listAttributeDefinitions();
   }
 
+  @Get('segments')
+  listSegments() {
+    return this.crmPam.listSegments();
+  }
+
   @Post('attribute-definitions')
   createAttributeDefinition(@Body() body: CreateCrmAttributeDefinitionDto) {
     return this.crmPam.createAttributeDefinition(body);

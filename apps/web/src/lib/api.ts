@@ -851,6 +851,11 @@ export const api = {
       }>
     >('/api/crm-pam/attribute-definitions'),
 
+  listCrmPamSegments: () =>
+    request<Array<{ slug: string; label: string; color_key?: string }>>(
+      '/api/crm-pam/segments',
+    ),
+
   createCrmPamAttributeDefinition: (body: {
     scope: 'area' | 'segment';
     segment_slug?: string;

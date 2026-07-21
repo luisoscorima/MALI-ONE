@@ -9,6 +9,7 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import {
   Button,
+  Badge,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -163,10 +164,18 @@ export function CrmPamPage() {
   const [payments, setPayments] = useState<PamRegistrationDto[]>([]);
   const [attrDefs, setAttrDefs] = useState<AttrDef[]>([]);
   const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [q, setQ] = useState('');
+  const [segment, setSegment] = useState('');
   const [attrKey, setAttrKey] = useState('');
   const [attrValue, setAttrValue] = useState('');
+  const [appliedQ, setAppliedQ] = useState('');
+  const [appliedAttrValue, setAppliedAttrValue] = useState('');
+  const [segments, setSegments] = useState<
+    Array<{ slug: string; label: string; color_key?: string }>
+  >([]);
 
   const [expandedContactId, setExpandedContactId] = useState<number | null>(
     null,
@@ -284,11 +293,12 @@ export function CrmPamPage() {
     try {
       const [data, linkedPage] = await Promise.all([
         api.listCrmPamContacts({
-          q: q || undefined,
+          q: appliedQ || undefined,
+          segment: segment || undefined,
           attr_key: attrKey || undefined,
-          attr_value: attrValue || undefined,
+          attr_value: appliedAttrValue || undefined,
           page,
-          limit: 100,
+          limit: pageSize,
         }),
         api.listCrmPamContacts({
           attr_key: 'payment_id',
@@ -298,6 +308,7 @@ export function CrmPamPage() {
       ]);
       setContacts(data.items);
       setTotal(data.total);
+      setPages(data.pages || (data.total > 0 ? Math.ceil(data.total / pageSize) : 0));
       const linked = new Set<string>();
       for (const c of linkedPage.items) {
         const pid = c.attributes.payment_id?.trim();
@@ -309,7 +320,13 @@ export function CrmPamPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, attrKey, attrValue, page]);
+  }, [appliedQ, segment, attrKey, appliedAttrValue, page, pageSize]);
+
+  function applyFilters() {
+    setAppliedQ(q.trim());
+    setAppliedAttrValue(attrValue.trim());
+    setPage(1);
+  }
 
   const loadPayments = useCallback(async () => {
     setPaymentsLoading(true);
@@ -327,10 +344,15 @@ export function CrmPamPage() {
 
   const loadAttrDefs = useCallback(async () => {
     try {
-      const defs = await api.listCrmPamAttributeDefinitions();
+      const [defs, segs] = await Promise.all([
+        api.listCrmPamAttributeDefinitions(),
+        api.listCrmPamSegments().catch(() => []),
+      ]);
       setAttrDefs(defs);
+      setSegments(segs);
     } catch {
       setAttrDefs([]);
+      setSegments([]);
     }
   }, []);
 
@@ -607,35 +629,73 @@ export function CrmPamPage() {
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="nombre, email, teléfono"
                 className="w-56"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') applyFilters();
+                }}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ak">Atributo</Label>
-              <Input
-                id="ak"
-                value={attrKey}
-                onChange={(e) => setAttrKey(e.target.value)}
-                placeholder="plan"
-                className="w-32"
-              />
+              <Label>Segmento</Label>
+              <Select
+                value={segment || '__all__'}
+                onValueChange={(value) => {
+                  setSegment(value === '__all__' ? '' : value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {segments.map((s) => (
+                    <SelectItem key={s.slug} value={s.slug}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="av">Valor</Label>
-              <Input
-                id="av"
-                value={attrValue}
-                onChange={(e) => setAttrValue(e.target.value)}
-                placeholder="amigo"
-                className="w-32"
-              />
+              <Label>Atributo</Label>
+              <Select
+                value={attrKey || '__none__'}
+                onValueChange={(value) => {
+                  const next = value === '__none__' ? '' : value;
+                  setAttrKey(next);
+                  if (!next) setAttrValue('');
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Atributo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Ninguno —</SelectItem>
+                  {areaAttrDefs.map((d) => (
+                    <SelectItem key={d.id} value={d.slug}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPage(1);
-                void loadContacts();
-              }}
-            >
+            {attrKey ? (
+              <div className="space-y-1">
+                <Label htmlFor="av">Valor</Label>
+                <Input
+                  id="av"
+                  value={attrValue}
+                  onChange={(e) => setAttrValue(e.target.value)}
+                  placeholder="Valor…"
+                  className="w-36"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyFilters();
+                  }}
+                />
+              </div>
+            ) : null}
+            <Button variant="outline" onClick={applyFilters}>
               <RefreshCw className="mr-1 size-4" />
               Filtrar
             </Button>
@@ -703,6 +763,7 @@ export function CrmPamPage() {
             </DropdownMenu>
             <span className="text-sm text-muted-foreground">
               {total} contactos
+              {pages > 1 ? ` · pág. ${page}/${pages}` : ''}
             </span>
           </div>
 
@@ -800,8 +861,27 @@ export function CrmPamPage() {
                             </TableCell>
                           ) : null}
                           {isColVisible('segments') ? (
-                            <TableCell className="text-xs">
-                              {c.segment_slugs.join(', ') || '—'}
+                            <TableCell>
+                              {c.segment_slugs.length === 0 ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {c.segment_slugs.map((slug) => {
+                                    const meta = segments.find(
+                                      (s) => s.slug === slug,
+                                    );
+                                    return (
+                                      <Badge
+                                        key={slug}
+                                        variant="secondary"
+                                        className="font-normal"
+                                      >
+                                        {meta?.label ?? slug}
+                                      </Badge>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </TableCell>
                           ) : null}
                           {visibleAttrDefs.map((d) => (
@@ -824,109 +904,106 @@ export function CrmPamPage() {
                           ) : null}
                         </TableRow>
                         {expanded && draftContact ? (
-                          <TableRow className="bg-muted/20">
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
                             <TableCell
                               colSpan={visibleColCount}
-                              className="p-4"
+                              className="p-0"
                             >
                               <div
-                                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                                className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4 shadow-sm"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    Nombre
-                                  </span>
-                                  <Input
-                                    value={draftContact.name}
-                                    onChange={(e) =>
-                                      setDraftContact({
-                                        ...draftContact,
-                                        name: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    Apellido
-                                  </span>
-                                  <Input
-                                    value={draftContact.last_name}
-                                    onChange={(e) =>
-                                      setDraftContact({
-                                        ...draftContact,
-                                        last_name: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    Email
-                                  </span>
-                                  <Input
-                                    type="email"
-                                    value={draftContact.email}
-                                    onChange={(e) =>
-                                      setDraftContact({
-                                        ...draftContact,
-                                        email: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    DNI
-                                  </span>
-                                  <Input
-                                    value={draftContact.dni}
-                                    onChange={(e) =>
-                                      setDraftContact({
-                                        ...draftContact,
-                                        dni: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </label>
-                                {areaAttrDefs.map((d) => (
-                                  <label
-                                    key={d.id}
-                                    className="space-y-1 text-sm"
-                                  >
-                                    <span className="text-muted-foreground">
-                                      {d.label}
-                                    </span>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Nombre</Label>
                                     <Input
-                                      value={
-                                        draftContact.attributes[d.slug] ?? ''
-                                      }
+                                      className="w-full min-w-0"
+                                      value={draftContact.name}
                                       onChange={(e) =>
                                         setDraftContact({
                                           ...draftContact,
-                                          attributes: {
-                                            ...draftContact.attributes,
-                                            [d.slug]: e.target.value,
-                                          },
+                                          name: e.target.value,
                                         })
                                       }
                                     />
-                                  </label>
-                                ))}
-                                <div className="flex items-end sm:col-span-2 lg:col-span-3">
-                                  <IconActionButton
-                                    label="Guardar en WhatsApp"
-                                    variant="default"
-                                    disabled={
-                                      savingContactId === c.contact_id
-                                    }
-                                    onClick={() =>
-                                      void saveContact(c.contact_id)
-                                    }
-                                  >
-                                    <Save className="size-4" />
-                                  </IconActionButton>
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Apellido</Label>
+                                    <Input
+                                      className="w-full min-w-0"
+                                      value={draftContact.last_name}
+                                      onChange={(e) =>
+                                        setDraftContact({
+                                          ...draftContact,
+                                          last_name: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Email</Label>
+                                    <Input
+                                      type="email"
+                                      className="w-full min-w-0"
+                                      value={draftContact.email}
+                                      onChange={(e) =>
+                                        setDraftContact({
+                                          ...draftContact,
+                                          email: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>DNI</Label>
+                                    <Input
+                                      className="w-full min-w-0"
+                                      value={draftContact.dni}
+                                      onChange={(e) =>
+                                        setDraftContact({
+                                          ...draftContact,
+                                          dni: e.target.value,
+                                        })
+                                      }
+                                    />
+                                  </div>
+                                  {areaAttrDefs.map((d) => (
+                                    <div
+                                      key={d.id}
+                                      className="flex min-w-0 flex-col gap-1.5"
+                                    >
+                                      <Label>{d.label}</Label>
+                                      <Input
+                                        className="w-full min-w-0"
+                                        value={
+                                          draftContact.attributes[d.slug] ?? ''
+                                        }
+                                        onChange={(e) =>
+                                          setDraftContact({
+                                            ...draftContact,
+                                            attributes: {
+                                              ...draftContact.attributes,
+                                              [d.slug]: e.target.value,
+                                            },
+                                          })
+                                        }
+                                      />
+                                    </div>
+                                  ))}
+                                  <div className="flex items-end sm:col-span-2">
+                                    <IconActionButton
+                                      label="Guardar en WhatsApp"
+                                      variant="default"
+                                      disabled={
+                                        savingContactId === c.contact_id
+                                      }
+                                      onClick={() =>
+                                        void saveContact(c.contact_id)
+                                      }
+                                    >
+                                      <Save className="size-4" />
+                                    </IconActionButton>
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
@@ -940,23 +1017,52 @@ export function CrmPamPage() {
             </div>
           )}
 
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={contacts.length === 0 || page * 100 >= total}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Siguiente
-            </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Página {pages === 0 ? 0 : page} de {pages || 1}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={loading || pages === 0 || page >= pages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Siguiente
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground">Por página</Label>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) => {
+                  setPageSize(Number(value));
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[25, 50, 100].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <span className="text-sm text-muted-foreground">
+              {total} en total
+            </span>
           </div>
         </TabsContent>
 

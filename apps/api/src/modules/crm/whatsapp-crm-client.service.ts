@@ -166,6 +166,13 @@ export class WhatsappCrmClientService {
     );
   }
 
+  async fetchSegments(
+    area = 'pam',
+  ): Promise<Array<{ slug: string; label: string; color_key?: string }>> {
+    const qs = new URLSearchParams({ area });
+    return this.request('GET', `/api/crm/segments?${qs.toString()}`);
+  }
+
   async createAttributeDefinition(body: {
     area?: string;
     scope: 'area' | 'segment';
