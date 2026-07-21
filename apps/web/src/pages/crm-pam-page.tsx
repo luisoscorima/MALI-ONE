@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type {
   EmailCampaignDto,
   PamPaymentMethodDto,
@@ -172,8 +173,8 @@ export function CrmPamPage() {
   const [segment, setSegment] = useState('');
   const [attrKey, setAttrKey] = useState('');
   const [attrValue, setAttrValue] = useState('');
-  const [appliedQ, setAppliedQ] = useState('');
-  const [appliedAttrValue, setAppliedAttrValue] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+  const [debouncedAttrValue, setDebouncedAttrValue] = useState('');
   const [segments, setSegments] = useState<
     Array<{ slug: string; label: string; color_key?: string }>
   >([]);
@@ -311,10 +312,11 @@ export function CrmPamPage() {
     try {
       const [data, linkedPage] = await Promise.all([
         api.listCrmPamContacts({
-          q: appliedQ || undefined,
+          q: debouncedQ || undefined,
           segment: segment || undefined,
           attr_key: attrKey || undefined,
-          attr_value: appliedAttrValue || undefined,
+          attr_value:
+            attrKey && debouncedAttrValue ? debouncedAttrValue : undefined,
           page,
           limit: pageSize,
         }),
@@ -338,13 +340,20 @@ export function CrmPamPage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedQ, segment, attrKey, appliedAttrValue, page, pageSize]);
+  }, [debouncedQ, segment, attrKey, debouncedAttrValue, page, pageSize]);
 
-  function applyFilters() {
-    setAppliedQ(q.trim());
-    setAppliedAttrValue(attrValue.trim());
-    setPage(1);
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedAttrValue(attrValue.trim()),
+      300,
+    );
+    return () => window.clearTimeout(timer);
+  }, [attrValue]);
 
   const loadPayments = useCallback(async () => {
     setPaymentsLoading(true);
@@ -668,54 +677,63 @@ export function CrmPamPage() {
     }
   }
 
-  function exportCsv() {
-    const dynamicHeaders = areaAttrDefs.map((d) => d.slug);
-    const header = [
-      'id',
-      'nombre',
-      'apellido',
-      'telefono',
-      'email',
-      'dni',
-      'segmentos',
-      ...dynamicHeaders,
-      'payment_id',
-      'mp_status_ledger',
-      'expiry_ledger',
-      'welcome',
-      'opt_in_email',
-    ];
-    const rows = contacts.map((c) => {
-      const ledger = c.attributes.payment_id
-        ? paymentsById.get(c.attributes.payment_id)
-        : undefined;
-      return [
-        c.contact_id,
-        c.name,
-        c.last_name,
-        c.phone,
-        c.email ?? '',
-        c.dni ?? c.attributes.dni ?? '',
-        c.segment_slugs.join(';'),
-        ...dynamicHeaders.map((slug) => c.attributes[slug] ?? ''),
-        c.attributes.payment_id ?? '',
-        ledger?.mpStatus ?? '',
-        ledger?.expiryDate ?? '',
-        ledger?.welcomeEmail ?? '',
-        c.opt_in_email ? '1' : '0',
-      ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(',');
-    });
-    const blob = new Blob([[header.join(','), ...rows].join('\n')], {
-      type: 'text/csv;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `crm-pam-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function exportExcel() {
+    try {
+      const data = await api.listCrmPamContacts({
+        q: debouncedQ || undefined,
+        segment: segment || undefined,
+        attr_key: attrKey || undefined,
+        attr_value:
+          attrKey && debouncedAttrValue ? debouncedAttrValue : undefined,
+        page: 1,
+        limit: 5000,
+      });
+      if (data.items.length === 0) {
+        toast.error('No hay contactos para exportar');
+        return;
+      }
+
+      const dynamicHeaders = areaAttrDefs.map((d) => ({
+        slug: d.slug,
+        label: d.label,
+      }));
+      const rows = data.items.map((c) => {
+        const ledger = c.attributes.payment_id
+          ? paymentsById.get(c.attributes.payment_id)
+          : undefined;
+        const row: Record<string, string | number> = {
+          ID: c.contact_id,
+          Nombre: c.name,
+          Apellido: c.last_name,
+          Teléfono: c.phone,
+          Email: c.email ?? '',
+          DNI: c.dni ?? c.attributes.dni ?? '',
+          Segmentos: c.segment_slugs.join('; '),
+        };
+        for (const h of dynamicHeaders) {
+          row[h.label] = c.attributes[h.slug] ?? '';
+        }
+        row['payment_id'] = c.attributes.payment_id ?? '';
+        row['MP ledger'] = ledger?.mpStatus ?? '';
+        row.Caducidad = ledger?.expiryDate
+          ? String(ledger.expiryDate).slice(0, 10)
+          : '';
+        row.Welcome = ledger?.welcomeEmail ?? '';
+        row['Opt-in email'] = c.opt_in_email ? 'sí' : 'no';
+        return row;
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Contactos PAM');
+      XLSX.writeFile(
+        wb,
+        `crm-pam-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast.success(`Exportados ${rows.length} contactos`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al exportar');
+    }
   }
 
   const contactColumns = useMemo<ColumnDef<CrmContact>[]>(() => {
@@ -1009,12 +1027,12 @@ export function CrmPamPage() {
               <Input
                 id="q"
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="nombre, email, teléfono"
-                className="w-56"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') applyFilters();
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
                 }}
+                placeholder="Toda la tabla…"
+                className="w-56"
               />
             </div>
             <div className="space-y-1">
@@ -1069,21 +1087,17 @@ export function CrmPamPage() {
                 <Input
                   id="av"
                   value={attrValue}
-                  onChange={(e) => setAttrValue(e.target.value)}
-                  placeholder="Valor…"
-                  className="w-36"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') applyFilters();
+                  onChange={(e) => {
+                    setAttrValue(e.target.value);
+                    setPage(1);
                   }}
+                  placeholder="Filtra al escribir…"
+                  className="w-40"
                 />
               </div>
             ) : null}
-            <Button variant="outline" onClick={applyFilters}>
-              <RefreshCw className="mr-1 size-4" />
-              Filtrar
-            </Button>
-            <Button variant="secondary" onClick={exportCsv}>
-              Exportar CSV
+            <Button variant="secondary" onClick={() => void exportExcel()}>
+              Exportar Excel
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
