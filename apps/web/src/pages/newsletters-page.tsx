@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ArrowDown,
-  ArrowUp,
-  Copy,
-  ExternalLink,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Copy, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { NewsletterDto } from '@mali-one/shared';
+import {
+  NewsletterEditor,
+  type NewsletterEditorHandle,
+} from '@/components/newsletter-editor';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
@@ -27,93 +24,31 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
 } from '@/components/ui';
 
-type BlockType = 'heading' | 'paragraph' | 'image' | 'button' | 'divider';
-
-type Block = {
-  id: string;
-  type: BlockType;
-  text?: string;
-  url?: string;
-  label?: string;
-};
-
-function newId() {
-  return Math.random().toString(36).slice(2, 10);
-}
-
-function blocksToHtml(blocks: Block[]): string {
-  const parts = blocks.map((b) => {
-    switch (b.type) {
-      case 'heading':
-        return `<h1 style="font-family:Georgia,serif;font-size:28px;color:#111;margin:0 0 16px">${escapeHtml(b.text || '')}</h1>`;
-      case 'paragraph':
-        return `<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#333;margin:0 0 16px">${escapeHtml(b.text || '').replace(/\n/g, '<br/>')}</p>`;
-      case 'image':
-        return b.url
-          ? `<p style="margin:0 0 16px"><img src="${escapeAttr(b.url)}" alt="" style="max-width:100%;height:auto"/></p>`
-          : '';
-      case 'button':
-        return `<p style="margin:0 0 24px"><a href="${escapeAttr(b.url || '#')}" style="display:inline-block;background:#c41230;color:#fff;text-decoration:none;padding:12px 20px;border-radius:4px;font-family:Arial,sans-serif">${escapeHtml(b.label || 'Ver más')}</a></p>`;
-      case 'divider':
-        return `<hr style="border:none;border-top:1px solid #ddd;margin:24px 0"/>`;
-      default:
-        return '';
-    }
-  });
-  return `<div style="max-width:640px;margin:0 auto;padding:24px">${parts.join('\n')}</div>`;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function escapeAttr(value: string): string {
-  return escapeHtml(value).replace(/'/g, '&#39;');
-}
-
-const BLOCK_LABELS: Record<BlockType, string> = {
-  heading: 'Título',
-  paragraph: 'Párrafo',
-  image: 'Imagen',
-  button: 'Botón',
-  divider: 'Separador',
-};
+type EditorMode = 'closed' | 'create' | 'edit';
 
 export function NewslettersPage() {
   const toast = useToast();
+  const editorRef = useRef<NewsletterEditorHandle>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const [mode, setMode] = useState<EditorMode>('closed');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [initialDesignJson, setInitialDesignJson] = useState<string | null>(
+    null,
+  );
+  const [initialHtml, setInitialHtml] = useState<string | null>(null);
+
   const [slug, setSlug] = useState('');
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
-  const [blocks, setBlocks] = useState<Block[]>([
-    { id: newId(), type: 'heading', text: 'Hola PAM' },
-    {
-      id: newId(),
-      type: 'paragraph',
-      text: 'Contenido del boletín. Arrastra bloques o edítalos abajo.',
-    },
-    {
-      id: newId(),
-      type: 'button',
-      label: 'Visitar mali.pe',
-      url: 'https://mali.pe',
-    },
-  ]);
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-
-  const htmlBody = useMemo(() => blocksToHtml(blocks), [blocks]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,55 +66,85 @@ export function NewslettersPage() {
     void load();
   }, [load]);
 
-  function addBlock(type: BlockType) {
-    const base: Block = { id: newId(), type };
-    if (type === 'heading') base.text = 'Nuevo título';
-    if (type === 'paragraph') base.text = 'Nuevo párrafo';
-    if (type === 'image') base.url = 'https://';
-    if (type === 'button') {
-      base.label = 'Botón';
-      base.url = 'https://mali.pe';
+  function resetMeta() {
+    setSlug('');
+    setTitle('');
+    setSubject('');
+    setStatus('draft');
+    setEditingId(null);
+    setInitialDesignJson(null);
+    setInitialHtml(null);
+  }
+
+  function openCreate() {
+    resetMeta();
+    setMode('create');
+    setEditorKey((k) => k + 1);
+  }
+
+  async function openEdit(id: string) {
+    try {
+      const n = await api.getNewsletter(id);
+      setEditingId(n.id);
+      setSlug(n.slug);
+      setTitle(n.title);
+      setSubject(n.subject);
+      setStatus(n.status === 'published' ? 'published' : 'draft');
+      setInitialDesignJson(n.designJson ?? null);
+      setInitialHtml(n.htmlBody);
+      setMode('edit');
+      setEditorKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo abrir');
     }
-    setBlocks((prev) => [...prev, base]);
   }
 
-  function moveBlock(from: number, to: number) {
-    setBlocks((prev) => {
-      if (to < 0 || to >= prev.length) return prev;
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
+  function closeEditor() {
+    setMode('closed');
+    resetMeta();
   }
 
-  function updateBlock(id: string, patch: Partial<Block>) {
-    setBlocks((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-    );
-  }
+  async function handleSave() {
+    const exported = editorRef.current?.getExport();
+    if (!exported?.htmlBody?.trim()) {
+      toast.error('El boletín no tiene contenido');
+      return;
+    }
+    if (!title.trim() || !subject.trim()) {
+      toast.error('Completa título y asunto');
+      return;
+    }
+    if (mode === 'create' && !slug.trim()) {
+      toast.error('Indica un slug para la URL pública');
+      return;
+    }
 
-  function removeBlock(id: string) {
-    setBlocks((prev) => prev.filter((b) => b.id !== id));
-  }
-
-  async function handleCreate() {
     setSaving(true);
     try {
-      await api.createNewsletter({
-        slug,
-        title,
-        subject,
-        htmlBody,
-        status,
-      });
-      toast.success('Boletín creado');
-      setSlug('');
-      setTitle('');
-      setSubject('');
+      if (mode === 'create') {
+        await api.createNewsletter({
+          slug: slug.trim().toLowerCase(),
+          title: title.trim(),
+          subject: subject.trim(),
+          htmlBody: exported.htmlBody,
+          designJson: exported.designJson,
+          status,
+        });
+        toast.success('Boletín creado');
+      } else if (mode === 'edit' && editingId) {
+        await api.updateNewsletter(editingId, {
+          title: title.trim(),
+          subject: subject.trim(),
+          htmlBody: exported.htmlBody,
+          designJson: exported.designJson,
+          status,
+        });
+        toast.success('Boletín actualizado');
+      }
+      closeEditor();
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo crear');
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar');
     } finally {
       setSaving(false);
     }
@@ -199,6 +164,18 @@ export function NewslettersPage() {
     }
   }
 
+  async function handleDelete(n: NewsletterDto) {
+    if (!window.confirm(`¿Eliminar el boletín “${n.title}”?`)) return;
+    try {
+      await api.deleteNewsletter(n.id);
+      if (editingId === n.id) closeEditor();
+      await load();
+      toast.success('Boletín eliminado');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
+    }
+  }
+
   async function copyUrl(slugValue: string) {
     const url = `${window.location.origin}/n/${slugValue}`;
     await navigator.clipboard.writeText(url);
@@ -209,15 +186,42 @@ export function NewslettersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Boletines"
-        description="Crea boletines con bloques (arrastrar para reordenar), publícalos y comparte la URL. El envío masivo se hace desde CRM PAM."
+        description="Editor visual drag & drop (GrapesJS). Publica y comparte la URL; el envío masivo se hace desde CRM PAM."
+        actions={
+          mode === 'closed' ? (
+            <Button type="button" onClick={openCreate}>
+              <Plus className="mr-1 size-4" />
+              Nuevo boletín
+            </Button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={closeEditor}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving}
+              >
+                {saving
+                  ? 'Guardando…'
+                  : mode === 'create'
+                    ? 'Guardar boletín'
+                    : 'Actualizar boletín'}
+              </Button>
+            </div>
+          )
+        }
       />
 
       {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {mode !== 'closed' ? (
         <div className="space-y-4 rounded-lg border border-border/60 p-4">
-          <h3 className="font-semibold">Nuevo boletín</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <h3 className="font-semibold">
+            {mode === 'create' ? 'Nuevo boletín' : 'Editar boletín'}
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1">
               <Label htmlFor="slug">Slug (URL /n/…)</Label>
               <Input
@@ -225,6 +229,7 @@ export function NewslettersPage() {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 placeholder="boletin-marzo-2026"
+                disabled={mode === 'edit'}
               />
             </div>
             <div className="space-y-1">
@@ -242,7 +247,7 @@ export function NewslettersPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1 sm:col-span-2">
+            <div className="space-y-1">
               <Label htmlFor="title">Título</Label>
               <Input
                 id="title"
@@ -250,7 +255,7 @@ export function NewslettersPage() {
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
-            <div className="space-y-1 sm:col-span-2">
+            <div className="space-y-1">
               <Label htmlFor="subject">Asunto del correo</Label>
               <Input
                 id="subject"
@@ -260,139 +265,28 @@ export function NewslettersPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {(Object.keys(BLOCK_LABELS) as BlockType[]).map((type) => (
-              <Button
-                key={type}
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => addBlock(type)}
-              >
-                <Plus className="mr-1 size-3" />
-                {BLOCK_LABELS[type]}
-              </Button>
-            ))}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Arrastra bloques al lienzo. Usa Escritorio / Móvil arriba para
+            previsualizar. El HTML se genera al guardar (compatible con email).
+          </p>
 
-          <div className="space-y-2">
-            {blocks.map((block, index) => (
-              <div
-                key={block.id}
-                draggable
-                onDragStart={() => setDragIndex(index)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (dragIndex === null || dragIndex === index) return;
-                  moveBlock(dragIndex, index);
-                  setDragIndex(null);
-                }}
-                className="cursor-grab rounded-md border border-border/80 bg-card p-3 active:cursor-grabbing"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {BLOCK_LABELS[block.type]}
-                  </span>
-                  <div className="flex gap-1">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7"
-                      onClick={() => moveBlock(index, index - 1)}
-                    >
-                      <ArrowUp className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7"
-                      onClick={() => moveBlock(index, index + 1)}
-                    >
-                      <ArrowDown className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-7"
-                      onClick={() => removeBlock(block.id)}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </div>
-                </div>
-                {block.type === 'heading' || block.type === 'paragraph' ? (
-                  <Textarea
-                    value={block.text ?? ''}
-                    onChange={(e) =>
-                      updateBlock(block.id, { text: e.target.value })
-                    }
-                    className="min-h-[72px]"
-                  />
-                ) : null}
-                {block.type === 'image' ? (
-                  <Input
-                    value={block.url ?? ''}
-                    onChange={(e) =>
-                      updateBlock(block.id, { url: e.target.value })
-                    }
-                    placeholder="https://… imagen"
-                  />
-                ) : null}
-                {block.type === 'button' ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Input
-                      value={block.label ?? ''}
-                      onChange={(e) =>
-                        updateBlock(block.id, { label: e.target.value })
-                      }
-                      placeholder="Texto del botón"
-                    />
-                    <Input
-                      value={block.url ?? ''}
-                      onChange={(e) =>
-                        updateBlock(block.id, { url: e.target.value })
-                      }
-                      placeholder="https://…"
-                    />
-                  </div>
-                ) : null}
-                {block.type === 'divider' ? (
-                  <p className="text-xs text-muted-foreground">
-                    Línea horizontal
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-
-          <Button
-            onClick={() => void handleCreate()}
-            disabled={saving || !slug || !title || !subject || blocks.length === 0}
-          >
-            Guardar boletín
-          </Button>
-        </div>
-
-        <div className="space-y-3 rounded-lg border border-border/60 p-4">
-          <h3 className="font-semibold">Vista previa</h3>
-          <div
-            className="min-h-[320px] rounded-md border border-border/40 bg-white p-4 text-black"
-            dangerouslySetInnerHTML={{ __html: htmlBody }}
+          <NewsletterEditor
+            key={editorKey}
+            ref={editorRef}
+            initialDesignJson={initialDesignJson}
+            initialHtml={initialHtml}
           />
         </div>
-      </div>
+      ) : null}
 
       {loading ? (
         <TableSkeleton rows={4} />
-      ) : newsletters.length === 0 ? (
+      ) : newsletters.length === 0 && mode === 'closed' ? (
         <EmptyState
           title="Sin boletines"
-          description="Crea el primero con el editor de bloques."
+          description="Crea el primero con el editor visual drag & drop."
         />
-      ) : (
+      ) : newsletters.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
@@ -411,7 +305,15 @@ export function NewslettersPage() {
                 </TableCell>
                 <TableCell className="font-mono text-sm">{n.slug}</TableCell>
                 <TableCell>{n.status}</TableCell>
-                <TableCell className="space-x-2 text-right">
+                <TableCell className="space-x-1 text-right">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void openEdit(n.id)}
+                    title="Editar"
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -425,6 +327,7 @@ export function NewslettersPage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => void copyUrl(n.slug)}
+                        title="Copiar URL"
                       >
                         <Copy className="size-4" />
                       </Button>
@@ -439,12 +342,20 @@ export function NewslettersPage() {
                       </Button>
                     </>
                   ) : null}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void handleDelete(n)}
+                    title="Eliminar"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      )}
+      ) : null}
     </div>
   );
 }

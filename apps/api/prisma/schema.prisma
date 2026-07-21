@@ -384,6 +384,8 @@ model Newsletter {
   title       String
   subject     String
   htmlBody    String           @db.Text
+  /// GrapesJS project JSON for re-editing the visual design.
+  designJson  String?          @db.Text
   status      NewsletterStatus @default(draft)
   createdById String
   createdBy   User             @relation(fields: [createdById], references: [id])

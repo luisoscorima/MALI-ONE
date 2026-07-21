@@ -31,6 +31,10 @@ export class CreateNewsletterDto {
   htmlBody!: string;
 
   @IsOptional()
+  @IsString()
+  designJson?: string | null;
+
+  @IsOptional()
   @IsIn(['draft', 'published'])
   status?: 'draft' | 'published';
 }
@@ -52,6 +56,10 @@ export class UpdateNewsletterDto {
   @IsString()
   @MinLength(1)
   htmlBody?: string;
+
+  @IsOptional()
+  @IsString()
+  designJson?: string | null;
 
   @IsOptional()
   @IsIn(['draft', 'published'])

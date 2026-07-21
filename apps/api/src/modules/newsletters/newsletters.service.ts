@@ -92,6 +92,7 @@ export class NewslettersService {
           title: dto.title.trim(),
           subject: dto.subject.trim(),
           htmlBody: dto.htmlBody,
+          designJson: dto.designJson ?? null,
           status: (dto.status as NewsletterStatus) ?? NewsletterStatus.draft,
           createdById: userId,
         },
@@ -117,6 +118,9 @@ export class NewslettersService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.subject !== undefined ? { subject: dto.subject.trim() } : {}),
         ...(dto.htmlBody !== undefined ? { htmlBody: dto.htmlBody } : {}),
+        ...(dto.designJson !== undefined
+          ? { designJson: dto.designJson }
+          : {}),
         ...(dto.status !== undefined
           ? { status: dto.status as NewsletterStatus }
           : {}),

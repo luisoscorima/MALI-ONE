@@ -470,6 +470,8 @@ export interface NewsletterDto {
   title: string;
   subject: string;
   htmlBody: string;
+  /** GrapesJS project JSON for re-editing. */
+  designJson?: string | null;
   status: NewsletterStatus;
   createdAt: string;
   updatedAt: string;
@@ -481,6 +483,7 @@ export interface CreateNewsletterDto {
   title: string;
   subject: string;
   htmlBody: string;
+  designJson?: string | null;
   status?: NewsletterStatus;
 }
 
@@ -488,6 +491,7 @@ export interface UpdateNewsletterDto {
   title?: string;
   subject?: string;
   htmlBody?: string;
+  designJson?: string | null;
   status?: NewsletterStatus;
 }
 

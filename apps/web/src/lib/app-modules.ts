@@ -58,7 +58,8 @@ export const APP_MODULES: {
   {
     id: 'newsletters',
     label: 'Boletines',
-    description: 'Editor de boletines HTML con URL pública compartible.',
+    description:
+      'Editor visual drag & drop de boletines con URL pública compartible.',
   },
   {
     id: 'crm_pam',
