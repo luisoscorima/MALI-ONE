@@ -43,7 +43,7 @@ export const APP_MODULES: {
   {
     id: 'pam_memberships',
     label: 'Membresías PAM',
-    description: 'Vitrina PAM, planes y ledger de pagos. Personas en CRM PAM.',
+    description: 'Vitrina del widget PAM: planes, beneficios y checkout.',
   },
   {
     id: 'screen_cast',
@@ -63,6 +63,7 @@ export const APP_MODULES: {
   {
     id: 'crm_pam',
     label: 'CRM PAM',
-    description: 'Contactos PAM (WhatsApp) y envío de boletines por SES.',
+    description:
+      'Contactos WhatsApp + ledger de pagos MP (manual) y envío de boletines.',
   },
 ];

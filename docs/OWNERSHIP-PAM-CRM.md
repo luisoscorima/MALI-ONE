@@ -2,54 +2,53 @@
 
 ## Tres capas
 
-| Capa | Dónde | Rol |
-|------|--------|-----|
-| **CRM (persona)** | WhatsApp `contacts` área `pam` | Fuente de verdad de personas |
-| **Pago / membresía** | MALI ONE `PamRegistration` (ledger) | MP, welcome SMTP, caducidad — UI **Pagos recientes** |
-| **Vitrina** | Widget + `/admin/pam` | Planes, beneficios, checkout |
+| Capa | Dónde (UI) | Rol |
+|------|------------|-----|
+| **Vitrina** | `/admin/pam` Membresías PAM | Solo planes, beneficios, checkout del widget |
+| **CRM + pagos** | `/admin/crm-pam` CRM PAM | Contactos WhatsApp + ledger MP (manual hoy) + welcome SMTP |
+| **Boletines** | `/admin/newsletters` | Editor; envío masivo SES desde CRM PAM |
 
-## Reparto de campos
+## Fuente de verdad
 
-**Ledger ONE:** registrado en, plan, frecuencia, checkout URL, acepta privacidad, estado MP, welcome, aviso caducidad, fecha caducidad (+ cobros MP a futuro).
+| Dato | Dueño |
+|------|--------|
+| Persona (nombre, apellido, email, celular) | WhatsApp CRM `contacts` área `pam` |
+| Demografía (DNI, dirección, etc.) | Atributos CRM |
+| Plan, frecuencia, MP, caducidad, welcome, checkout | Ledger ONE `PamRegistration` (copia de plan/MP/expiry en attrs CRM para segmentar) |
 
-**CRM WhatsApp — columnas:** nombre, apellido, correo, celular.
-
-**CRM — atributos:** DNI, dirección, ciudad, distrito, género, fecha nacimiento, cómo te enteraste, y **copia** de `plan`, `frecuencia`, `mp_status`, `expiry`, `payment_id` (para segmentar; dueño = ONE).
-
-## Flujo actual
+## Flujo
 
 ```text
-Widget → ONE (ledger) + sync persona a CRM
+Widget → ONE ledger + sync persona a CRM WhatsApp
       → Checkout MP
-      → (manual hoy / webhook) ONE: mp_status + expiry
-      → re-sync atributos membresía al CRM
+      → CRM PAM → pestaña Pagos: marcar MP + caducidad (manual hoy)
+      → re-sync attrs membresía al CRM
       → Welcome / avisos caducidad por SMTP pam@
-      → Personas se leen en CRM PAM (ONE → API WhatsApp)
+      → CRM PAM → Contactos: ve persona CRM cruzada con ledger
 ```
 
-## Módulos
+## Módulos de acceso
 
-| Módulo | Ruta |
-|--------|------|
-| Membresías PAM (vitrina + pagos) | `/admin/pam` |
-| CRM PAM (contactos + envío boletines) | `/admin/crm-pam` |
-| Boletines | `/admin/newsletters` |
+| Módulo | Qué abre |
+|--------|----------|
+| `pam_memberships` | Solo vitrina `/admin/pam` |
+| `crm_pam` | CRM + ledger pagos + envío boletines |
+| `newsletters` | Editor de boletines |
 
 ## Para cerrar el flujo (SMTP; sin SES de bienvenida)
 
-Hecho / usable ahora (con config):
+Usable con config:
 
 - Alta widget → ledger + CRM
-- Pagos recientes: marcar MP, caducidad, reenviar welcome
-- Cron avisos caducidad (si SMTP `PAM_SMTP_*` configurado)
-- Caducidad mensual = +1 mes; anual = +1 año (desde confirmación)
+- CRM PAM → Pagos: MP, caducidad, reenviar welcome
+- Cron avisos caducidad si `PAM_SMTP_*`
+- Caducidad: mensual +1 mes; anual +1 año
 
-Pendiente / frágil:
+Pendiente:
 
-1. **`PAM_SMTP_*`** en producción (host, user, pass, from)
-2. **`WHATSAPP_CRM_BASE_URL` + `WHATSAPP_CRM_SERVICE_TOKEN`** en ambos lados
-3. **Webhook Mercado Pago** fiable (hoy matching por `checkoutUrl`/id es frágil; ops manual en Pagos)
-4. **IDs de pago MP** persistidos en ledger (`mpPaymentId` / preapproval) para conciliar
-5. **Renovaciones** (mismo celular, nuevo periodo) — política de update vs nueva fila
-6. **Plantillas** welcome/expiry editables (hoy HTML fijo en código)
-7. Boletines masivos SES = otro canal (no bloquea este flujo SMTP)
+1. `PAM_SMTP_*` en producción
+2. `WHATSAPP_CRM_*` en ambos lados
+3. Webhook Mercado Pago fiable
+4. IDs de pago MP en ledger
+5. Política de renovaciones
+6. Plantillas welcome/expiry editables

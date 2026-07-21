@@ -236,9 +236,9 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | `widget_educacion` | `/admin/widgets/educacion` | Mapa, selector, calendario, popup y aliados (educacion.mali.pe) |
 | `widget_biblioteca` | `/admin/widgets/biblioteca` | Configurador carrusel Koha (biblioteca.mali.pe) |
 | `widget_museo` | `/admin/widgets/museo` | Popup e interfaz embebible (mali.pe/es) |
-| `pam_memberships` | `/admin/pam` | Vitrina PAM: planes y beneficios (personas en CRM PAM) |
+| `pam_memberships` | `/admin/pam` | Vitrina PAM: planes y beneficios (pagos en CRM PAM) |
 | `newsletters` | `/admin/newsletters` | Boletines HTML (bloques), URL pública compartible |
-| `crm_pam` | `/admin/crm-pam` | Contactos PAM (WhatsApp) y envío SES de boletines |
+| `crm_pam` | `/admin/crm-pam` | Contactos WhatsApp + ledger pagos MP + envío SES |
 | `screen_cast` | `/admin/screen-cast` | Playlists y monitores para tótems y quioscos |
 | `bsale_reports` | `/bsale/kardex` | Kardex consolidado Bsale |
 | `password_vault` | `/vault` | Acceso a Vaultwarden |
