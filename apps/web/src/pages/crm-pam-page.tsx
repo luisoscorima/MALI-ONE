@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import type {
   EmailCampaignDto,
@@ -15,6 +16,7 @@ import { api } from '@/lib/api';
 import {
   Button,
   Badge,
+  DataTable,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -28,12 +30,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Tabs,
   TabsContent,
   TabsList,
@@ -380,13 +376,6 @@ export function CrmPamPage() {
     [paymentMethods],
   );
 
-  function paymentMethodLabel(slug: string) {
-    return (
-      paymentMethods.find((m) => m.slug === slug)?.label ??
-      (slug === PAM_DEFAULT_PAYMENT_METHOD ? 'Mercado Pago' : slug)
-    );
-  }
-
   async function createPaymentMethod() {
     const label = newMethodLabel.trim();
     if (!label) {
@@ -729,6 +718,274 @@ export function CrmPamPage() {
     URL.revokeObjectURL(url);
   }
 
+  const contactColumns = useMemo<ColumnDef<CrmContact>[]>(() => {
+    const cols: ColumnDef<CrmContact>[] = [];
+
+    if (isColVisible('name')) {
+      cols.push({
+        id: 'name',
+        header: 'Nombre',
+        meta: { className: 'sticky left-0 z-10 bg-background' },
+        cell: ({ row }) => {
+          const c = row.original;
+          const ledger = c.attributes.payment_id
+            ? paymentsById.get(c.attributes.payment_id)
+            : undefined;
+          const pending =
+            ledger &&
+            (!ledger.mpStatus || !CONFIRMED_MP.includes(ledger.mpStatus));
+          const expanded = expandedContactId === c.contact_id;
+          return (
+            <>
+              <span className="mr-1 text-muted-foreground">
+                {expanded ? '▾' : '▸'}
+              </span>
+              {dash(c.name)}
+              {ledger && pending ? (
+                <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+                  pago pend.
+                </span>
+              ) : null}
+            </>
+          );
+        },
+      });
+    }
+    if (isColVisible('last_name')) {
+      cols.push({
+        id: 'last_name',
+        header: 'Apellido',
+        cell: ({ row }) => dash(row.original.last_name),
+      });
+    }
+    if (isColVisible('phone')) {
+      cols.push({
+        id: 'phone',
+        header: 'Teléfono',
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">{row.original.phone}</span>
+        ),
+      });
+    }
+    if (isColVisible('email')) {
+      cols.push({
+        id: 'email',
+        header: 'Email',
+        cell: ({ row }) => dash(row.original.email),
+      });
+    }
+    if (isColVisible('dni')) {
+      cols.push({
+        id: 'dni',
+        header: 'DNI',
+        cell: ({ row }) =>
+          dash(row.original.dni ?? row.original.attributes.dni),
+      });
+    }
+    if (isColVisible('segments')) {
+      cols.push({
+        id: 'segments',
+        header: 'Segmentos',
+        cell: ({ row }) => {
+          const slugs = row.original.segment_slugs;
+          if (slugs.length === 0) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <div className="flex flex-wrap gap-1">
+              {slugs.map((slug) => {
+                const meta = segments.find((s) => s.slug === slug);
+                return (
+                  <Badge key={slug} variant="secondary" className="font-normal">
+                    {meta?.label ?? slug}
+                  </Badge>
+                );
+              })}
+            </div>
+          );
+        },
+      });
+    }
+    for (const d of visibleAttrDefs) {
+      cols.push({
+        id: attrColId(d.slug),
+        header: d.label,
+        cell: ({ row }) => dash(row.original.attributes[d.slug]),
+      });
+    }
+    if (isColVisible('mp_ledger')) {
+      cols.push({
+        id: 'mp_ledger',
+        header: 'MP ledger',
+        cell: ({ row }) => {
+          const c = row.original;
+          const ledger = c.attributes.payment_id
+            ? paymentsById.get(c.attributes.payment_id)
+            : undefined;
+          return dash(ledger?.mpStatus ?? c.attributes.mp_status ?? null);
+        },
+      });
+    }
+    if (isColVisible('expiry')) {
+      cols.push({
+        id: 'expiry',
+        header: 'Caducidad',
+        cell: ({ row }) => {
+          const ledger = row.original.attributes.payment_id
+            ? paymentsById.get(row.original.attributes.payment_id)
+            : undefined;
+          return ledger ? formatDate(ledger.expiryDate) : '—';
+        },
+      });
+    }
+    if (isColVisible('welcome')) {
+      cols.push({
+        id: 'welcome',
+        header: 'Welcome',
+        cell: ({ row }) => {
+          const ledger = row.original.attributes.payment_id
+            ? paymentsById.get(row.original.attributes.payment_id)
+            : undefined;
+          return ledger?.welcomeEmail ?? '—';
+        },
+      });
+    }
+    return cols;
+  }, [
+    isColVisible,
+    visibleAttrDefs,
+    segments,
+    paymentsById,
+    expandedContactId,
+  ]);
+
+  const paymentColumns = useMemo<ColumnDef<PamRegistrationDto>[]>(
+    () => [
+      {
+        id: 'createdAt',
+        header: 'Registrado',
+        cell: ({ row }) => {
+          const p = row.original;
+          const expanded = expandedPaymentId === p.id;
+          return (
+            <>
+              <span className="mr-1 text-muted-foreground">
+                {expanded ? '▾' : '▸'}
+              </span>
+              {formatDateTime(p.createdAt)}
+            </>
+          );
+        },
+      },
+      {
+        id: 'persona',
+        header: 'Persona',
+        cell: ({ row }) => {
+          const p = row.original;
+          const pending =
+            !p.mpStatus || !CONFIRMED_MP.includes(p.mpStatus);
+          return (
+            <div>
+              <div>
+                {p.nombres} {p.apellidos}
+                {pending ? (
+                  <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+                    pendiente
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {p.correo} · {p.celular}
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground">
+                id: {p.id}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'plan',
+        header: 'Plan',
+        cell: ({ row }) =>
+          `${row.original.plan} / ${row.original.frecuencia}`,
+      },
+      {
+        id: 'paymentMethod',
+        header: 'Medio de pago',
+        cell: ({ row }) => {
+          const p = row.original;
+          const methodSlug =
+            draftMethod[p.id] !== undefined
+              ? draftMethod[p.id]
+              : (p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD);
+          return (
+            paymentMethods.find((m) => m.slug === methodSlug)?.label ??
+            (methodSlug === PAM_DEFAULT_PAYMENT_METHOD
+              ? 'Mercado Pago'
+              : methodSlug)
+          );
+        },
+      },
+      {
+        id: 'mpStatus',
+        header: 'MP',
+        cell: ({ row }) => row.original.mpStatus ?? '—',
+      },
+      {
+        id: 'expiryDate',
+        header: 'Caducidad',
+        cell: ({ row }) => formatDate(row.original.expiryDate),
+      },
+      {
+        id: 'welcomeEmail',
+        header: 'Welcome',
+        cell: ({ row }) => row.original.welcomeEmail,
+      },
+      {
+        id: 'linked',
+        header: 'Vínculo',
+        cell: ({ row }) =>
+          linkedPaymentIds.has(row.original.id) ? (
+            <span className="text-xs text-emerald-600 dark:text-emerald-400">
+              vinculado
+            </span>
+          ) : (
+            <span className="text-xs text-amber-700 dark:text-amber-400">
+              sin vínculo
+            </span>
+          ),
+      },
+    ],
+    [expandedPaymentId, draftMethod, linkedPaymentIds, paymentMethods],
+  );
+
+  const campaignColumns = useMemo<ColumnDef<EmailCampaignDto>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: 'Envío',
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.name}</span>
+        ),
+      },
+      { accessorKey: 'status', header: 'Estado' },
+      {
+        id: 'sent',
+        header: 'Enviados',
+        cell: ({ row }) =>
+          `${row.original.sentCount}/${row.original.totalRecipients}`,
+      },
+      {
+        id: 'engagement',
+        header: 'Opens / Clicks',
+        cell: ({ row }) =>
+          `${row.original.openCount} / ${row.original.clickCount}`,
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -901,295 +1158,167 @@ export function CrmPamPage() {
               description="Configura WHATSAPP_CRM_* o espera altas del widget PAM (sync al CRM)."
             />
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border/60">
-              <Table
-                className="w-max min-w-full"
-                style={{ minWidth: `${Math.max(visibleColCount * 140, 640)}px` }}
-              >
-                <TableHeader>
-                  <TableRow>
-                    {isColVisible('name') ? (
-                      <TableHead className="sticky left-0 z-10 bg-background">
-                        Nombre
-                      </TableHead>
-                    ) : null}
-                    {isColVisible('last_name') ? (
-                      <TableHead>Apellido</TableHead>
-                    ) : null}
-                    {isColVisible('phone') ? (
-                      <TableHead>Teléfono</TableHead>
-                    ) : null}
-                    {isColVisible('email') ? <TableHead>Email</TableHead> : null}
-                    {isColVisible('dni') ? <TableHead>DNI</TableHead> : null}
-                    {isColVisible('segments') ? (
-                      <TableHead>Segmentos</TableHead>
-                    ) : null}
-                    {visibleAttrDefs.map((d) => (
-                      <TableHead key={d.id}>{d.label}</TableHead>
-                    ))}
-                    {isColVisible('mp_ledger') ? (
-                      <TableHead>MP ledger</TableHead>
-                    ) : null}
-                    {isColVisible('expiry') ? (
-                      <TableHead>Caducidad</TableHead>
-                    ) : null}
-                    {isColVisible('welcome') ? (
-                      <TableHead>Welcome</TableHead>
-                    ) : null}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contacts.map((c) => {
-                    const ledger = c.attributes.payment_id
-                      ? paymentsById.get(c.attributes.payment_id)
-                      : undefined;
-                    const mp =
-                      ledger?.mpStatus ?? c.attributes.mp_status ?? null;
-                    const pending =
-                      ledger &&
-                      (!ledger.mpStatus ||
-                        !CONFIRMED_MP.includes(ledger.mpStatus));
-                    const expanded = expandedContactId === c.contact_id;
-
-                    return (
-                      <Fragment key={c.contact_id}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() => openContactEditor(c)}
+            <DataTable
+              columns={contactColumns}
+              data={contacts}
+              getRowId={(c) => String(c.contact_id)}
+              onRowClick={openContactEditor}
+              isRowExpanded={(c) => expandedContactId === c.contact_id}
+              tableClassName="w-max min-w-full"
+              tableStyle={{
+                minWidth: `${Math.max(visibleColCount * 140, 640)}px`,
+              }}
+              renderExpandedRow={(c) =>
+                draftContact ? (
+                  <div
+                    className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4 shadow-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Nombre</Label>
+                        <Input
+                          className="w-full min-w-0"
+                          value={draftContact.name}
+                          onChange={(e) =>
+                            setDraftContact({
+                              ...draftContact,
+                              name: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Apellido</Label>
+                        <Input
+                          className="w-full min-w-0"
+                          value={draftContact.last_name}
+                          onChange={(e) =>
+                            setDraftContact({
+                              ...draftContact,
+                              last_name: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Email</Label>
+                        <Input
+                          type="email"
+                          className="w-full min-w-0"
+                          value={draftContact.email}
+                          onChange={(e) =>
+                            setDraftContact({
+                              ...draftContact,
+                              email: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>DNI</Label>
+                        <Input
+                          className="w-full min-w-0"
+                          value={draftContact.dni}
+                          onChange={(e) =>
+                            setDraftContact({
+                              ...draftContact,
+                              dni: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      {areaAttrDefs.map((d) => (
+                        <div
+                          key={d.id}
+                          className="flex min-w-0 flex-col gap-1.5"
                         >
-                          {isColVisible('name') ? (
-                            <TableCell className="sticky left-0 z-10 bg-background">
-                              <span className="mr-1 text-muted-foreground">
-                                {expanded ? '▾' : '▸'}
-                              </span>
-                              {dash(c.name)}
-                              {ledger && pending ? (
-                                <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
-                                  pago pend.
-                                </span>
-                              ) : null}
-                            </TableCell>
-                          ) : null}
-                          {isColVisible('last_name') ? (
-                            <TableCell>{dash(c.last_name)}</TableCell>
-                          ) : null}
-                          {isColVisible('phone') ? (
-                            <TableCell className="font-mono text-sm">
-                              {c.phone}
-                            </TableCell>
-                          ) : null}
-                          {isColVisible('email') ? (
-                            <TableCell>{dash(c.email)}</TableCell>
-                          ) : null}
-                          {isColVisible('dni') ? (
-                            <TableCell>
-                              {dash(c.dni ?? c.attributes.dni)}
-                            </TableCell>
-                          ) : null}
-                          {isColVisible('segments') ? (
-                            <TableCell>
-                              {c.segment_slugs.length === 0 ? (
-                                <span className="text-muted-foreground">—</span>
-                              ) : (
-                                <div className="flex flex-wrap gap-1">
-                                  {c.segment_slugs.map((slug) => {
-                                    const meta = segments.find(
-                                      (s) => s.slug === slug,
-                                    );
-                                    return (
-                                      <Badge
-                                        key={slug}
-                                        variant="secondary"
-                                        className="font-normal"
-                                      >
-                                        {meta?.label ?? slug}
-                                      </Badge>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </TableCell>
-                          ) : null}
-                          {visibleAttrDefs.map((d) => (
-                            <TableCell key={d.id}>
-                              {dash(c.attributes[d.slug])}
-                            </TableCell>
+                          <Label>{d.label}</Label>
+                          <Input
+                            className="w-full min-w-0"
+                            value={draftContact.attributes[d.slug] ?? ''}
+                            onChange={(e) =>
+                              setDraftContact({
+                                ...draftContact,
+                                attributes: {
+                                  ...draftContact.attributes,
+                                  [d.slug]: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                      <div className="flex items-end sm:col-span-2">
+                        <IconActionButton
+                          label="Guardar en WhatsApp"
+                          variant="default"
+                          disabled={savingContactId === c.contact_id}
+                          onClick={() => void saveContact(c.contact_id)}
+                        >
+                          <Save className="size-4" />
+                        </IconActionButton>
+                      </div>
+                    </div>
+                  </div>
+                ) : null
+              }
+              footer={
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    {total} en total
+                  </span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground">
+                        Por página
+                      </Label>
+                      <Select
+                        value={String(pageSize)}
+                        onValueChange={(value) => {
+                          setPageSize(Number(value));
+                          setPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[25, 50, 100].map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n}
+                            </SelectItem>
                           ))}
-                          {isColVisible('mp_ledger') ? (
-                            <TableCell>{dash(mp)}</TableCell>
-                          ) : null}
-                          {isColVisible('expiry') ? (
-                            <TableCell>
-                              {ledger ? formatDate(ledger.expiryDate) : '—'}
-                            </TableCell>
-                          ) : null}
-                          {isColVisible('welcome') ? (
-                            <TableCell>
-                              {ledger?.welcomeEmail ?? '—'}
-                            </TableCell>
-                          ) : null}
-                        </TableRow>
-                        {expanded && draftContact ? (
-                          <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell
-                              colSpan={visibleColCount}
-                              className="p-0"
-                            >
-                              <div
-                                className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4 shadow-sm"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Nombre</Label>
-                                    <Input
-                                      className="w-full min-w-0"
-                                      value={draftContact.name}
-                                      onChange={(e) =>
-                                        setDraftContact({
-                                          ...draftContact,
-                                          name: e.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Apellido</Label>
-                                    <Input
-                                      className="w-full min-w-0"
-                                      value={draftContact.last_name}
-                                      onChange={(e) =>
-                                        setDraftContact({
-                                          ...draftContact,
-                                          last_name: e.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Email</Label>
-                                    <Input
-                                      type="email"
-                                      className="w-full min-w-0"
-                                      value={draftContact.email}
-                                      onChange={(e) =>
-                                        setDraftContact({
-                                          ...draftContact,
-                                          email: e.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>DNI</Label>
-                                    <Input
-                                      className="w-full min-w-0"
-                                      value={draftContact.dni}
-                                      onChange={(e) =>
-                                        setDraftContact({
-                                          ...draftContact,
-                                          dni: e.target.value,
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                  {areaAttrDefs.map((d) => (
-                                    <div
-                                      key={d.id}
-                                      className="flex min-w-0 flex-col gap-1.5"
-                                    >
-                                      <Label>{d.label}</Label>
-                                      <Input
-                                        className="w-full min-w-0"
-                                        value={
-                                          draftContact.attributes[d.slug] ?? ''
-                                        }
-                                        onChange={(e) =>
-                                          setDraftContact({
-                                            ...draftContact,
-                                            attributes: {
-                                              ...draftContact.attributes,
-                                              [d.slug]: e.target.value,
-                                            },
-                                          })
-                                        }
-                                      />
-                                    </div>
-                                  ))}
-                                  <div className="flex items-end sm:col-span-2">
-                                    <IconActionButton
-                                      label="Guardar en WhatsApp"
-                                      variant="default"
-                                      disabled={
-                                        savingContactId === c.contact_id
-                                      }
-                                      onClick={() =>
-                                        void saveContact(c.contact_id)
-                                      }
-                                    >
-                                      <Save className="size-4" />
-                                    </IconActionButton>
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={page <= 1 || loading}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Página {pages === 0 ? 0 : page} de {pages || 1}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={loading || pages === 0 || page >= pages}
+                        onClick={() => setPage((p) => p + 1)}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              }
+            />
           )}
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {pages === 0 ? 0 : page} de {pages || 1}
-              </span>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={loading || pages === 0 || page >= pages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Siguiente
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground">Por página</Label>
-              <Select
-                value={String(pageSize)}
-                onValueChange={(value) => {
-                  setPageSize(Number(value));
-                  setPage(1);
-                }}
-              >
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[25, 50, 100].map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <span className="text-sm text-muted-foreground">
-              {total} en total
-            </span>
-          </div>
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4">
@@ -1419,220 +1548,147 @@ export function CrmPamPage() {
               description="Registros del widget o altas manuales aparecerán aquí."
             />
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border/60">
-              <Table className="min-w-[800px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Registrado</TableHead>
-                    <TableHead>Persona</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Medio de pago</TableHead>
-                    <TableHead>MP</TableHead>
-                    <TableHead>Caducidad</TableHead>
-                    <TableHead>Welcome</TableHead>
-                    <TableHead>Vínculo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments.map((p) => {
-                    const pending =
-                      !p.mpStatus || !CONFIRMED_MP.includes(p.mpStatus);
-                    const expanded = expandedPaymentId === p.id;
-                    const linked = linkedPaymentIds.has(p.id);
-                    const methodSlug =
-                      draftMethod[p.id] !== undefined
-                        ? draftMethod[p.id]
-                        : (p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD);
-                    const mpValue =
-                      draftMp[p.id] !== undefined
-                        ? draftMp[p.id]
-                        : (p.mpStatus ?? '');
-                    const expiryValue =
-                      draftExpiry[p.id] !== undefined
-                        ? draftExpiry[p.id]
-                        : toDateInput(p.expiryDate);
-                    const methodLabel = paymentMethodLabel(methodSlug);
-
-                    return (
-                      <Fragment key={p.id}>
-                        <TableRow
-                          className="cursor-pointer hover:bg-muted/40"
-                          onClick={() => {
-                            setExpandedPaymentId((prev) =>
-                              prev === p.id ? null : p.id,
-                            );
-                            setDraftMp((prev) => ({
-                              ...prev,
-                              [p.id]: p.mpStatus ?? '',
-                            }));
-                            setDraftExpiry((prev) => ({
-                              ...prev,
-                              [p.id]: toDateInput(p.expiryDate),
-                            }));
+            <DataTable
+              columns={paymentColumns}
+              data={payments}
+              getRowId={(p) => p.id}
+              tableClassName="min-w-[800px]"
+              onRowClick={(p) => {
+                setExpandedPaymentId((prev) => (prev === p.id ? null : p.id));
+                setDraftMp((prev) => ({
+                  ...prev,
+                  [p.id]: p.mpStatus ?? '',
+                }));
+                setDraftExpiry((prev) => ({
+                  ...prev,
+                  [p.id]: toDateInput(p.expiryDate),
+                }));
+                setDraftMethod((prev) => ({
+                  ...prev,
+                  [p.id]: p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD,
+                }));
+              }}
+              isRowExpanded={(p) => expandedPaymentId === p.id}
+              renderExpandedRow={(p) => {
+                const methodSlug =
+                  draftMethod[p.id] !== undefined
+                    ? draftMethod[p.id]
+                    : (p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD);
+                const mpValue =
+                  draftMp[p.id] !== undefined
+                    ? draftMp[p.id]
+                    : (p.mpStatus ?? '');
+                const expiryValue =
+                  draftExpiry[p.id] !== undefined
+                    ? draftExpiry[p.id]
+                    : toDateInput(p.expiryDate);
+                return (
+                  <div
+                    className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
+                        <span className="text-xs text-muted-foreground">
+                          Checkout URL
+                        </span>
+                        <p className="break-all font-mono text-xs">
+                          {p.checkoutUrl || '—'}
+                        </p>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Medio de pago</Label>
+                        <Select
+                          value={methodSlug}
+                          onValueChange={(value) =>
                             setDraftMethod((prev) => ({
                               ...prev,
-                              [p.id]:
-                                p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD,
-                            }));
-                          }}
+                              [p.id]: value,
+                            }))
+                          }
                         >
-                          <TableCell>
-                            <span className="mr-1 text-muted-foreground">
-                              {expanded ? '▾' : '▸'}
-                            </span>
-                            {formatDateTime(p.createdAt)}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              {p.nombres} {p.apellidos}
-                              {pending ? (
-                                <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
-                                  pendiente
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {p.correo} · {p.celular}
-                            </div>
-                            <div className="font-mono text-[10px] text-muted-foreground">
-                              id: {p.id}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {p.plan} / {p.frecuencia}
-                          </TableCell>
-                          <TableCell>{methodLabel}</TableCell>
-                          <TableCell>{p.mpStatus ?? '—'}</TableCell>
-                          <TableCell>{formatDate(p.expiryDate)}</TableCell>
-                          <TableCell>{p.welcomeEmail}</TableCell>
-                          <TableCell>
-                            {linked ? (
-                              <span className="text-xs text-emerald-600 dark:text-emerald-400">
-                                vinculado
-                              </span>
-                            ) : (
-                              <span className="text-xs text-amber-700 dark:text-amber-400">
-                                sin vínculo
-                              </span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                        {expanded ? (
-                          <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={8} className="p-0">
-                              <div
-                                className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4"
-                                onClick={(e) => e.stopPropagation()}
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activePaymentMethods.map((m) => (
+                              <SelectItem key={m.id} value={m.slug}>
+                                {m.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Estado Mercado Pago</Label>
+                        <Select
+                          value={mpValue || '__none__'}
+                          onValueChange={(value) =>
+                            setDraftMp((prev) => ({
+                              ...prev,
+                              [p.id]: value === '__none__' ? '' : value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="—" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MP_STATUSES.map((s) => (
+                              <SelectItem
+                                key={s.value || 'empty'}
+                                value={s.value || '__none__'}
                               >
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                  <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
-                                    <span className="text-xs text-muted-foreground">
-                                      Checkout URL
-                                    </span>
-                                    <p className="break-all font-mono text-xs">
-                                      {p.checkoutUrl || '—'}
-                                    </p>
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Medio de pago</Label>
-                                    <Select
-                                      value={methodSlug}
-                                      onValueChange={(value) =>
-                                        setDraftMethod((prev) => ({
-                                          ...prev,
-                                          [p.id]: value,
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {activePaymentMethods.map((m) => (
-                                          <SelectItem key={m.id} value={m.slug}>
-                                            {m.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Estado Mercado Pago</Label>
-                                    <Select
-                                      value={mpValue || '__none__'}
-                                      onValueChange={(value) =>
-                                        setDraftMp((prev) => ({
-                                          ...prev,
-                                          [p.id]:
-                                            value === '__none__' ? '' : value,
-                                        }))
-                                      }
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="—" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {MP_STATUSES.map((s) => (
-                                          <SelectItem
-                                            key={s.value || 'empty'}
-                                            value={s.value || '__none__'}
-                                          >
-                                            {s.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Fecha caducidad</Label>
-                                    <Input
-                                      type="date"
-                                      value={expiryValue}
-                                      onChange={(e) =>
-                                        setDraftExpiry((prev) => ({
-                                          ...prev,
-                                          [p.id]: e.target.value,
-                                        }))
-                                      }
-                                    />
-                                  </div>
-                                  <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
-                                    <IconActionButton
-                                      label="Guardar pago"
-                                      variant="default"
-                                      disabled={savingId === p.id}
-                                      onClick={() => void savePayment(p.id)}
-                                    >
-                                      <Save className="size-4" />
-                                    </IconActionButton>
-                                    <IconActionButton
-                                      label="Reenviar bienvenida SMTP"
-                                      disabled={
-                                        !p.mpStatus ||
-                                        !CONFIRMED_MP.includes(p.mpStatus)
-                                      }
-                                      onClick={() => void resendWelcome(p.id)}
-                                    >
-                                      <Mail className="size-4" />
-                                    </IconActionButton>
-                                    <IconActionButton
-                                      label="Vincular a este pago"
-                                      onClick={() => void linkPayment(p.id)}
-                                    >
-                                      <Link2 className="size-4" />
-                                    </IconActionButton>
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                                {s.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-1.5">
+                        <Label>Fecha caducidad</Label>
+                        <Input
+                          type="date"
+                          value={expiryValue}
+                          onChange={(e) =>
+                            setDraftExpiry((prev) => ({
+                              ...prev,
+                              [p.id]: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+                        <IconActionButton
+                          label="Guardar pago"
+                          variant="default"
+                          disabled={savingId === p.id}
+                          onClick={() => void savePayment(p.id)}
+                        >
+                          <Save className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Reenviar bienvenida SMTP"
+                          disabled={
+                            !p.mpStatus ||
+                            !CONFIRMED_MP.includes(p.mpStatus)
+                          }
+                          onClick={() => void resendWelcome(p.id)}
+                        >
+                          <Mail className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Vincular a este pago"
+                          onClick={() => void linkPayment(p.id)}
+                        >
+                          <Link2 className="size-4" />
+                        </IconActionButton>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }}
+            />
           )}
         </TabsContent>
 
@@ -1700,30 +1756,11 @@ export function CrmPamPage() {
               description="Los envíos aparecerán aquí."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Envío</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Enviados</TableHead>
-                  <TableHead>Opens / Clicks</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c.status}</TableCell>
-                    <TableCell>
-                      {c.sentCount}/{c.totalRecipients}
-                    </TableCell>
-                    <TableCell>
-                      {c.openCount} / {c.clickCount}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable
+              columns={campaignColumns}
+              data={campaigns}
+              getRowId={(c) => c.id}
+            />
           )}
         </TabsContent>
       </Tabs>
