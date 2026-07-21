@@ -159,10 +159,18 @@ export function CrmPamPage() {
       'apellido',
       'telefono',
       'email',
+      'dni',
+      'plan',
+      'frecuencia',
+      'mp_status',
+      'ciudad',
+      'distrito',
+      'genero',
+      'fecha_nacimiento',
+      'como_te_enteraste',
       'opt_in_email',
       'segmentos',
-      'plan',
-      'mp_status',
+      'payment_id',
     ];
     const rows = contacts.map((c) =>
       [
@@ -171,10 +179,18 @@ export function CrmPamPage() {
         c.last_name,
         c.phone,
         c.email ?? '',
+        c.attributes.dni ?? '',
+        c.attributes.plan ?? '',
+        c.attributes.frecuencia ?? '',
+        c.attributes.mp_status ?? '',
+        c.attributes.ciudad ?? '',
+        c.attributes.distrito ?? '',
+        c.attributes.genero ?? '',
+        c.attributes.fecha_nacimiento ?? '',
+        c.attributes.como_te_enteraste ?? '',
         c.opt_in_email ? '1' : '0',
         c.segment_slugs.join(';'),
-        c.attributes.plan ?? '',
-        c.attributes.mp_status ?? '',
+        c.attributes.payment_id ?? '',
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
         .join(','),
@@ -260,7 +276,7 @@ export function CrmPamPage() {
           ) : contacts.length === 0 ? (
             <EmptyState
               title="Sin contactos"
-              description="Configura WHATSAPP_CRM_* o sincroniza registros PAM."
+              description="Configura WHATSAPP_CRM_* o espera altas del widget PAM (sync al CRM)."
             />
           ) : (
             <div className="overflow-x-auto rounded-md border border-border/60">
@@ -270,9 +286,12 @@ export function CrmPamPage() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Opt-in email</TableHead>
+                    <TableHead>DNI</TableHead>
                     <TableHead>Plan</TableHead>
                     <TableHead>MP</TableHead>
+                    <TableHead>Ciudad</TableHead>
+                    <TableHead>Distrito</TableHead>
+                    <TableHead>Opt-in email</TableHead>
                     <TableHead>Segmentos</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -286,9 +305,17 @@ export function CrmPamPage() {
                         {c.phone}
                       </TableCell>
                       <TableCell>{c.email ?? '—'}</TableCell>
-                      <TableCell>{c.opt_in_email ? 'Sí' : 'No'}</TableCell>
-                      <TableCell>{c.attributes.plan ?? '—'}</TableCell>
+                      <TableCell>{c.attributes.dni ?? '—'}</TableCell>
+                      <TableCell>
+                        {c.attributes.plan ?? '—'}
+                        {c.attributes.frecuencia
+                          ? ` / ${c.attributes.frecuencia}`
+                          : ''}
+                      </TableCell>
                       <TableCell>{c.attributes.mp_status ?? '—'}</TableCell>
+                      <TableCell>{c.attributes.ciudad ?? '—'}</TableCell>
+                      <TableCell>{c.attributes.distrito ?? '—'}</TableCell>
+                      <TableCell>{c.opt_in_email ? 'Sí' : 'No'}</TableCell>
                       <TableCell className="text-xs">
                         {c.segment_slugs.join(', ') || '—'}
                       </TableCell>

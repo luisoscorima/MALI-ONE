@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PamEmailStatus, PamMpStatus, Prisma } from '@prisma/client';
@@ -42,6 +43,8 @@ const DEFAULT_MUSEO_POPUP = {
 
 @Injectable()
 export class PamWidgetsService {
+  private readonly logger = new Logger(PamWidgetsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -198,9 +201,9 @@ export class PamWidgetsService {
       effectiveMp &&
       MP_CONFIRMED.includes(effectiveMp) &&
       dto.expiryDate === undefined &&
-      !existing.expiryDate
+      (!existing.expiryDate || mpStatusChanging)
     ) {
-      data.expiryDate = this.calculateExpiryDate(existing.createdAt, frecuencia);
+      data.expiryDate = this.calculateExpiryDate(new Date(), frecuencia);
     }
 
     const updated = await this.prisma.pamRegistration.update({
@@ -247,7 +250,7 @@ export class PamWidgetsService {
       throw new BadRequestException('Debes aceptar la política de privacidad');
     }
 
-    return this.prisma.pamRegistration.create({
+    const created = await this.prisma.pamRegistration.create({
       data: {
         nombres: dto.nombres,
         apellidos: dto.apellidos,
@@ -265,10 +268,21 @@ export class PamWidgetsService {
         checkoutUrl: dto.checkoutUrl,
         aceptaPrivacidad: dto.aceptaPrivacidad,
       },
-    }).then((created) => {
-      this.crm.syncPamRegistration(created);
-      return created;
     });
+
+    // Persona → WhatsApp CRM (fuente de verdad). PamRegistration queda como ledger de pago.
+    try {
+      await this.crm.syncPamRegistrationAsync(created);
+    } catch (err) {
+      this.logger.warn(
+        `CRM sync diferido para pago ${created.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+      this.crm.syncPamRegistration(created);
+    }
+
+    return created;
   }
 
   async handleMercadoPagoWebhook(body: Record<string, unknown>) {
@@ -304,7 +318,7 @@ export class PamWidgetsService {
 
     if (mpStatus && MP_CONFIRMED.includes(mpStatus)) {
       const expiryDate = this.calculateExpiryDate(
-        registration.createdAt,
+        new Date(),
         registration.frecuencia,
       );
       update.expiryDate = expiryDate;
@@ -329,12 +343,18 @@ export class PamWidgetsService {
     await this.email.sendPendingExpiryNotices();
   }
 
-  private calculateExpiryDate(createdAt: Date, frecuencia: string) {
-    const date = new Date(createdAt);
-    if (frecuencia.toLowerCase().includes('año') || frecuencia === 'yearly') {
-      date.setFullYear(date.getFullYear() + 1);
+  private calculateExpiryDate(from: Date, frecuencia: string) {
+    const date = new Date(from);
+    const freq = frecuencia.toLowerCase();
+    if (
+      freq.includes('mes') ||
+      freq === 'monthly' ||
+      freq === 'mensual'
+    ) {
+      date.setMonth(date.getMonth() + 1);
     } else {
-      date.setMonth(date.getMonth() + 12);
+      // yearly / anual / año
+      date.setFullYear(date.getFullYear() + 1);
     }
     return date;
   }

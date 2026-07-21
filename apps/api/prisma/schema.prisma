@@ -288,6 +288,7 @@ model PamPlan {
 }
 
 model PamRegistration {
+  /// Ledger de pago/membresía (MP, welcome, expiry). La persona vive en WhatsApp CRM.
   id               String          @id @default(cuid())
   createdAt        DateTime        @default(now())
   nombres          String
@@ -312,6 +313,7 @@ model PamRegistration {
 
   @@index([correo])
   @@index([mpStatus])
+  @@index([celular])
 }
 
 model ScreenCastPlaylist {

@@ -59,17 +59,26 @@ export class WhatsappCrmClientService {
       return;
     }
 
+    // Persona (columnas) + demografía (atributos) + copia operativa de membresía para segmentar.
+    // Ledger ONE (checkout, privacidad, welcome/aviso SMTP) NO se replica al CRM.
     const attributes: Record<string, string> = {
+      source: 'pam_widget',
+      payment_id: reg.id,
       dni: reg.dni,
       plan: reg.plan,
       frecuencia: reg.frecuencia,
     };
+
+    this.setAttr(attributes, 'direccion', reg.direccion);
+    this.setAttr(attributes, 'ciudad', reg.ciudad);
+    this.setAttr(attributes, 'distrito', reg.distrito);
+    this.setAttr(attributes, 'genero', reg.genero);
+    this.setAttr(attributes, 'fecha_nacimiento', reg.fechaNacimiento);
+    this.setAttr(attributes, 'como_te_enteraste', reg.comoTeEnteraste);
     if (reg.mpStatus) attributes.mp_status = reg.mpStatus;
     if (reg.expiryDate) {
       attributes.expiry = reg.expiryDate.toISOString().slice(0, 10);
     }
-    if (reg.distrito) attributes.distrito = reg.distrito;
-    if (reg.ciudad) attributes.ciudad = reg.ciudad;
 
     await this.syncContact({
       area: 'pam',
@@ -82,6 +91,15 @@ export class WhatsappCrmClientService {
       attributes,
       external_id: reg.id,
     });
+  }
+
+  private setAttr(
+    attrs: Record<string, string>,
+    key: string,
+    value: string | null | undefined,
+  ) {
+    const v = String(value ?? '').trim();
+    if (v) attrs[key] = v;
   }
 
   async syncContact(payload: CrmSyncPayload): Promise<unknown> {

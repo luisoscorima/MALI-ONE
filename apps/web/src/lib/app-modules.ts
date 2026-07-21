@@ -43,7 +43,7 @@ export const APP_MODULES: {
   {
     id: 'pam_memberships',
     label: 'Membresías PAM',
-    description: 'Planes, beneficios, registros y pagos del programa.',
+    description: 'Vitrina PAM, planes y ledger de pagos. Personas en CRM PAM.',
   },
   {
     id: 'screen_cast',

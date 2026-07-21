@@ -4,31 +4,52 @@
 
 | Capa | Dónde | Rol |
 |------|--------|-----|
-| **CRM** | WhatsApp (`contacts` área `pam`) | Fuente de verdad de personas |
-| **Producto** | MALI ONE (`PamRegistration`, planes, MP) | Membresías, pagos, históricos |
-| **Vitrina** | Widget PAM embebido | Escaparate público; no lista CRM |
+| **CRM (persona)** | WhatsApp `contacts` área `pam` | Fuente de verdad de personas |
+| **Pago / membresía** | MALI ONE `PamRegistration` (ledger) | MP, welcome SMTP, caducidad — UI **Pagos recientes** |
+| **Vitrina** | Widget + `/admin/pam` | Planes, beneficios, checkout |
 
-## Módulos en MALI ONE (separados)
+## Reparto de campos
 
-| Módulo | Ruta | Permiso | Qué hace |
-|--------|------|---------|----------|
-| **Boletines** | `/admin/newsletters` | `newsletters` | Editor por bloques (drag & drop), publicar, URL `/n/{slug}` |
-| **CRM PAM** | `/admin/crm-pam` | `crm_pam` | Lista contactos (API WhatsApp), export CSV, envío SES de boletines publicados |
-| **Membresías PAM** | `/admin/pam` | `pam_memberships` | Producto: planes, registros, pagos |
+**Ledger ONE:** registrado en, plan, frecuencia, checkout URL, acepta privacidad, estado MP, welcome, aviso caducidad, fecha caducidad (+ cobros MP a futuro).
 
-## Configuración
+**CRM WhatsApp — columnas:** nombre, apellido, correo, celular.
 
-```env
-WHATSAPP_CRM_BASE_URL=https://whatsapp.mali.pe
-WHATSAPP_CRM_SERVICE_TOKEN=<mismo que CRM_SERVICE_TOKEN en WhatsApp>
-SES_FROM_EMAIL=noreply@mali.pe
-SES_FROM_NAME=MALI
+**CRM — atributos:** DNI, dirección, ciudad, distrito, género, fecha nacimiento, cómo te enteraste, y **copia** de `plan`, `frecuencia`, `mp_status`, `expiry`, `payment_id` (para segmentar; dueño = ONE).
+
+## Flujo actual
+
+```text
+Widget → ONE (ledger) + sync persona a CRM
+      → Checkout MP
+      → (manual hoy / webhook) ONE: mp_status + expiry
+      → re-sync atributos membresía al CRM
+      → Welcome / avisos caducidad por SMTP pam@
+      → Personas se leen en CRM PAM (ONE → API WhatsApp)
 ```
 
-Contrato API WhatsApp: `docs/CRM-API.md` en mali-whatsapp-mvp (`/api/crm/sync`, `/api/crm/audience`, `/api/crm/contacts`).
+## Módulos
 
-## Flujo operativo
+| Módulo | Ruta |
+|--------|------|
+| Membresías PAM (vitrina + pagos) | `/admin/pam` |
+| CRM PAM (contactos + envío boletines) | `/admin/crm-pam` |
+| Boletines | `/admin/newsletters` |
 
-1. Widget/admin → `PamRegistration` → sync a WhatsApp CRM  
-2. Usuario crea boletín en **Boletines** → publica → copia URL  
-3. En **CRM PAM** ve la lista (fuente WhatsApp) → elige boletín → envía por SES  
+## Para cerrar el flujo (SMTP; sin SES de bienvenida)
+
+Hecho / usable ahora (con config):
+
+- Alta widget → ledger + CRM
+- Pagos recientes: marcar MP, caducidad, reenviar welcome
+- Cron avisos caducidad (si SMTP `PAM_SMTP_*` configurado)
+- Caducidad mensual = +1 mes; anual = +1 año (desde confirmación)
+
+Pendiente / frágil:
+
+1. **`PAM_SMTP_*`** en producción (host, user, pass, from)
+2. **`WHATSAPP_CRM_BASE_URL` + `WHATSAPP_CRM_SERVICE_TOKEN`** en ambos lados
+3. **Webhook Mercado Pago** fiable (hoy matching por `checkoutUrl`/id es frágil; ops manual en Pagos)
+4. **IDs de pago MP** persistidos en ledger (`mpPaymentId` / preapproval) para conciliar
+5. **Renovaciones** (mismo celular, nuevo periodo) — política de update vs nueva fila
+6. **Plantillas** welcome/expiry editables (hoy HTML fijo en código)
+7. Boletines masivos SES = otro canal (no bloquea este flujo SMTP)
