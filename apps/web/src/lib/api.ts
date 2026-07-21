@@ -807,6 +807,7 @@ export const api = {
         last_name: string;
         phone: string;
         email: string | null;
+        dni: string | null;
         opt_in: boolean;
         opt_in_email: boolean;
         active: boolean;
@@ -817,6 +818,86 @@ export const api = {
       }>;
     }>(`/api/crm-pam/contacts${q ? `?${q}` : ''}`);
   },
+
+  patchCrmPamContact: (
+    id: number,
+    body: {
+      name?: string;
+      last_name?: string;
+      email?: string | null;
+      dni?: string | null;
+      opt_in?: boolean;
+      opt_in_email?: boolean;
+      segment_slugs?: string[];
+      attributes?: Record<string, string>;
+    },
+  ) =>
+    request(`/api/crm-pam/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  listCrmPamAttributeDefinitions: () =>
+    request<
+      Array<{
+        id: number;
+        segment_slug: string | null;
+        slug: string;
+        label: string;
+        field_type: string;
+        sort_order: number;
+        required: boolean;
+        active: boolean;
+      }>
+    >('/api/crm-pam/attribute-definitions'),
+
+  createCrmPamAttributeDefinition: (body: {
+    scope: 'area' | 'segment';
+    segment_slug?: string;
+    slug: string;
+    label: string;
+    field_type?: string;
+    sort_order?: number;
+    required?: boolean;
+  }) =>
+    request('/api/crm-pam/attribute-definitions', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateCrmPamAttributeDefinition: (
+    id: number,
+    body: {
+      label: string;
+      field_type?: string;
+      sort_order?: number;
+      required?: boolean;
+      active?: boolean;
+    },
+  ) =>
+    request(`/api/crm-pam/attribute-definitions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  listCrmPamPayments: () =>
+    request<import('@mali-one/shared').PamRegistrationDto[]>(
+      '/api/crm-pam/payments',
+    ),
+
+  linkCrmPamPayment: (id: string) =>
+    request<{ ok: boolean; paymentId: string; phone: string }>(
+      `/api/crm-pam/payments/${id}/link-contact`,
+      { method: 'POST' },
+    ),
+
+  linkCrmPamPaymentsByPhone: () =>
+    request<{
+      ok: boolean;
+      linked: number;
+      phones: number;
+      errors: Array<{ paymentId: string; error: string }>;
+    }>('/api/crm-pam/payments/link-by-phone', { method: 'POST' }),
 
   listCrmPamNewsletters: () =>
     request<

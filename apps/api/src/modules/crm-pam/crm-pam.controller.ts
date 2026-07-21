@@ -1,11 +1,25 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { AppModule, User } from '@prisma/client';
 import type { Request } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
+import { RequirePermission } from '../../core/guards/permission.decorator';
 import { CrmPamService } from './crm-pam.service';
 import {
+  CreateCrmAttributeDefinitionDto,
   CreateEmailCampaignDto,
   ListCrmContactsQueryDto,
+  PatchCrmContactDto,
+  UpdateCrmAttributeDefinitionDto,
 } from './dto/crm-pam.dto';
 
 @Controller('crm-pam')
@@ -27,6 +41,50 @@ export class CrmPamController {
       page: query.page ? Number(query.page) : 1,
       limit: query.limit ? Number(query.limit) : 100,
     });
+  }
+
+  @Patch('contacts/:id')
+  patchContact(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: PatchCrmContactDto,
+  ) {
+    return this.crmPam.patchContact(id, body);
+  }
+
+  @Get('attribute-definitions')
+  listAttributeDefinitions() {
+    return this.crmPam.listAttributeDefinitions();
+  }
+
+  @Post('attribute-definitions')
+  createAttributeDefinition(@Body() body: CreateCrmAttributeDefinitionDto) {
+    return this.crmPam.createAttributeDefinition(body);
+  }
+
+  @Patch('attribute-definitions/:id')
+  updateAttributeDefinition(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateCrmAttributeDefinitionDto,
+  ) {
+    return this.crmPam.updateAttributeDefinition(id, body);
+  }
+
+  @Get('payments')
+  @RequirePermission('pam.registros.read')
+  listPayments() {
+    return this.crmPam.listPayments();
+  }
+
+  @Post('payments/link-by-phone')
+  @RequirePermission('pam.registros.manage')
+  linkPaymentsByPhone() {
+    return this.crmPam.linkPaymentsByPhone();
+  }
+
+  @Post('payments/:id/link-contact')
+  @RequirePermission('pam.registros.manage')
+  linkPayment(@Param('id') id: string) {
+    return this.crmPam.linkPayment(id);
   }
 
   @Get('newsletters')

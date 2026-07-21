@@ -54,6 +54,124 @@ export class CrmPamService {
     });
   }
 
+  listAttributeDefinitions() {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    return this.crm.fetchAttributeDefinitions('pam');
+  }
+
+  createAttributeDefinition(dto: {
+    scope: 'area' | 'segment';
+    segment_slug?: string;
+    slug: string;
+    label: string;
+    field_type?: string;
+    sort_order?: number;
+    required?: boolean;
+  }) {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    return this.crm.createAttributeDefinition({ area: 'pam', ...dto });
+  }
+
+  updateAttributeDefinition(
+    id: number,
+    dto: {
+      label: string;
+      field_type?: string;
+      sort_order?: number;
+      required?: boolean;
+      active?: boolean;
+    },
+  ) {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    return this.crm.updateAttributeDefinition(id, dto, 'pam');
+  }
+
+  patchContact(
+    contactId: number,
+    dto: {
+      name?: string;
+      last_name?: string;
+      email?: string | null;
+      dni?: string | null;
+      opt_in?: boolean;
+      opt_in_email?: boolean;
+      segment_slugs?: string[];
+      attributes?: Record<string, string>;
+    },
+  ) {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    return this.crm.patchContact(contactId, dto, 'pam');
+  }
+
+  listPayments() {
+    return this.prisma.pamRegistration.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /** Vincula un pago concreto al contacto WA (payment_id = este registro). */
+  async linkPayment(paymentId: string) {
+    const reg = await this.prisma.pamRegistration.findUnique({
+      where: { id: paymentId },
+    });
+    if (!reg) throw new NotFoundException('Pago no encontrado');
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    await this.crm.syncPamRegistrationAsync(reg);
+    return { ok: true, paymentId: reg.id, phone: reg.celular };
+  }
+
+  /**
+   * Por cada teléfono con pagos, vincula el PamRegistration más reciente
+   * (createdAt) al contacto WhatsApp vía payment_id.
+   */
+  async linkPaymentsByPhone() {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    const regs = await this.prisma.pamRegistration.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    const latestByPhone = new Map<string, (typeof regs)[number]>();
+    for (const reg of regs) {
+      const phone = this.crm.toE164Pe(reg.celular);
+      if (!phone) continue;
+      if (!latestByPhone.has(phone)) {
+        latestByPhone.set(phone, reg);
+      }
+    }
+
+    let linked = 0;
+    const errors: Array<{ paymentId: string; error: string }> = [];
+    for (const reg of latestByPhone.values()) {
+      try {
+        await this.crm.syncPamRegistrationAsync(reg);
+        linked += 1;
+      } catch (err) {
+        errors.push({
+          paymentId: reg.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    return {
+      ok: true,
+      linked,
+      phones: latestByPhone.size,
+      errors,
+    };
+  }
+
   listPublishedNewsletters() {
     return this.newsletters.listPublished();
   }

@@ -8,10 +8,38 @@ export type CrmSyncPayload = {
   last_name?: string;
   phone: string;
   email?: string;
+  dni?: string | null;
   opt_in?: boolean;
   opt_in_email?: boolean;
   attributes?: Record<string, string>;
   external_id?: string;
+};
+
+export type CrmAttributeDefinition = {
+  id: number;
+  segment_slug: string | null;
+  slug: string;
+  label: string;
+  field_type: string;
+  sort_order: number;
+  required: boolean;
+  active: boolean;
+};
+
+export type CrmContactRow = {
+  contact_id: number;
+  name: string;
+  last_name: string;
+  phone: string;
+  email: string | null;
+  dni: string | null;
+  opt_in: boolean;
+  opt_in_email: boolean;
+  active: boolean;
+  segment_slugs: string[];
+  attributes: Record<string, string>;
+  created_at: string;
+  updated_at: string;
 };
 
 @Injectable()
@@ -59,12 +87,11 @@ export class WhatsappCrmClientService {
       return;
     }
 
-    // Persona (columnas) + demografía (atributos) + copia operativa de membresía para segmentar.
-    // Ledger ONE (checkout, privacidad, welcome/aviso SMTP) NO se replica al CRM.
+    // Persona (columnas) + demografía (atributos) + copia operativa de membresía.
+    // Ledger ONE (checkout, privacidad, welcome SMTP) NO se replica al CRM.
     const attributes: Record<string, string> = {
       source: 'pam_widget',
       payment_id: reg.id,
-      dni: reg.dni,
       plan: reg.plan,
       frecuencia: reg.frecuencia,
     };
@@ -86,6 +113,7 @@ export class WhatsappCrmClientService {
       last_name: reg.apellidos,
       phone,
       email: reg.correo,
+      dni: reg.dni,
       opt_in: true,
       opt_in_email: true,
       attributes,
@@ -104,6 +132,73 @@ export class WhatsappCrmClientService {
 
   async syncContact(payload: CrmSyncPayload): Promise<unknown> {
     return this.request('POST', '/api/crm/sync', payload);
+  }
+
+  async patchContact(
+    contactId: number,
+    body: {
+      name?: string;
+      last_name?: string;
+      email?: string | null;
+      dni?: string | null;
+      opt_in?: boolean;
+      opt_in_email?: boolean;
+      segment_slugs?: string[];
+      attributes?: Record<string, string>;
+    },
+    area = 'pam',
+  ): Promise<CrmContactRow> {
+    const qs = new URLSearchParams({ area });
+    return this.request(
+      'PATCH',
+      `/api/crm/contacts/${contactId}?${qs.toString()}`,
+      body,
+    );
+  }
+
+  async fetchAttributeDefinitions(
+    area = 'pam',
+  ): Promise<CrmAttributeDefinition[]> {
+    const qs = new URLSearchParams({ area });
+    return this.request(
+      'GET',
+      `/api/crm/attribute-definitions?${qs.toString()}`,
+    );
+  }
+
+  async createAttributeDefinition(body: {
+    area?: string;
+    scope: 'area' | 'segment';
+    segment_slug?: string;
+    slug: string;
+    label: string;
+    field_type?: string;
+    sort_order?: number;
+    required?: boolean;
+  }): Promise<CrmAttributeDefinition> {
+    return this.request('POST', '/api/crm/attribute-definitions', {
+      area: body.area ?? 'pam',
+      ...body,
+    });
+  }
+
+  async updateAttributeDefinition(
+    id: number,
+    body: {
+      label: string;
+      field_type?: string;
+      sort_order?: number;
+      required?: boolean;
+      active?: boolean;
+    },
+    area = 'pam',
+  ): Promise<CrmAttributeDefinition> {
+    const qs = new URLSearchParams({ area });
+    return this.request(
+      'PATCH',
+      `/api/crm/attribute-definitions/${id}?${qs.toString()}`,
+      body,
+    );
   }
 
   async fetchAudience(params: {
@@ -154,20 +249,7 @@ export class WhatsappCrmClientService {
     page?: number;
     limit?: number;
   }): Promise<{
-    items: Array<{
-      contact_id: number;
-      name: string;
-      last_name: string;
-      phone: string;
-      email: string | null;
-      opt_in: boolean;
-      opt_in_email: boolean;
-      active: boolean;
-      segment_slugs: string[];
-      attributes: Record<string, string>;
-      created_at: string;
-      updated_at: string;
-    }>;
+    items: CrmContactRow[];
     total: number;
     page: number;
     limit: number;
@@ -191,7 +273,7 @@ export class WhatsappCrmClientService {
   }
 
   private async request<T = unknown>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PATCH',
     path: string,
     body?: unknown,
   ): Promise<T> {
@@ -205,7 +287,10 @@ export class WhatsappCrmClientService {
         'Content-Type': 'application/json',
         'X-Crm-Service-Token': this.token,
       },
-      body: method === 'POST' ? JSON.stringify(body ?? {}) : undefined,
+      body:
+        method === 'POST' || method === 'PATCH'
+          ? JSON.stringify(body ?? {})
+          : undefined,
     });
 
     const json = (await res.json().catch(() => ({}))) as {
