@@ -287,6 +287,21 @@ model PamPlan {
   activo          Boolean @default(true)
 }
 
+/// Catálogo de medios de pago (editable en CRM PAM). Solo Mercado Pago es sistema/default del widget.
+model PamPaymentMethod {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  label     String
+  active    Boolean  @default(true)
+  /// No se puede borrar (p. ej. mercado_pago).
+  system    Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
 model PamRegistration {
   /// Ledger de pago/membresía (MP, welcome, expiry). La persona vive en WhatsApp CRM.
   id               String          @id @default(cuid())
@@ -305,8 +320,8 @@ model PamRegistration {
   plan             String
   frecuencia       String
   checkoutUrl      String?
-  /// Pasarela / opción de pago: mercado_pago | niubiz | izipay | otro
-  paymentGateway   String          @default("mercado_pago")
+  /// Slug de PamPaymentMethod (default mercado_pago en widget).
+  paymentMethod    String          @default("mercado_pago")
   aceptaPrivacidad Boolean
   mpStatus         PamMpStatus?
   welcomeEmail     PamEmailStatus  @default(PENDIENTE)
@@ -316,7 +331,7 @@ model PamRegistration {
   @@index([correo])
   @@index([mpStatus])
   @@index([celular])
-  @@index([paymentGateway])
+  @@index([paymentMethod])
 }
 
 model ScreenCastPlaylist {

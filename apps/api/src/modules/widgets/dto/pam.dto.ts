@@ -196,7 +196,7 @@ export class CreatePamRegistrationDto {
 
   @IsOptional()
   @IsString()
-  paymentGateway?: string;
+  paymentMethod?: string;
 
   @IsBoolean()
   aceptaPrivacidad!: boolean;
@@ -261,7 +261,7 @@ export class UpdatePamRegistrationDto {
 
   @IsOptional()
   @IsString()
-  paymentGateway?: string;
+  paymentMethod?: string;
 
   @IsOptional()
   @IsBoolean()

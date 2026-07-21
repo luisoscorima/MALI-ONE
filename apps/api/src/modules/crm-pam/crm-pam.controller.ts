@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -18,9 +19,11 @@ import {
   CreateCrmAttributeDefinitionDto,
   CreateEmailCampaignDto,
   CreatePamPaymentDto,
+  CreatePamPaymentMethodDto,
   ListCrmContactsQueryDto,
   PatchCrmContactDto,
   UpdateCrmAttributeDefinitionDto,
+  UpdatePamPaymentMethodDto,
 } from './dto/crm-pam.dto';
 
 @Controller('crm-pam')
@@ -79,6 +82,33 @@ export class CrmPamController {
   @RequirePermission('pam.registros.read')
   listPayments() {
     return this.crmPam.listPayments();
+  }
+
+  @Get('payment-methods')
+  @RequirePermission('pam.registros.read')
+  listPaymentMethods() {
+    return this.crmPam.listPaymentMethods(true);
+  }
+
+  @Post('payment-methods')
+  @RequirePermission('pam.registros.manage')
+  createPaymentMethod(@Body() body: CreatePamPaymentMethodDto) {
+    return this.crmPam.createPaymentMethod(body);
+  }
+
+  @Patch('payment-methods/:id')
+  @RequirePermission('pam.registros.manage')
+  updatePaymentMethod(
+    @Param('id') id: string,
+    @Body() body: UpdatePamPaymentMethodDto,
+  ) {
+    return this.crmPam.updatePaymentMethod(id, body);
+  }
+
+  @Delete('payment-methods/:id')
+  @RequirePermission('pam.registros.manage')
+  deletePaymentMethod(@Param('id') id: string) {
+    return this.crmPam.deletePaymentMethod(id);
   }
 
   @Post('payments')

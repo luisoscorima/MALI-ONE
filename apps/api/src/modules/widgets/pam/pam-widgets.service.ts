@@ -145,6 +145,19 @@ export class PamWidgetsService {
     const existing = await this.findRegistration(id);
     const data: Prisma.PamRegistrationUpdateInput = {};
 
+    if (dto.paymentMethod !== undefined) {
+      const slug = dto.paymentMethod.trim() || 'mercado_pago';
+      const method = await this.prisma.pamPaymentMethod.findUnique({
+        where: { slug },
+      });
+      if (!method || !method.active) {
+        throw new BadRequestException(
+          `Medio de pago inválido o inactivo: "${slug}"`,
+        );
+      }
+      data.paymentMethod = method.slug;
+    }
+
     const stringFields = [
       'nombres',
       'apellidos',
@@ -160,7 +173,6 @@ export class PamWidgetsService {
       'plan',
       'frecuencia',
       'checkoutUrl',
-      'paymentGateway',
     ] as const;
 
     for (const field of stringFields) {
@@ -267,9 +279,21 @@ export class PamWidgetsService {
         plan: dto.plan,
         frecuencia: dto.frecuencia,
         checkoutUrl: dto.checkoutUrl,
-        paymentGateway: dto.paymentGateway?.trim() || 'mercado_pago',
+        paymentMethod: 'mercado_pago',
         aceptaPrivacidad: dto.aceptaPrivacidad,
       },
+    });
+
+    await this.prisma.pamPaymentMethod.upsert({
+      where: { slug: 'mercado_pago' },
+      create: {
+        slug: 'mercado_pago',
+        label: 'Mercado Pago',
+        active: true,
+        system: true,
+        sortOrder: 0,
+      },
+      update: { system: true },
     });
 
     // Persona → WhatsApp CRM (fuente de verdad). PamRegistration queda como ledger de pago.

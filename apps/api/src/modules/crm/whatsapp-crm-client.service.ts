@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { PamRegistration } from '@prisma/client';
+import { PrismaService } from '../../core/prisma/prisma.service';
 
 /** Defs de área que el widget/ledger deben tener en WhatsApp (idempotente). */
 const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
@@ -10,7 +11,7 @@ const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
   sort_order?: number;
 }> = [
   { slug: 'payment_id', label: 'ID pago (MALI ONE)', sort_order: 1 },
-  { slug: 'pasarela', label: 'Pasarela / opción de pago', sort_order: 2 },
+  { slug: 'medio_pago', label: 'Medio de pago', sort_order: 2 },
   { slug: 'plan', label: 'Plan', sort_order: 3 },
   { slug: 'frecuencia', label: 'Frecuencia', sort_order: 4 },
   { slug: 'mp_status', label: 'Estado MP', sort_order: 5 },
@@ -73,7 +74,10 @@ export type CrmContactRow = {
 export class WhatsappCrmClientService {
   private readonly logger = new Logger(WhatsappCrmClientService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private get baseUrl(): string {
     return String(this.config.get('WHATSAPP_CRM_BASE_URL') ?? '')
@@ -118,14 +122,17 @@ export class WhatsappCrmClientService {
 
     // Persona (columnas) + demografía (atributos) + copia operativa de membresía.
     // Ledger ONE (checkout, privacidad, welcome SMTP) NO se replica al CRM.
-    const gateway = String(
-      (reg as { paymentGateway?: string }).paymentGateway ?? 'mercado_pago',
-    ).trim() || 'mercado_pago';
+    const methodSlug =
+      String(reg.paymentMethod ?? 'mercado_pago').trim() || 'mercado_pago';
+    const method = await this.prisma.pamPaymentMethod.findUnique({
+      where: { slug: methodSlug },
+    });
+    const medioPagoLabel = method?.label ?? methodSlug;
 
     const attributes: Record<string, string> = {
       source: 'pam_widget',
       payment_id: reg.id,
-      pasarela: gateway,
+      medio_pago: medioPagoLabel,
       plan: reg.plan,
       frecuencia: reg.frecuencia,
     };

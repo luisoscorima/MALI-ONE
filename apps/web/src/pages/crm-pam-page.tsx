@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
-import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send } from 'lucide-react';
+import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import type {
   EmailCampaignDto,
+  PamPaymentMethodDto,
   PamRegistrationDto,
 } from '@mali-one/shared';
-import {
-  PAM_PAYMENT_GATEWAY_LABELS,
-  PAM_PAYMENT_GATEWAYS,
-} from '@mali-one/shared';
+import { PAM_DEFAULT_PAYMENT_METHOD } from '@mali-one/shared';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -202,11 +200,17 @@ export function CrmPamPage() {
   );
   const [draftMp, setDraftMp] = useState<Record<string, string>>({});
   const [draftExpiry, setDraftExpiry] = useState<Record<string, string>>({});
-  const [draftGateway, setDraftGateway] = useState<Record<string, string>>({});
+  const [draftMethod, setDraftMethod] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [showNewPayment, setShowNewPayment] = useState(false);
   const [creatingPayment, setCreatingPayment] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PamPaymentMethodDto[]>(
+    [],
+  );
+  const [showMethodsManager, setShowMethodsManager] = useState(false);
+  const [newMethodLabel, setNewMethodLabel] = useState('');
+  const [savingMethod, setSavingMethod] = useState(false);
   const [newPayment, setNewPayment] = useState({
     nombres: '',
     apellidos: '',
@@ -215,7 +219,7 @@ export function CrmPamPage() {
     correo: '',
     plan: 'amigo',
     frecuencia: 'monthly',
-    paymentGateway: 'mercado_pago',
+    paymentMethod: PAM_DEFAULT_PAYMENT_METHOD,
     mpStatus: '',
     expiryDate: '',
   });
@@ -360,6 +364,82 @@ export function CrmPamPage() {
     }
   }, [toast]);
 
+  const loadPaymentMethods = useCallback(async () => {
+    try {
+      const rows = await api.listCrmPamPaymentMethods();
+      setPaymentMethods(rows);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Error al cargar medios de pago',
+      );
+    }
+  }, [toast]);
+
+  const activePaymentMethods = useMemo(
+    () => paymentMethods.filter((m) => m.active),
+    [paymentMethods],
+  );
+
+  function paymentMethodLabel(slug: string) {
+    return (
+      paymentMethods.find((m) => m.slug === slug)?.label ??
+      (slug === PAM_DEFAULT_PAYMENT_METHOD ? 'Mercado Pago' : slug)
+    );
+  }
+
+  async function createPaymentMethod() {
+    const label = newMethodLabel.trim();
+    if (!label) {
+      toast.error('Escribe el nombre del medio de pago');
+      return;
+    }
+    setSavingMethod(true);
+    try {
+      await api.createCrmPamPaymentMethod({ label });
+      setNewMethodLabel('');
+      toast.success('Medio de pago creado');
+      await loadPaymentMethods();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo crear');
+    } finally {
+      setSavingMethod(false);
+    }
+  }
+
+  async function togglePaymentMethodActive(method: PamPaymentMethodDto) {
+    if (method.system && method.active) {
+      toast.error('No se puede desactivar Mercado Pago');
+      return;
+    }
+    try {
+      await api.updateCrmPamPaymentMethod(method.id, {
+        active: !method.active,
+      });
+      await loadPaymentMethods();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo actualizar');
+    }
+  }
+
+  async function removePaymentMethod(method: PamPaymentMethodDto) {
+    if (method.system) {
+      toast.error('No se puede eliminar Mercado Pago');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Eliminar medio de pago',
+      description: `¿Eliminar “${method.label}”? Solo si no hay pagos usándolo.`,
+    });
+    if (!ok) return;
+    try {
+      await api.deleteCrmPamPaymentMethod(method.id);
+      toast.success('Medio de pago eliminado');
+      await loadPaymentMethods();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
+    }
+  }
+
   const loadAttrDefs = useCallback(async () => {
     try {
       const [defs, segs] = await Promise.all([
@@ -394,8 +474,9 @@ export function CrmPamPage() {
 
   useEffect(() => {
     void loadPayments();
+    void loadPaymentMethods();
     void loadAttrDefs();
-  }, [loadPayments, loadAttrDefs]);
+  }, [loadPayments, loadPaymentMethods, loadAttrDefs]);
 
   useEffect(() => {
     if (tab === 'send') void loadCampaigns();
@@ -447,11 +528,11 @@ export function CrmPamPage() {
     try {
       const mpStatus = draftMp[id];
       const expiryDate = draftExpiry[id];
-      const paymentGateway = draftGateway[id];
+      const paymentMethod = draftMethod[id];
       const updated = await api.updatePamRegistration(id, {
         ...(mpStatus !== undefined ? { mpStatus } : {}),
         ...(expiryDate !== undefined ? { expiryDate } : {}),
-        ...(paymentGateway !== undefined ? { paymentGateway } : {}),
+        ...(paymentMethod !== undefined ? { paymentMethod } : {}),
       });
       updatePaymentInState(updated);
       toast.success('Pago actualizado (sync a CRM WhatsApp)');
@@ -485,7 +566,7 @@ export function CrmPamPage() {
         correo: newPayment.correo.trim(),
         plan: newPayment.plan.trim(),
         frecuencia: newPayment.frecuencia,
-        paymentGateway: newPayment.paymentGateway,
+        paymentMethod: newPayment.paymentMethod,
         ...(newPayment.mpStatus ? { mpStatus: newPayment.mpStatus } : {}),
         ...(newPayment.expiryDate
           ? { expiryDate: newPayment.expiryDate }
@@ -501,7 +582,7 @@ export function CrmPamPage() {
         correo: '',
         plan: 'amigo',
         frecuencia: 'monthly',
-        paymentGateway: 'mercado_pago',
+        paymentMethod: PAM_DEFAULT_PAYMENT_METHOD,
         mpStatus: '',
         expiryDate: '',
       });
@@ -1115,10 +1196,17 @@ export function CrmPamPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Ledger local. Cruce con contactos vía{' '}
-              <code className="text-xs">payment_id</code>. Widget → Mercado
-              Pago por defecto; también altas manuales (Niubiz, Izipay, etc.).
+              <code className="text-xs">payment_id</code>. Del widget el medio
+              es Mercado Pago; para externos crea medios y asígnalos al pago.
             </p>
             <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMethodsManager((v) => !v)}
+              >
+                {showMethodsManager ? 'Cerrar medios' : 'Medios de pago'}
+              </Button>
               <Button size="sm" onClick={() => setShowNewPayment((v) => !v)}>
                 <Plus className="mr-1 size-4" />
                 {showNewPayment ? 'Cerrar formulario' : 'Añadir pago'}
@@ -1135,13 +1223,83 @@ export function CrmPamPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void loadPayments()}
+                onClick={() => {
+                  void loadPayments();
+                  void loadPaymentMethods();
+                }}
               >
                 <RefreshCw className="mr-1 size-4" />
                 Actualizar
               </Button>
             </div>
           </div>
+
+          {showMethodsManager ? (
+            <div className="space-y-3 rounded-md border border-border/60 p-4">
+              <p className="text-sm font-medium">Catálogo de medios de pago</p>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  className="max-w-xs"
+                  placeholder="Ej. Niubiz, Izipay…"
+                  value={newMethodLabel}
+                  onChange={(e) => setNewMethodLabel(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  disabled={savingMethod}
+                  onClick={() => void createPaymentMethod()}
+                >
+                  <Plus className="mr-1 size-4" />
+                  {savingMethod ? 'Creando…' : 'Crear medio'}
+                </Button>
+              </div>
+              <ul className="divide-y divide-border/60 rounded-md border border-border/50">
+                {paymentMethods.map((m) => (
+                  <li
+                    key={m.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-medium">{m.label}</span>
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">
+                        {m.slug}
+                      </span>
+                      {m.system ? (
+                        <Badge variant="secondary" className="ml-2">
+                          Sistema
+                        </Badge>
+                      ) : null}
+                      {!m.active ? (
+                        <Badge variant="outline" className="ml-2">
+                          Inactivo
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-1">
+                      {!m.system ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void togglePaymentMethodActive(m)}
+                        >
+                          {m.active ? 'Desactivar' : 'Activar'}
+                        </Button>
+                      ) : null}
+                      {!m.system ? (
+                        <IconActionButton
+                          label="Eliminar"
+                          variant="ghost"
+                          onClick={() => void removePaymentMethod(m)}
+                        >
+                          <Trash2 className="size-4" />
+                        </IconActionButton>
+                      ) : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {showNewPayment ? (
             <div className="grid gap-3 rounded-md border border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1184,20 +1342,20 @@ export function CrmPamPage() {
                 </Select>
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label>Pasarela / opción de pago</Label>
+                <Label>Medio de pago</Label>
                 <Select
-                  value={newPayment.paymentGateway}
+                  value={newPayment.paymentMethod}
                   onValueChange={(value) =>
-                    setNewPayment({ ...newPayment, paymentGateway: value })
+                    setNewPayment({ ...newPayment, paymentMethod: value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PAM_PAYMENT_GATEWAYS.map((g) => (
-                      <SelectItem key={g} value={g}>
-                        {PAM_PAYMENT_GATEWAY_LABELS[g]}
+                    {activePaymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.slug}>
+                        {m.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1268,7 +1426,7 @@ export function CrmPamPage() {
                     <TableHead>Registrado</TableHead>
                     <TableHead>Persona</TableHead>
                     <TableHead>Plan</TableHead>
-                    <TableHead>Pasarela</TableHead>
+                    <TableHead>Medio de pago</TableHead>
                     <TableHead>MP</TableHead>
                     <TableHead>Caducidad</TableHead>
                     <TableHead>Welcome</TableHead>
@@ -1281,10 +1439,10 @@ export function CrmPamPage() {
                       !p.mpStatus || !CONFIRMED_MP.includes(p.mpStatus);
                     const expanded = expandedPaymentId === p.id;
                     const linked = linkedPaymentIds.has(p.id);
-                    const gateway =
-                      draftGateway[p.id] !== undefined
-                        ? draftGateway[p.id]
-                        : (p.paymentGateway ?? 'mercado_pago');
+                    const methodSlug =
+                      draftMethod[p.id] !== undefined
+                        ? draftMethod[p.id]
+                        : (p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD);
                     const mpValue =
                       draftMp[p.id] !== undefined
                         ? draftMp[p.id]
@@ -1293,10 +1451,7 @@ export function CrmPamPage() {
                       draftExpiry[p.id] !== undefined
                         ? draftExpiry[p.id]
                         : toDateInput(p.expiryDate);
-                    const gatewayLabel =
-                      PAM_PAYMENT_GATEWAY_LABELS[
-                        gateway as keyof typeof PAM_PAYMENT_GATEWAY_LABELS
-                      ] ?? gateway;
+                    const methodLabel = paymentMethodLabel(methodSlug);
 
                     return (
                       <Fragment key={p.id}>
@@ -1314,9 +1469,10 @@ export function CrmPamPage() {
                               ...prev,
                               [p.id]: toDateInput(p.expiryDate),
                             }));
-                            setDraftGateway((prev) => ({
+                            setDraftMethod((prev) => ({
                               ...prev,
-                              [p.id]: p.paymentGateway ?? 'mercado_pago',
+                              [p.id]:
+                                p.paymentMethod ?? PAM_DEFAULT_PAYMENT_METHOD,
                             }));
                           }}
                         >
@@ -1345,7 +1501,7 @@ export function CrmPamPage() {
                           <TableCell>
                             {p.plan} / {p.frecuencia}
                           </TableCell>
-                          <TableCell>{gatewayLabel}</TableCell>
+                          <TableCell>{methodLabel}</TableCell>
                           <TableCell>{p.mpStatus ?? '—'}</TableCell>
                           <TableCell>{formatDate(p.expiryDate)}</TableCell>
                           <TableCell>{p.welcomeEmail}</TableCell>
@@ -1378,11 +1534,11 @@ export function CrmPamPage() {
                                     </p>
                                   </div>
                                   <div className="flex min-w-0 flex-col gap-1.5">
-                                    <Label>Pasarela</Label>
+                                    <Label>Medio de pago</Label>
                                     <Select
-                                      value={gateway}
+                                      value={methodSlug}
                                       onValueChange={(value) =>
-                                        setDraftGateway((prev) => ({
+                                        setDraftMethod((prev) => ({
                                           ...prev,
                                           [p.id]: value,
                                         }))
@@ -1392,9 +1548,9 @@ export function CrmPamPage() {
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {PAM_PAYMENT_GATEWAYS.map((g) => (
-                                          <SelectItem key={g} value={g}>
-                                            {PAM_PAYMENT_GATEWAY_LABELS[g]}
+                                        {activePaymentMethods.map((m) => (
+                                          <SelectItem key={m.id} value={m.slug}>
+                                            {m.label}
                                           </SelectItem>
                                         ))}
                                       </SelectContent>

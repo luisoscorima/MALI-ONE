@@ -124,6 +124,131 @@ export class CrmPamService {
     });
   }
 
+  async ensureDefaultPaymentMethod() {
+    await this.prisma.pamPaymentMethod.upsert({
+      where: { slug: 'mercado_pago' },
+      create: {
+        slug: 'mercado_pago',
+        label: 'Mercado Pago',
+        active: true,
+        system: true,
+        sortOrder: 0,
+      },
+      update: { system: true },
+    });
+  }
+
+  async listPaymentMethods(includeInactive = true) {
+    await this.ensureDefaultPaymentMethod();
+    return this.prisma.pamPaymentMethod.findMany({
+      where: includeInactive ? undefined : { active: true },
+      orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }],
+    });
+  }
+
+  private slugifyPaymentMethod(label: string, explicit?: string) {
+    const base = String(explicit ?? label)
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 64);
+    if (!base) {
+      throw new BadRequestException('Slug de medio de pago inválido');
+    }
+    return base;
+  }
+
+  async createPaymentMethod(dto: {
+    label: string;
+    slug?: string;
+    active?: boolean;
+    sortOrder?: number;
+  }) {
+    const label = dto.label.trim();
+    if (!label) throw new BadRequestException('Nombre requerido');
+    const slug = this.slugifyPaymentMethod(label, dto.slug);
+    if (slug === 'mercado_pago') {
+      throw new BadRequestException(
+        'Mercado Pago ya existe como medio de pago del sistema',
+      );
+    }
+    try {
+      return await this.prisma.pamPaymentMethod.create({
+        data: {
+          slug,
+          label,
+          active: dto.active ?? true,
+          system: false,
+          sortOrder: dto.sortOrder ?? 100,
+        },
+      });
+    } catch {
+      throw new BadRequestException(`Ya existe un medio de pago con slug "${slug}"`);
+    }
+  }
+
+  async updatePaymentMethod(
+    id: string,
+    dto: { label?: string; active?: boolean; sortOrder?: number },
+  ) {
+    const existing = await this.prisma.pamPaymentMethod.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException('Medio de pago no encontrado');
+    if (existing.system && dto.active === false) {
+      throw new BadRequestException(
+        'No se puede desactivar Mercado Pago (medio de sistema)',
+      );
+    }
+    return this.prisma.pamPaymentMethod.update({
+      where: { id },
+      data: {
+        ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+        ...(dto.active !== undefined ? { active: dto.active } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+    });
+  }
+
+  async deletePaymentMethod(id: string) {
+    const existing = await this.prisma.pamPaymentMethod.findUnique({
+      where: { id },
+    });
+    if (!existing) throw new NotFoundException('Medio de pago no encontrado');
+    if (existing.system) {
+      throw new BadRequestException(
+        'No se puede eliminar Mercado Pago (medio de sistema)',
+      );
+    }
+    const inUse = await this.prisma.pamRegistration.count({
+      where: { paymentMethod: existing.slug },
+    });
+    if (inUse > 0) {
+      throw new BadRequestException(
+        `Hay ${inUse} pago(s) con este medio. Desactívalo en lugar de eliminarlo.`,
+      );
+    }
+    await this.prisma.pamPaymentMethod.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  async resolvePaymentMethodSlug(slug?: string) {
+    await this.ensureDefaultPaymentMethod();
+    const value = String(slug ?? 'mercado_pago').trim() || 'mercado_pago';
+    const method = await this.prisma.pamPaymentMethod.findUnique({
+      where: { slug: value },
+    });
+    if (!method || !method.active) {
+      throw new BadRequestException(
+        `Medio de pago inválido o inactivo: "${value}"`,
+      );
+    }
+    return method.slug;
+  }
+
   async createPayment(dto: {
     nombres: string;
     apellidos: string;
@@ -138,7 +263,7 @@ export class CrmPamService {
     comoTeEnteraste?: string;
     plan: string;
     frecuencia: string;
-    paymentGateway?: string;
+    paymentMethod?: string;
     checkoutUrl?: string;
     mpStatus?: string;
     expiryDate?: string;
@@ -148,8 +273,7 @@ export class CrmPamService {
       throw new BadRequestException('WhatsApp CRM no configurado');
     }
 
-    const gateway =
-      String(dto.paymentGateway ?? 'mercado_pago').trim() || 'mercado_pago';
+    const paymentMethod = await this.resolvePaymentMethodSlug(dto.paymentMethod);
 
     const created = await this.prisma.pamRegistration.create({
       data: {
@@ -166,7 +290,7 @@ export class CrmPamService {
         comoTeEnteraste: dto.comoTeEnteraste?.trim() || null,
         plan: dto.plan.trim(),
         frecuencia: dto.frecuencia.trim(),
-        paymentGateway: gateway,
+        paymentMethod,
         checkoutUrl: dto.checkoutUrl?.trim() || null,
         aceptaPrivacidad: dto.aceptaPrivacidad ?? true,
         mpStatus: dto.mpStatus

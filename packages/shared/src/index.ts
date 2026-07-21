@@ -344,8 +344,8 @@ export interface PamRegistrationDto {
   plan: string;
   frecuencia: string;
   checkoutUrl: string | null;
-  /** mercado_pago | niubiz | izipay | otro */
-  paymentGateway: string;
+  /** Slug de PamPaymentMethod (default mercado_pago en widget). */
+  paymentMethod: string;
   aceptaPrivacidad: boolean;
   mpStatus: string | null;
   welcomeEmail: string;
@@ -353,21 +353,32 @@ export interface PamRegistrationDto {
   expiryDate: string | null;
 }
 
-export const PAM_PAYMENT_GATEWAYS = [
-  'mercado_pago',
-  'niubiz',
-  'izipay',
-  'otro',
-] as const;
+/** Único medio de pago de sistema / default del widget. */
+export const PAM_DEFAULT_PAYMENT_METHOD = 'mercado_pago';
 
-export type PamPaymentGateway = (typeof PAM_PAYMENT_GATEWAYS)[number];
+export interface PamPaymentMethodDto {
+  id: string;
+  slug: string;
+  label: string;
+  active: boolean;
+  system: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export const PAM_PAYMENT_GATEWAY_LABELS: Record<PamPaymentGateway, string> = {
-  mercado_pago: 'Mercado Pago',
-  niubiz: 'Niubiz',
-  izipay: 'Izipay',
-  otro: 'Otro',
-};
+export interface CreatePamPaymentMethodDto {
+  label: string;
+  slug?: string;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdatePamPaymentMethodDto {
+  label?: string;
+  active?: boolean;
+  sortOrder?: number;
+}
 
 export interface UpdatePamRegistrationDto {
   nombres?: string;
@@ -384,7 +395,7 @@ export interface UpdatePamRegistrationDto {
   plan?: string;
   frecuencia?: string;
   checkoutUrl?: string;
-  paymentGateway?: string;
+  paymentMethod?: string;
   aceptaPrivacidad?: boolean;
   mpStatus?: string;
   welcomeEmail?: string;
@@ -406,7 +417,7 @@ export interface CreatePamPaymentDto {
   comoTeEnteraste?: string;
   plan: string;
   frecuencia: string;
-  paymentGateway?: string;
+  paymentMethod?: string;
   checkoutUrl?: string;
   mpStatus?: string;
   expiryDate?: string;

@@ -223,7 +223,7 @@ export class CreatePamPaymentDto {
 
   @IsOptional()
   @IsString()
-  paymentGateway?: string;
+  paymentMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -240,4 +240,40 @@ export class CreatePamPaymentDto {
   @IsOptional()
   @IsBoolean()
   aceptaPrivacidad?: boolean;
+}
+
+export class CreatePamPaymentMethodDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  label!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  slug?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+}
+
+export class UpdatePamPaymentMethodDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  label?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
 }

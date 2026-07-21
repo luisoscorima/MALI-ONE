@@ -890,6 +890,33 @@ export const api = {
       '/api/crm-pam/payments',
     ),
 
+  listCrmPamPaymentMethods: () =>
+    request<import('@mali-one/shared').PamPaymentMethodDto[]>(
+      '/api/crm-pam/payment-methods',
+    ),
+
+  createCrmPamPaymentMethod: (
+    body: import('@mali-one/shared').CreatePamPaymentMethodDto,
+  ) =>
+    request<import('@mali-one/shared').PamPaymentMethodDto>(
+      '/api/crm-pam/payment-methods',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateCrmPamPaymentMethod: (
+    id: string,
+    body: import('@mali-one/shared').UpdatePamPaymentMethodDto,
+  ) =>
+    request<import('@mali-one/shared').PamPaymentMethodDto>(
+      `/api/crm-pam/payment-methods/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteCrmPamPaymentMethod: (id: string) =>
+    request<{ ok: boolean }>(`/api/crm-pam/payment-methods/${id}`, {
+      method: 'DELETE',
+    }),
+
   createCrmPamPayment: (
     body: import('@mali-one/shared').CreatePamPaymentDto,
   ) =>
