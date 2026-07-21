@@ -160,6 +160,7 @@ export class PamWidgetsService {
       'plan',
       'frecuencia',
       'checkoutUrl',
+      'paymentGateway',
     ] as const;
 
     for (const field of stringFields) {
@@ -266,6 +267,7 @@ export class PamWidgetsService {
         plan: dto.plan,
         frecuencia: dto.frecuencia,
         checkoutUrl: dto.checkoutUrl,
+        paymentGateway: dto.paymentGateway?.trim() || 'mercado_pago',
         aceptaPrivacidad: dto.aceptaPrivacidad,
       },
     });

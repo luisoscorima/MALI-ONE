@@ -124,6 +124,62 @@ export class CrmPamService {
     });
   }
 
+  async createPayment(dto: {
+    nombres: string;
+    apellidos: string;
+    dni: string;
+    celular: string;
+    correo: string;
+    direccion?: string;
+    ciudad?: string;
+    distrito?: string;
+    genero?: string;
+    fechaNacimiento?: string;
+    comoTeEnteraste?: string;
+    plan: string;
+    frecuencia: string;
+    paymentGateway?: string;
+    checkoutUrl?: string;
+    mpStatus?: string;
+    expiryDate?: string;
+    aceptaPrivacidad?: boolean;
+  }) {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+
+    const gateway =
+      String(dto.paymentGateway ?? 'mercado_pago').trim() || 'mercado_pago';
+
+    const created = await this.prisma.pamRegistration.create({
+      data: {
+        nombres: dto.nombres.trim(),
+        apellidos: dto.apellidos.trim(),
+        dni: dto.dni.trim(),
+        celular: dto.celular.trim(),
+        correo: dto.correo.trim().toLowerCase(),
+        direccion: dto.direccion?.trim() || null,
+        ciudad: dto.ciudad?.trim() || null,
+        distrito: dto.distrito?.trim() || null,
+        genero: dto.genero?.trim() || null,
+        fechaNacimiento: dto.fechaNacimiento?.trim() || null,
+        comoTeEnteraste: dto.comoTeEnteraste?.trim() || null,
+        plan: dto.plan.trim(),
+        frecuencia: dto.frecuencia.trim(),
+        paymentGateway: gateway,
+        checkoutUrl: dto.checkoutUrl?.trim() || null,
+        aceptaPrivacidad: dto.aceptaPrivacidad ?? true,
+        mpStatus: dto.mpStatus
+          ? (dto.mpStatus as import('@prisma/client').PamMpStatus)
+          : null,
+        expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : null,
+      },
+    });
+
+    await this.crm.syncPamRegistrationAsync(created);
+    return created;
+  }
+
   /** Vincula un pago concreto al contacto WA (payment_id = este registro). */
   async linkPayment(paymentId: string) {
     const reg = await this.prisma.pamRegistration.findUnique({

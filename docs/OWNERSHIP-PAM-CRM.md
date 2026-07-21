@@ -5,18 +5,18 @@
 | Capa | Dónde (UI) | Rol |
 |------|------------|-----|
 | **Vitrina** | `/admin/pam` Membresías PAM | Solo planes, beneficios, checkout del widget |
-| **CRM + pagos** | `/admin/crm-pam` CRM PAM | Centralizadora: contactos WhatsApp + ledger MP + vínculo `payment_id` |
+| **CRM + pagos** | `/admin/crm-pam` CRM PAM | Contactos WhatsApp + ledger de pagos (pasarela editable) |
 | **Boletines** | `/admin/newsletters` | Editor; envío masivo SES desde CRM PAM |
+| **Atributos / persona** | [WhatsApp `/attributes`](https://whatsapp.mali.pe/attributes) y `/contacts` | Catálogo y edición de attrs (incl. `payment_id`) |
 
 ## Fuente de verdad
 
 | Dato | Dueño |
 |------|--------|
-| Persona nativa: nombre, apellido, teléfono, email, DNI (opcional), opt-ins | WhatsApp `contacts` área `pam` |
-| Segmentos | WhatsApp `contact_segments` |
-| Atributos demográficos / custom | WhatsApp `contact_attributes` según catálogo `/attributes` |
-| Plan, frecuencia, MP, caducidad, welcome, checkout | Ledger ONE `PamRegistration` |
-| Copia operativa en CRM (`payment_id`, `plan`, `mp_status`, `expiry`, …) | Escrita por sync ONE → WA (para segmentar) |
+| Persona nativa: nombre, apellido, teléfono, email, DNI | WhatsApp `contacts` |
+| Segmentos y atributos custom | WhatsApp |
+| `payment_id`, `pasarela`, plan, mp_status, expiry, demografía widget | Attrs CRM (copia); **dueño del pago** = ledger ONE |
+| Ledger: plan, frecuencia, pasarela, MP, caducidad, welcome, checkout | `PamRegistration` en MALI ONE |
 
 ## Cruce Contactos ↔ Pagos
 
@@ -24,41 +24,41 @@
 contact.attributes.payment_id === PamRegistration.id
 ```
 
-- Altas del widget: sync crea/actualiza contacto y escribe `payment_id`.
-- Históricos / otras pasarelas: en **Pagos** → “Vincular a este pago” o “Vincular por teléfono” (elige el `PamRegistration` más reciente por celular).
-- La tabla Contactos **no** hace fallback por teléfono: solo muestra ledger si hay `payment_id`.
+- Widget: sync crea/actualiza contacto + escribe `payment_id` y `pasarela`.
+- Históricos: **Vincular** / **Vincular por teléfono** (pago más reciente).
+- `payment_id` es atributo editable en WhatsApp (def creada automáticamente si no existe).
 
-## Bidireccionalidad
+## Pasarela / opción de pago
 
-- WhatsApp es canónico de personas/attrs.
-- MALI ONE lee y escribe vía CRM API (`GET/PATCH contacts`, defs, sync).
-- Editar en CRM PAM o en WhatsApp `/contacts` actualiza la misma ficha.
-- Definiciones de atributos: WhatsApp `/attributes` o pestaña **Atributos** en CRM PAM.
+Campo ledger `paymentGateway` (default `mercado_pago` en altas del widget).
+
+Opciones: Mercado Pago, Niubiz, Izipay, Otro — editables en Pagos; altas manuales desde CRM PAM.
+
+Copia a CRM: atributo `pasarela`.
+
+## Ensure de atributos (widget → WhatsApp)
+
+En cada sync, ONE llama `POST /api/crm/attribute-definitions/ensure`:
+
+- Si el slug **no existe** en área `pam`, lo crea.
+- Si **ya existe**, no hace nada.
+
+Incluye: `payment_id`, `pasarela`, `plan`, `frecuencia`, `mp_status`, `expiry`, demografía del formulario widget, etc.
 
 ## Flujo
 
 ```text
-Widget / alta legacy → ONE ledger
-      → sync (o Vincular) → contacto WA + payment_id
-      → CRM PAM Pagos: marcar MP + caducidad
-      → re-sync attrs membresía
-      → Welcome SMTP pam@
-      → CRM PAM Contactos: persona + attrs + estado ledger
+Widget / alta manual Pagos → ONE ledger (pasarela)
+      → ensure defs attrs WA (si faltan)
+      → sync persona + payment_id + pasarela
+      → Pagos: marcar MP/caducidad / vincular
+      → Welcome SMTP
 ```
 
-## Módulos de acceso
+## Módulos
 
 | Módulo | Qué abre |
 |--------|----------|
-| `pam_memberships` | Solo vitrina `/admin/pam` |
-| `crm_pam` | CRM + ledger pagos + defs + envío boletines |
-| `newsletters` | Editor de boletines |
-
-## Para cerrar el flujo (SMTP)
-
-1. `PAM_SMTP_*` en producción
-2. `WHATSAPP_CRM_*` en ambos lados
-3. Webhook Mercado Pago fiable
-4. IDs de pago MP en ledger
-5. Política de renovaciones (hoy un solo `payment_id` activo por contacto)
-6. Plantillas welcome/expiry editables
+| `pam_memberships` | Vitrina `/admin/pam` |
+| `crm_pam` | Contactos + Pagos + envío boletines |
+| `newsletters` | Editor |

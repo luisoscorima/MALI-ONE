@@ -344,12 +344,30 @@ export interface PamRegistrationDto {
   plan: string;
   frecuencia: string;
   checkoutUrl: string | null;
+  /** mercado_pago | niubiz | izipay | otro */
+  paymentGateway: string;
   aceptaPrivacidad: boolean;
   mpStatus: string | null;
   welcomeEmail: string;
   expiryNotice: string;
   expiryDate: string | null;
 }
+
+export const PAM_PAYMENT_GATEWAYS = [
+  'mercado_pago',
+  'niubiz',
+  'izipay',
+  'otro',
+] as const;
+
+export type PamPaymentGateway = (typeof PAM_PAYMENT_GATEWAYS)[number];
+
+export const PAM_PAYMENT_GATEWAY_LABELS: Record<PamPaymentGateway, string> = {
+  mercado_pago: 'Mercado Pago',
+  niubiz: 'Niubiz',
+  izipay: 'Izipay',
+  otro: 'Otro',
+};
 
 export interface UpdatePamRegistrationDto {
   nombres?: string;
@@ -366,11 +384,33 @@ export interface UpdatePamRegistrationDto {
   plan?: string;
   frecuencia?: string;
   checkoutUrl?: string;
+  paymentGateway?: string;
   aceptaPrivacidad?: boolean;
   mpStatus?: string;
   welcomeEmail?: string;
   expiryNotice?: string;
   expiryDate?: string;
+}
+
+export interface CreatePamPaymentDto {
+  nombres: string;
+  apellidos: string;
+  dni: string;
+  celular: string;
+  correo: string;
+  direccion?: string;
+  ciudad?: string;
+  distrito?: string;
+  genero?: string;
+  fechaNacimiento?: string;
+  comoTeEnteraste?: string;
+  plan: string;
+  frecuencia: string;
+  paymentGateway?: string;
+  checkoutUrl?: string;
+  mpStatus?: string;
+  expiryDate?: string;
+  aceptaPrivacidad?: boolean;
 }
 
 export interface PamAdminStateDto {

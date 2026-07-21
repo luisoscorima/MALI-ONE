@@ -2,6 +2,33 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { PamRegistration } from '@prisma/client';
 
+/** Defs de área que el widget/ledger deben tener en WhatsApp (idempotente). */
+const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
+  slug: string;
+  label: string;
+  field_type?: string;
+  sort_order?: number;
+}> = [
+  { slug: 'payment_id', label: 'ID pago (MALI ONE)', sort_order: 1 },
+  { slug: 'pasarela', label: 'Pasarela / opción de pago', sort_order: 2 },
+  { slug: 'plan', label: 'Plan', sort_order: 3 },
+  { slug: 'frecuencia', label: 'Frecuencia', sort_order: 4 },
+  { slug: 'mp_status', label: 'Estado MP', sort_order: 5 },
+  { slug: 'expiry', label: 'Caducidad', field_type: 'date', sort_order: 6 },
+  { slug: 'direccion', label: 'Dirección', sort_order: 10 },
+  { slug: 'ciudad', label: 'Ciudad', sort_order: 11 },
+  { slug: 'distrito', label: 'Distrito', sort_order: 12 },
+  { slug: 'genero', label: 'Género', sort_order: 13 },
+  {
+    slug: 'fecha_nacimiento',
+    label: 'Fecha de nacimiento',
+    field_type: 'date',
+    sort_order: 14,
+  },
+  { slug: 'como_te_enteraste', label: 'Cómo te enteraste', sort_order: 15 },
+  { slug: 'source', label: 'Origen', sort_order: 20 },
+];
+
 export type CrmSyncPayload = {
   area?: string;
   name: string;
@@ -87,11 +114,18 @@ export class WhatsappCrmClientService {
       return;
     }
 
+    await this.ensurePamWidgetAttributeDefinitions();
+
     // Persona (columnas) + demografía (atributos) + copia operativa de membresía.
     // Ledger ONE (checkout, privacidad, welcome SMTP) NO se replica al CRM.
+    const gateway = String(
+      (reg as { paymentGateway?: string }).paymentGateway ?? 'mercado_pago',
+    ).trim() || 'mercado_pago';
+
     const attributes: Record<string, string> = {
       source: 'pam_widget',
       payment_id: reg.id,
+      pasarela: gateway,
       plan: reg.plan,
       frecuencia: reg.frecuencia,
     };
@@ -119,6 +153,23 @@ export class WhatsappCrmClientService {
       attributes,
       external_id: reg.id,
     });
+  }
+
+  /** Asegura defs de attrs PAM en WhatsApp (crea solo si no existen). */
+  async ensurePamWidgetAttributeDefinitions(): Promise<void> {
+    if (!this.configured) return;
+    try {
+      await this.request('POST', '/api/crm/attribute-definitions/ensure', {
+        area: 'pam',
+        definitions: PAM_WIDGET_ATTR_DEFINITIONS,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `No se pudieron asegurar defs de atributos PAM: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   private setAttr(

@@ -890,6 +890,14 @@ export const api = {
       '/api/crm-pam/payments',
     ),
 
+  createCrmPamPayment: (
+    body: import('@mali-one/shared').CreatePamPaymentDto,
+  ) =>
+    request<import('@mali-one/shared').PamRegistrationDto>(
+      '/api/crm-pam/payments',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   linkCrmPamPayment: (id: string) =>
     request<{ ok: boolean; paymentId: string; phone: string }>(
       `/api/crm-pam/payments/${id}/link-contact`,

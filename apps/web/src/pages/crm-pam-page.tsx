@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, Fragment } from 'react';
 import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send } from 'lucide-react';
-import type { EmailCampaignDto, PamRegistrationDto } from '@mali-one/shared';
+import type {
+  EmailCampaignDto,
+  PamRegistrationDto,
+} from '@mali-one/shared';
+import {
+  PAM_PAYMENT_GATEWAY_LABELS,
+  PAM_PAYMENT_GATEWAYS,
+} from '@mali-one/shared';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -190,17 +197,28 @@ export function CrmPamPage() {
   } | null>(null);
   const [savingContactId, setSavingContactId] = useState<number | null>(null);
 
-  const [newAttrSlug, setNewAttrSlug] = useState('');
-  const [newAttrLabel, setNewAttrLabel] = useState('');
-  const [creatingAttr, setCreatingAttr] = useState(false);
-
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(
     null,
   );
   const [draftMp, setDraftMp] = useState<Record<string, string>>({});
   const [draftExpiry, setDraftExpiry] = useState<Record<string, string>>({});
+  const [draftGateway, setDraftGateway] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [showNewPayment, setShowNewPayment] = useState(false);
+  const [creatingPayment, setCreatingPayment] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    nombres: '',
+    apellidos: '',
+    dni: '',
+    celular: '',
+    correo: '',
+    plan: 'amigo',
+    frecuencia: 'monthly',
+    paymentGateway: 'mercado_pago',
+    mpStatus: '',
+    expiryDate: '',
+  });
 
   const [newsletters, setNewsletters] = useState<PublishedNewsletter[]>([]);
   const [campaigns, setCampaigns] = useState<EmailCampaignDto[]>([]);
@@ -418,30 +436,6 @@ export function CrmPamPage() {
     }
   }
 
-  async function createAttrDef() {
-    if (!newAttrSlug.trim() || !newAttrLabel.trim()) {
-      toast.error('Slug y etiqueta son obligatorios');
-      return;
-    }
-    setCreatingAttr(true);
-    try {
-      await api.createCrmPamAttributeDefinition({
-        scope: 'area',
-        slug: newAttrSlug.trim().toLowerCase(),
-        label: newAttrLabel.trim(),
-        field_type: 'text',
-      });
-      toast.success('Atributo creado en WhatsApp');
-      setNewAttrSlug('');
-      setNewAttrLabel('');
-      await loadAttrDefs();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al crear atributo');
-    } finally {
-      setCreatingAttr(false);
-    }
-  }
-
   function updatePaymentInState(updated: PamRegistrationDto) {
     setPayments((prev) =>
       prev.map((p) => (p.id === updated.id ? updated : p)),
@@ -453,9 +447,11 @@ export function CrmPamPage() {
     try {
       const mpStatus = draftMp[id];
       const expiryDate = draftExpiry[id];
+      const paymentGateway = draftGateway[id];
       const updated = await api.updatePamRegistration(id, {
         ...(mpStatus !== undefined ? { mpStatus } : {}),
         ...(expiryDate !== undefined ? { expiryDate } : {}),
+        ...(paymentGateway !== undefined ? { paymentGateway } : {}),
       });
       updatePaymentInState(updated);
       toast.success('Pago actualizado (sync a CRM WhatsApp)');
@@ -464,6 +460,56 @@ export function CrmPamPage() {
       toast.error(e instanceof Error ? e.message : 'Error al guardar pago');
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function createPayment() {
+    if (
+      !newPayment.nombres.trim() ||
+      !newPayment.apellidos.trim() ||
+      !newPayment.dni.trim() ||
+      !newPayment.celular.trim() ||
+      !newPayment.correo.trim() ||
+      !newPayment.plan.trim()
+    ) {
+      toast.error('Completa nombre, apellido, DNI, celular, correo y plan');
+      return;
+    }
+    setCreatingPayment(true);
+    try {
+      await api.createCrmPamPayment({
+        nombres: newPayment.nombres.trim(),
+        apellidos: newPayment.apellidos.trim(),
+        dni: newPayment.dni.trim(),
+        celular: newPayment.celular.trim(),
+        correo: newPayment.correo.trim(),
+        plan: newPayment.plan.trim(),
+        frecuencia: newPayment.frecuencia,
+        paymentGateway: newPayment.paymentGateway,
+        ...(newPayment.mpStatus ? { mpStatus: newPayment.mpStatus } : {}),
+        ...(newPayment.expiryDate
+          ? { expiryDate: newPayment.expiryDate }
+          : {}),
+      });
+      toast.success('Pago creado y vinculado al CRM');
+      setShowNewPayment(false);
+      setNewPayment({
+        nombres: '',
+        apellidos: '',
+        dni: '',
+        celular: '',
+        correo: '',
+        plan: 'amigo',
+        frecuencia: 'monthly',
+        paymentGateway: 'mercado_pago',
+        mpStatus: '',
+        expiryDate: '',
+      });
+      await Promise.all([loadPayments(), loadContacts()]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al crear pago');
+    } finally {
+      setCreatingPayment(false);
     }
   }
 
@@ -615,7 +661,6 @@ export function CrmPamPage() {
         <TabsList>
           <TabsTrigger value="contacts">Contactos</TabsTrigger>
           <TabsTrigger value="payments">Pagos</TabsTrigger>
-          <TabsTrigger value="attrs">Atributos</TabsTrigger>
           <TabsTrigger value="send">Enviar boletín</TabsTrigger>
         </TabsList>
 
@@ -1070,10 +1115,14 @@ export function CrmPamPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
               Ledger local. Cruce con contactos vía{' '}
-              <code className="text-xs">payment_id</code>. Vincula históricos
-              por teléfono (más reciente) o fila a fila.
+              <code className="text-xs">payment_id</code>. Widget → Mercado
+              Pago por defecto; también altas manuales (Niubiz, Izipay, etc.).
             </p>
             <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setShowNewPayment((v) => !v)}>
+                <Plus className="mr-1 size-4" />
+                {showNewPayment ? 'Cerrar formulario' : 'Añadir pago'}
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -1094,21 +1143,132 @@ export function CrmPamPage() {
             </div>
           </div>
 
+          {showNewPayment ? (
+            <div className="grid gap-3 rounded-md border border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(
+                [
+                  ['nombres', 'Nombres'],
+                  ['apellidos', 'Apellidos'],
+                  ['dni', 'DNI'],
+                  ['celular', 'Celular'],
+                  ['correo', 'Correo'],
+                  ['plan', 'Plan'],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key} className="flex min-w-0 flex-col gap-1.5">
+                  <Label>{label}</Label>
+                  <Input
+                    className="w-full min-w-0"
+                    value={newPayment[key]}
+                    onChange={(e) =>
+                      setNewPayment({ ...newPayment, [key]: e.target.value })
+                    }
+                  />
+                </div>
+              ))}
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Frecuencia</Label>
+                <Select
+                  value={newPayment.frecuencia}
+                  onValueChange={(value) =>
+                    setNewPayment({ ...newPayment, frecuencia: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Pasarela / opción de pago</Label>
+                <Select
+                  value={newPayment.paymentGateway}
+                  onValueChange={(value) =>
+                    setNewPayment({ ...newPayment, paymentGateway: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAM_PAYMENT_GATEWAYS.map((g) => (
+                      <SelectItem key={g} value={g}>
+                        {PAM_PAYMENT_GATEWAY_LABELS[g]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Estado MP (opcional)</Label>
+                <Select
+                  value={newPayment.mpStatus || '__none__'}
+                  onValueChange={(value) =>
+                    setNewPayment({
+                      ...newPayment,
+                      mpStatus: value === '__none__' ? '' : value,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MP_STATUSES.map((s) => (
+                      <SelectItem
+                        key={s.value || 'empty'}
+                        value={s.value || '__none__'}
+                      >
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Caducidad (opcional)</Label>
+                <Input
+                  type="date"
+                  value={newPayment.expiryDate}
+                  onChange={(e) =>
+                    setNewPayment({
+                      ...newPayment,
+                      expiryDate: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="flex items-end sm:col-span-2 lg:col-span-3">
+                <Button
+                  disabled={creatingPayment}
+                  onClick={() => void createPayment()}
+                >
+                  {creatingPayment ? 'Guardando…' : 'Crear pago y sync CRM'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           {paymentsLoading ? (
-            <TableSkeleton rows={8} cols={6} />
+            <TableSkeleton rows={8} cols={7} />
           ) : payments.length === 0 ? (
             <EmptyState
               title="Sin pagos"
-              description="Los registros del widget PAM aparecerán aquí."
+              description="Registros del widget o altas manuales aparecerán aquí."
             />
           ) : (
             <div className="overflow-x-auto rounded-md border border-border/60">
-              <Table className="min-w-[720px]">
+              <Table className="min-w-[800px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Registrado</TableHead>
                     <TableHead>Persona</TableHead>
                     <TableHead>Plan</TableHead>
+                    <TableHead>Pasarela</TableHead>
                     <TableHead>MP</TableHead>
                     <TableHead>Caducidad</TableHead>
                     <TableHead>Welcome</TableHead>
@@ -1121,6 +1281,10 @@ export function CrmPamPage() {
                       !p.mpStatus || !CONFIRMED_MP.includes(p.mpStatus);
                     const expanded = expandedPaymentId === p.id;
                     const linked = linkedPaymentIds.has(p.id);
+                    const gateway =
+                      draftGateway[p.id] !== undefined
+                        ? draftGateway[p.id]
+                        : (p.paymentGateway ?? 'mercado_pago');
                     const mpValue =
                       draftMp[p.id] !== undefined
                         ? draftMp[p.id]
@@ -1129,6 +1293,10 @@ export function CrmPamPage() {
                       draftExpiry[p.id] !== undefined
                         ? draftExpiry[p.id]
                         : toDateInput(p.expiryDate);
+                    const gatewayLabel =
+                      PAM_PAYMENT_GATEWAY_LABELS[
+                        gateway as keyof typeof PAM_PAYMENT_GATEWAY_LABELS
+                      ] ?? gateway;
 
                     return (
                       <Fragment key={p.id}>
@@ -1145,6 +1313,10 @@ export function CrmPamPage() {
                             setDraftExpiry((prev) => ({
                               ...prev,
                               [p.id]: toDateInput(p.expiryDate),
+                            }));
+                            setDraftGateway((prev) => ({
+                              ...prev,
+                              [p.id]: p.paymentGateway ?? 'mercado_pago',
                             }));
                           }}
                         >
@@ -1166,10 +1338,14 @@ export function CrmPamPage() {
                             <div className="text-xs text-muted-foreground">
                               {p.correo} · {p.celular}
                             </div>
+                            <div className="font-mono text-[10px] text-muted-foreground">
+                              id: {p.id}
+                            </div>
                           </TableCell>
                           <TableCell>
                             {p.plan} / {p.frecuencia}
                           </TableCell>
+                          <TableCell>{gatewayLabel}</TableCell>
                           <TableCell>{p.mpStatus ?? '—'}</TableCell>
                           <TableCell>{formatDate(p.expiryDate)}</TableCell>
                           <TableCell>{p.welcomeEmail}</TableCell>
@@ -1186,89 +1362,110 @@ export function CrmPamPage() {
                           </TableCell>
                         </TableRow>
                         {expanded ? (
-                          <TableRow className="bg-muted/20">
-                            <TableCell colSpan={7} className="p-4">
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={8} className="p-0">
                               <div
-                                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+                                className="sticky left-0 z-20 w-[min(100vw-4rem,42rem)] max-w-full border-t border-border bg-muted/40 p-4"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <div className="text-sm sm:col-span-2 lg:col-span-3">
-                                  <span className="text-xs text-muted-foreground">
-                                    Checkout URL
-                                  </span>
-                                  <p className="break-all font-mono text-xs">
-                                    {p.checkoutUrl || '—'}
-                                  </p>
-                                </div>
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    Estado Mercado Pago
-                                  </span>
-                                  <Select
-                                    value={mpValue || '__none__'}
-                                    onValueChange={(value) =>
-                                      setDraftMp((prev) => ({
-                                        ...prev,
-                                        [p.id]:
-                                          value === '__none__' ? '' : value,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="— Sin estado —" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {MP_STATUSES.map((s) => (
-                                        <SelectItem
-                                          key={s.value || 'empty'}
-                                          value={s.value || '__none__'}
-                                        >
-                                          {s.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </label>
-                                <label className="space-y-1 text-sm">
-                                  <span className="text-muted-foreground">
-                                    Fecha caducidad
-                                  </span>
-                                  <Input
-                                    type="date"
-                                    value={expiryValue}
-                                    onChange={(e) =>
-                                      setDraftExpiry((prev) => ({
-                                        ...prev,
-                                        [p.id]: e.target.value,
-                                      }))
-                                    }
-                                  />
-                                </label>
-                                <div className="flex flex-wrap items-end gap-2 sm:col-span-2 lg:col-span-3">
-                                  <IconActionButton
-                                    label="Guardar pago"
-                                    variant="default"
-                                    disabled={savingId === p.id}
-                                    onClick={() => void savePayment(p.id)}
-                                  >
-                                    <Save className="size-4" />
-                                  </IconActionButton>
-                                  <IconActionButton
-                                    label="Reenviar bienvenida SMTP"
-                                    disabled={
-                                      !p.mpStatus ||
-                                      !CONFIRMED_MP.includes(p.mpStatus)
-                                    }
-                                    onClick={() => void resendWelcome(p.id)}
-                                  >
-                                    <Mail className="size-4" />
-                                  </IconActionButton>
-                                  <IconActionButton
-                                    label="Vincular a este pago"
-                                    onClick={() => void linkPayment(p.id)}
-                                  >
-                                    <Link2 className="size-4" />
-                                  </IconActionButton>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
+                                    <span className="text-xs text-muted-foreground">
+                                      Checkout URL
+                                    </span>
+                                    <p className="break-all font-mono text-xs">
+                                      {p.checkoutUrl || '—'}
+                                    </p>
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Pasarela</Label>
+                                    <Select
+                                      value={gateway}
+                                      onValueChange={(value) =>
+                                        setDraftGateway((prev) => ({
+                                          ...prev,
+                                          [p.id]: value,
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {PAM_PAYMENT_GATEWAYS.map((g) => (
+                                          <SelectItem key={g} value={g}>
+                                            {PAM_PAYMENT_GATEWAY_LABELS[g]}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Estado Mercado Pago</Label>
+                                    <Select
+                                      value={mpValue || '__none__'}
+                                      onValueChange={(value) =>
+                                        setDraftMp((prev) => ({
+                                          ...prev,
+                                          [p.id]:
+                                            value === '__none__' ? '' : value,
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="—" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {MP_STATUSES.map((s) => (
+                                          <SelectItem
+                                            key={s.value || 'empty'}
+                                            value={s.value || '__none__'}
+                                          >
+                                            {s.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="flex min-w-0 flex-col gap-1.5">
+                                    <Label>Fecha caducidad</Label>
+                                    <Input
+                                      type="date"
+                                      value={expiryValue}
+                                      onChange={(e) =>
+                                        setDraftExpiry((prev) => ({
+                                          ...prev,
+                                          [p.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                  <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
+                                    <IconActionButton
+                                      label="Guardar pago"
+                                      variant="default"
+                                      disabled={savingId === p.id}
+                                      onClick={() => void savePayment(p.id)}
+                                    >
+                                      <Save className="size-4" />
+                                    </IconActionButton>
+                                    <IconActionButton
+                                      label="Reenviar bienvenida SMTP"
+                                      disabled={
+                                        !p.mpStatus ||
+                                        !CONFIRMED_MP.includes(p.mpStatus)
+                                      }
+                                      onClick={() => void resendWelcome(p.id)}
+                                    >
+                                      <Mail className="size-4" />
+                                    </IconActionButton>
+                                    <IconActionButton
+                                      label="Vincular a este pago"
+                                      onClick={() => void linkPayment(p.id)}
+                                    >
+                                      <Link2 className="size-4" />
+                                    </IconActionButton>
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
@@ -1280,81 +1477,6 @@ export function CrmPamPage() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="attrs" className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Catálogo de atributos del área PAM en WhatsApp (
-            <a
-              className="underline"
-              href="https://whatsapp.mali.pe/attributes"
-              target="_blank"
-              rel="noreferrer"
-            >
-              /attributes
-            </a>
-            ). También puedes crear defs desde aquí.
-          </p>
-          <div className="flex flex-wrap items-end gap-3 rounded-md border border-border/60 p-4">
-            <div className="space-y-1">
-              <Label>Slug</Label>
-              <Input
-                value={newAttrSlug}
-                onChange={(e) => setNewAttrSlug(e.target.value)}
-                placeholder="ciudad"
-                className="w-40"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Etiqueta</Label>
-              <Input
-                value={newAttrLabel}
-                onChange={(e) => setNewAttrLabel(e.target.value)}
-                placeholder="Ciudad"
-                className="w-48"
-              />
-            </div>
-            <Button
-              disabled={creatingAttr}
-              onClick={() => void createAttrDef()}
-            >
-              <Plus className="mr-1 size-4" />
-              Crear atributo
-            </Button>
-          </div>
-          {attrDefs.length === 0 ? (
-            <EmptyState
-              title="Sin definiciones"
-              description="Crea atributos aquí o en WhatsApp /attributes."
-            />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Etiqueta</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Ámbito</TableHead>
-                  <TableHead>Activo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attrDefs.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-mono text-sm">{d.slug}</TableCell>
-                    <TableCell>{d.label}</TableCell>
-                    <TableCell>{d.field_type}</TableCell>
-                    <TableCell>
-                      {d.segment_slug
-                        ? `segmento:${d.segment_slug}`
-                        : 'área'}
-                    </TableCell>
-                    <TableCell>{d.active ? 'Sí' : 'No'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           )}
         </TabsContent>
 

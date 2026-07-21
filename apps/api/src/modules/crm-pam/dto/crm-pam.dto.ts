@@ -162,3 +162,82 @@ export class UpdateCrmAttributeDefinitionDto {
   @IsBoolean()
   active?: boolean;
 }
+
+export class CreatePamPaymentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(150)
+  nombres!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(150)
+  apellidos!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(32)
+  dni!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(20)
+  celular!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(255)
+  correo!: string;
+
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @IsOptional()
+  @IsString()
+  ciudad?: string;
+
+  @IsOptional()
+  @IsString()
+  distrito?: string;
+
+  @IsOptional()
+  @IsString()
+  genero?: string;
+
+  @IsOptional()
+  @IsString()
+  fechaNacimiento?: string;
+
+  @IsOptional()
+  @IsString()
+  comoTeEnteraste?: string;
+
+  @IsString()
+  @MinLength(1)
+  plan!: string;
+
+  @IsString()
+  @MinLength(1)
+  frecuencia!: string;
+
+  @IsOptional()
+  @IsString()
+  paymentGateway?: string;
+
+  @IsOptional()
+  @IsString()
+  checkoutUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  mpStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  expiryDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  aceptaPrivacidad?: boolean;
+}

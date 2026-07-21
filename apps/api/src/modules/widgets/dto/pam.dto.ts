@@ -194,6 +194,10 @@ export class CreatePamRegistrationDto {
   @IsString()
   checkoutUrl?: string;
 
+  @IsOptional()
+  @IsString()
+  paymentGateway?: string;
+
   @IsBoolean()
   aceptaPrivacidad!: boolean;
 }
@@ -254,6 +258,10 @@ export class UpdatePamRegistrationDto {
   @IsOptional()
   @IsString()
   checkoutUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentGateway?: string;
 
   @IsOptional()
   @IsBoolean()

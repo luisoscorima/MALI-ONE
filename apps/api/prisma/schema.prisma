@@ -305,6 +305,8 @@ model PamRegistration {
   plan             String
   frecuencia       String
   checkoutUrl      String?
+  /// Pasarela / opción de pago: mercado_pago | niubiz | izipay | otro
+  paymentGateway   String          @default("mercado_pago")
   aceptaPrivacidad Boolean
   mpStatus         PamMpStatus?
   welcomeEmail     PamEmailStatus  @default(PENDIENTE)
@@ -314,6 +316,7 @@ model PamRegistration {
   @@index([correo])
   @@index([mpStatus])
   @@index([celular])
+  @@index([paymentGateway])
 }
 
 model ScreenCastPlaylist {

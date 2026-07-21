@@ -17,6 +17,7 @@ import { CrmPamService } from './crm-pam.service';
 import {
   CreateCrmAttributeDefinitionDto,
   CreateEmailCampaignDto,
+  CreatePamPaymentDto,
   ListCrmContactsQueryDto,
   PatchCrmContactDto,
   UpdateCrmAttributeDefinitionDto,
@@ -78,6 +79,12 @@ export class CrmPamController {
   @RequirePermission('pam.registros.read')
   listPayments() {
     return this.crmPam.listPayments();
+  }
+
+  @Post('payments')
+  @RequirePermission('pam.registros.manage')
+  createPayment(@Body() body: CreatePamPaymentDto) {
+    return this.crmPam.createPayment(body);
   }
 
   @Post('payments/link-by-phone')
