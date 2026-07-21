@@ -12,6 +12,8 @@ import {
   PackageSearch,
   Shield,
   Users,
+  Newspaper,
+  Contact,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -68,6 +70,18 @@ export const appNavSections: AppNavSection[] = [
         label: 'Kardex Bsale',
         icon: PackageSearch,
         module: 'bsale_reports',
+      },
+      {
+        to: '/admin/newsletters',
+        label: 'Boletines',
+        icon: Newspaper,
+        module: 'newsletters',
+      },
+      {
+        to: '/admin/crm-pam',
+        label: 'CRM PAM',
+        icon: Contact,
+        module: 'crm_pam',
       },
     ],
   },

@@ -28,6 +28,8 @@ import { WidgetMuseoInterfazPage } from '@/pages/widget-museo-interfaz-page';
 import { PamMembershipsPage } from '@/pages/pam-memberships-page';
 import { WidgetMuseoPopupPage } from '@/pages/widget-museo-popup-page';
 import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
+import { NewslettersPage } from '@/pages/newsletters-page';
+import { CrmPamPage } from '@/pages/crm-pam-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -131,6 +133,19 @@ function AuthenticatedApp() {
                   <Route element={<ModuleGuard module="bsale_reports" />}>
                     <Route path="bsale/kardex" element={<BsaleKardexPage />} />
                   </Route>
+                  <Route element={<ModuleGuard module="newsletters" />}>
+                    <Route
+                      path="admin/newsletters"
+                      element={<NewslettersPage />}
+                    />
+                  </Route>
+                  <Route element={<ModuleGuard module="crm_pam" />}>
+                    <Route path="admin/crm-pam" element={<CrmPamPage />} />
+                  </Route>
+                  <Route
+                    path="admin/mailing"
+                    element={<Navigate to="/admin/newsletters" replace />}
+                  />
                   <Route element={<SuperAdminGuard />}>
                     <Route path="admin/app-users" element={<AppUsersPage />} />
                   </Route>

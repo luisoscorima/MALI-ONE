@@ -11,6 +11,8 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.pam_memberships,
   AppModule.screen_cast,
   AppModule.bsale_reports,
+  AppModule.newsletters,
+  AppModule.crm_pam,
 ];
 
 type UserWithModules = User & {

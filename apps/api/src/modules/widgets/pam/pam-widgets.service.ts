@@ -16,6 +16,7 @@ import {
 import { UpdateMuseoPopupDto } from '../dto/update-museo-popup.dto';
 import { buildPopupPublicConfig, POPUP_TIMING } from '../popup-schedule.util';
 import { PamEmailService } from './pam-email.service';
+import { WhatsappCrmClientService } from '../../crm/whatsapp-crm-client.service';
 
 const MP_CONFIRMED: PamMpStatus[] = ['approved', 'authorized'];
 
@@ -45,6 +46,7 @@ export class PamWidgetsService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly email: PamEmailService,
+    private readonly crm: WhatsappCrmClientService,
   ) {}
 
   async getPublicConfig() {
@@ -206,6 +208,8 @@ export class PamWidgetsService {
       data,
     });
 
+    this.crm.syncPamRegistration(updated);
+
     const wasConfirmed =
       existing.mpStatus != null && MP_CONFIRMED.includes(existing.mpStatus);
     const nowConfirmed =
@@ -261,6 +265,9 @@ export class PamWidgetsService {
         checkoutUrl: dto.checkoutUrl,
         aceptaPrivacidad: dto.aceptaPrivacidad,
       },
+    }).then((created) => {
+      this.crm.syncPamRegistration(created);
+      return created;
     });
   }
 
@@ -307,6 +314,8 @@ export class PamWidgetsService {
       where: { id: registration.id },
       data: update,
     });
+
+    this.crm.syncPamRegistration(updated);
 
     if (mpStatus && MP_CONFIRMED.includes(mpStatus)) {
       await this.email.sendWelcomeIfNeeded(updated.id);

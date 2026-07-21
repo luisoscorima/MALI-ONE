@@ -21,6 +21,9 @@ import { WidgetsModule } from './modules/widgets/widgets.module';
 import { PamModule } from './modules/pam/pam.module';
 import { ScreenCastModule } from './modules/screen-cast/screen-cast.module';
 import { BsaleModule } from './modules/bsale/bsale.module';
+import { CrmClientModule } from './modules/crm/crm-client.module';
+import { NewslettersModule } from './modules/newsletters/newsletters.module';
+import { CrmPamModule } from './modules/crm-pam/crm-pam.module';
 
 @Module({
   imports: [
@@ -30,6 +33,7 @@ import { BsaleModule } from './modules/bsale/bsale.module';
     RedisModule,
     S3Module,
     QrModule,
+    CrmClientModule,
     AuthGoogleModule,
     GoogleAdminModule,
     LinksModule,
@@ -39,6 +43,8 @@ import { BsaleModule } from './modules/bsale/bsale.module';
     PamModule,
     ScreenCastModule,
     BsaleModule,
+    NewslettersModule,
+    CrmPamModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -744,4 +744,130 @@ export const api = {
     a.remove();
     URL.revokeObjectURL(url);
   },
+
+  listNewsletters: () =>
+    request<import('@mali-one/shared').NewsletterDto[]>('/api/newsletters'),
+
+  getNewsletter: (id: string) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/newsletters/${id}`,
+    ),
+
+  createNewsletter: (body: import('@mali-one/shared').CreateNewsletterDto) =>
+    request<import('@mali-one/shared').NewsletterDto>('/api/newsletters', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateNewsletter: (
+    id: string,
+    body: import('@mali-one/shared').UpdateNewsletterDto,
+  ) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/newsletters/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteNewsletter: (id: string) =>
+    request<{ ok: boolean }>(`/api/newsletters/${id}`, {
+      method: 'DELETE',
+    }),
+
+  listCrmPamContacts: (params?: {
+    q?: string;
+    segment?: string;
+    attr_key?: string;
+    attr_value?: string;
+    has_email?: boolean;
+    page?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.q) qs.set('q', params.q);
+    if (params?.segment) qs.set('segment', params.segment);
+    if (params?.attr_key) qs.set('attr_key', params.attr_key);
+    if (params?.attr_value !== undefined) {
+      qs.set('attr_value', params.attr_value);
+    }
+    if (params?.has_email !== undefined) {
+      qs.set('has_email', String(params.has_email));
+    }
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    const q = qs.toString();
+    return request<{
+      area: string;
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+      items: Array<{
+        contact_id: number;
+        name: string;
+        last_name: string;
+        phone: string;
+        email: string | null;
+        opt_in: boolean;
+        opt_in_email: boolean;
+        active: boolean;
+        segment_slugs: string[];
+        attributes: Record<string, string>;
+        created_at: string;
+        updated_at: string;
+      }>;
+    }>(`/api/crm-pam/contacts${q ? `?${q}` : ''}`);
+  },
+
+  listCrmPamNewsletters: () =>
+    request<
+      Array<{
+        id: string;
+        slug: string;
+        title: string;
+        subject: string;
+        status: string;
+        updatedAt: string;
+      }>
+    >('/api/crm-pam/newsletters'),
+
+  listEmailCampaigns: () =>
+    request<import('@mali-one/shared').EmailCampaignDto[]>(
+      '/api/crm-pam/campaigns',
+    ),
+
+  getEmailCampaign: (id: string) =>
+    request<import('@mali-one/shared').EmailCampaignDto>(
+      `/api/crm-pam/campaigns/${id}`,
+    ),
+
+  getEmailCampaignStats: (id: string) =>
+    request<import('@mali-one/shared').EmailCampaignStatsDto>(
+      `/api/crm-pam/campaigns/${id}/stats`,
+    ),
+
+  createEmailCampaign: (
+    body: import('@mali-one/shared').CreateEmailCampaignDto,
+  ) =>
+    request<import('@mali-one/shared').EmailCampaignDto>(
+      '/api/crm-pam/campaigns',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  previewEmailAudience: (id: string) =>
+    request<{
+      total: number;
+      area: string;
+      sample: Array<{
+        contact_id: number;
+        email: string;
+        name: string;
+        last_name: string;
+      }>;
+    }>(`/api/crm-pam/campaigns/${id}/audience-preview`),
+
+  sendEmailCampaign: (id: string) =>
+    request<import('@mali-one/shared').EmailCampaignDto>(
+      `/api/crm-pam/campaigns/${id}/send`,
+      { method: 'POST' },
+    ),
 };

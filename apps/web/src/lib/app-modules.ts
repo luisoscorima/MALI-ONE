@@ -55,4 +55,14 @@ export const APP_MODULES: {
     label: 'Reportes Bsale',
     description: 'Kardex consolidado de stock por almacén y período.',
   },
+  {
+    id: 'newsletters',
+    label: 'Boletines',
+    description: 'Editor de boletines HTML con URL pública compartible.',
+  },
+  {
+    id: 'crm_pam',
+    label: 'CRM PAM',
+    description: 'Contactos PAM (WhatsApp) y envío de boletines por SES.',
+  },
 ];

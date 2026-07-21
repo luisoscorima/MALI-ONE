@@ -21,7 +21,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api', {
-    exclude: [{ path: 'r/:slug', method: RequestMethod.GET }],
+    exclude: [
+      { path: 'r/:slug', method: RequestMethod.GET },
+      { path: 'n/:slug', method: RequestMethod.GET },
+      { path: 'mail/o/:token', method: RequestMethod.GET },
+      { path: 'mail/c/:token', method: RequestMethod.GET },
+    ],
   });
   app.use(cookieParser());
 

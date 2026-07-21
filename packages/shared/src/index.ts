@@ -10,7 +10,10 @@ export type AppModule =
   | 'widget_museo'
   | 'pam_memberships'
   | 'screen_cast'
-  | 'bsale_reports';
+  | 'bsale_reports'
+  | 'mailing'
+  | 'newsletters'
+  | 'crm_pam';
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
 
@@ -452,3 +455,74 @@ export type BsaleKardexJobDto =
   | { status: 'ready'; data: BsaleKardexResultDto }
   | { status: 'pending'; startedAt: number }
   | { status: 'error'; message: string };
+
+export type NewsletterStatus = 'draft' | 'published';
+export type EmailCampaignStatus =
+  | 'draft'
+  | 'queued'
+  | 'sending'
+  | 'completed'
+  | 'failed';
+
+export interface NewsletterDto {
+  id: string;
+  slug: string;
+  title: string;
+  subject: string;
+  htmlBody: string;
+  status: NewsletterStatus;
+  createdAt: string;
+  updatedAt: string;
+  publicUrl?: string;
+}
+
+export interface CreateNewsletterDto {
+  slug: string;
+  title: string;
+  subject: string;
+  htmlBody: string;
+  status?: NewsletterStatus;
+}
+
+export interface UpdateNewsletterDto {
+  title?: string;
+  subject?: string;
+  htmlBody?: string;
+  status?: NewsletterStatus;
+}
+
+export interface EmailCampaignDto {
+  id: string;
+  newsletterId: string;
+  name: string;
+  status: EmailCampaignStatus;
+  audienceArea: string;
+  audienceSegment: string | null;
+  audienceAttrKey: string | null;
+  audienceAttrValue: string | null;
+  totalRecipients: number;
+  sentCount: number;
+  openCount: number;
+  clickCount: number;
+  errorCount: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateEmailCampaignDto {
+  newsletterId: string;
+  name: string;
+  audienceArea?: string;
+  audienceSegment?: string;
+  audienceAttrKey?: string;
+  audienceAttrValue?: string;
+}
+
+export interface EmailCampaignStatsDto {
+  openRate: number;
+  clickRate: number;
+  opensByDay: Array<{ day: string; count: number }>;
+  clicksByDay: Array<{ day: string; count: number }>;
+  campaign: EmailCampaignDto;
+}

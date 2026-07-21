@@ -7,9 +7,12 @@ import {
   KeyRound,
   Landmark,
   Link2,
+  Mail,
   MonitorPlay,
   PackageSearch,
   Users,
+  Newspaper,
+  Contact,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
@@ -76,6 +79,24 @@ export const moduleMeta: Record<
     icon: Heart,
     group: 'widgets',
     accent: 'rose',
+  },
+  newsletters: {
+    to: '/admin/newsletters',
+    icon: Newspaper,
+    group: 'operaciones',
+    accent: 'blue',
+  },
+  crm_pam: {
+    to: '/admin/crm-pam',
+    icon: Contact,
+    group: 'operaciones',
+    accent: 'violet',
+  },
+  mailing: {
+    to: '/admin/newsletters',
+    icon: Mail,
+    group: 'operaciones',
+    accent: 'blue',
   },
 };
 

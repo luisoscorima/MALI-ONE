@@ -9,6 +9,10 @@ Sistema de operaciones internas (backoffice) para **mali.pe**.
 - **Enlaces y QR** (`/links`): acortador, WhatsApp, archivos S3, QR personalizable, carga masiva Excel y estadísticas
 - Gestor S3 (super admin)
 - Configuradores de widgets embebidos (educación, biblioteca, museo) y membresías PAM
+- **Boletines** (`/admin/newsletters`): editor por bloques, URL pública `/n/{slug}`
+- **CRM PAM** (`/admin/crm-pam`): lista de contactos (fuente WhatsApp) y envío SES de boletines
+
+Ver ownership CRM/producto/vitrina en [docs/OWNERSHIP-PAM-CRM.md](docs/OWNERSHIP-PAM-CRM.md).
 
 ### Enlaces y QR (`/links`)
 
@@ -233,6 +237,11 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | `widget_biblioteca` | `/admin/widgets/biblioteca` | Configurador carrusel Koha (biblioteca.mali.pe) |
 | `widget_museo` | `/admin/widgets/museo` | Popup e interfaz embebible (mali.pe/es) |
 | `pam_memberships` | `/admin/pam` | Planes, beneficios, registros y pagos PAM |
+| `newsletters` | `/admin/newsletters` | Boletines HTML (bloques), URL pública compartible |
+| `crm_pam` | `/admin/crm-pam` | Contactos PAM (WhatsApp) y envío SES de boletines |
+| `screen_cast` | `/admin/screen-cast` | Playlists y monitores para tótems y quioscos |
+| `bsale_reports` | `/bsale/kardex` | Kardex consolidado Bsale |
+| `password_vault` | `/vault` | Acceso a Vaultwarden |
 
 Ver [docs/WIDGETS-EMBED.md](docs/WIDGETS-EMBED.md) para snippets iframe en sitios públicos.
 

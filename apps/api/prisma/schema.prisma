@@ -23,6 +23,9 @@ enum AppModule {
   pam_memberships
   screen_cast
   bsale_reports
+  mailing
+  newsletters
+  crm_pam
 }
 
 enum ScreenCastMediaType {
@@ -72,6 +75,8 @@ model User {
   shortLinks     ShortLink[]
   auditLogs      AdminAuditLog[]    @relation("ActorAuditLogs")
   moduleAccess   UserModuleAccess[]
+  newsletters    Newsletter[]
+  emailCampaigns EmailCampaign[]
 }
 
 model UserModuleAccess {
@@ -346,3 +351,109 @@ model ScreenCastMonitor {
 
   @@index([playlistId])
 }
+
+enum NewsletterStatus {
+  draft
+  published
+}
+
+enum EmailCampaignStatus {
+  draft
+  queued
+  sending
+  completed
+  failed
+}
+
+enum EmailSendStatus {
+  pending
+  sent
+  failed
+}
+
+enum EmailEventType {
+  open
+  click
+}
+
+model Newsletter {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  title       String
+  subject     String
+  htmlBody    String           @db.Text
+  status      NewsletterStatus @default(draft)
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  campaigns   EmailCampaign[]
+
+  @@index([createdById])
+  @@index([status])
+}
+
+model EmailCampaign {
+  id                 String              @id @default(cuid())
+  newsletterId       String
+  newsletter         Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  name               String
+  status             EmailCampaignStatus @default(draft)
+  audienceArea       String              @default("pam")
+  audienceSegment    String?
+  audienceAttrKey    String?
+  audienceAttrValue  String?
+  totalRecipients    Int                 @default(0)
+  sentCount          Int                 @default(0)
+  openCount          Int                 @default(0)
+  clickCount         Int                 @default(0)
+  errorCount         Int                 @default(0)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdById        String
+  createdBy          User                @relation(fields: [createdById], references: [id])
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  sends              EmailSend[]
+  events             EmailEvent[]
+
+  @@index([newsletterId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model EmailSend {
+  id           String          @id @default(cuid())
+  campaignId   String
+  campaign     EmailCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email        String
+  contactId    Int?
+  name         String?
+  status       EmailSendStatus @default(pending)
+  openToken    String          @unique @default(cuid())
+  sesMessageId String?
+  error        String?
+  sentAt       DateTime?
+  createdAt    DateTime        @default(now())
+  events       EmailEvent[]
+
+  @@index([campaignId])
+  @@index([email])
+}
+
+model EmailEvent {
+  id         String         @id @default(cuid())
+  campaignId String
+  campaign   EmailCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sendId     String?
+  send       EmailSend?     @relation(fields: [sendId], references: [id], onDelete: SetNull)
+  type       EmailEventType
+  url        String?
+  userAgent  String?
+  createdAt  DateTime       @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([sendId])
+  @@index([type])
+}
+
