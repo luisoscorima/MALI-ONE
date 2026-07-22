@@ -216,7 +216,11 @@ export class PamWidgetsService {
       dto.expiryDate === undefined &&
       (!existing.expiryDate || mpStatusChanging)
     ) {
-      data.expiryDate = this.calculateExpiryDate(new Date(), frecuencia);
+      data.expiryDate = await this.resolveExpiryDate(
+        new Date(),
+        frecuencia,
+        dto.plan ?? existing.plan,
+      );
     }
 
     const updated = await this.prisma.pamRegistration.update({
@@ -343,9 +347,10 @@ export class PamWidgetsService {
     const update: Prisma.PamRegistrationUpdateInput = { mpStatus };
 
     if (mpStatus && MP_CONFIRMED.includes(mpStatus)) {
-      const expiryDate = this.calculateExpiryDate(
+      const expiryDate = await this.resolveExpiryDate(
         new Date(),
         registration.frecuencia,
+        registration.plan,
       );
       update.expiryDate = expiryDate;
     }
@@ -369,20 +374,50 @@ export class PamWidgetsService {
     await this.email.sendPendingExpiryNotices();
   }
 
-  private calculateExpiryDate(from: Date, frecuencia: string) {
+  private calculateExpiryDate(
+    from: Date,
+    frecuencia: string,
+    durationLabel?: string | null,
+  ) {
     const date = new Date(from);
     const freq = frecuencia.toLowerCase();
-    if (
-      freq.includes('mes') ||
-      freq === 'monthly' ||
-      freq === 'mensual'
-    ) {
-      date.setMonth(date.getMonth() + 1);
-    } else {
-      // yearly / anual / año
-      date.setFullYear(date.getFullYear() + 1);
+    const label = String(durationLabel ?? frecuencia).toLowerCase();
+    const monthsMatch = label.match(/(\d+)\s*mes/);
+    if (monthsMatch) {
+      date.setMonth(date.getMonth() + Number(monthsMatch[1]));
+      return date;
     }
+    if (
+      label.includes('año') ||
+      label.includes('year') ||
+      label.includes('anual') ||
+      freq === 'yearly' ||
+      freq.includes('anual') ||
+      freq.includes('año') ||
+      freq.includes('year')
+    ) {
+      date.setFullYear(date.getFullYear() + 1);
+      return date;
+    }
+    // mes / monthly / mensual
+    date.setMonth(date.getMonth() + 1);
     return date;
+  }
+
+  private async resolveExpiryDate(from: Date, frecuencia: string, plan: string) {
+    const pamPlan = await this.prisma.pamPlan.findUnique({
+      where: { slug: plan },
+    });
+    const freq = frecuencia.toLowerCase();
+    const isYearly =
+      freq === 'yearly' ||
+      freq.includes('anual') ||
+      freq.includes('año') ||
+      freq.includes('year');
+    const duration = isYearly
+      ? pamPlan?.yearlyDuration
+      : pamPlan?.monthlyDuration;
+    return this.calculateExpiryDate(from, frecuencia, duration);
   }
 
   private normalizeMpStatus(raw: string): PamMpStatus | null {

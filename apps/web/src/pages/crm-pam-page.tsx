@@ -117,7 +117,7 @@ const FIXED_COLUMNS: Array<{ id: FixedColId; label: string; locked?: boolean }> 
     { id: 'email', label: 'Email' },
     { id: 'dni', label: 'DNI' },
     { id: 'segments', label: 'Segmentos' },
-    { id: 'mp_ledger', label: 'MP ledger' },
+    { id: 'mp_ledger', label: 'Estado de pago' },
     { id: 'expiry', label: 'Caducidad' },
     { id: 'welcome', label: 'Welcome' },
   ];
@@ -162,6 +162,47 @@ function formatDateTime(iso: string) {
 function toDateInput(iso: string | null) {
   if (!iso) return '';
   return iso.slice(0, 10);
+}
+
+/** Caducidad desde frecuencia (+ duración del plan del widget si existe). */
+function computeExpiryDateInput(
+  frecuencia: string,
+  planSlug?: string,
+  plans: PamPlanDto[] = [],
+  from: Date = new Date(),
+) {
+  const plan = planSlug
+    ? plans.find((p) => p.slug === planSlug)
+    : undefined;
+  const freq = String(frecuencia ?? '').toLowerCase();
+  const isYearly =
+    freq === 'yearly' ||
+    freq.includes('anual') ||
+    freq.includes('año') ||
+    freq.includes('year');
+  const durationLabel = String(
+    (isYearly ? plan?.yearlyDuration : plan?.monthlyDuration) ?? frecuencia,
+  ).toLowerCase();
+
+  const date = new Date(from);
+  const monthsMatch = durationLabel.match(/(\d+)\s*mes/);
+  if (monthsMatch) {
+    date.setMonth(date.getMonth() + Number(monthsMatch[1]));
+  } else if (
+    durationLabel.includes('año') ||
+    durationLabel.includes('year') ||
+    durationLabel.includes('anual') ||
+    isYearly
+  ) {
+    date.setFullYear(date.getFullYear() + 1);
+  } else {
+    date.setMonth(date.getMonth() + 1);
+  }
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 function dash(v: string | null | undefined) {
@@ -951,7 +992,7 @@ export function CrmPamPage() {
     if (isColVisible('mp_ledger')) {
       cols.push({
         id: 'mp_ledger',
-        header: 'MP ledger',
+        header: 'Estado de pago',
         cell: ({ row }) => {
           const c = row.original;
           const ledger = c.attributes.payment_id
@@ -1064,7 +1105,7 @@ export function CrmPamPage() {
       },
       {
         id: 'mpStatus',
-        header: 'MP',
+        header: 'Estado de pago',
         cell: ({ row }) => row.original.mpStatus ?? '—',
       },
       {
@@ -1706,7 +1747,19 @@ export function CrmPamPage() {
                 <Select
                   value={newPayment.plan}
                   onValueChange={(value) =>
-                    setNewPayment({ ...newPayment, plan: value })
+                    setNewPayment((prev) => ({
+                      ...prev,
+                      plan: value,
+                      ...(CONFIRMED_MP.includes(prev.mpStatus)
+                        ? {
+                            expiryDate: computeExpiryDateInput(
+                              prev.frecuencia,
+                              value,
+                              pamPlans,
+                            ),
+                          }
+                        : {}),
+                    }))
                   }
                 >
                   <SelectTrigger>
@@ -1732,7 +1785,19 @@ export function CrmPamPage() {
                 <Select
                   value={newPayment.frecuencia}
                   onValueChange={(value) =>
-                    setNewPayment({ ...newPayment, frecuencia: value })
+                    setNewPayment((prev) => ({
+                      ...prev,
+                      frecuencia: value,
+                      ...(CONFIRMED_MP.includes(prev.mpStatus)
+                        ? {
+                            expiryDate: computeExpiryDateInput(
+                              value,
+                              prev.plan,
+                              pamPlans,
+                            ),
+                          }
+                        : {}),
+                    }))
                   }
                 >
                   <SelectTrigger>
@@ -1765,15 +1830,25 @@ export function CrmPamPage() {
                 </Select>
               </div>
               <div className="flex min-w-0 flex-col gap-1.5">
-                <Label>Estado MP (opcional)</Label>
+                <Label>Estado de pago (opcional)</Label>
                 <Select
                   value={newPayment.mpStatus || '__none__'}
-                  onValueChange={(value) =>
-                    setNewPayment({
-                      ...newPayment,
-                      mpStatus: value === '__none__' ? '' : value,
-                    })
-                  }
+                  onValueChange={(value) => {
+                    const mpStatus = value === '__none__' ? '' : value;
+                    setNewPayment((prev) => ({
+                      ...prev,
+                      mpStatus,
+                      ...(CONFIRMED_MP.includes(mpStatus)
+                        ? {
+                            expiryDate: computeExpiryDateInput(
+                              prev.frecuencia,
+                              prev.plan,
+                              pamPlans,
+                            ),
+                          }
+                        : {}),
+                    }));
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="—" />
@@ -1894,15 +1969,26 @@ export function CrmPamPage() {
                         </Select>
                       </div>
                       <div className="flex min-w-0 flex-col gap-1.5">
-                        <Label>Estado Mercado Pago</Label>
+                        <Label>Estado de pago</Label>
                         <Select
                           value={mpValue || '__none__'}
-                          onValueChange={(value) =>
+                          onValueChange={(value) => {
+                            const next = value === '__none__' ? '' : value;
                             setDraftMp((prev) => ({
                               ...prev,
-                              [p.id]: value === '__none__' ? '' : value,
-                            }))
-                          }
+                              [p.id]: next,
+                            }));
+                            if (CONFIRMED_MP.includes(next)) {
+                              setDraftExpiry((prev) => ({
+                                ...prev,
+                                [p.id]: computeExpiryDateInput(
+                                  p.frecuencia,
+                                  p.plan,
+                                  pamPlans,
+                                ),
+                              }));
+                            }
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="—" />
