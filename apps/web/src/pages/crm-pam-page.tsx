@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type {
   EmailCampaignDto,
   PamPaymentMethodDto,
+  PamPlanDto,
   PamRegistrationDto,
 } from '@mali-one/shared';
 import { PAM_DEFAULT_PAYMENT_METHOD } from '@mali-one/shared';
@@ -36,6 +37,19 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui';
+
+const EMPTY_NEW_PAYMENT = {
+  nombres: '',
+  apellidos: '',
+  dni: '',
+  celular: '',
+  correo: '',
+  plan: 'amigo',
+  frecuencia: 'monthly',
+  paymentMethod: PAM_DEFAULT_PAYMENT_METHOD,
+  mpStatus: '',
+  expiryDate: '',
+};
 
 type CrmContact = {
   contact_id: number;
@@ -205,21 +219,19 @@ export function CrmPamPage() {
   const [paymentMethods, setPaymentMethods] = useState<PamPaymentMethodDto[]>(
     [],
   );
+  const [pamPlans, setPamPlans] = useState<PamPlanDto[]>([]);
   const [showMethodsManager, setShowMethodsManager] = useState(false);
   const [newMethodLabel, setNewMethodLabel] = useState('');
   const [savingMethod, setSavingMethod] = useState(false);
-  const [newPayment, setNewPayment] = useState({
-    nombres: '',
-    apellidos: '',
-    dni: '',
-    celular: '',
-    correo: '',
-    plan: 'amigo',
-    frecuencia: 'monthly',
-    paymentMethod: PAM_DEFAULT_PAYMENT_METHOD,
-    mpStatus: '',
-    expiryDate: '',
-  });
+  const [newPayment, setNewPayment] = useState(EMPTY_NEW_PAYMENT);
+  const [contactSuggestions, setContactSuggestions] = useState<CrmContact[]>(
+    [],
+  );
+  const [suggestField, setSuggestField] = useState<'nombres' | 'celular' | null>(
+    null,
+  );
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const suggestTimer = useRef<number | null>(null);
 
   const [newsletters, setNewsletters] = useState<PublishedNewsletter[]>([]);
   const [campaigns, setCampaigns] = useState<EmailCampaignDto[]>([]);
@@ -380,9 +392,26 @@ export function CrmPamPage() {
     }
   }, [toast]);
 
+  const loadPamPlans = useCallback(async () => {
+    try {
+      const rows = await api.getPamPlans();
+      setPamPlans(rows);
+    } catch {
+      setPamPlans([]);
+    }
+  }, []);
+
   const activePaymentMethods = useMemo(
     () => paymentMethods.filter((m) => m.active),
     [paymentMethods],
+  );
+
+  const activePamPlans = useMemo(
+    () =>
+      [...pamPlans]
+        .filter((p) => p.activo)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    [pamPlans],
   );
 
   async function createPaymentMethod() {
@@ -473,8 +502,17 @@ export function CrmPamPage() {
   useEffect(() => {
     void loadPayments();
     void loadPaymentMethods();
+    void loadPamPlans();
     void loadAttrDefs();
-  }, [loadPayments, loadPaymentMethods, loadAttrDefs]);
+  }, [loadPayments, loadPaymentMethods, loadPamPlans, loadAttrDefs]);
+
+  useEffect(() => {
+    if (activePamPlans.length === 0) return;
+    setNewPayment((prev) => {
+      if (activePamPlans.some((p) => p.slug === prev.plan)) return prev;
+      return { ...prev, plan: activePamPlans[0].slug };
+    });
+  }, [activePamPlans]);
 
   useEffect(() => {
     if (tab === 'send') void loadCampaigns();
@@ -542,6 +580,94 @@ export function CrmPamPage() {
     }
   }
 
+  function fillPaymentFromContact(c: CrmContact) {
+    const freq = String(c.attributes.frecuencia ?? '').trim();
+    const plan = String(c.attributes.plan ?? '').trim();
+    const medioLabel = String(c.attributes.medio_pago ?? '').trim().toLowerCase();
+    const matchedMethod = paymentMethods.find(
+      (m) =>
+        m.active &&
+        (m.label.toLowerCase() === medioLabel ||
+          m.slug.toLowerCase() === medioLabel),
+    );
+
+    setNewPayment((prev) => ({
+      ...prev,
+      nombres: c.name.trim() || prev.nombres,
+      apellidos: c.last_name.trim() || prev.apellidos,
+      dni: (c.dni ?? c.attributes.dni ?? '').trim() || prev.dni,
+      celular: c.phone.trim() || prev.celular,
+      correo: (c.email ?? '').trim() || prev.correo,
+      plan: plan || prev.plan,
+      frecuencia:
+        freq === 'yearly' || freq === 'monthly' ? freq : prev.frecuencia,
+      paymentMethod: matchedMethod?.slug ?? prev.paymentMethod,
+    }));
+  }
+
+  async function openCreatePaymentFromContact(c: CrmContact) {
+    const hasPayment = Boolean(c.attributes.payment_id?.trim());
+    if (hasPayment) {
+      const ok = await confirm({
+        title: 'Crear otro pago',
+        description:
+          'Este contacto ya tiene un payment_id. ¿Crear un pago nuevo y re-vincular?',
+        confirmLabel: 'Crear pago',
+      });
+      if (!ok) return;
+    }
+    fillPaymentFromContact(c);
+    setContactSuggestions([]);
+    setSuggestField(null);
+    setShowNewPayment(true);
+    setTab('payments');
+    setExpandedContactId(null);
+    toast.success('Formulario de pago precargado desde el contacto');
+  }
+
+  async function searchContactSuggestions(
+    field: 'nombres' | 'celular',
+    raw: string,
+  ) {
+    const q = raw.trim();
+    if (q.length < 2) {
+      setContactSuggestions([]);
+      setSuggestField(null);
+      return;
+    }
+    setSuggestField(field);
+    setSuggestLoading(true);
+    try {
+      const data = await api.listCrmPamContacts({
+        q,
+        page: 1,
+        limit: 8,
+      });
+      setContactSuggestions(data.items);
+      setSuggestField(field);
+    } catch {
+      setContactSuggestions([]);
+    } finally {
+      setSuggestLoading(false);
+    }
+  }
+
+  function queueContactSuggestions(
+    field: 'nombres' | 'celular',
+    raw: string,
+  ) {
+    if (suggestTimer.current) window.clearTimeout(suggestTimer.current);
+    suggestTimer.current = window.setTimeout(() => {
+      void searchContactSuggestions(field, raw);
+    }, 280);
+  }
+
+  function applyContactSuggestion(c: CrmContact) {
+    fillPaymentFromContact(c);
+    setContactSuggestions([]);
+    setSuggestField(null);
+  }
+
   async function createPayment() {
     if (
       !newPayment.nombres.trim() ||
@@ -572,18 +698,9 @@ export function CrmPamPage() {
       });
       toast.success('Pago creado y vinculado al CRM');
       setShowNewPayment(false);
-      setNewPayment({
-        nombres: '',
-        apellidos: '',
-        dni: '',
-        celular: '',
-        correo: '',
-        plan: 'amigo',
-        frecuencia: 'monthly',
-        paymentMethod: PAM_DEFAULT_PAYMENT_METHOD,
-        mpStatus: '',
-        expiryDate: '',
-      });
+      setNewPayment(EMPTY_NEW_PAYMENT);
+      setContactSuggestions([]);
+      setSuggestField(null);
       await Promise.all([loadPayments(), loadContacts()]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear pago');
@@ -1263,7 +1380,7 @@ export function CrmPamPage() {
                           />
                         </div>
                       ))}
-                      <div className="flex items-end sm:col-span-2">
+                      <div className="flex flex-wrap items-end gap-2 sm:col-span-2">
                         <IconActionButton
                           label="Guardar en WhatsApp"
                           variant="default"
@@ -1272,6 +1389,14 @@ export function CrmPamPage() {
                         >
                           <Save className="size-4" />
                         </IconActionButton>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void openCreatePaymentFromContact(c)}
+                        >
+                          <Plus className="mr-1 size-4" />
+                          Crear pago
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -1338,9 +1463,9 @@ export function CrmPamPage() {
         <TabsContent value="payments" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              Ledger local. Cruce con contactos vía{' '}
-              <code className="text-xs">payment_id</code>. Del widget el medio
-              es Mercado Pago; para externos crea medios y asígnalos al pago.
+              Ledger local. Cruce vía <code className="text-xs">payment_id</code>
+              . Widget → Mercado Pago; históricos desde Contactos (Crear pago) o
+              Añadir pago con autocompletado CRM.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -1446,27 +1571,162 @@ export function CrmPamPage() {
 
           {showNewPayment ? (
             <div className="grid gap-3 rounded-md border border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
-              {(
-                [
-                  ['nombres', 'Nombres'],
-                  ['apellidos', 'Apellidos'],
-                  ['dni', 'DNI'],
-                  ['celular', 'Celular'],
-                  ['correo', 'Correo'],
-                  ['plan', 'Plan'],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="flex min-w-0 flex-col gap-1.5">
-                  <Label>{label}</Label>
-                  <Input
-                    className="w-full min-w-0"
-                    value={newPayment[key]}
-                    onChange={(e) =>
-                      setNewPayment({ ...newPayment, [key]: e.target.value })
-                    }
-                  />
-                </div>
-              ))}
+              <div className="relative flex min-w-0 flex-col gap-1.5">
+                <Label>Nombres</Label>
+                <Input
+                  className="w-full min-w-0"
+                  value={newPayment.nombres}
+                  autoComplete="off"
+                  placeholder="Escribe para buscar contacto…"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNewPayment({ ...newPayment, nombres: value });
+                    queueContactSuggestions('nombres', value);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      if (suggestField === 'nombres') {
+                        setSuggestField(null);
+                        setContactSuggestions([]);
+                      }
+                    }, 150);
+                  }}
+                />
+                {suggestField === 'nombres' &&
+                (suggestLoading || contactSuggestions.length > 0) ? (
+                  <div className="absolute top-full z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-md">
+                    {suggestLoading ? (
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                        Buscando…
+                      </p>
+                    ) : (
+                      contactSuggestions.map((c) => (
+                        <button
+                          key={c.contact_id}
+                          type="button"
+                          className="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyContactSuggestion(c)}
+                        >
+                          <span className="font-medium">
+                            {c.name} {c.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.phone}
+                            {c.email ? ` · ${c.email}` : ''}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Apellidos</Label>
+                <Input
+                  className="w-full min-w-0"
+                  value={newPayment.apellidos}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, apellidos: e.target.value })
+                  }
+                />
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>DNI</Label>
+                <Input
+                  className="w-full min-w-0"
+                  value={newPayment.dni}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, dni: e.target.value })
+                  }
+                />
+              </div>
+              <div className="relative flex min-w-0 flex-col gap-1.5">
+                <Label>Celular</Label>
+                <Input
+                  className="w-full min-w-0"
+                  value={newPayment.celular}
+                  autoComplete="off"
+                  placeholder="Escribe para buscar contacto…"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNewPayment({ ...newPayment, celular: value });
+                    queueContactSuggestions('celular', value);
+                  }}
+                  onBlur={() => {
+                    window.setTimeout(() => {
+                      if (suggestField === 'celular') {
+                        setSuggestField(null);
+                        setContactSuggestions([]);
+                      }
+                    }, 150);
+                  }}
+                />
+                {suggestField === 'celular' &&
+                (suggestLoading || contactSuggestions.length > 0) ? (
+                  <div className="absolute top-full z-30 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-md">
+                    {suggestLoading ? (
+                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                        Buscando…
+                      </p>
+                    ) : (
+                      contactSuggestions.map((c) => (
+                        <button
+                          key={c.contact_id}
+                          type="button"
+                          className="flex w-full flex-col rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => applyContactSuggestion(c)}
+                        >
+                          <span className="font-medium">
+                            {c.name} {c.last_name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {c.phone}
+                            {c.email ? ` · ${c.email}` : ''}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Correo</Label>
+                <Input
+                  className="w-full min-w-0"
+                  value={newPayment.correo}
+                  onChange={(e) =>
+                    setNewPayment({ ...newPayment, correo: e.target.value })
+                  }
+                />
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <Label>Plan</Label>
+                <Select
+                  value={newPayment.plan}
+                  onValueChange={(value) =>
+                    setNewPayment({ ...newPayment, plan: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Elegir membresía" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activePamPlans.map((p) => (
+                      <SelectItem key={p.id} value={p.slug}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                    {newPayment.plan &&
+                    !activePamPlans.some((p) => p.slug === newPayment.plan) ? (
+                      <SelectItem value={newPayment.plan}>
+                        {newPayment.plan} (histórico)
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex min-w-0 flex-col gap-1.5">
                 <Label>Frecuencia</Label>
                 <Select

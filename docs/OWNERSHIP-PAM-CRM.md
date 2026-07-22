@@ -51,7 +51,8 @@ Incluye: `payment_id`, `medio_pago`, `plan`, `frecuencia`, `mp_status`, `expiry`
 
 ```text
 Widget → ONE ledger (medio = Mercado Pago)
-   o alta manual Pagos (elige medio del catálogo)
+   o Contacto CRM → Crear pago (form precargado)
+   o Pagos → Añadir pago (autocomplete por nombre/celular)
       → ensure defs attrs WA (si faltan)
       → sync persona + payment_id + medio_pago
       → Pagos: marcar MP/caducidad / vincular
