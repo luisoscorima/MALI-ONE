@@ -510,6 +510,7 @@ export type BsaleKardexJobDto =
 export type NewsletterStatus = 'draft' | 'published';
 export type EmailCampaignStatus =
   | 'draft'
+  | 'scheduled'
   | 'queued'
   | 'sending'
   | 'completed'
@@ -553,6 +554,8 @@ export interface EmailCampaignDto {
   status: EmailCampaignStatus;
   audienceArea: string;
   audienceSegment: string | null;
+  audienceSegments: string[];
+  audienceExcludeSegments: string[];
   audienceAttrKey: string | null;
   audienceAttrValue: string | null;
   totalRecipients: number;
@@ -560,6 +563,7 @@ export interface EmailCampaignDto {
   openCount: number;
   clickCount: number;
   errorCount: number;
+  scheduledAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -569,9 +573,33 @@ export interface CreateEmailCampaignDto {
   newsletterId: string;
   name: string;
   audienceArea?: string;
+  /** @deprecated Prefer audienceSegments */
   audienceSegment?: string;
+  audienceSegments?: string[];
+  audienceExcludeSegments?: string[];
   audienceAttrKey?: string;
   audienceAttrValue?: string;
+  /** ISO datetime; when set, campaign is created as scheduled. */
+  scheduledAt?: string;
+}
+
+export interface PreviewEmailAudienceDto {
+  audienceArea?: string;
+  audienceSegments: string[];
+  audienceExcludeSegments?: string[];
+  audienceAttrKey?: string;
+  audienceAttrValue?: string;
+}
+
+export interface EmailAudiencePreviewDto {
+  total: number;
+  area: string;
+  sample: Array<{
+    contact_id: number;
+    email: string;
+    name: string;
+    last_name: string;
+  }>;
 }
 
 export interface EmailCampaignStatsDto {

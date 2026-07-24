@@ -269,6 +269,8 @@ export class WhatsappCrmClientService {
   async fetchAudience(params: {
     area?: string;
     segment?: string;
+    segments?: string[];
+    exclude_segments?: string[];
     attr_key?: string;
     attr_value?: string;
     page?: number;
@@ -289,9 +291,31 @@ export class WhatsappCrmClientService {
     pages: number;
     area: string;
   }> {
+    const segments =
+      params.segments?.map((s) => s.trim()).filter(Boolean) ??
+      (params.segment ? [params.segment.trim()] : []);
+    const exclude =
+      params.exclude_segments?.map((s) => s.trim()).filter(Boolean) ?? [];
+
+    const usePost = segments.length > 1 || exclude.length > 0;
+
+    if (usePost) {
+      return this.request('POST', '/api/crm/audience', {
+        area: params.area ?? 'pam',
+        segments: segments.length ? segments : undefined,
+        segment: segments.length === 1 ? segments[0] : params.segment,
+        exclude_segments: exclude.length ? exclude : undefined,
+        attr_key: params.attr_key,
+        attr_value: params.attr_value,
+        page: params.page,
+        limit: params.limit,
+        opt_in_email: params.opt_in_email,
+      });
+    }
+
     const qs = new URLSearchParams();
     qs.set('area', params.area ?? 'pam');
-    if (params.segment) qs.set('segment', params.segment);
+    if (segments[0]) qs.set('segment', segments[0]);
     if (params.attr_key) qs.set('attr_key', params.attr_key);
     if (params.attr_value !== undefined) qs.set('attr_value', params.attr_value);
     if (params.page) qs.set('page', String(params.page));

@@ -1,8 +1,10 @@
 import {
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
+  IsISO8601,
   IsObject,
   IsOptional,
   IsString,
@@ -24,10 +26,52 @@ export class CreateEmailCampaignDto {
   @MaxLength(20)
   audienceArea?: string;
 
+  /** @deprecated Prefer audienceSegments */
   @IsOptional()
   @IsString()
   @MaxLength(50)
   audienceSegment?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  audienceSegments?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  audienceExcludeSegments?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  audienceAttrKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  audienceAttrValue?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  scheduledAt?: string;
+}
+
+export class PreviewEmailAudienceDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  audienceArea?: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  audienceSegments!: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  audienceExcludeSegments?: string[];
 
   @IsOptional()
   @IsString()

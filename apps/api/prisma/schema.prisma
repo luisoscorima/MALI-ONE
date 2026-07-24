@@ -379,6 +379,7 @@ enum NewsletterStatus {
 
 enum EmailCampaignStatus {
   draft
+  scheduled
   queued
   sending
   completed
@@ -416,32 +417,37 @@ model Newsletter {
 }
 
 model EmailCampaign {
-  id                 String              @id @default(cuid())
-  newsletterId       String
-  newsletter         Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
-  name               String
-  status             EmailCampaignStatus @default(draft)
-  audienceArea       String              @default("pam")
-  audienceSegment    String?
-  audienceAttrKey    String?
-  audienceAttrValue  String?
-  totalRecipients    Int                 @default(0)
-  sentCount          Int                 @default(0)
-  openCount          Int                 @default(0)
-  clickCount         Int                 @default(0)
-  errorCount         Int                 @default(0)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  createdById        String
-  createdBy          User                @relation(fields: [createdById], references: [id])
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  sends              EmailSend[]
-  events             EmailEvent[]
+  id                       String              @id @default(cuid())
+  newsletterId             String
+  newsletter               Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  name                     String
+  status                   EmailCampaignStatus @default(draft)
+  audienceArea             String              @default("pam")
+  /// Legacy singular; prefer audienceSegments.
+  audienceSegment          String?
+  audienceSegments         String[]            @default([])
+  audienceExcludeSegments  String[]            @default([])
+  audienceAttrKey          String?
+  audienceAttrValue        String?
+  totalRecipients          Int                 @default(0)
+  sentCount                Int                 @default(0)
+  openCount                Int                 @default(0)
+  clickCount               Int                 @default(0)
+  errorCount               Int                 @default(0)
+  scheduledAt              DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  createdById              String
+  createdBy                User                @relation(fields: [createdById], references: [id])
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  sends                    EmailSend[]
+  events                   EmailEvent[]
 
   @@index([newsletterId])
   @@index([createdById])
   @@index([status])
+  @@index([scheduledAt])
 }
 
 model EmailSend {

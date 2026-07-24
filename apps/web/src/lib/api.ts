@@ -974,17 +974,18 @@ export const api = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
 
+  previewCrmPamAudience: (
+    body: import('@mali-one/shared').PreviewEmailAudienceDto,
+  ) =>
+    request<import('@mali-one/shared').EmailAudiencePreviewDto>(
+      '/api/crm-pam/audience-preview',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   previewEmailAudience: (id: string) =>
-    request<{
-      total: number;
-      area: string;
-      sample: Array<{
-        contact_id: number;
-        email: string;
-        name: string;
-        last_name: string;
-      }>;
-    }>(`/api/crm-pam/campaigns/${id}/audience-preview`),
+    request<import('@mali-one/shared').EmailAudiencePreviewDto>(
+      `/api/crm-pam/campaigns/${id}/audience-preview`,
+    ),
 
   sendEmailCampaign: (id: string) =>
     request<import('@mali-one/shared').EmailCampaignDto>(

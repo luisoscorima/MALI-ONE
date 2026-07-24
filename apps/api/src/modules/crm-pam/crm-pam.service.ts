@@ -13,7 +13,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { WhatsappCrmClientService } from '../crm/whatsapp-crm-client.service';
 import { NewslettersService } from '../newsletters/newsletters.service';
-import { CreateEmailCampaignDto } from './dto/crm-pam.dto';
+import { CreateEmailCampaignDto, PreviewEmailAudienceDto } from './dto/crm-pam.dto';
 import { SesMailService } from './ses-mail.service';
 
 @Injectable()
@@ -27,6 +27,30 @@ export class CrmPamService {
     private readonly crm: WhatsappCrmClientService,
     private readonly newsletters: NewslettersService,
   ) {}
+
+  private normalizeSegments(raw?: string[] | string | null): string[] {
+    const list = Array.isArray(raw)
+      ? raw
+      : raw
+        ? [raw]
+        : [];
+    return [
+      ...new Set(
+        list
+          .map((s) => String(s ?? '').trim())
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  private campaignSegments(campaign: {
+    audienceSegments?: string[] | null;
+    audienceSegment?: string | null;
+  }): string[] {
+    const fromArray = this.normalizeSegments(campaign.audienceSegments);
+    if (fromArray.length) return fromArray;
+    return this.normalizeSegments(campaign.audienceSegment);
+  }
 
   async listContacts(query: {
     q?: string;
@@ -437,18 +461,84 @@ export class CrmPamService {
       );
     }
 
+    const audienceSegments = this.normalizeSegments(
+      dto.audienceSegments?.length
+        ? dto.audienceSegments
+        : dto.audienceSegment
+          ? [dto.audienceSegment]
+          : [],
+    );
+    if (!audienceSegments.length) {
+      throw new BadRequestException('Indica al menos un segmento');
+    }
+
+    const audienceExcludeSegments = this.normalizeSegments(
+      dto.audienceExcludeSegments,
+    ).filter((s) => !audienceSegments.includes(s));
+
+    let scheduledAt: Date | null = null;
+    let status: EmailCampaignStatus = EmailCampaignStatus.draft;
+    if (dto.scheduledAt) {
+      scheduledAt = new Date(dto.scheduledAt);
+      if (Number.isNaN(scheduledAt.getTime())) {
+        throw new BadRequestException('Fecha de programación inválida');
+      }
+      if (scheduledAt.getTime() <= Date.now()) {
+        throw new BadRequestException(
+          'La programación debe ser una fecha futura',
+        );
+      }
+      status = EmailCampaignStatus.scheduled;
+    }
+
     return this.prisma.emailCampaign.create({
       data: {
         newsletterId: dto.newsletterId,
         name: dto.name.trim(),
         audienceArea: (dto.audienceArea ?? 'pam').trim().toLowerCase() || 'pam',
-        audienceSegment: dto.audienceSegment?.trim() || null,
+        audienceSegment: audienceSegments[0] ?? null,
+        audienceSegments,
+        audienceExcludeSegments,
         audienceAttrKey: dto.audienceAttrKey?.trim() || null,
         audienceAttrValue: dto.audienceAttrValue?.trim() || null,
+        scheduledAt,
         createdById: userId,
-        status: EmailCampaignStatus.draft,
+        status,
       },
     });
+  }
+
+  async previewAudienceQuery(dto: PreviewEmailAudienceDto) {
+    if (!this.crm.configured) {
+      throw new BadRequestException('WhatsApp CRM no configurado');
+    }
+    const segments = this.normalizeSegments(dto.audienceSegments);
+    if (!segments.length) {
+      throw new BadRequestException('Indica al menos un segmento');
+    }
+    const exclude = this.normalizeSegments(dto.audienceExcludeSegments).filter(
+      (s) => !segments.includes(s),
+    );
+    const audience = await this.crm.fetchAudience({
+      area: (dto.audienceArea ?? 'pam').trim().toLowerCase() || 'pam',
+      segments,
+      exclude_segments: exclude,
+      attr_key: dto.audienceAttrKey?.trim() || undefined,
+      attr_value: dto.audienceAttrValue?.trim() || undefined,
+      limit: 100,
+      page: 1,
+      opt_in_email: true,
+    });
+    return {
+      total: audience.total,
+      sample: audience.items.slice(0, 100).map((i) => ({
+        contact_id: i.contact_id,
+        email: i.email,
+        name: i.name,
+        last_name: i.last_name,
+      })),
+      area: audience.area,
+    };
   }
 
   async previewAudience(campaignId: string) {
@@ -456,18 +546,26 @@ export class CrmPamService {
     if (!this.crm.configured) {
       throw new BadRequestException('WhatsApp CRM no configurado');
     }
+    const segments = this.campaignSegments(campaign);
     const audience = await this.crm.fetchAudience({
       area: campaign.audienceArea,
-      segment: campaign.audienceSegment ?? undefined,
+      segments: segments.length ? segments : undefined,
+      segment: segments[0],
+      exclude_segments: campaign.audienceExcludeSegments ?? [],
       attr_key: campaign.audienceAttrKey ?? undefined,
       attr_value: campaign.audienceAttrValue ?? undefined,
-      limit: 50,
+      limit: 100,
       page: 1,
       opt_in_email: true,
     });
     return {
       total: audience.total,
-      sample: audience.items.slice(0, 20),
+      sample: audience.items.slice(0, 100).map((i) => ({
+        contact_id: i.contact_id,
+        email: i.email,
+        name: i.name,
+        last_name: i.last_name,
+      })),
       area: audience.area,
     };
   }
@@ -511,6 +609,33 @@ export class CrmPamService {
     return this.getCampaign(campaignId);
   }
 
+  /** Picks up scheduled campaigns whose time has arrived. */
+  async processDueScheduledCampaigns() {
+    const due = await this.prisma.emailCampaign.findMany({
+      where: {
+        status: EmailCampaignStatus.scheduled,
+        scheduledAt: { lte: new Date() },
+      },
+      select: { id: true },
+      take: 20,
+    });
+    for (const row of due) {
+      try {
+        await this.startCampaign(row.id);
+      } catch (err) {
+        this.logger.warn(
+          `Scheduled campaign ${row.id} failed to start: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+        await this.prisma.emailCampaign.update({
+          where: { id: row.id },
+          data: { status: EmailCampaignStatus.failed },
+        });
+      }
+    }
+  }
+
   private async processCampaign(campaignId: string) {
     if (this.sending.has(campaignId)) return;
     this.sending.add(campaignId);
@@ -529,6 +654,7 @@ export class CrmPamService {
       await this.prisma.emailSend.deleteMany({ where: { campaignId } });
       await this.prisma.emailEvent.deleteMany({ where: { campaignId } });
 
+      const segments = this.campaignSegments(campaign);
       const recipients: Array<{
         contact_id: number;
         email: string;
@@ -540,7 +666,9 @@ export class CrmPamService {
       while (page <= pages) {
         const batch = await this.crm.fetchAudience({
           area: campaign.audienceArea,
-          segment: campaign.audienceSegment ?? undefined,
+          segments: segments.length ? segments : undefined,
+          segment: segments[0],
+          exclude_segments: campaign.audienceExcludeSegments ?? [],
           attr_key: campaign.audienceAttrKey ?? undefined,
           attr_value: campaign.audienceAttrValue ?? undefined,
           page,

@@ -19,6 +19,11 @@ import {
   Button,
   Badge,
   DataTable,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -278,10 +283,25 @@ export function CrmPamPage() {
   const [campaigns, setCampaigns] = useState<EmailCampaignDto[]>([]);
   const [newsletterId, setNewsletterId] = useState('');
   const [campaignName, setCampaignName] = useState('');
-  const [filterAttrKey, setFilterAttrKey] = useState('plan');
-  const [filterAttrValue, setFilterAttrValue] = useState('');
+  const [includeSegments, setIncludeSegments] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [excludeSegments, setExcludeSegments] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [audiencePreview, setAudiencePreview] = useState<{
+    total: number;
+    sample: Array<{
+      contact_id: number;
+      email: string;
+      name: string;
+      last_name: string;
+    }>;
+  } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
+  const [scheduledAt, setScheduledAt] = useState('');
   const [saving, setSaving] = useState(false);
-  const [audienceInfo, setAudienceInfo] = useState('');
   const [visibleCols, setVisibleCols] = useState<Set<string>>(
     () => loadStoredVisibleCols() ?? new Set(DEFAULT_VISIBLE_COLS),
   );
@@ -793,16 +813,81 @@ export function CrmPamPage() {
     }
   }
 
-  async function handleCreateAndSend() {
+  async function handlePreviewAudience() {
+    const segmentList = [...includeSegments];
+    if (!segmentList.length) {
+      toast.error('Marca al menos un segmento');
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const preview = await api.previewCrmPamAudience({
+        audienceArea: 'pam',
+        audienceSegments: segmentList,
+        audienceExcludeSegments: [...excludeSegments],
+      });
+      setAudiencePreview({
+        total: preview.total,
+        sample: preview.sample,
+      });
+      toast.success(`${preview.total} destinatarios`);
+    } catch (e) {
+      setAudiencePreview(null);
+      toast.error(e instanceof Error ? e.message : 'Error al previsualizar');
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function invalidateAudiencePreview() {
+    setAudiencePreview(null);
+  }
+
+  function toggleCampaignSegment(
+    slug: string,
+    which: 'include' | 'exclude',
+  ) {
+    const setter = which === 'include' ? setIncludeSegments : setExcludeSegments;
+    const otherSetter =
+      which === 'include' ? setExcludeSegments : setIncludeSegments;
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+    otherSetter((prev) => {
+      if (!prev.has(slug)) return prev;
+      const next = new Set(prev);
+      next.delete(slug);
+      return next;
+    });
+    invalidateAudiencePreview();
+  }
+
+  async function handleCreateCampaign(mode: 'now' | 'scheduled') {
     if (!newsletterId) {
       toast.error('Elige un boletín publicado');
       return;
     }
+    const segmentList = [...includeSegments];
+    if (!segmentList.length) {
+      toast.error('Marca al menos un segmento');
+      return;
+    }
+    if (mode === 'scheduled' && !scheduledAt.trim()) {
+      toast.error('Indica fecha y hora de programación');
+      return;
+    }
+
+    const when =
+      mode === 'scheduled'
+        ? `programada para ${new Date(scheduledAt).toLocaleString('es-PE')}`
+        : 'envío inmediato';
     const ok = await confirm({
-      title: 'Enviar boletín',
-      description:
-        'Se creará una campaña y se enviará por SES a contactos PAM con email y opt-in. ¿Continuar?',
-      confirmLabel: 'Enviar',
+      title: mode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
+      description: `Se creará la campaña (${when}) hacia contactos PAM con email y opt-in.`,
+      confirmLabel: mode === 'scheduled' ? 'Programar' : 'Enviar',
     });
     if (!ok) return;
 
@@ -814,22 +899,24 @@ export function CrmPamPage() {
           campaignName ||
           `Envío ${new Date().toLocaleString('es-PE')}`,
         audienceArea: 'pam',
-        audienceAttrKey: filterAttrKey || undefined,
-        audienceAttrValue: filterAttrValue || undefined,
+        audienceSegments: segmentList,
+        audienceExcludeSegments: [...excludeSegments],
+        ...(mode === 'scheduled'
+          ? { scheduledAt: new Date(scheduledAt).toISOString() }
+          : {}),
       });
-      const preview = await api.previewEmailAudience(campaign.id);
-      setAudienceInfo(
-        `${preview.total} destinatarios. Muestra: ${preview.sample
-          .slice(0, 5)
-          .map((s) => s.email)
-          .join(', ')}`,
-      );
-      await api.sendEmailCampaign(campaign.id);
-      toast.success('Envío iniciado');
+
+      if (mode === 'now') {
+        await api.sendEmailCampaign(campaign.id);
+        toast.success('Envío iniciado');
+      } else {
+        toast.success('Campaña programada');
+      }
+      setCampaignName('');
       await loadCampaigns();
       setTab('send');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al enviar');
+      toast.error(e instanceof Error ? e.message : 'Error al crear campaña');
     } finally {
       setSaving(false);
     }
@@ -1147,6 +1234,27 @@ export function CrmPamPage() {
       },
       { accessorKey: 'status', header: 'Estado' },
       {
+        id: 'segments',
+        header: 'Segmentos',
+        cell: ({ row }) => {
+          const segs =
+            row.original.audienceSegments?.length > 0
+              ? row.original.audienceSegments
+              : row.original.audienceSegment
+                ? [row.original.audienceSegment]
+                : [];
+          return segs.length ? segs.join(', ') : '—';
+        },
+      },
+      {
+        id: 'scheduled',
+        header: 'Programado',
+        cell: ({ row }) =>
+          row.original.scheduledAt
+            ? new Date(row.original.scheduledAt).toLocaleString('es-PE')
+            : '—',
+      },
+      {
         id: 'sent',
         header: 'Enviados',
         cell: ({ row }) =>
@@ -1175,7 +1283,7 @@ export function CrmPamPage() {
         <TabsList>
           <TabsTrigger value="contacts">Contactos</TabsTrigger>
           <TabsTrigger value="payments">Pagos</TabsTrigger>
-          <TabsTrigger value="send">Enviar boletín</TabsTrigger>
+          <TabsTrigger value="send">Campañas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contacts" className="space-y-4">
@@ -1509,16 +1617,16 @@ export function CrmPamPage() {
               Añadir pago con autocompletado CRM.
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMethodsManager((v) => !v)}
-              >
-                {showMethodsManager ? 'Cerrar medios' : 'Medios de pago'}
-              </Button>
               <Button size="sm" onClick={() => setShowNewPayment((v) => !v)}>
                 <Plus className="mr-1 size-4" />
                 {showNewPayment ? 'Cerrar formulario' : 'Añadir pago'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMethodsManager(true)}
+              >
+                Medios de pago
               </Button>
               <Button
                 variant="secondary"
@@ -1543,72 +1651,82 @@ export function CrmPamPage() {
             </div>
           </div>
 
-          {showMethodsManager ? (
-            <div className="space-y-3 rounded-md border border-border/60 p-4">
-              <p className="text-sm font-medium">Catálogo de medios de pago</p>
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  className="max-w-xs"
-                  placeholder="Ej. Niubiz, Izipay…"
-                  value={newMethodLabel}
-                  onChange={(e) => setNewMethodLabel(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  disabled={savingMethod}
-                  onClick={() => void createPaymentMethod()}
-                >
-                  <Plus className="mr-1 size-4" />
-                  {savingMethod ? 'Creando…' : 'Crear medio'}
-                </Button>
-              </div>
-              <ul className="divide-y divide-border/60 rounded-md border border-border/50">
-                {paymentMethods.map((m) => (
-                  <li
-                    key={m.id}
-                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+          <Dialog
+            open={showMethodsManager}
+            onOpenChange={setShowMethodsManager}
+          >
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Medios de pago</DialogTitle>
+                <DialogDescription>
+                  Catálogo usado al registrar y editar pagos del ledger PAM.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    className="max-w-xs"
+                    placeholder="Ej. Niubiz, Izipay…"
+                    value={newMethodLabel}
+                    onChange={(e) => setNewMethodLabel(e.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={savingMethod}
+                    onClick={() => void createPaymentMethod()}
                   >
-                    <div className="min-w-0">
-                      <span className="font-medium">{m.label}</span>
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">
-                        {m.slug}
-                      </span>
-                      {m.system ? (
-                        <Badge variant="secondary" className="ml-2">
-                          Sistema
-                        </Badge>
-                      ) : null}
-                      {!m.active ? (
-                        <Badge variant="outline" className="ml-2">
-                          Inactivo
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <div className="flex gap-1">
-                      {!m.system ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void togglePaymentMethodActive(m)}
-                        >
-                          {m.active ? 'Desactivar' : 'Activar'}
-                        </Button>
-                      ) : null}
-                      {!m.system ? (
-                        <IconActionButton
-                          label="Eliminar"
-                          variant="ghost"
-                          onClick={() => void removePaymentMethod(m)}
-                        >
-                          <Trash2 className="size-4" />
-                        </IconActionButton>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+                    <Plus className="mr-1 size-4" />
+                    {savingMethod ? 'Creando…' : 'Crear medio'}
+                  </Button>
+                </div>
+                <ul className="max-h-72 divide-y divide-border/60 overflow-auto rounded-md border border-border/50">
+                  {paymentMethods.map((m) => (
+                    <li
+                      key={m.id}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <span className="font-medium">{m.label}</span>
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">
+                          {m.slug}
+                        </span>
+                        {m.system ? (
+                          <Badge variant="secondary" className="ml-2">
+                            Sistema
+                          </Badge>
+                        ) : null}
+                        {!m.active ? (
+                          <Badge variant="outline" className="ml-2">
+                            Inactivo
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-1">
+                        {!m.system ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void togglePaymentMethodActive(m)}
+                          >
+                            {m.active ? 'Desactivar' : 'Activar'}
+                          </Button>
+                        ) : null}
+                        {!m.system ? (
+                          <IconActionButton
+                            label="Eliminar"
+                            variant="ghost"
+                            onClick={() => void removePaymentMethod(m)}
+                          >
+                            <Trash2 className="size-4" />
+                          </IconActionButton>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {showNewPayment ? (
             <div className="grid gap-3 rounded-md border border-border/60 p-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -2053,10 +2171,116 @@ export function CrmPamPage() {
         </TabsContent>
 
         <TabsContent value="send" className="space-y-4">
-          <div className="grid gap-4 rounded-lg border border-border/60 p-4 md:grid-cols-2">
-            <div className="space-y-3">
+          <div className="space-y-5 rounded-lg border border-border/60 p-4">
+            <div className="space-y-2">
+              <Label>1. Incluir segmentos</Label>
+              <p className="text-xs text-muted-foreground">
+                Contactos en cualquiera de los segmentos (unión), con email y
+                opt-in.
+              </p>
+              {segments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay segmentos cargados desde WhatsApp CRM.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {segments.map((s) => {
+                    const on = includeSegments.has(s.slug);
+                    return (
+                      <Button
+                        key={`inc-${s.slug}`}
+                        type="button"
+                        size="sm"
+                        variant={on ? 'default' : 'outline'}
+                        onClick={() =>
+                          toggleCampaignSegment(s.slug, 'include')
+                        }
+                      >
+                        {s.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2 border-t border-border/50 pt-4">
+              <Label>Excluir segmentos (opcional)</Label>
+              <div className="flex flex-wrap gap-2">
+                {segments.map((s) => {
+                  const on = excludeSegments.has(s.slug);
+                  const blocked = includeSegments.has(s.slug);
+                  return (
+                    <Button
+                      key={`exc-${s.slug}`}
+                      type="button"
+                      size="sm"
+                      variant={on ? 'secondary' : 'outline'}
+                      disabled={blocked}
+                      onClick={() =>
+                        toggleCampaignSegment(s.slug, 'exclude')
+                      }
+                    >
+                      {s.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t border-border/50 pt-4">
+              <Label>2. Vista previa de destinatarios</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={previewLoading || includeSegments.size === 0}
+                  onClick={() => void handlePreviewAudience()}
+                >
+                  {previewLoading ? 'Cargando…' : 'Mostrar destinatarios'}
+                </Button>
+                {audiencePreview ? (
+                  <span className="text-sm text-muted-foreground">
+                    {audiencePreview.total} destinatarios
+                  </span>
+                ) : null}
+              </div>
+              {audiencePreview ? (
+                <div className="max-h-64 overflow-auto rounded-md border border-border/50">
+                  <table className="w-full text-left text-sm">
+                    <thead className="sticky top-0 bg-muted/80">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Nombre</th>
+                        <th className="px-3 py-2 font-medium">Apellidos</th>
+                        <th className="px-3 py-2 font-medium">Email</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {audiencePreview.sample.map((r) => (
+                        <tr
+                          key={r.contact_id}
+                          className="border-t border-border/40"
+                        >
+                          <td className="px-3 py-1.5">{r.name || '—'}</td>
+                          <td className="px-3 py-1.5">{r.last_name || '—'}</td>
+                          <td className="px-3 py-1.5">{r.email}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {audiencePreview.total > audiencePreview.sample.length ? (
+                    <p className="border-t border-border/40 px-3 py-2 text-xs text-muted-foreground">
+                      Mostrando {audiencePreview.sample.length} de{' '}
+                      {audiencePreview.total}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 border-t border-border/50 pt-4 md:grid-cols-2">
               <div className="space-y-1">
-                <Label>Boletín publicado</Label>
+                <Label>3. Boletín publicado</Label>
                 <Select value={newsletterId} onValueChange={setNewsletterId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar" />
@@ -2076,44 +2300,76 @@ export function CrmPamPage() {
                   id="cname"
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Opcional"
                 />
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label>Filtro atributo (opcional)</Label>
-                <Input
-                  value={filterAttrKey}
-                  onChange={(e) => setFilterAttrKey(e.target.value)}
-                  placeholder="plan"
-                />
+
+            <div className="space-y-3 border-t border-border/50 pt-4">
+              <Label>4. Programación y envío</Label>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    checked={scheduleMode === 'now'}
+                    onChange={() => setScheduleMode('now')}
+                  />
+                  Enviar ahora
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    checked={scheduleMode === 'scheduled'}
+                    onChange={() => setScheduleMode('scheduled')}
+                  />
+                  Programar envío
+                </label>
               </div>
-              <div className="space-y-1">
-                <Label>Valor</Label>
-                <Input
-                  value={filterAttrValue}
-                  onChange={(e) => setFilterAttrValue(e.target.value)}
-                  placeholder="amigo"
-                />
+              {scheduleMode === 'scheduled' ? (
+                <div className="max-w-xs space-y-1">
+                  <Label htmlFor="schedAt">Fecha y hora</Label>
+                  <Input
+                    id="schedAt"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                  />
+                </div>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {scheduleMode === 'now' ? (
+                  <Button
+                    onClick={() => void handleCreateCampaign('now')}
+                    disabled={
+                      saving || !newsletterId || includeSegments.size === 0
+                    }
+                  >
+                    <Send className="mr-1 size-4" />
+                    {saving ? 'Enviando…' : 'Enviar'}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void handleCreateCampaign('scheduled')}
+                    disabled={
+                      saving ||
+                      !newsletterId ||
+                      includeSegments.size === 0 ||
+                      !scheduledAt.trim()
+                    }
+                  >
+                    {saving ? 'Guardando…' : 'Programar'}
+                  </Button>
+                )}
               </div>
-            </div>
-            <div className="md:col-span-2">
-              <Button
-                onClick={() => void handleCreateAndSend()}
-                disabled={saving || !newsletterId}
-              >
-                <Send className="mr-1 size-4" />
-                Crear y enviar
-              </Button>
             </div>
           </div>
 
-          {audienceInfo ? <AlertBanner>{audienceInfo}</AlertBanner> : null}
-
           {campaigns.length === 0 ? (
             <EmptyState
-              title="Sin envíos"
-              description="Los envíos aparecerán aquí."
+              title="Sin campañas"
+              description="Las campañas aparecerán aquí."
             />
           ) : (
             <DataTable

@@ -22,6 +22,7 @@ import {
   CreatePamPaymentMethodDto,
   ListCrmContactsQueryDto,
   PatchCrmContactDto,
+  PreviewEmailAudienceDto,
   UpdateCrmAttributeDefinitionDto,
   UpdatePamPaymentMethodDto,
 } from './dto/crm-pam.dto';
@@ -152,6 +153,11 @@ export class CrmPamController {
   @Post('campaigns')
   createCampaign(@Req() req: Request, @Body() body: CreateEmailCampaignDto) {
     return this.crmPam.createCampaign((req.user as User).id, body);
+  }
+
+  @Post('audience-preview')
+  previewAudienceQuery(@Body() body: PreviewEmailAudienceDto) {
+    return this.crmPam.previewAudienceQuery(body);
   }
 
   @Get('campaigns/:id/audience-preview')
