@@ -21,7 +21,7 @@ export const moduleMeta: Record<
   {
     to: string;
     icon: typeof Link2;
-    group: 'operaciones' | 'widgets' | 'herramientas';
+    group: 'operaciones' | 'crms' | 'widgets' | 'herramientas';
     accent: ModuleCardAccent;
   }
 > = {
@@ -74,8 +74,8 @@ export const moduleMeta: Record<
     group: 'widgets',
     accent: 'violet',
   },
-  pam_memberships: {
-    to: '/admin/pam',
+  widget_pam: {
+    to: '/admin/widget-pam',
     icon: Heart,
     group: 'widgets',
     accent: 'rose',
@@ -83,25 +83,26 @@ export const moduleMeta: Record<
   newsletters: {
     to: '/admin/newsletters',
     icon: Newspaper,
-    group: 'operaciones',
+    group: 'crms',
     accent: 'blue',
   },
   crm_pam: {
     to: '/admin/crm-pam',
     icon: Contact,
-    group: 'operaciones',
+    group: 'crms',
     accent: 'violet',
   },
   mailing: {
     to: '/admin/newsletters',
     icon: Mail,
-    group: 'operaciones',
+    group: 'crms',
     accent: 'blue',
   },
 };
 
 export const groupLabels: Record<string, string> = {
   operaciones: 'Operaciones',
+  crms: 'CRMs',
   widgets: 'Widgets y sitios',
   herramientas: 'Herramientas',
 };

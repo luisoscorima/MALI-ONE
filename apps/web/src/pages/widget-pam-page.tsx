@@ -94,7 +94,7 @@ function PlanEditor({
   );
 }
 
-export function PamMembershipsPage() {
+export function WidgetPamPage() {
   const toast = useToast();
   const [state, setState] = useState<PamPageState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -230,7 +230,7 @@ export function PamMembershipsPage() {
 
   return (
     <WidgetToolLayout
-      title="Membresías PAM"
+      title="Widget PAM"
       description="Vitrina del widget: planes, beneficios y checkout MP."
       config={config}
       preview={<WidgetPreviewFrame tabs={MEMBERSHIP_PREVIEW} />}

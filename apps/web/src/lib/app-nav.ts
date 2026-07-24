@@ -71,6 +71,11 @@ export const appNavSections: AppNavSection[] = [
         icon: PackageSearch,
         module: 'bsale_reports',
       },
+    ],
+  },
+  {
+    label: 'CRMs',
+    items: [
       {
         to: '/admin/newsletters',
         label: 'Boletines',
@@ -107,10 +112,10 @@ export const appNavSections: AppNavSection[] = [
         module: 'widget_museo',
       },
       {
-        to: '/admin/pam',
-        label: 'Membresías PAM',
+        to: '/admin/widget-pam',
+        label: 'Widget PAM',
         icon: Heart,
-        module: 'pam_memberships',
+        module: 'widget_pam',
       },
     ],
   },

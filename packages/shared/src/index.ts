@@ -8,7 +8,7 @@ export type AppModule =
   | 'widget_educacion'
   | 'widget_biblioteca'
   | 'widget_museo'
-  | 'pam_memberships'
+  | 'widget_pam'
   | 'screen_cast'
   | 'bsale_reports'
   | 'mailing'

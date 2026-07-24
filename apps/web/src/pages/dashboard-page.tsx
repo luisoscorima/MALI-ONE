@@ -17,7 +17,7 @@ export function DashboardPage() {
     }),
   );
 
-  const groups = ['operaciones', 'widgets', 'herramientas'] as const;
+  const groups = ['operaciones', 'crms', 'widgets', 'herramientas'] as const;
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">

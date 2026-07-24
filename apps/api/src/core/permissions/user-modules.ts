@@ -8,7 +8,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.widget_educacion,
   AppModule.widget_biblioteca,
   AppModule.widget_museo,
-  AppModule.pam_memberships,
+  AppModule.widget_pam,
   AppModule.screen_cast,
   AppModule.bsale_reports,
   AppModule.newsletters,

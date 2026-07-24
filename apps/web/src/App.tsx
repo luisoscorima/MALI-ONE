@@ -25,8 +25,8 @@ import { WidgetEducacionPopupPage } from '@/pages/widget-educacion-popup-page';
 import { WidgetEducacionSelectorPage } from '@/pages/widget-educacion-selector-page';
 import { WidgetMuseoHubPage } from '@/pages/widget-museo-hub-page';
 import { WidgetMuseoInterfazPage } from '@/pages/widget-museo-interfaz-page';
-import { PamMembershipsPage } from '@/pages/pam-memberships-page';
 import { WidgetMuseoPopupPage } from '@/pages/widget-museo-popup-page';
+import { WidgetPamPage } from '@/pages/widget-pam-page';
 import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 import { NewslettersPage } from '@/pages/newsletters-page';
 import { CrmPamPage } from '@/pages/crm-pam-page';
@@ -114,21 +114,12 @@ function AuthenticatedApp() {
                       path="admin/widgets/museo/interfaz-sistemas"
                       element={<WidgetMuseoInterfazPage />}
                     />
-                    <Route
-                      path="admin/widgets/museo/membership"
-                      element={<Navigate to="/admin/pam" replace />}
-                    />
-                    <Route
-                      path="admin/widgets/pam"
-                      element={<Navigate to="/admin/pam" replace />}
-                    />
-                    <Route
-                      path="admin/widgets/pam/*"
-                      element={<Navigate to="/admin/pam" replace />}
-                    />
                   </Route>
-                  <Route element={<ModuleGuard module="pam_memberships" />}>
-                    <Route path="admin/pam" element={<PamMembershipsPage />} />
+                  <Route element={<ModuleGuard module="widget_pam" />}>
+                    <Route
+                      path="admin/widget-pam"
+                      element={<WidgetPamPage />}
+                    />
                   </Route>
                   <Route element={<ModuleGuard module="bsale_reports" />}>
                     <Route path="bsale/kardex" element={<BsaleKardexPage />} />

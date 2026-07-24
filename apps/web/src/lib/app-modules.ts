@@ -41,8 +41,8 @@ export const APP_MODULES: {
     description: 'Popup e interfaz embebible en mali.pe/es.',
   },
   {
-    id: 'pam_memberships',
-    label: 'Membresías PAM',
+    id: 'widget_pam',
+    label: 'Widget PAM',
     description: 'Vitrina del widget PAM: planes, beneficios y checkout.',
   },
   {

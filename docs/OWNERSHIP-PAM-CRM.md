@@ -4,7 +4,7 @@
 
 | Capa | Dónde (UI) | Rol |
 |------|------------|-----|
-| **Vitrina** | `/admin/pam` Membresías PAM | Solo planes, beneficios, checkout del widget |
+| **Vitrina** | `/admin/widget-pam` Widget PAM | Solo planes, beneficios, checkout del widget |
 | **CRM + pagos** | `/admin/crm-pam` CRM PAM | Contactos WhatsApp + ledger de pagos + **medios de pago** |
 | **Boletines** | `/admin/newsletters` | Editor; envío masivo SES desde CRM PAM |
 | **Atributos / persona** | [WhatsApp `/attributes`](https://whatsapp.mali.pe/attributes) y `/contacts` | Catálogo y edición de attrs (incl. `payment_id`, `medio_pago`) |
@@ -63,6 +63,6 @@ Widget → ONE ledger (medio = Mercado Pago)
 
 | Módulo | Qué abre |
 |--------|----------|
-| `pam_memberships` | Vitrina `/admin/pam` |
+| `widget_pam` | Vitrina `/admin/widget-pam` |
 | `crm_pam` | Contactos + Pagos + medios + envío boletines |
 | `newsletters` | Editor |

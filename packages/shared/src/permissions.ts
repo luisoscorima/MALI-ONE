@@ -1,7 +1,7 @@
 /** Permisos recurso.acción; hoy se resuelven contra AppModule hasta RBAC completo. */
 export const APP_PERMISSION_MODULES = {
-  'pam.settings.manage': 'pam_memberships',
-  'pam.planes.manage': 'pam_memberships',
+  'pam.settings.manage': 'widget_pam',
+  'pam.planes.manage': 'widget_pam',
   'pam.registros.read': 'crm_pam',
   'pam.registros.manage': 'crm_pam',
   'widgets.museo.popup.manage': 'widget_museo',
