@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { PamRegistration } from '@prisma/client';
+import type { EducacionLead, PamRegistration } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
 /** Defs de área que el widget/ledger deben tener en WhatsApp (idempotente). */
@@ -27,6 +27,20 @@ const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
     sort_order: 14,
   },
   { slug: 'como_te_enteraste', label: 'Cómo te enteraste', sort_order: 15 },
+  { slug: 'source', label: 'Origen', sort_order: 20 },
+];
+
+const EDUCACION_LEAD_ATTR_DEFINITIONS: Array<{
+  slug: string;
+  label: string;
+  field_type?: string;
+  sort_order?: number;
+}> = [
+  { slug: 'fuente', label: 'Fuente', sort_order: 1 },
+  { slug: 'curso', label: 'Curso', sort_order: 2 },
+  { slug: 'curso_url', label: 'URL del curso', sort_order: 3 },
+  { slug: 'origen', label: 'Origen sistema', sort_order: 4 },
+  { slug: 'programa', label: 'Programa web', sort_order: 5 },
   { slug: 'source', label: 'Origen', sort_order: 20 },
 ];
 
@@ -173,6 +187,84 @@ export class WhatsappCrmClientService {
     } catch (err) {
       this.logger.warn(
         `No se pudieron asegurar defs de atributos PAM: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  /** Fire-and-forget sync de lead Educación → WhatsApp CRM. */
+  syncEducacionLead(lead: EducacionLead): void {
+    void this.syncEducacionLeadAsync(lead).catch((err) => {
+      this.logger.warn(
+        `CRM sync failed for EducacionLead ${lead.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
+  }
+
+  async syncEducacionLeadAsync(lead: EducacionLead): Promise<void> {
+    if (!this.configured) {
+      this.logger.debug('WhatsApp CRM no configurado; omitiendo sync Educación');
+      return;
+    }
+
+    const phone = this.toE164Pe(lead.celular);
+    if (!phone) {
+      throw new Error(`Teléfono inválido en lead ${lead.id}`);
+    }
+
+    const area = String(lead.whatsappArea || 'educacion_ep').trim();
+    await this.ensureEducacionLeadAttributeDefinitions(area);
+
+    const lastName = String(lead.apellidos ?? '').trim();
+
+    const attributes: Record<string, string> = {
+      source: 'educacion_lead_widget',
+      origen: 'mali_one_widget',
+      fuente: lead.fuente || 'WEB',
+      programa: this.resolveEducacionPrograma(lead),
+    };
+    this.setAttr(attributes, 'curso', lead.courseTitle ?? lead.courseSlug);
+    this.setAttr(attributes, 'curso_url', lead.pageUrl);
+
+    await this.syncContact({
+      area,
+      name: lead.nombres,
+      last_name: lastName,
+      phone,
+      email: lead.email,
+      dni: lead.dni,
+      opt_in: true,
+      opt_in_email: Boolean(lead.optInMarketing),
+      attributes,
+      external_id: lead.id,
+    });
+  }
+
+  /** Segmento web para tipificación (EP / Diseño / CA). */
+  private resolveEducacionPrograma(lead: EducacionLead): string {
+    const url = String(lead.pageUrl ?? '').toLowerCase();
+    if (url.includes('/diseno-y-comunicaciones/')) {
+      return 'diseno-y-comunicaciones';
+    }
+    if (lead.whatsappArea === 'educacion_ca') {
+      return 'cursos-de-arte';
+    }
+    return 'extension-profesional';
+  }
+
+  async ensureEducacionLeadAttributeDefinitions(area: string): Promise<void> {
+    if (!this.configured) return;
+    try {
+      await this.request('POST', '/api/crm/attribute-definitions/ensure', {
+        area,
+        definitions: EDUCACION_LEAD_ATTR_DEFINITIONS,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `No se pudieron asegurar defs de atributos Educación (${area}): ${
           err instanceof Error ? err.message : String(err)
         }`,
       );

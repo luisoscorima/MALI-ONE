@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { EducacionWidgetsController } from './educacion/educacion-widgets.controller';
 import { EducacionWidgetsService } from './educacion/educacion-widgets.service';
+import { EducacionLeadsService } from './educacion/educacion-leads.service';
+import { EducacionLeadsSheetsService } from './educacion/educacion-leads-sheets.service';
 import { BibliotecaWidgetsController } from './biblioteca/biblioteca-widgets.controller';
 import { BibliotecaWidgetsService } from './biblioteca/biblioteca-widgets.service';
 import { PamWidgetsController } from './pam/pam-widgets.controller';
@@ -18,6 +20,8 @@ import { MuseoWidgetsController } from './museo/museo-widgets.controller';
   ],
   providers: [
     EducacionWidgetsService,
+    EducacionLeadsService,
+    EducacionLeadsSheetsService,
     BibliotecaWidgetsService,
     PamWidgetsService,
     PamEmailService,

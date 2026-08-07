@@ -334,6 +334,37 @@ model PamRegistration {
   @@index([paymentMethod])
 }
 
+/// Lead del widget «Conversemos» (Educación). Persona canónica en WhatsApp CRM.
+model EducacionLead {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  nombres         String
+  apellidos       String
+  dni             String
+  celular         String
+  email           String
+  optInMarketing  Boolean  @default(false)
+  acceptPrivacy   Boolean
+  courseSlug      String?
+  courseTitle     String?
+  pageUrl         String?
+  /// Área WhatsApp: educacion_ep (Extensión Profesional) | educacion_ca (Cursos de Arte)
+  whatsappArea    String   @default("educacion_ep")
+  fuente          String   @default("WEB")
+  /// pending | ok | error | skipped
+  waStatus        String   @default("pending")
+  waError         String?
+  /// pending | ok | error | skipped | disabled
+  sheetStatus     String   @default("pending")
+  sheetError      String?
+
+  @@index([celular])
+  @@index([email])
+  @@index([createdAt])
+  @@index([whatsappArea])
+}
+
 model ScreenCastPlaylist {
   id        String                   @id @default(cuid())
   name      String

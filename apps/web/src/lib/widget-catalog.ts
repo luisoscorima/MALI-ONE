@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   MapPin,
   Megaphone,
+  MessageSquare,
   MousePointerClick,
   Users,
 } from 'lucide-react';
@@ -75,6 +76,16 @@ export const WIDGET_AREAS: Record<WidgetAreaId, WidgetAreaCatalog> = {
         description: 'Grilla de logos con filtro por categoría.',
         path: 'aliados',
         icon: Users,
+        embedHost: 'educacion.mali.pe',
+      },
+      {
+        id: 'lead-form',
+        label: 'Formulario Conversemos',
+        description:
+          'Captura de leads hacia WhatsApp CRM (espejo Sheet opcional).',
+        path: 'lead-form',
+        icon: MessageSquare,
+        previewOnly: true,
         embedHost: 'educacion.mali.pe',
       },
     ],

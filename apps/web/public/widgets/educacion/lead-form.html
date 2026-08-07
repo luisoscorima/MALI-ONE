@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversemos — MALI Educación</title>
+  <link rel="stylesheet" href="benton-sans.css" />
+  <style>
+    :root {
+      --lead-bg: #b4b3ff;
+      --lead-btn: #10059f;
+      --lead-text: #ffffff;
+      --lead-input-bg: #ffffff;
+      --lead-input-text: #1a1a1a;
+      --lead-error: #7a1020;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'BentonSansFB', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: var(--lead-text);
+    }
+
+    .lead-form {
+      background: var(--lead-bg);
+      color: var(--lead-text);
+      padding: 28px 24px 32px;
+      width: 100%;
+    }
+
+    .lead-form__title {
+      margin: 0 0 6px;
+      text-align: center;
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .lead-form__subtitle {
+      margin: 0 0 20px;
+      text-align: center;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      opacity: 0.95;
+    }
+
+    .lead-form__field {
+      margin-bottom: 12px;
+    }
+
+    .lead-form__field label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .lead-form__field label .req {
+      margin-left: 2px;
+    }
+
+    .lead-form__field input[type="text"],
+    .lead-form__field input[type="email"],
+    .lead-form__field input[type="tel"] {
+      width: 100%;
+      border: 0;
+      border-radius: 2px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--lead-input-text);
+      background: var(--lead-input-bg);
+    }
+
+    .lead-form__field input:focus {
+      outline: 2px solid rgba(16, 5, 159, 0.45);
+      outline-offset: 1px;
+    }
+
+    .lead-form__checks {
+      margin: 16px 0 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .lead-form__check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+
+    .lead-form__check input {
+      margin-top: 3px;
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+    }
+
+    .lead-form__check a {
+      color: inherit;
+      text-decoration: underline;
+      font-weight: 600;
+    }
+
+    .lead-form__submit {
+      display: block;
+      width: 100%;
+      border: 0;
+      border-radius: 2px;
+      background: var(--lead-btn);
+      color: #fff;
+      font-family: inherit;
+      font-size: 1.15rem;
+      font-weight: 700;
+      padding: 14px 16px;
+      cursor: pointer;
+    }
+
+    .lead-form__submit:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    .lead-form__msg {
+      margin-top: 14px;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .lead-form__msg--error {
+      color: var(--lead-error);
+      background: rgba(255, 255, 255, 0.55);
+      padding: 8px 10px;
+      border-radius: 2px;
+    }
+
+    .lead-form__msg--ok {
+      background: rgba(255, 255, 255, 0.35);
+      padding: 8px 10px;
+      border-radius: 2px;
+    }
+
+    .lead-form__wa {
+      display: none;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .lead-form--done .lead-form__wa {
+      display: block;
+    }
+
+    .lead-form__wa a {
+      display: inline-block;
+      background: #25d366;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 12px 16px;
+      border-radius: 2px;
+    }
+
+    .lead-form--done .lead-form__fields,
+    .lead-form--done .lead-form__checks,
+    .lead-form--done .lead-form__submit {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <form class="lead-form" id="lead-form" novalidate>
+    <h3 class="lead-form__title">Conversemos</h3>
+    <p class="lead-form__subtitle">Estamos listos para brindarte la asesoría que necesitas</p>
+
+    <div class="lead-form__fields">
+      <div class="lead-form__field">
+        <label for="nombres">Nombres<span class="req">*</span></label>
+        <input id="nombres" name="nombres" type="text" required autocomplete="given-name" />
+      </div>
+      <div class="lead-form__field">
+        <label for="apellidos">Apellidos<span class="req">*</span></label>
+        <input id="apellidos" name="apellidos" type="text" required autocomplete="family-name" />
+      </div>
+      <div class="lead-form__field">
+        <label for="dni">DNI<span class="req">*</span></label>
+        <input id="dni" name="dni" type="text" inputmode="numeric" required maxlength="20" />
+      </div>
+      <div class="lead-form__field">
+        <label for="celular">Celular<span class="req">*</span></label>
+        <input id="celular" name="celular" type="tel" inputmode="tel" required autocomplete="tel" />
+      </div>
+      <div class="lead-form__field">
+        <label for="email">Correo Electrónico<span class="req">*</span></label>
+        <input id="email" name="email" type="email" required autocomplete="email" />
+      </div>
+    </div>
+
+    <div class="lead-form__checks">
+      <label class="lead-form__check">
+        <input type="checkbox" id="optInMarketing" name="optInMarketing" />
+        <span>Autorizo el envío de publicidad e información comercial.</span>
+      </label>
+      <label class="lead-form__check">
+        <input type="checkbox" id="acceptPrivacy" name="acceptPrivacy" required />
+        <span>
+          He leído y acepto las
+          <a id="privacy-link" href="https://educacion.mali.pe/wp-content/uploads/2026/01/Uso_de_datos_Terminos_y_condiciones_Mali_Educacion_2026.pdf" target="_blank" rel="noopener noreferrer">políticas de privacidad</a>.
+        </span>
+      </label>
+    </div>
+
+    <button class="lead-form__submit" type="submit" id="submit-btn">Enviar información</button>
+    <div class="lead-form__msg" id="form-msg" role="status" aria-live="polite"></div>
+    <div class="lead-form__wa" id="wa-cta">
+      <a id="wa-link" href="#" target="_blank" rel="noopener noreferrer">Continuar por WhatsApp</a>
+    </div>
+  </form>
+
+  <script src="../shared/widget-api.js"></script>
+  <script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var courseSlug = params.get('curso') || params.get('course') || '';
+  var courseTitle = params.get('titulo') || params.get('title') || '';
+  var pageUrl = params.get('url') || params.get('pageUrl') || '';
+  var area = params.get('area') || 'educacion_ep';
+  if (area !== 'educacion_ep' && area !== 'educacion_ca') {
+    area = 'educacion_ep';
+  }
+  var bg = params.get('bg') || params.get('color') || '';
+  var privacy = params.get('privacy') || '';
+  var waPhone = String(params.get('wa') || '').replace(/\D/g, '');
+
+  if (bg) {
+    document.documentElement.style.setProperty('--lead-bg', bg);
+  }
+  if (privacy) {
+    document.getElementById('privacy-link').href = privacy;
+  }
+
+  var form = document.getElementById('lead-form');
+  var msg = document.getElementById('form-msg');
+  var btn = document.getElementById('submit-btn');
+  var waLink = document.getElementById('wa-link');
+  var api = (window.MALI_WIDGET_API || (location.origin + '/api/widgets')) + '/educacion/leads';
+
+  function buildWhatsAppUrl() {
+    if (!waPhone) return '';
+    var text;
+    if (area === 'educacion_ca') {
+      text = courseTitle
+        ? '¡Hola MALI Educación! Vengo desde la web, deseo más información sobre el curso ' + courseTitle + ', por favor.'
+        : '¡Hola MALI Educación! Vengo desde la web, deseo más información sobre los cursos de arte, por favor.';
+    } else {
+      text = courseTitle
+        ? '¡Hola MALI Educación! Vengo desde la web, deseo más información sobre el curso ' + courseTitle + ', por favor.'
+        : '¡Hola MALI Educación! Vengo desde la web, deseo más información sobre Extensión Profesional, por favor.';
+    }
+    return 'https://api.whatsapp.com/send?phone=' + encodeURIComponent(waPhone) + '&text=' + encodeURIComponent(text);
+  }
+
+  function openWhatsApp(url) {
+    if (!url) return;
+    waLink.href = url;
+    try {
+      window.parent.postMessage({ type: 'mali-lead-open-whatsapp', url: url }, '*');
+    } catch (e) {}
+    try {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e2) {}
+  }
+
+  function notifyResize() {
+    try {
+      var height = Math.ceil(document.documentElement.scrollHeight || document.body.scrollHeight);
+      window.parent.postMessage({ type: 'mali-lead-iframe-resize', height: height }, '*');
+    } catch (e) {}
+  }
+
+  function setMsg(text, kind) {
+    msg.textContent = text || '';
+    msg.className = 'lead-form__msg' + (kind ? ' lead-form__msg--' + kind : '');
+    notifyResize();
+  }
+
+  function val(id) {
+    return String(document.getElementById(id).value || '').trim();
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    setMsg('');
+
+    if (!document.getElementById('acceptPrivacy').checked) {
+      setMsg('Debes aceptar las políticas de privacidad.', 'error');
+      return;
+    }
+
+    var payload = {
+      nombres: val('nombres'),
+      apellidos: val('apellidos'),
+      dni: val('dni'),
+      celular: val('celular'),
+      email: val('email'),
+      optInMarketing: document.getElementById('optInMarketing').checked,
+      acceptPrivacy: true,
+      courseSlug: courseSlug || undefined,
+      courseTitle: courseTitle || undefined,
+      pageUrl: pageUrl || undefined,
+      whatsappArea: area,
+    };
+
+    if (!payload.nombres || !payload.apellidos ||
+        !payload.dni || !payload.celular || !payload.email) {
+      setMsg('Completa todos los campos obligatorios.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Enviando…';
+
+    fetch(api, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(function (res) {
+        return res.json().then(function (body) {
+          return { ok: res.ok, status: res.status, body: body };
+        }).catch(function () {
+          return { ok: res.ok, status: res.status, body: null };
+        });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          var err =
+            (result.body && (result.body.message || result.body.error)) ||
+            'No se pudo enviar. Intenta de nuevo.';
+          if (Array.isArray(err)) err = err.join(' ');
+          throw new Error(String(err));
+        }
+        form.classList.add('lead-form--done');
+        var waUrl = buildWhatsAppUrl();
+        if (waUrl) {
+          setMsg('¡Gracias! Te abrimos WhatsApp para que envíes tu mensaje y un asesor te atienda.', 'ok');
+          openWhatsApp(waUrl);
+        } else {
+          setMsg('¡Gracias! Un asesor se pondrá en contacto contigo pronto.', 'ok');
+        }
+      })
+      .catch(function (err) {
+        setMsg(err.message || 'No se pudo enviar. Intenta de nuevo.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Enviar información';
+      });
+  });
+
+  window.addEventListener('load', notifyResize);
+  window.addEventListener('resize', notifyResize);
+  if (window.ResizeObserver) {
+    new ResizeObserver(notifyResize).observe(document.body);
+  }
+  setTimeout(notifyResize, 50);
+})();
+  </script>
+</body>
+</html>

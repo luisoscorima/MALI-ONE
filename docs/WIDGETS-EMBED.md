@@ -27,6 +27,7 @@ La configuración editable desde MALI ONE (popups, carrusel, calendario, mapa, e
 | [educacion.mali.pe](https://educacion.mali.pe) | Popup promocional | Script `{APP_URL}/widgets/shared/popup-loader.js?ctx=educacion` |
 | [mali.pe/es](https://mali.pe/es) | Popup promocional | Script `{APP_URL}/widgets/shared/popup-loader.js?ctx=museo` |
 | [educacion.mali.pe](https://educacion.mali.pe) | Aliados | `{APP_URL}/widgets/educacion/aliados.html` |
+| [educacion.mali.pe](https://educacion.mali.pe) | Formulario Conversemos (leads) | `{APP_URL}/widgets/educacion/lead-form.html?curso=&titulo=&area=educacion_ep` |
 
 Reemplaza `{APP_URL}` por tu instancia (ej. `https://dev.mali.pe`).
 
@@ -98,6 +99,7 @@ Activa el plugin y usa los shortcodes:
 | `[mali_mapa]` | iframe del mapa |
 | `[mali_calendario]` | iframe del calendario |
 | `[mali_aliados]` | iframe de aliados |
+| `[mali_lead_form]` | iframe formulario Conversemos (leads → WhatsApp + Sheet) |
 | `[mali_popup]` | flag: carga popup-loader.js (`ctx=educacion`) |
 
 El **selector flotante** se carga globalmente en todas las páginas (filtro `mali_one_embed_selector_global`). El plugin obtiene las sedes **desde PHP** (`wp_remote_get` → `MALI_ONE_EMBED.selectorConfig`); el loader usa esa config y, si falta, hace `fetch` a la API como respaldo.
@@ -123,6 +125,7 @@ Tras migrar, desactiva `mali-popup` y la config popup legacy de `mali-shared-con
 - `GET /api/widgets/educacion/popup/config`
 - `GET /api/widgets/museo/popup/config`
 - `GET /api/widgets/educacion/aliados/config`
+- `POST /api/widgets/educacion/leads`
 - `GET /api/widgets/biblioteca/carousel`
 - `GET /api/widgets/pam/config`
 - `POST /api/widgets/pam/registrations`
@@ -154,7 +157,40 @@ PAM_SMTP_PORT=587
 PAM_SMTP_USER=
 PAM_SMTP_PASS=
 PAM_SMTP_FROM=pam@mali.pe
+WHATSAPP_CRM_BASE_URL=
+WHATSAPP_CRM_SERVICE_TOKEN=
+# Espejo transitorio Sheet (leads Educación). Apagar al activar CRM Educación.
+EDUCACION_LEADS_SHEETS_ENABLED=false
+# Libro EP+CA (ID o URL). Pestañas:
+GOOGLE_SHEETS_LEADS_ID=
+GOOGLE_SHEETS_LEADS_TAB_EP=EP
+GOOGLE_SHEETS_LEADS_TAB_CA=CA
+# Libro aparte Diseño y Comunicaciones (ID o URL)
+GOOGLE_SHEETS_LEADS_DISENO_ID=
+GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
 ```
+
+## Formulario Conversemos (leads)
+
+Flujo: widget → `POST /api/widgets/educacion/leads` → ledger `EducacionLead` → sync WhatsApp CRM (`area` por query/body) → append opcional a Google Sheets.
+
+Enrutado Sheet: `/extensionprofesional/` → pestaña EP; `/diseno-y-comunicaciones/` → libro Diseño; Cursos de Arte → pestaña CA. WhatsApp: EP sigue en `educacion_ep` también para Diseño.
+
+Query params del embed:
+
+| Param | Uso |
+|-------|-----|
+| `curso` | slug del curso |
+| `titulo` | título visible / atributo CRM |
+| `area` | `educacion_ep` (Extensión Profesional) o `educacion_ca` (Cursos de Arte) |
+| `url` | URL de la ficha |
+| `bg` / `color` | color de fondo del formulario |
+| `privacy` | URL del PDF de políticas |
+| `wa` | teléfono WhatsApp (E.164 sin `+`; desde ACF `whatsapp_de_contacto`) |
+
+Tras un envío OK, el widget abre un chat prellenado (`api.whatsapp.com`) para que el visitante envíe el mensaje y abra la ventana de 24 h. Si el navegador bloquea el popup, queda el botón «Continuar por WhatsApp».
+
+Shortcode WP: `[mali_lead_form]` (infiere área por `post_type`). Checklist go-live: [docs/EDUCACION-LEADS.md](EDUCACION-LEADS.md).
 
 ## Seed inicial
 

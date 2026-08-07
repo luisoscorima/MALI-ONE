@@ -20,6 +20,7 @@ import { WidgetBibliotecaHubPage } from '@/pages/widget-biblioteca-hub-page';
 import { WidgetEducacionAliadosPage } from '@/pages/widget-educacion-aliados-page';
 import { WidgetEducacionCalendarioPage } from '@/pages/widget-educacion-calendario-page';
 import { WidgetEducacionHubPage } from '@/pages/widget-educacion-hub-page';
+import { WidgetEducacionLeadFormPage } from '@/pages/widget-educacion-lead-form-page';
 import { WidgetEducacionMapaPage } from '@/pages/widget-educacion-mapa-page';
 import { WidgetEducacionPopupPage } from '@/pages/widget-educacion-popup-page';
 import { WidgetEducacionSelectorPage } from '@/pages/widget-educacion-selector-page';
@@ -89,6 +90,10 @@ function AuthenticatedApp() {
                     <Route
                       path="admin/widgets/educacion/aliados"
                       element={<WidgetEducacionAliadosPage />}
+                    />
+                    <Route
+                      path="admin/widgets/educacion/lead-form"
+                      element={<WidgetEducacionLeadFormPage />}
                     />
                   </Route>
                   <Route element={<ModuleGuard module="widget_biblioteca" />}>

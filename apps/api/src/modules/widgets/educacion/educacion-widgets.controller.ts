@@ -8,11 +8,14 @@ import {
   Post,
   Put,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AppModule } from '@prisma/client';
 import { Public } from '../../../core/guards/public.decorator';
 import { RequireModule } from '../../../core/guards/module.decorator';
 import { EducacionWidgetsService } from './educacion-widgets.service';
+import { EducacionLeadsService } from './educacion-leads.service';
 import { UpdateEducacionSettingsDto } from '../dto/update-educacion-settings.dto';
 import {
   CreateEducacionDistrictDto,
@@ -32,10 +35,14 @@ import {
   UpdateEducacionAliadoDto,
 } from '../dto/create-educacion-aliado.dto';
 import { ImportEducacionAliadosDto } from '../dto/import-educacion-aliados.dto';
+import { CreateEducacionLeadDto } from '../dto/create-educacion-lead.dto';
 
 @Controller('widgets/educacion')
 export class EducacionWidgetsController {
-  constructor(private readonly service: EducacionWidgetsService) {}
+  constructor(
+    private readonly service: EducacionWidgetsService,
+    private readonly leads: EducacionLeadsService,
+  ) {}
 
   @Public()
   @Get('config')
@@ -77,6 +84,16 @@ export class EducacionWidgetsController {
   @Get('aliados/config')
   getAliadosPublicConfig() {
     return this.service.getAliadosPublicConfig();
+  }
+
+  @Public()
+  @Post('leads')
+  createLead(@Req() req: Request, @Body() body: CreateEducacionLeadDto) {
+    const ip =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip ??
+      'unknown';
+    return this.leads.createLead(body, ip);
   }
 
   @Get('admin')

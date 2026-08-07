@@ -233,7 +233,7 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | `links` | `/links` | Enlaces cortos, QR personalizable, carga masiva, estadísticas y subida de archivos |
 | `workspace_users` | `/admin/users` | Gestión de cuentas Google Workspace |
 | `s3_manager` | `/admin/s3` | Explorador de buckets y archivos en AWS |
-| `widget_educacion` | `/admin/widgets/educacion` | Mapa, selector, calendario, popup y aliados (educacion.mali.pe) |
+| `widget_educacion` | `/admin/widgets/educacion` | Mapa, selector, calendario, popup, aliados y formulario Conversemos (leads) |
 | `widget_biblioteca` | `/admin/widgets/biblioteca` | Configurador carrusel Koha (biblioteca.mali.pe) |
 | `widget_museo` | `/admin/widgets/museo` | Popup e interfaz embebible (mali.pe/es) |
 | `widget_pam` | `/admin/widget-pam` | Vitrina PAM: planes y beneficios (pagos en CRM PAM) |
