@@ -232,10 +232,10 @@ export class WhatsappCrmClientService {
       name: lead.nombres,
       last_name: lastName,
       phone,
-      email: lead.email,
-      dni: lead.dni,
+      email: lead.email || undefined,
+      dni: lead.dni || null,
       opt_in: true,
-      opt_in_email: Boolean(lead.optInMarketing),
+      opt_in_email: Boolean(lead.optInMarketing && lead.email),
       attributes,
       external_id: lead.id,
     });

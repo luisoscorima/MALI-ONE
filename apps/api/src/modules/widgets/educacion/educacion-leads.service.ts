@@ -43,9 +43,9 @@ export class EducacionLeadsService {
       data: {
         nombres: dto.nombres.trim(),
         apellidos: dto.apellidos.trim(),
-        dni: dto.dni.trim(),
+        dni: dto.dni?.trim() || null,
         celular: dto.celular.trim(),
-        email: dto.email.trim().toLowerCase(),
+        email: dto.email?.trim().toLowerCase() || null,
         optInMarketing: Boolean(dto.optInMarketing),
         acceptPrivacy: true,
         courseSlug: dto.courseSlug?.trim() || null,

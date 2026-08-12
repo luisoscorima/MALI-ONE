@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
@@ -6,12 +7,19 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export const EDUCACION_WHATSAPP_AREAS = [
   'educacion_ep',
   'educacion_ca',
 ] as const;
+
+function emptyToUndefined({ value }: { value: unknown }) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
 
 export class CreateEducacionLeadDto {
   @IsString()
@@ -24,19 +32,25 @@ export class CreateEducacionLeadDto {
   @MaxLength(160)
   apellidos!: string;
 
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @ValidateIf((_, v) => v != null)
   @IsString()
   @MinLength(5)
   @MaxLength(20)
-  dni!: string;
+  dni?: string;
 
   @IsString()
   @MinLength(7)
   @MaxLength(20)
   celular!: string;
 
+  @IsOptional()
+  @Transform(emptyToUndefined)
+  @ValidateIf((_, v) => v != null)
   @IsEmail()
   @MaxLength(160)
-  email!: string;
+  email?: string;
 
   @IsBoolean()
   optInMarketing!: boolean;

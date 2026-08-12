@@ -191,16 +191,16 @@
         <input id="apellidos" name="apellidos" type="text" required autocomplete="family-name" />
       </div>
       <div class="lead-form__field">
-        <label for="dni">DNI<span class="req">*</span></label>
-        <input id="dni" name="dni" type="text" inputmode="numeric" required maxlength="20" />
+        <label for="dni">DNI</label>
+        <input id="dni" name="dni" type="text" inputmode="numeric" maxlength="20" />
       </div>
       <div class="lead-form__field">
         <label for="celular">Celular<span class="req">*</span></label>
         <input id="celular" name="celular" type="tel" inputmode="tel" required autocomplete="tel" />
       </div>
       <div class="lead-form__field">
-        <label for="email">Correo Electrónico<span class="req">*</span></label>
-        <input id="email" name="email" type="email" required autocomplete="email" />
+        <label for="email">Correo Electrónico</label>
+        <input id="email" name="email" type="email" autocomplete="email" />
       </div>
     </div>
 
@@ -305,12 +305,14 @@
       return;
     }
 
+    var dni = val('dni');
+    var email = val('email');
     var payload = {
       nombres: val('nombres'),
       apellidos: val('apellidos'),
-      dni: val('dni'),
+      dni: dni || undefined,
       celular: val('celular'),
-      email: val('email'),
+      email: email || undefined,
       optInMarketing: document.getElementById('optInMarketing').checked,
       acceptPrivacy: true,
       courseSlug: courseSlug || undefined,
@@ -319,9 +321,13 @@
       whatsappArea: area,
     };
 
-    if (!payload.nombres || !payload.apellidos ||
-        !payload.dni || !payload.celular || !payload.email) {
+    if (!payload.nombres || !payload.apellidos || !payload.celular) {
       setMsg('Completa todos los campos obligatorios.', 'error');
+      return;
+    }
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMsg('Ingresa un correo válido o déjalo vacío.', 'error');
       return;
     }
 

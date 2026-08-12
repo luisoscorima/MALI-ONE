@@ -341,9 +341,9 @@ model EducacionLead {
   updatedAt       DateTime @updatedAt
   nombres         String
   apellidos       String
-  dni             String
+  dni             String?
   celular         String
-  email           String
+  email           String?
   optInMarketing  Boolean  @default(false)
   acceptPrivacy   Boolean
   courseSlug      String?
