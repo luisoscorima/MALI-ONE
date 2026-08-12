@@ -74,6 +74,11 @@ import { APP_PERMISSION_MODULES } from './permissions';
 export type { AppPermission, PermissionAppModule } from './permissions';
 export { APP_PERMISSION_MODULES };
 
+export {
+  EDUCACION_LEAD_FUENTE,
+  EDUCACION_LEAD_SOURCE,
+} from './educacion-leads';
+
 import type { QrStyleDto } from './qr-style';
 export type {
   QrStyleDto,

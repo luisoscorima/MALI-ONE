@@ -16,7 +16,7 @@ export type EducacionSheetBucket = 'ep' | 'ca' | 'diseno';
  *
  * Columnas (append):
  * Fecha | Nombres | Apellidos | DNI | Celular | Correo |
- * Curso | Fuente | URL | OptIn Marketing | Lead ID | Bucket
+ * Curso | Fuente | Source | URL | OptIn Marketing | Lead ID | Bucket
  */
 @Injectable()
 export class EducacionLeadsSheetsService {
@@ -65,7 +65,7 @@ export class EducacionLeadsSheetsService {
 
     const sheets = this.getSheetsClient();
     const fecha = lead.createdAt.toISOString().slice(0, 19).replace('T', ' ');
-    const range = `'${tab.replace(/'/g, "''")}'!A:L`;
+    const range = `'${tab.replace(/'/g, "''")}'!A:M`;
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,
@@ -83,6 +83,7 @@ export class EducacionLeadsSheetsService {
             lead.email,
             lead.courseTitle ?? lead.courseSlug ?? '',
             lead.fuente,
+            lead.source,
             lead.pageUrl ?? '',
             lead.optInMarketing ? 'SI' : 'NO',
             lead.id,

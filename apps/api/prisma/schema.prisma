@@ -351,7 +351,9 @@ model EducacionLead {
   pageUrl         String?
   /// Área WhatsApp: educacion_ep (Extensión Profesional) | educacion_ca (Cursos de Arte)
   whatsappArea    String   @default("educacion_ep")
-  fuente          String   @default("WEB")
+  fuente          String   @default("Web MALI Educación")
+  /// Identificador técnico del origen (widget, import, etc.)
+  source          String   @default("educacion_lead_widget")
   /// pending | ok | error | skipped
   waStatus        String   @default("pending")
   waError         String?

@@ -17,7 +17,7 @@ Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLe
    - `GOOGLE_SHEETS_LEADS_TAB_EP=EP` / `GOOGLE_SHEETS_LEADS_TAB_CA=CA` (nombres exactos de las pestañas)
    - `GOOGLE_SHEETS_LEADS_DISENO_ID=` ID **o URL** del libro aparte Diseño y Comunicaciones
    - `GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno`
-   - Columnas append: Fecha, Nombres, Apellidos, DNI, Celular, Correo, Curso, Fuente, URL, OptIn Marketing, Lead ID, Bucket
+   - Columnas append: Fecha, Nombres, Apellidos, DNI, Celular, Correo, Curso, Fuente, Source, URL, OptIn Marketing, Lead ID, Bucket
 
    Enrutado automático:
 
@@ -35,7 +35,7 @@ Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLe
 5. **Prueba E2E** (curso EP de prueba):
    - Enviar formulario «Conversemos»
    - Verificar fila en tabla `EducacionLead` (`waStatus=ok`)
-   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con attrs `fuente=WEB`, `curso`, `origen=mali_one_widget`
+   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con attrs `source=educacion_lead_widget`, `fuente=Web MALI Educación`, `programa`, `curso`, `curso_url`
    - Si Sheets está on: fila nueva en el rango configurado
    - Apagar Sheet a propósito (`ENABLED=false`) y confirmar que el submit sigue OK y WA sync funciona
 

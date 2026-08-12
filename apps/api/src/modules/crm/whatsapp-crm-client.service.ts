@@ -36,12 +36,11 @@ const EDUCACION_LEAD_ATTR_DEFINITIONS: Array<{
   field_type?: string;
   sort_order?: number;
 }> = [
-  { slug: 'fuente', label: 'Fuente', sort_order: 1 },
+  { slug: 'fuente', label: 'Fuente Lead', sort_order: 1 },
   { slug: 'curso', label: 'Curso', sort_order: 2 },
   { slug: 'curso_url', label: 'URL del curso', sort_order: 3 },
-  { slug: 'origen', label: 'Origen sistema', sort_order: 4 },
-  { slug: 'programa', label: 'Programa web', sort_order: 5 },
-  { slug: 'source', label: 'Origen', sort_order: 20 },
+  { slug: 'programa', label: 'Programa web', sort_order: 4 },
+  { slug: 'source', label: 'Source', sort_order: 20 },
 ];
 
 export type CrmSyncPayload = {
@@ -221,9 +220,8 @@ export class WhatsappCrmClientService {
     const lastName = String(lead.apellidos ?? '').trim();
 
     const attributes: Record<string, string> = {
-      source: 'educacion_lead_widget',
-      origen: 'mali_one_widget',
-      fuente: lead.fuente || 'WEB',
+      source: lead.source,
+      fuente: lead.fuente,
       programa: this.resolveEducacionPrograma(lead),
     };
     this.setAttr(attributes, 'curso', lead.courseTitle ?? lead.courseSlug);

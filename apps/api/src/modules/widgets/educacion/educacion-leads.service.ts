@@ -1,4 +1,8 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  EDUCACION_LEAD_FUENTE,
+  EDUCACION_LEAD_SOURCE,
+} from '@mali-one/shared';
 import type { EducacionLead } from '@prisma/client';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
@@ -48,7 +52,8 @@ export class EducacionLeadsService {
         courseTitle: dto.courseTitle?.trim() || null,
         pageUrl: dto.pageUrl?.trim() || null,
         whatsappArea,
-        fuente: 'WEB',
+        fuente: EDUCACION_LEAD_FUENTE,
+        source: EDUCACION_LEAD_SOURCE,
         sheetStatus: this.sheets.enabled ? 'pending' : 'disabled',
       },
     });
