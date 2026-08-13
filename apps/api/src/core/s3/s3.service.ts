@@ -60,18 +60,20 @@ export class S3Service {
     body: Buffer,
     mimeType: string,
   ): Promise<string> {
+    // Do not set object ACL: modern buckets use "Bucket owner enforced"
+    // (ACLs disabled). Public access comes from bucket policy when
+    // S3_PUBLIC_READ=true.
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: body,
         ContentType: mimeType,
-        ACL: this.publicRead ? 'public-read' : undefined,
       }),
     );
 
     if (this.publicRead) {
-      return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+      return this.getPublicUrl(key);
     }
 
     return getSignedUrl(
