@@ -1006,18 +1006,27 @@ export function ScreenCastAdminPage() {
                   : 'Sin playlist asignada'}
               </p>
             </div>
-            <WidgetPreviewFrame
-              key={`${previewKey}-${previewMonitor.id}`}
-              tabs={[
-                {
-                  id: 'player',
-                  label: previewMonitor.name,
-                  src: `/screen-cast?id=${encodeURIComponent(previewScreenKey)}`,
-                  height: '540px',
-                  previewMode: true,
-                },
-              ]}
-            />
+            <div className="max-h-[min(80vh,820px)] overflow-auto rounded-lg border border-border bg-black">
+              <WidgetPreviewFrame
+                key={`${previewKey}-${previewMonitor.id}`}
+                tabs={[
+                  {
+                    id: 'player',
+                    label: previewMonitor.name,
+                    src: `/screen-cast?id=${encodeURIComponent(previewScreenKey)}`,
+                    width:
+                      previewMonitor.orientation === 'PORTRAIT'
+                        ? '1080px'
+                        : '1920px',
+                    height:
+                      previewMonitor.orientation === 'PORTRAIT'
+                        ? '1920px'
+                        : '1080px',
+                    previewMode: true,
+                  },
+                ]}
+              />
+            </div>
           </div>
         ) : (
           <EmptyState

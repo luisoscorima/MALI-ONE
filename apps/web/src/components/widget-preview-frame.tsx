@@ -6,6 +6,8 @@ export type WidgetPreviewTab = {
   label: string;
   src: string;
   height?: string;
+  /** Fixed iframe width (e.g. screen-cast preview). Defaults to 100%. */
+  width?: string;
   pamEmbed?: boolean;
   /** Añade ?preview=1 al iframe (estilos de demo en el HTML del widget; no afecta WordPress). */
   previewMode?: boolean;
@@ -75,8 +77,15 @@ export function WidgetPreviewFrame({ tabs }: Props) {
         key={src}
         src={src}
         title={tab.label}
-        className="w-full rounded-lg border border-border bg-white"
-        style={{ height: tab.height ?? 'min(80vh, 720px)' }}
+        className={cn(
+          'rounded-lg border border-border bg-black',
+          !tab.width && 'w-full',
+        )}
+        style={{
+          height: tab.height ?? 'min(80vh, 720px)',
+          width: tab.width,
+          maxWidth: tab.width ? undefined : '100%',
+        }}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
       />
     </div>
