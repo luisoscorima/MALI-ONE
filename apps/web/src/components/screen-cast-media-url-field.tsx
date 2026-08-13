@@ -150,7 +150,10 @@ export function ScreenCastMediaUrlField({
                   ? 'Subiendo a S3…'
                   : 'Arrastra un archivo o haz clic para elegir'}
               </p>
-              <p className="text-xs text-muted">JPG, PNG, GIF o MP4</p>
+              <p className="text-xs text-muted">
+                JPG, PNG, GIF o MP4. PNG/JPG se optimizan a JPEG al subir (las
+                URLs externas no se procesan).
+              </p>
             </div>
             <Button
               type="button"

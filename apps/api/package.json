@@ -43,6 +43,7 @@
     "qrcode-generator": "1.4.4",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "sharp": "^0.35.3",
     "socket.io": "^4.8.3",
     "ua-parser-js": "^2.0.10"
   },
@@ -58,6 +59,7 @@
     "@types/nodemailer": "^6.4.17",
     "@types/passport-google-oauth20": "^2.0.16",
     "@types/passport-jwt": "^4.0.1",
+    "@types/sharp": "^0.32.0",
     "@types/ua-parser-js": "^0.7.39",
     "prisma": "^6.4.1",
     "tsx": "^4.19.3",

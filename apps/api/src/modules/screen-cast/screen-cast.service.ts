@@ -11,6 +11,7 @@ import {
   ScreenCastPlaylist,
   ScreenCastPlaylistItem,
 } from '@prisma/client';
+import sharp from 'sharp';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { S3Service } from '../../core/s3/s3.service';
 import {
@@ -29,12 +30,24 @@ const ALLOWED_MIME = new Set([
   'video/mp4',
 ]);
 
+/** Still images (not GIF) are normalized to JPEG for TV decode + size. */
+const OPTIMIZE_TO_JPEG = new Set(['image/jpeg', 'image/png']);
+
+const JPEG_QUALITY = 90;
+/** Max edge so 1080×1920 portrait and 1920×1080 landscape both fit. */
+const MAX_EDGE = 1920;
+
 type UploadedFile = {
   originalname: string;
   mimetype: string;
   size: number;
   buffer: Buffer;
 };
+
+function toJpegFileName(originalName: string): string {
+  const base = originalName.replace(/\.[^.]+$/, '') || 'image';
+  return `${base}.jpg`;
+}
 
 @Injectable()
 export class ScreenCastService {
@@ -65,14 +78,40 @@ export class ScreenCastService {
       throw new BadRequestException(`El archivo supera ${maxMb} MB`);
     }
 
-    const key = this.s3.buildScreenCastKey(file.originalname);
-    const url = await this.s3.uploadFile(key, file.buffer, file.mimetype);
+    let uploadBuffer = file.buffer;
+    let uploadMime = mime;
+    let uploadName = file.originalname;
+
+    if (OPTIMIZE_TO_JPEG.has(mime)) {
+      try {
+        uploadBuffer = await sharp(file.buffer)
+          .rotate()
+          .resize({
+            width: MAX_EDGE,
+            height: MAX_EDGE,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .flatten({ background: { r: 0, g: 0, b: 0 } })
+          .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+          .toBuffer();
+        uploadMime = 'image/jpeg';
+        uploadName = toJpegFileName(file.originalname);
+      } catch {
+        throw new BadRequestException(
+          'No se pudo procesar la imagen. Prueba otro JPG/PNG.',
+        );
+      }
+    }
+
+    const key = this.s3.buildScreenCastKey(uploadName);
+    const url = await this.s3.uploadFile(key, uploadBuffer, uploadMime);
 
     let mediaType: ScreenCastMediaType = ScreenCastMediaType.image;
     if (mime === 'video/mp4') mediaType = ScreenCastMediaType.video;
     else if (mime === 'image/gif') mediaType = ScreenCastMediaType.gif;
 
-    return { url, key, mediaType, fileName: file.originalname };
+    return { url, key, mediaType, fileName: uploadName };
   }
 
   // --- Playlists ---

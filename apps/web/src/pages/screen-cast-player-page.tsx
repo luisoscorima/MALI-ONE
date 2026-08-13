@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type SyntheticEvent,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import type {
@@ -14,6 +21,7 @@ import {
 } from '@/lib/screen-cast-offline';
 
 const HEARTBEAT_MS = 30_000;
+const KIOSK_CLASS = 'screen-cast-kiosk';
 
 function destroyVideo(video: HTMLVideoElement | null) {
   if (!video) return;
@@ -28,6 +36,10 @@ function destroyVideo(video: HTMLVideoElement | null) {
   } catch {
     // ignore cleanup errors on Tizen
   }
+}
+
+function isViewportPortrait(): boolean {
+  return window.innerHeight > window.innerWidth;
 }
 
 /**
@@ -50,6 +62,28 @@ function connectScreenCastSocket(screenKey: string): Socket {
   });
 }
 
+function stageStyle(
+  isPortraitConfig: boolean,
+  viewportPortrait: boolean,
+): CSSProperties {
+  if (!isPortraitConfig) {
+    return { width: '100%', height: '100%' };
+  }
+  // Native portrait viewport (e.g. 1080×1920): fill without CSS rotate.
+  if (viewportPortrait) {
+    return { width: '100%', height: '100%' };
+  }
+  // Landscape browser + portrait content: rotate stage (Samsung Signage pattern).
+  return {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    width: '100vh',
+    height: '100vw',
+    transform: 'translate(-50%, -50%) rotate(90deg)',
+  };
+}
+
 export function ScreenCastPlayerPage() {
   const [params] = useSearchParams();
   const screenKey = (params.get('id') ?? '').trim().toLowerCase();
@@ -58,6 +92,7 @@ export function ScreenCastPlayerPage() {
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [viewportPortrait, setViewportPortrait] = useState(isViewportPortrait);
 
   const timerRef = useRef<number | null>(null);
   const heartbeatRef = useRef<number | null>(null);
@@ -65,6 +100,7 @@ export function ScreenCastPlayerPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const indexRef = useRef(0);
   const itemsRef = useRef<ScreenCastPublicItemDto[]>([]);
+  const preloadRef = useRef<HTMLImageElement | null>(null);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -110,6 +146,25 @@ export function ScreenCastPlayerPage() {
     }
   }, [screenKey, cleanupMedia]);
 
+  // Lock document scroll for kiosk / Tizen (rotated stage overflows layout box).
+  useEffect(() => {
+    document.documentElement.classList.add(KIOSK_CLASS);
+    window.scrollTo(0, 0);
+    return () => {
+      document.documentElement.classList.remove(KIOSK_CLASS);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setViewportPortrait(isViewportPortrait());
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+
   useEffect(() => {
     void registerScreenCastServiceWorker();
     void loadConfig();
@@ -153,6 +208,7 @@ export function ScreenCastPlayerPage() {
   useEffect(() => {
     clearTimer();
     destroyVideo(videoRef.current);
+    window.scrollTo(0, 0);
 
     const items = itemsRef.current;
     const item = items[index];
@@ -161,6 +217,18 @@ export function ScreenCastPlayerPage() {
         clearTimer();
         destroyVideo(videoRef.current);
       };
+    }
+
+    // Preload next still so Samsung first-paint is less delayed.
+    const nextItem = items[(index + 1) % items.length];
+    if (
+      nextItem &&
+      nextItem !== item &&
+      (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif')
+    ) {
+      const pre = new Image();
+      preloadRef.current = pre;
+      pre.src = nextItem.mediaUrl;
     }
 
     if (item.mediaType === 'video') {
@@ -227,21 +295,7 @@ export function ScreenCastPlayerPage() {
     <div className="screen-cast-player fixed inset-0 z-100 overflow-hidden bg-black text-white">
       <div
         className="flex items-center justify-center"
-        style={
-          isPortrait
-            ? {
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                width: '100vh',
-                height: '100vw',
-                transform: 'translate(-50%, -50%) rotate(90deg)',
-              }
-            : {
-                width: '100%',
-                height: '100%',
-              }
-        }
+        style={stageStyle(isPortrait, viewportPortrait)}
       >
         {loading && (
           <div className="flex h-full w-full items-center justify-center text-sm opacity-70">
