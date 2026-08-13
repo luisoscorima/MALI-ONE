@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -22,6 +23,18 @@ import {
 
 const HEARTBEAT_MS = 30_000;
 const KIOSK_CLASS = 'screen-cast-kiosk';
+
+const MEDIA_FILL_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  maxWidth: 'none',
+  maxHeight: 'none',
+  objectFit: 'fill',
+  display: 'block',
+};
 
 function destroyVideo(video: HTMLVideoElement | null) {
   if (!video) return;
@@ -62,28 +75,40 @@ function connectScreenCastSocket(screenKey: string): Socket {
   });
 }
 
+/**
+ * Portrait on landscape browser: size stage to vh×vw and center with margins
+ * (not translate+rotate — that mis-centers on Tizen and leaves a top gap).
+ */
 function stageStyle(
   isPortraitConfig: boolean,
   viewportPortrait: boolean,
   vw: number,
   vh: number,
 ): CSSProperties {
-  if (!isPortraitConfig) {
-    return { width: '100%', height: '100%' };
-  }
-  // Native portrait viewport (e.g. 1080×1920): fill without CSS rotate.
-  if (viewportPortrait) {
-    return { width: '100%', height: '100%' };
-  }
-  // Landscape browser + portrait content: rotate stage (Samsung Signage pattern).
-  // Use innerWidth/innerHeight px — more reliable than vh/vw on Tizen chrome.
+  const fill: CSSProperties = {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  };
+
+  if (!isPortraitConfig) return fill;
+
+  // Panel/browser already portrait (1080×1920): no CSS rotate.
+  if (viewportPortrait) return fill;
+
+  // Landscape browser + portrait content (Samsung Signage pattern).
   return {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
     width: `${vh}px`,
     height: `${vw}px`,
-    transform: 'translate(-50%, -50%) rotate(90deg)',
+    top: `${(vh - vw) / 2}px`,
+    left: `${(vw - vh) / 2}px`,
+    transform: 'rotate(90deg)',
+    transformOrigin: 'center center',
   };
 }
 
@@ -95,10 +120,12 @@ export function ScreenCastPlayerPage() {
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [viewportPortrait, setViewportPortrait] = useState(isViewportPortrait);
+  const [viewportPortrait, setViewportPortrait] = useState(() =>
+    typeof window !== 'undefined' ? isViewportPortrait() : true,
+  );
   const [viewportSize, setViewportSize] = useState(() => ({
-    vw: typeof window !== 'undefined' ? window.innerWidth : 1920,
-    vh: typeof window !== 'undefined' ? window.innerHeight : 1080,
+    vw: typeof window !== 'undefined' ? window.innerWidth : 1080,
+    vh: typeof window !== 'undefined' ? window.innerHeight : 1920,
   }));
 
   const timerRef = useRef<number | null>(null);
@@ -153,8 +180,8 @@ export function ScreenCastPlayerPage() {
     }
   }, [screenKey, cleanupMedia]);
 
-  // Lock document scroll for kiosk / Tizen (rotated stage overflows layout box).
-  useEffect(() => {
+  // Before paint: lock kiosk styles so the first frame is already full-bleed.
+  useLayoutEffect(() => {
     document.documentElement.classList.add(KIOSK_CLASS);
     const meta = document.querySelector('meta[name="viewport"]');
     const prevViewport = meta?.getAttribute('content') ?? '';
@@ -173,6 +200,7 @@ export function ScreenCastPlayerPage() {
     const syncViewport = () => {
       setViewportPortrait(isViewportPortrait());
       setViewportSize({ vw: window.innerWidth, vh: window.innerHeight });
+      window.scrollTo(0, 0);
     };
     syncViewport();
     window.addEventListener('resize', syncViewport);
@@ -208,7 +236,6 @@ export function ScreenCastPlayerPage() {
       }
     };
 
-    // Immediate heartbeat so presence is fresh without waiting for the interval.
     sendHeartbeat();
     heartbeatRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
 
@@ -237,7 +264,6 @@ export function ScreenCastPlayerPage() {
       };
     }
 
-    // Preload next still so Samsung first-paint is less delayed.
     const nextItem = items[(index + 1) % items.length];
     if (
       nextItem &&
@@ -256,8 +282,6 @@ export function ScreenCastPlayerPage() {
       const onEnded = () => advance();
       const onError = () => advance();
 
-      // Only same-origin media may use crossOrigin. S3 signed URLs typically
-      // lack bucket CORS; setting anonymous would block the video from loading.
       if (isCorsCacheableMediaUrl(item.mediaUrl)) {
         video.crossOrigin = 'anonymous';
       } else {
@@ -310,9 +334,9 @@ export function ScreenCastPlayerPage() {
   }
 
   return (
-    <div className="screen-cast-player z-100 overflow-hidden bg-black text-white">
+    <div className="screen-cast-player fixed inset-0 z-100 overflow-hidden bg-black text-white">
       <div
-        className="flex h-full w-full items-center justify-center"
+        className="screen-cast-stage"
         style={stageStyle(
           isPortrait,
           viewportPortrait,
@@ -321,20 +345,20 @@ export function ScreenCastPlayerPage() {
         )}
       >
         {loading && (
-          <div className="flex h-full w-full items-center justify-center text-sm opacity-70">
+          <div className="absolute inset-0 flex items-center justify-center text-sm opacity-70">
             Cargando…
           </div>
         )}
 
         {!loading && error && (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <p className="text-lg font-medium">No se pudo cargar la pantalla</p>
             <p className="text-sm opacity-70">{error}</p>
           </div>
         )}
 
         {!loading && !error && config?.empty && (
-          <div className="flex h-full w-full items-center justify-center px-6 text-center">
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
             <p className="text-2xl font-medium tracking-wide">
               Sin contenido asignado
             </p>
@@ -343,11 +367,8 @@ export function ScreenCastPlayerPage() {
 
         <video
           ref={videoRef}
-          className={
-            showVideo
-              ? 'h-full w-full object-cover'
-              : 'pointer-events-none hidden'
-          }
+          className={showVideo ? undefined : 'pointer-events-none hidden'}
+          style={showVideo ? MEDIA_FILL_STYLE : undefined}
           autoPlay
           muted
           playsInline
@@ -360,7 +381,7 @@ export function ScreenCastPlayerPage() {
             key={`${current.mediaUrl}-${index}`}
             src={current.mediaUrl}
             alt=""
-            className="h-full w-full object-cover"
+            style={MEDIA_FILL_STYLE}
             draggable={false}
             {...(imageUsesCors ? { crossOrigin: 'anonymous' as const } : {})}
             onError={handleImageError}
