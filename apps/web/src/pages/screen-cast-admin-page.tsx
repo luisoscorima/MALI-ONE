@@ -8,12 +8,12 @@ import type {
   ScreenCastPlaylistItemDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
-import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
 import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
+import { cn } from '@/lib/utils';
 import {
   Badge,
   Button,
@@ -1006,26 +1006,23 @@ export function ScreenCastAdminPage() {
                   : 'Sin playlist asignada'}
               </p>
             </div>
-            <div className="max-h-[min(80vh,820px)] overflow-auto rounded-lg border border-border bg-black">
-              <WidgetPreviewFrame
+            <div className="flex justify-center">
+              <div
                 key={`${previewKey}-${previewMonitor.id}`}
-                tabs={[
-                  {
-                    id: 'player',
-                    label: previewMonitor.name,
-                    src: `/screen-cast?id=${encodeURIComponent(previewScreenKey)}`,
-                    width:
-                      previewMonitor.orientation === 'PORTRAIT'
-                        ? '1080px'
-                        : '1920px',
-                    height:
-                      previewMonitor.orientation === 'PORTRAIT'
-                        ? '1920px'
-                        : '1080px',
-                    previewMode: true,
-                  },
-                ]}
-              />
+                className={cn(
+                  'overflow-hidden rounded-lg border border-border bg-black shadow-sm',
+                  previewMonitor.orientation === 'PORTRAIT'
+                    ? 'aspect-9/16 w-[min(100%,360px)]'
+                    : 'aspect-video w-full max-w-4xl',
+                )}
+              >
+                <iframe
+                  title={`Vista previa ${previewMonitor.name}`}
+                  src={`/screen-cast?id=${encodeURIComponent(previewScreenKey)}&preview=1`}
+                  className="h-full w-full border-0 bg-black"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                />
+              </div>
             </div>
           </div>
         ) : (
