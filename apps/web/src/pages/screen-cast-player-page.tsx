@@ -65,6 +65,8 @@ function connectScreenCastSocket(screenKey: string): Socket {
 function stageStyle(
   isPortraitConfig: boolean,
   viewportPortrait: boolean,
+  vw: number,
+  vh: number,
 ): CSSProperties {
   if (!isPortraitConfig) {
     return { width: '100%', height: '100%' };
@@ -74,12 +76,13 @@ function stageStyle(
     return { width: '100%', height: '100%' };
   }
   // Landscape browser + portrait content: rotate stage (Samsung Signage pattern).
+  // Use innerWidth/innerHeight px — more reliable than vh/vw on Tizen chrome.
   return {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    width: '100vh',
-    height: '100vw',
+    width: `${vh}px`,
+    height: `${vw}px`,
     transform: 'translate(-50%, -50%) rotate(90deg)',
   };
 }
@@ -93,6 +96,10 @@ export function ScreenCastPlayerPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [viewportPortrait, setViewportPortrait] = useState(isViewportPortrait);
+  const [viewportSize, setViewportSize] = useState(() => ({
+    vw: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    vh: typeof window !== 'undefined' ? window.innerHeight : 1080,
+  }));
 
   const timerRef = useRef<number | null>(null);
   const heartbeatRef = useRef<number | null>(null);
@@ -149,19 +156,30 @@ export function ScreenCastPlayerPage() {
   // Lock document scroll for kiosk / Tizen (rotated stage overflows layout box).
   useEffect(() => {
     document.documentElement.classList.add(KIOSK_CLASS);
+    const meta = document.querySelector('meta[name="viewport"]');
+    const prevViewport = meta?.getAttribute('content') ?? '';
+    meta?.setAttribute(
+      'content',
+      'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover',
+    );
     window.scrollTo(0, 0);
     return () => {
       document.documentElement.classList.remove(KIOSK_CLASS);
+      if (meta && prevViewport) meta.setAttribute('content', prevViewport);
     };
   }, []);
 
   useEffect(() => {
-    const onResize = () => setViewportPortrait(isViewportPortrait());
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
+    const syncViewport = () => {
+      setViewportPortrait(isViewportPortrait());
+      setViewportSize({ vw: window.innerWidth, vh: window.innerHeight });
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    window.addEventListener('orientationchange', syncViewport);
     return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
+      window.removeEventListener('resize', syncViewport);
+      window.removeEventListener('orientationchange', syncViewport);
     };
   }, []);
 
@@ -292,10 +310,15 @@ export function ScreenCastPlayerPage() {
   }
 
   return (
-    <div className="screen-cast-player fixed inset-0 z-100 overflow-hidden bg-black text-white">
+    <div className="screen-cast-player z-100 overflow-hidden bg-black text-white">
       <div
-        className="flex items-center justify-center"
-        style={stageStyle(isPortrait, viewportPortrait)}
+        className="flex h-full w-full items-center justify-center"
+        style={stageStyle(
+          isPortrait,
+          viewportPortrait,
+          viewportSize.vw,
+          viewportSize.vh,
+        )}
       >
         {loading && (
           <div className="flex h-full w-full items-center justify-center text-sm opacity-70">
@@ -322,7 +345,7 @@ export function ScreenCastPlayerPage() {
           ref={videoRef}
           className={
             showVideo
-              ? 'h-full w-full object-contain'
+              ? 'h-full w-full object-cover'
               : 'pointer-events-none hidden'
           }
           autoPlay
@@ -337,7 +360,7 @@ export function ScreenCastPlayerPage() {
             key={`${current.mediaUrl}-${index}`}
             src={current.mediaUrl}
             alt=""
-            className="h-full w-full object-contain"
+            className="h-full w-full object-cover"
             draggable={false}
             {...(imageUsesCors ? { crossOrigin: 'anonymous' as const } : {})}
             onError={handleImageError}

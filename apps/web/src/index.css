@@ -325,20 +325,37 @@ body {
   cursor: none !important;
 }
 
-/* Lock document scroll on Tizen/Samsung (rotated portrait stage overflows layout) */
+/* Lock document scroll on Tizen/Samsung (rotated portrait stage overflows layout).
+   Avoid position:fixed on body — it leaves a top gap / white strip on some TVs. */
+html.screen-cast-kiosk {
+  background: #000 !important;
+}
+
 html.screen-cast-kiosk,
 html.screen-cast-kiosk body,
 html.screen-cast-kiosk #root {
   overflow: hidden !important;
+  width: 100% !important;
   height: 100% !important;
   max-height: 100% !important;
   min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: #000 !important;
   overscroll-behavior: none;
   touch-action: none;
 }
 
-html.screen-cast-kiosk body {
+html.screen-cast-kiosk .screen-cast-player {
   position: fixed;
-  inset: 0;
-  width: 100%;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-height: -webkit-fill-available;
+  background: #000;
 }
