@@ -1,5 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Copy, Eye, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  Eye,
+  Film,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Trash2,
+  CopyPlus,
+} from 'lucide-react';
 import type {
   ScreenCastMediaType,
   ScreenCastMonitorDto,
@@ -8,7 +19,6 @@ import type {
   ScreenCastPlaylistItemDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
-import { WidgetToolLayout } from '@/components/widget-tool-layout';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
@@ -18,6 +28,12 @@ import {
   Badge,
   Button,
   Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -32,6 +48,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@/components/ui';
 
 type PlaylistSummary = ScreenCastPlaylistDto & {
@@ -43,7 +66,6 @@ type ItemDraft = {
   mediaUrl: string;
   mediaType: ScreenCastMediaType;
   durationMs: number;
-  sortOrder: number;
   activo: boolean;
 };
 
@@ -56,12 +78,15 @@ type MonitorDraft = {
   playlistId: string;
 };
 
-function emptyItem(sortOrder: number): ItemDraft {
+type AdminTab = 'config' | 'preview';
+
+const DURATION_PRESETS_SEC = [5, 10, 15, 30] as const;
+
+function emptyItem(): ItemDraft {
   return {
     mediaUrl: '',
     mediaType: 'image',
     durationMs: 10_000,
-    sortOrder,
     activo: true,
   };
 }
@@ -76,6 +101,84 @@ function emptyMonitorDraft(): MonitorDraft {
   };
 }
 
+function playerUrl(screenKey: string): string {
+  return `${window.location.origin}/screen-cast?id=${encodeURIComponent(screenKey)}`;
+}
+
+function formatLastSeen(iso: string | null | undefined): string {
+  if (!iso) return 'Nunca visto';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return date.toLocaleString();
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 45) return 'hace unos segundos';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `hace ${min} min`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `hace ${hrs} h`;
+  return date.toLocaleString();
+}
+
+function OnlineStatusBadge({
+  online,
+  lastSeenAt,
+}: {
+  online: boolean;
+  lastSeenAt: string | null | undefined;
+}) {
+  const absolute =
+    lastSeenAt && !Number.isNaN(new Date(lastSeenAt).getTime())
+      ? new Date(lastSeenAt).toLocaleString()
+      : null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          variant={online ? 'default' : 'secondary'}
+          className="cursor-default"
+        >
+          {online ? 'Online' : 'Offline'}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-center">
+        <p>Última vez: {formatLastSeen(lastSeenAt)}</p>
+        {absolute ? (
+          <p className="mt-0.5 text-[11px] opacity-80">{absolute}</p>
+        ) : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function MediaThumb({
+  mediaUrl,
+  mediaType,
+  className,
+}: {
+  mediaUrl: string;
+  mediaType: ScreenCastMediaType;
+  className?: string;
+}) {
+  if (mediaType === 'video') {
+    return (
+      <div
+        className={cn(
+          'flex flex-col items-center justify-center gap-1 bg-muted text-muted-foreground',
+          className,
+        )}
+      >
+        <Film size={20} />
+        <span className="text-[10px] font-semibold tracking-wide">MP4</span>
+      </div>
+    );
+  }
+  return (
+    <img src={mediaUrl} alt="" className={cn('object-cover', className)} />
+  );
+}
+
 export function ScreenCastAdminPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -85,23 +188,34 @@ export function ScreenCastAdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [activeTab, setActiveTab] = useState<AdminTab>('config');
+
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [creatingPlaylist, setCreatingPlaylist] = useState(false);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(
+
+  const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false);
+  const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(
     null,
   );
   const [playlistName, setPlaylistName] = useState('');
   const [playlistActivo, setPlaylistActivo] = useState(true);
   const [items, setItems] = useState<ScreenCastPlaylistItemDto[]>([]);
-  const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
   const [loadingPlaylist, setLoadingPlaylist] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
+  const [itemDialogOpen, setItemDialogOpen] = useState(false);
+  const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
+  const [savingItem, setSavingItem] = useState(false);
+
+  const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
+  const [savingMonitor, setSavingMonitor] = useState(false);
+
   const [previewKey, setPreviewKey] = useState(0);
-  const [syncingMonitors, setSyncingMonitors] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [syncingMonitorId, setSyncingMonitorId] = useState<string | null>(null);
   const [previewMonitorId, setPreviewMonitorId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'config' | 'preview'>('config');
 
   const loadLists = useCallback(async () => {
     try {
@@ -129,10 +243,12 @@ export function ScreenCastAdminPage() {
         setPlaylistName(data.name);
         setPlaylistActivo(data.activo);
         setItems(data.items ?? []);
-        setItemDraft(null);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Error al cargar playlist');
-        setSelectedPlaylistId(null);
+        toast.error(
+          e instanceof Error ? e.message : 'Error al cargar playlist',
+        );
+        setPlaylistDialogOpen(false);
+        setEditingPlaylistId(null);
       } finally {
         setLoadingPlaylist(false);
       }
@@ -145,8 +261,10 @@ export function ScreenCastAdminPage() {
   }, [loadLists]);
 
   useEffect(() => {
-    if (selectedPlaylistId) void loadPlaylistDetail(selectedPlaylistId);
-  }, [selectedPlaylistId, loadPlaylistDetail]);
+    if (playlistDialogOpen && editingPlaylistId) {
+      void loadPlaylistDetail(editingPlaylistId);
+    }
+  }, [playlistDialogOpen, editingPlaylistId, loadPlaylistDetail]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -166,6 +284,32 @@ export function ScreenCastAdminPage() {
     });
   }, [monitors]);
 
+  const playlistMonitorOrients = useMemo(() => {
+    if (!editingPlaylistId) {
+      return { hasPortraitMonitors: false, hasLandscapeMonitors: false };
+    }
+    const assigned = monitors.filter((m) => m.playlistId === editingPlaylistId);
+    return {
+      hasPortraitMonitors: assigned.some((m) => m.orientation === 'PORTRAIT'),
+      hasLandscapeMonitors: assigned.some((m) => m.orientation === 'LANDSCAPE'),
+    };
+  }, [editingPlaylistId, monitors]);
+
+  function openPlaylistEditor(id: string) {
+    setEditingPlaylistId(id);
+    setItemDraft(null);
+    setItemDialogOpen(false);
+    setPlaylistDialogOpen(true);
+  }
+
+  function closePlaylistEditor() {
+    setPlaylistDialogOpen(false);
+    setEditingPlaylistId(null);
+    setItemDialogOpen(false);
+    setItemDraft(null);
+    setItems([]);
+  }
+
   async function createPlaylist() {
     const trimmed = newPlaylistName.trim();
     if (!trimmed) {
@@ -178,7 +322,7 @@ export function ScreenCastAdminPage() {
       toast.success('Playlist creada');
       setNewPlaylistName('');
       await loadLists();
-      setSelectedPlaylistId(created.id);
+      openPlaylistEditor(created.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear');
     } finally {
@@ -187,7 +331,7 @@ export function ScreenCastAdminPage() {
   }
 
   async function savePlaylistMeta() {
-    if (!selectedPlaylistId) return;
+    if (!editingPlaylistId) return;
     const trimmed = playlistName.trim();
     if (!trimmed) {
       toast.error('El nombre es obligatorio');
@@ -195,13 +339,13 @@ export function ScreenCastAdminPage() {
     }
     setSavingMeta(true);
     try {
-      await api.updateScreenCastPlaylist(selectedPlaylistId, {
+      await api.updateScreenCastPlaylist(editingPlaylistId, {
         name: trimmed,
         activo: playlistActivo,
       });
       toast.success('Playlist guardada');
       await loadLists();
-      await loadPlaylistDetail(selectedPlaylistId);
+      await loadPlaylistDetail(editingPlaylistId);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar');
     } finally {
@@ -209,51 +353,14 @@ export function ScreenCastAdminPage() {
     }
   }
 
-  async function persistItem(item: ItemDraft) {
-    if (!selectedPlaylistId) return;
-    const mediaUrl = item.mediaUrl.trim();
-    if (!mediaUrl) {
-      toast.error('La URL del medio es obligatoria');
-      return;
-    }
-    const payload = {
-      mediaUrl,
-      mediaType: item.mediaType,
-      durationMs: item.durationMs,
-      sortOrder: item.sortOrder,
-      activo: item.activo,
-    };
+  async function duplicatePlaylist(playlist: PlaylistSummary) {
     try {
-      if (item.id) {
-        await api.updateScreenCastPlaylistItem(item.id, payload);
-        toast.success('Ítem guardado');
-      } else {
-        await api.createScreenCastPlaylistItem(selectedPlaylistId, payload);
-        toast.success('Ítem creado');
-      }
-      setItemDraft(null);
+      const created = await api.duplicateScreenCastPlaylist(playlist.id);
+      toast.success('Playlist duplicada');
       await loadLists();
-      await loadPlaylistDetail(selectedPlaylistId);
+      openPlaylistEditor(created.id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al guardar ítem');
-    }
-  }
-
-  async function removeItem(item: ScreenCastPlaylistItemDto) {
-    if (!selectedPlaylistId) return;
-    const ok = await confirm({
-      title: '¿Eliminar este ítem?',
-      confirmLabel: 'Eliminar',
-      variant: 'destructive',
-    });
-    if (!ok) return;
-    try {
-      await api.deleteScreenCastPlaylistItem(item.id);
-      toast.success('Ítem eliminado');
-      await loadLists();
-      await loadPlaylistDetail(selectedPlaylistId);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+      toast.error(e instanceof Error ? e.message : 'Error al duplicar');
     }
   }
 
@@ -268,14 +375,140 @@ export function ScreenCastAdminPage() {
     try {
       await api.deleteScreenCastPlaylist(playlist.id);
       toast.success('Playlist eliminada');
-      if (selectedPlaylistId === playlist.id) {
-        setSelectedPlaylistId(null);
-        setItems([]);
-      }
+      if (editingPlaylistId === playlist.id) closePlaylistEditor();
       await loadLists();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
     }
+  }
+
+  function openItemCreate() {
+    setItemDraft(emptyItem());
+    setItemDialogOpen(true);
+  }
+
+  function openItemEdit(item: ScreenCastPlaylistItemDto) {
+    setItemDraft({
+      id: item.id,
+      mediaUrl: item.mediaUrl,
+      mediaType: item.mediaType,
+      durationMs: item.durationMs,
+      activo: item.activo,
+    });
+    setItemDialogOpen(true);
+  }
+
+  function closeItemDialog() {
+    setItemDialogOpen(false);
+    setItemDraft(null);
+  }
+
+  async function persistItem() {
+    if (!editingPlaylistId || !itemDraft) return;
+    const mediaUrl = itemDraft.mediaUrl.trim();
+    if (!mediaUrl) {
+      toast.error('La URL del medio es obligatoria');
+      return;
+    }
+    const payload = {
+      mediaUrl,
+      mediaType: itemDraft.mediaType,
+      durationMs: itemDraft.durationMs,
+      activo: itemDraft.activo,
+    };
+    setSavingItem(true);
+    try {
+      if (itemDraft.id) {
+        await api.updateScreenCastPlaylistItem(itemDraft.id, payload);
+        toast.success('Ítem guardado');
+      } else {
+        await api.createScreenCastPlaylistItem(editingPlaylistId, payload);
+        toast.success('Ítem creado');
+      }
+      closeItemDialog();
+      await loadLists();
+      await loadPlaylistDetail(editingPlaylistId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al guardar ítem');
+    } finally {
+      setSavingItem(false);
+    }
+  }
+
+  async function duplicateItem(item: ScreenCastPlaylistItemDto) {
+    if (!editingPlaylistId) return;
+    try {
+      await api.duplicateScreenCastPlaylistItem(item.id);
+      toast.success('Ítem duplicado');
+      await loadLists();
+      await loadPlaylistDetail(editingPlaylistId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al duplicar ítem');
+    }
+  }
+
+  async function removeItem(item: ScreenCastPlaylistItemDto) {
+    if (!editingPlaylistId) return;
+    const ok = await confirm({
+      title: '¿Eliminar este ítem?',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteScreenCastPlaylistItem(item.id);
+      toast.success('Ítem eliminado');
+      await loadLists();
+      await loadPlaylistDetail(editingPlaylistId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+    }
+  }
+
+  async function moveItem(index: number, direction: -1 | 1) {
+    if (!editingPlaylistId || reordering) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= items.length) return;
+
+    const ordered = [...items];
+    const [moved] = ordered.splice(index, 1);
+    ordered.splice(nextIndex, 0, moved!);
+    setItems(ordered);
+    setReordering(true);
+    try {
+      const updated = await api.reorderScreenCastPlaylistItems(
+        editingPlaylistId,
+        ordered.map((i) => i.id),
+      );
+      setItems(updated);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al reordenar');
+      await loadPlaylistDetail(editingPlaylistId);
+    } finally {
+      setReordering(false);
+    }
+  }
+
+  function openMonitorCreate() {
+    setMonitorDraft(emptyMonitorDraft());
+    setMonitorDialogOpen(true);
+  }
+
+  function openMonitorEdit(m: ScreenCastMonitorDto) {
+    setMonitorDraft({
+      id: m.id,
+      screenKey: m.screenKey,
+      name: m.name,
+      location: m.location ?? '',
+      orientation: m.orientation ?? 'LANDSCAPE',
+      playlistId: m.playlistId ?? '',
+    });
+    setMonitorDialogOpen(true);
+  }
+
+  function closeMonitorDialog() {
+    setMonitorDialogOpen(false);
+    setMonitorDraft(null);
   }
 
   async function saveMonitorDraft() {
@@ -293,6 +526,7 @@ export function ScreenCastAdminPage() {
       orientation: monitorDraft.orientation,
       playlistId: monitorDraft.playlistId || null,
     };
+    setSavingMonitor(true);
     try {
       if (monitorDraft.id) {
         await api.updateScreenCastMonitor(monitorDraft.id, payload);
@@ -301,11 +535,13 @@ export function ScreenCastAdminPage() {
         await api.createScreenCastMonitor(payload);
         toast.success('Monitor creado');
       }
-      setMonitorDraft(null);
+      closeMonitorDialog();
       setPreviewKey((k) => k + 1);
       await loadLists();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar');
+    } finally {
+      setSavingMonitor(false);
     }
   }
 
@@ -330,7 +566,7 @@ export function ScreenCastAdminPage() {
       toast.error('No hay monitores para sincronizar');
       return;
     }
-    setSyncingMonitors(true);
+    setSyncingAll(true);
     try {
       const result = await api.syncAllScreenCastMonitors();
       toast.success(
@@ -342,21 +578,32 @@ export function ScreenCastAdminPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al sincronizar');
     } finally {
-      setSyncingMonitors(false);
+      setSyncingAll(false);
+    }
+  }
+
+  async function syncOneMonitor(monitor: ScreenCastMonitorDto) {
+    setSyncingMonitorId(monitor.id);
+    try {
+      const result = await api.syncScreenCastMonitor(monitor.id);
+      toast.success(
+        result.notified > 0
+          ? `Pantalla «${monitor.name}» sincronizada`
+          : `«${monitor.name}» no está conectada`,
+      );
+      setPreviewKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al sincronizar');
+    } finally {
+      setSyncingMonitorId(null);
     }
   }
 
   function copyUrl(screenKey: string) {
-    const url = `${window.location.origin}/screen-cast?id=${encodeURIComponent(screenKey)}`;
-    void navigator.clipboard.writeText(url).then(
+    void navigator.clipboard.writeText(playerUrl(screenKey)).then(
       () => toast.success('URL copiada'),
       () => toast.error('No se pudo copiar'),
     );
-  }
-
-  function selectPlaylistFromMonitor(playlistId: string | null | undefined) {
-    if (!playlistId) return;
-    setSelectedPlaylistId(playlistId);
   }
 
   function selectMonitorForPreview(monitorId: string) {
@@ -365,534 +612,225 @@ export function ScreenCastAdminPage() {
     setActiveTab('preview');
   }
 
+  function goToPlaylistFromMonitor(playlistId: string | null | undefined) {
+    if (!playlistId) return;
+    setActiveTab('config');
+    openPlaylistEditor(playlistId);
+  }
+
   if (loading) return <PageLoading />;
 
   const previewMonitor =
     monitors.find((m) => m.id === previewMonitorId) ?? monitors[0] ?? null;
   const previewScreenKey = previewMonitor?.screenKey;
+  const itemDurationSec = itemDraft
+    ? Math.max(1, Math.round(itemDraft.durationMs / 1000))
+    : 10;
 
   return (
-    <WidgetToolLayout
-      title="Transmisión a pantallas"
-      description="Configura listas de reproducción y monitores quiosco desde un solo panel."
-      activeTab={activeTab}
-      onActiveTabChange={setActiveTab}
-      config={
-        <div className="space-y-10">
-          {error && <AlertBanner>{error}</AlertBanner>}
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">
+          Transmisión a pantallas
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Configura listas de reproducción y monitores quiosco desde un solo
+          panel.
+        </p>
+      </div>
 
+      {error ? <AlertBanner>{error}</AlertBanner> : null}
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as AdminTab)}
+      >
+        <TabsList>
+          <TabsTrigger value="config">Configuración</TabsTrigger>
+          <TabsTrigger value="preview">Vista previa</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="config" className="space-y-8">
           <section className="space-y-4">
             <div>
-              <h2 className="text-lg font-medium">Listas de reproducción</h2>
+              <h3 className="text-lg font-medium">Listas de reproducción</h3>
               <p className="mt-1 text-sm text-muted">
                 Playlists reutilizables con imágenes, GIFs y videos.
               </p>
             </div>
 
             <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="pl-name">Nueva playlist</Label>
-                <Input
-                  id="pl-name"
-                  value={newPlaylistName}
-                  placeholder="Lobby principal"
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void createPlaylist();
-                  }}
-                />
-              </div>
-              <Button
-                type="button"
-                disabled={creatingPlaylist}
-                onClick={() => void createPlaylist()}
-              >
-                <Plus size={16} />
-                Crear
-              </Button>
-            </Card>
-
-            {playlists.length === 0 ? (
-              <EmptyState
-                title="Sin playlists"
-                description="Crea una lista y añade imágenes o videos."
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="pl-name">Nueva playlist</Label>
+              <Input
+                id="pl-name"
+                value={newPlaylistName}
+                placeholder="Lobby principal"
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void createPlaylist();
+                }}
               />
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Ítems</TableHead>
-                      <TableHead>Monitores</TableHead>
-                      <TableHead className="w-28" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {playlists.map((p) => (
-                      <TableRow
-                        key={p.id}
-                        className={
-                          selectedPlaylistId === p.id
-                            ? 'bg-muted/50'
-                            : undefined
-                        }
-                      >
-                        <TableCell className="font-medium">
-                          <button
-                            type="button"
-                            className="text-left hover:underline"
-                            onClick={() => setSelectedPlaylistId(p.id)}
-                          >
-                            {p.name}
-                          </button>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={p.activo ? 'default' : 'secondary'}>
-                            {p.activo ? 'Activa' : 'Inactiva'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{p._count?.items ?? 0}</TableCell>
-                        <TableCell>{p._count?.monitors ?? 0}</TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              title="Editar"
-                              onClick={() => setSelectedPlaylistId(p.id)}
-                            >
-                              <Pencil size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              title="Eliminar"
-                              onClick={() => void removePlaylist(p)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            </div>
+            <Button
+              type="button"
+              disabled={creatingPlaylist}
+              onClick={() => void createPlaylist()}
+            >
+              <Plus size={16} />
+              Crear
+            </Button>
+          </Card>
 
-            {selectedPlaylistId && (
-              <Card className="space-y-6 p-4">
-                {loadingPlaylist ? (
-                  <p className="text-sm text-muted">Cargando playlist…</p>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-medium">Editar playlist</h3>
-                        <p className="mt-1 text-sm text-muted">
-                          JPG, PNG, GIF y MP4. Pega una URL o elige desde S3.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPlaylistId(null);
-                          setItemDraft(null);
-                        }}
-                      >
-                        Cerrar
-                      </Button>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="pl-detail-name">Nombre</Label>
-                        <Input
-                          id="pl-detail-name"
-                          value={playlistName}
-                          onChange={(e) => setPlaylistName(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <SettingSwitchInline
-                          label="Activa"
-                          checked={playlistActivo}
-                          onCheckedChange={setPlaylistActivo}
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      disabled={savingMeta}
-                      onClick={() => void savePlaylistMeta()}
-                    >
-                      Guardar playlist
-                    </Button>
-
-                    <div className="flex items-center justify-between border-t pt-4">
-                      <h4 className="font-medium">Ítems ({items.length})</h4>
-                      <Button
-                        type="button"
-                        onClick={() => setItemDraft(emptyItem(items.length))}
-                      >
-                        <Plus size={16} />
-                        Añadir ítem
-                      </Button>
-                    </div>
-
-                    {itemDraft && (
-                      <div className="space-y-4 rounded-md border p-4">
-                        <h4 className="font-medium">
-                          {itemDraft.id ? 'Editar ítem' : 'Nuevo ítem'}
-                        </h4>
-                        <div className="space-y-2">
-                          <Label>URL del medio</Label>
-                          <ScreenCastMediaUrlField
-                            value={itemDraft.mediaUrl}
-                            onChange={(url, type) =>
-                              setItemDraft({
-                                ...itemDraft,
-                                mediaUrl: url,
-                                ...(type ? { mediaType: type } : {}),
-                              })
-                            }
-                          />
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label>Tipo</Label>
-                            <Select
-                              value={itemDraft.mediaType}
-                              onValueChange={(v) =>
-                                setItemDraft({
-                                  ...itemDraft,
-                                  mediaType: v as ScreenCastMediaType,
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="image">
-                                  Imagen (JPG/PNG)
-                                </SelectItem>
-                                <SelectItem value="gif">GIF</SelectItem>
-                                <SelectItem value="video">
-                                  Video (MP4)
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="dur">Duración (ms)</Label>
-                            <Input
-                              id="dur"
-                              type="number"
-                              min={1000}
-                              step={1000}
-                              value={itemDraft.durationMs}
-                              disabled={itemDraft.mediaType === 'video'}
-                              onChange={(e) =>
-                                setItemDraft({
-                                  ...itemDraft,
-                                  durationMs:
-                                    Number(e.target.value) || 10_000,
-                                })
-                              }
-                            />
-                            {itemDraft.mediaType === 'video' && (
-                              <p className="text-xs text-muted">
-                                El video avanza al terminar (onEnded).
-                              </p>
-                            )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="order">Orden</Label>
-                            <Input
-                              id="order"
-                              type="number"
-                              min={0}
-                              value={itemDraft.sortOrder}
-                              onChange={(e) =>
-                                setItemDraft({
-                                  ...itemDraft,
-                                  sortOrder: Number(e.target.value) || 0,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                        <SettingSwitchInline
-                          label="Activo"
-                          checked={itemDraft.activo}
-                          onCheckedChange={(v) =>
-                            setItemDraft({ ...itemDraft, activo: v })
-                          }
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={() => void persistItem(itemDraft)}
-                          >
-                            Guardar ítem
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setItemDraft(null)}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      {items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex flex-wrap items-center gap-4 rounded-md border p-3"
+          {playlists.length === 0 ? (
+            <EmptyState
+              title="Sin playlists"
+              description="Crea una lista y añade imágenes o videos."
+            />
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Ítems</TableHead>
+                    <TableHead>Monitores</TableHead>
+                    <TableHead className="w-36" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {playlists.map((p) => (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        <button
+                          type="button"
+                          className="text-left hover:underline"
+                          onClick={() => openPlaylistEditor(p.id)}
                         >
-                          <div className="h-16 w-24 shrink-0 overflow-hidden rounded bg-muted">
-                            {item.mediaType === 'video' ? (
-                              <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                                MP4
-                              </div>
-                            ) : (
-                              <img
-                                src={item.mediaUrl}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">
-                              {item.mediaUrl}
-                            </p>
-                            <p className="text-xs text-muted">
-                              {item.mediaType} · orden {item.sortOrder}
-                              {item.mediaType !== 'video'
-                                ? ` · ${Math.round(item.durationMs / 1000)}s`
-                                : ''}
-                              {!item.activo ? ' · inactivo' : ''}
-                            </p>
-                          </div>
-                          <div className="flex gap-1">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                setItemDraft({
-                                  id: item.id,
-                                  mediaUrl: item.mediaUrl,
-                                  mediaType: item.mediaType,
-                                  durationMs: item.durationMs,
-                                  sortOrder: item.sortOrder,
-                                  activo: item.activo,
-                                })
-                              }
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => void removeItem(item)}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                          </div>
+                          {p.name}
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={p.activo ? 'default' : 'secondary'}>
+                          {p.activo ? 'Activa' : 'Inactiva'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{p._count?.items ?? 0}</TableCell>
+                      <TableCell>{p._count?.monitors ?? 0}</TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            title="Editar"
+                            onClick={() => openPlaylistEditor(p.id)}
+                          >
+                            <Pencil size={16} />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            title="Duplicar"
+                            onClick={() => void duplicatePlaylist(p)}
+                          >
+                            <CopyPlus size={16} />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            title="Eliminar"
+                            onClick={() => void removePlaylist(p)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
                         </div>
-                      ))}
-                      {items.length === 0 && !itemDraft && (
-                        <p className="text-sm text-muted">
-                          Aún no hay ítems en esta playlist.
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-              </Card>
-            )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
           </section>
 
           <section className="space-y-4 border-t pt-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-medium">Monitores</h2>
-                <p className="mt-1 text-sm text-muted">
-                  Registra pantallas físicas y asigna una playlist. El estado
-                  Online/Offline refleja la conexión WebSocket en vivo.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={syncingMonitors || monitors.length === 0}
-                  onClick={() => void syncAllMonitors()}
-                >
-                  <RefreshCw
-                    size={16}
-                    className={syncingMonitors ? 'animate-spin' : undefined}
-                  />
-                  Sincronizar todos
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => setMonitorDraft(emptyMonitorDraft())}
-                >
-                  <Plus size={16} />
-                  Nuevo monitor
-                </Button>
-              </div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-medium">Monitores</h3>
+              <p className="mt-1 text-sm text-muted">
+                Registra pantallas físicas y asigna una playlist. Online/Offline
+                refleja la conexión WebSocket en vivo.
+              </p>
             </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={syncingAll || monitors.length === 0}
+                onClick={() => void syncAllMonitors()}
+              >
+                <RefreshCw
+                  size={16}
+                  className={syncingAll ? 'animate-spin' : undefined}
+                />
+                Sincronizar todos
+              </Button>
+              <Button type="button" onClick={openMonitorCreate}>
+                <Plus size={16} />
+                Nuevo monitor
+              </Button>
+            </div>
+          </div>
 
-            {monitorDraft && (
-              <Card className="space-y-4 p-4">
-                <h3 className="font-medium">
-                  {monitorDraft.id ? 'Editar monitor' : 'Nuevo monitor'}
-                </h3>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="sc-key">ID de pantalla</Label>
-                    <Input
-                      id="sc-key"
-                      value={monitorDraft.screenKey}
-                      placeholder="pantalla_001"
-                      onChange={(e) =>
-                        setMonitorDraft({
-                          ...monitorDraft,
-                          screenKey: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sc-name">Nombre</Label>
-                    <Input
-                      id="sc-name"
-                      value={monitorDraft.name}
-                      onChange={(e) =>
-                        setMonitorDraft({
-                          ...monitorDraft,
-                          name: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="sc-loc">Ubicación</Label>
-                    <Input
-                      id="sc-loc"
-                      value={monitorDraft.location}
-                      onChange={(e) =>
-                        setMonitorDraft({
-                          ...monitorDraft,
-                          location: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Orientación</Label>
-                    <Select
-                      value={monitorDraft.orientation}
-                      onValueChange={(v) =>
-                        setMonitorDraft({
-                          ...monitorDraft,
-                          orientation: v as ScreenCastOrientation,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="LANDSCAPE">
-                          Horizontal (Landscape)
-                        </SelectItem>
-                        <SelectItem value="PORTRAIT">
-                          Vertical (Portrait)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Playlist</Label>
-                    <Select
-                      value={monitorDraft.playlistId || '__none__'}
-                      onValueChange={(v) =>
-                        setMonitorDraft({
-                          ...monitorDraft,
-                          playlistId: v === '__none__' ? '' : v,
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sin playlist" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Sin playlist</SelectItem>
-                        {playlists.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" onClick={() => void saveMonitorDraft()}>
-                    Guardar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setMonitorDraft(null)}
-                  >
-                    Cancelar
-                  </Button>
-                </div>
-              </Card>
-            )}
-
-            {monitors.length === 0 ? (
-              <EmptyState
-                title="Sin monitores"
-                description="Crea el primero para obtener su URL de reproducción."
-              />
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Orientación</TableHead>
-                      <TableHead>Ubicación</TableHead>
-                      <TableHead>Playlist</TableHead>
-                      <TableHead className="w-44" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {monitors.map((m) => (
+          {monitors.length === 0 ? (
+            <EmptyState
+              title="Sin monitores"
+              description="Crea el primero para obtener su URL de reproducción."
+            />
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Orientación</TableHead>
+                    <TableHead>Reproducción</TableHead>
+                    <TableHead>Playlist</TableHead>
+                    <TableHead className="w-52" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monitors.map((m) => {
+                    const slideLabel =
+                      m.online &&
+                      m.playbackTotal != null &&
+                      m.playbackTotal > 0 &&
+                      m.playbackIndex != null
+                        ? `${m.playbackIndex + 1}/${m.playbackTotal}`
+                        : '—';
+                    return (
                       <TableRow key={m.id}>
                         <TableCell>
-                          <Badge variant={m.online ? 'default' : 'secondary'}>
-                            {m.online ? 'Online' : 'Offline'}
-                          </Badge>
+                          <div className="space-y-1">
+                            <OnlineStatusBadge
+                              online={m.online}
+                              lastSeenAt={m.lastSeenAt}
+                            />
+                            {m.lastError ? (
+                              <p
+                                className="max-w-40 truncate text-xs text-destructive"
+                                title={m.lastError}
+                              >
+                                {m.lastError}
+                              </p>
+                            ) : null}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">{m.name}</TableCell>
                         <TableCell className="font-mono text-sm">
@@ -903,14 +841,16 @@ export function ScreenCastAdminPage() {
                             ? 'Vertical'
                             : 'Horizontal'}
                         </TableCell>
-                        <TableCell>{m.location || '—'}</TableCell>
+                        <TableCell className="tabular-nums">
+                          {slideLabel}
+                        </TableCell>
                         <TableCell>
                           {m.playlistName ? (
                             <button
                               type="button"
                               className="text-sm underline-offset-2 hover:underline"
                               onClick={() =>
-                                selectPlaylistFromMonitor(m.playlistId)
+                                goToPlaylistFromMonitor(m.playlistId)
                               }
                             >
                               {m.playlistName}
@@ -934,6 +874,23 @@ export function ScreenCastAdminPage() {
                               type="button"
                               size="icon"
                               variant="ghost"
+                              title="Sincronizar"
+                              disabled={syncingMonitorId === m.id}
+                              onClick={() => void syncOneMonitor(m)}
+                            >
+                              <RefreshCw
+                                size={16}
+                                className={
+                                  syncingMonitorId === m.id
+                                    ? 'animate-spin'
+                                    : undefined
+                                }
+                              />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
                               title="Copiar URL"
                               onClick={() => copyUrl(m.screenKey)}
                             >
@@ -944,17 +901,7 @@ export function ScreenCastAdminPage() {
                               size="icon"
                               variant="ghost"
                               title="Editar"
-                              onClick={() => {
-                                setPreviewMonitorId(m.id);
-                                setMonitorDraft({
-                                  id: m.id,
-                                  screenKey: m.screenKey,
-                                  name: m.name,
-                                  location: m.location ?? '',
-                                  orientation: m.orientation ?? 'LANDSCAPE',
-                                  playlistId: m.playlistId ?? '',
-                                });
-                              }}
+                              onClick={() => openMonitorEdit(m)}
                             >
                               <Pencil size={16} />
                             </Button>
@@ -970,68 +917,518 @@ export function ScreenCastAdminPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
           </section>
-        </div>
-      }
-      preview={
-        previewScreenKey && previewMonitor ? (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="w-full max-w-sm space-y-2">
-                <Label htmlFor="sc-preview-monitor">Monitor a previsualizar</Label>
-                <Select
-                  value={previewMonitor.id}
-                  onValueChange={(id) => selectMonitorForPreview(id)}
+        </TabsContent>
+
+        <TabsContent value="preview" className="space-y-4">
+          {previewScreenKey && previewMonitor ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="w-full max-w-sm space-y-2">
+                  <Label htmlFor="sc-preview-monitor">
+                    Monitor a previsualizar
+                  </Label>
+                  <Select
+                    value={previewMonitor.id}
+                    onValueChange={(id) => selectMonitorForPreview(id)}
+                  >
+                    <SelectTrigger id="sc-preview-monitor">
+                      <SelectValue placeholder="Elige un monitor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monitors.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name} ({m.screenKey})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 text-sm text-muted">
+                  <p>
+                    {previewMonitor.playlistName
+                      ? `Playlist: ${previewMonitor.playlistName}`
+                      : 'Sin playlist asignada'}
+                  </p>
+                  <p className="flex flex-wrap items-center gap-2">
+                    <OnlineStatusBadge
+                      online={previewMonitor.online}
+                      lastSeenAt={previewMonitor.lastSeenAt}
+                    />
+                    {previewMonitor.online &&
+                    previewMonitor.playbackTotal != null &&
+                    previewMonitor.playbackTotal > 0 &&
+                    previewMonitor.playbackIndex != null ? (
+                      <span className="tabular-nums">
+                        Slide{' '}
+                        {previewMonitor.playbackIndex + 1}/
+                        {previewMonitor.playbackTotal}
+                      </span>
+                    ) : null}
+                  </p>
+                  {previewMonitor.lastError ? (
+                    <p className="text-destructive">{previewMonitor.lastError}</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex justify-center">
+                <div
+                  key={`${previewKey}-${previewMonitor.id}`}
+                  className={cn(
+                    'overflow-hidden rounded-lg border border-border bg-black shadow-sm',
+                    previewMonitor.orientation === 'PORTRAIT'
+                      ? 'aspect-9/16 w-[min(100%,360px)]'
+                      : 'aspect-video w-full max-w-4xl',
+                  )}
                 >
-                  <SelectTrigger id="sc-preview-monitor">
-                    <SelectValue placeholder="Elige un monitor" />
+                  <iframe
+                    title={`Vista previa ${previewMonitor.name}`}
+                    src={`/screen-cast?id=${encodeURIComponent(previewScreenKey)}&preview=1`}
+                    className="h-full w-full border-0 bg-black"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title="Sin vista previa"
+              description="Crea un monitor para previsualizar el reproductor."
+            />
+          )}
+        </TabsContent>
+      </Tabs>
+
+      <Dialog
+        open={playlistDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closePlaylistEditor();
+          else setPlaylistDialogOpen(true);
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),42rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+          <DialogHeader className="shrink-0 border-b px-6 py-4">
+            <DialogTitle>Editar playlist</DialogTitle>
+            <DialogDescription>
+              JPG, PNG, GIF y MP4. Pega una URL o elige desde S3.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4">
+            {loadingPlaylist ? (
+              <p className="text-sm text-muted">Cargando playlist…</p>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="pl-detail-name">Nombre</Label>
+                    <Input
+                      id="pl-detail-name"
+                      value={playlistName}
+                      onChange={(e) => setPlaylistName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <SettingSwitchInline
+                      label="Activa"
+                      checked={playlistActivo}
+                      onCheckedChange={setPlaylistActivo}
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  disabled={savingMeta}
+                  onClick={() => void savePlaylistMeta()}
+                >
+                  Guardar playlist
+                </Button>
+
+                <div className="flex items-center justify-between border-t pt-4">
+                  <h4 className="font-medium">Ítems ({items.length})</h4>
+                  <Button type="button" onClick={openItemCreate}>
+                    <Plus size={16} />
+                    Añadir ítem
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {items.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-center gap-3 rounded-md border p-3"
+                    >
+                      <div className="h-16 w-24 shrink-0 overflow-hidden rounded bg-muted">
+                        <MediaThumb
+                          mediaUrl={item.mediaUrl}
+                          mediaType={item.mediaType}
+                          className="h-full w-full"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">
+                          {item.mediaUrl}
+                        </p>
+                        <p className="text-xs text-muted">
+                          {item.mediaType === 'video'
+                            ? 'video · avanza al terminar'
+                            : `${item.mediaType} · ${Math.round(item.durationMs / 1000)}s`}
+                          {!item.activo ? ' · inactivo' : ''}
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          title="Subir"
+                          disabled={reordering || index === 0}
+                          onClick={() => void moveItem(index, -1)}
+                        >
+                          <ArrowUp size={16} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          title="Bajar"
+                          disabled={reordering || index === items.length - 1}
+                          onClick={() => void moveItem(index, 1)}
+                        >
+                          <ArrowDown size={16} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          title="Duplicar"
+                          onClick={() => void duplicateItem(item)}
+                        >
+                          <CopyPlus size={16} />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openItemEdit(item)}
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          title="Eliminar"
+                          onClick={() => void removeItem(item)}
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 ? (
+                    <p className="text-sm text-muted">
+                      Aún no hay ítems en esta playlist.
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
+            <Button type="button" variant="outline" onClick={closePlaylistEditor}>
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={itemDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeItemDialog();
+          else setItemDialogOpen(true);
+        }}
+      >
+        <DialogContent className="max-h-[min(90vh,900px)] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {itemDraft?.id ? 'Editar ítem' : 'Nuevo ítem'}
+            </DialogTitle>
+            <DialogDescription>
+              Duración en segundos para imagen/GIF. El video avanza al terminar.
+            </DialogDescription>
+          </DialogHeader>
+
+          {itemDraft ? (
+            <div className="space-y-4">
+              {itemDraft.mediaUrl.trim() ? (
+                <div className="overflow-hidden rounded-md border bg-muted">
+                  {itemDraft.mediaType === 'video' ? (
+                    <div className="flex aspect-video flex-col items-center justify-center gap-2 text-muted-foreground">
+                      <Film size={40} />
+                      <span className="text-sm font-semibold tracking-wide">
+                        MP4
+                      </span>
+                    </div>
+                  ) : (
+                    <img
+                      src={itemDraft.mediaUrl}
+                      alt=""
+                      className="mx-auto max-h-56 w-full object-contain"
+                    />
+                  )}
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label>URL del medio</Label>
+                <ScreenCastMediaUrlField
+                  value={itemDraft.mediaUrl}
+                  hasPortraitMonitors={
+                    playlistMonitorOrients.hasPortraitMonitors
+                  }
+                  hasLandscapeMonitors={
+                    playlistMonitorOrients.hasLandscapeMonitors
+                  }
+                  onChange={(url, type) =>
+                    setItemDraft({
+                      ...itemDraft,
+                      mediaUrl: url,
+                      ...(type ? { mediaType: type } : {}),
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select
+                    value={itemDraft.mediaType}
+                    onValueChange={(v) =>
+                      setItemDraft({
+                        ...itemDraft,
+                        mediaType: v as ScreenCastMediaType,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="image">Imagen (JPG/PNG)</SelectItem>
+                      <SelectItem value="gif">GIF</SelectItem>
+                      <SelectItem value="video">Video (MP4)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="dur-sec">Duración (segundos)</Label>
+                  <Input
+                    id="dur-sec"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={itemDurationSec}
+                    disabled={itemDraft.mediaType === 'video'}
+                    onChange={(e) => {
+                      const sec = Math.max(1, Number(e.target.value) || 1);
+                      setItemDraft({
+                        ...itemDraft,
+                        durationMs: sec * 1000,
+                      });
+                    }}
+                  />
+                  <div className="flex flex-wrap gap-1">
+                    {DURATION_PRESETS_SEC.map((sec) => (
+                      <Button
+                        key={sec}
+                        type="button"
+                        size="sm"
+                        variant={
+                          itemDraft.mediaType !== 'video' &&
+                          itemDurationSec === sec
+                            ? 'default'
+                            : 'outline'
+                        }
+                        disabled={itemDraft.mediaType === 'video'}
+                        onClick={() =>
+                          setItemDraft({
+                            ...itemDraft,
+                            durationMs: sec * 1000,
+                          })
+                        }
+                      >
+                        {sec}s
+                      </Button>
+                    ))}
+                  </div>
+                  {itemDraft.mediaType === 'video' ? (
+                    <p className="text-xs text-muted">
+                      El video avanza al terminar (onEnded).
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <SettingSwitchInline
+                label="Activo"
+                checked={itemDraft.activo}
+                onCheckedChange={(v) =>
+                  setItemDraft({ ...itemDraft, activo: v })
+                }
+              />
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeItemDialog}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={savingItem || !itemDraft}
+              onClick={() => void persistItem()}
+            >
+              Guardar ítem
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={monitorDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeMonitorDialog();
+          else setMonitorDialogOpen(true);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {monitorDraft?.id ? 'Editar monitor' : 'Nuevo monitor'}
+            </DialogTitle>
+            <DialogDescription>
+              El ID de pantalla forma parte de la URL del reproductor.
+            </DialogDescription>
+          </DialogHeader>
+
+          {monitorDraft ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sc-key">ID de pantalla</Label>
+                <Input
+                  id="sc-key"
+                  value={monitorDraft.screenKey}
+                  placeholder="pantalla_001"
+                  onChange={(e) =>
+                    setMonitorDraft({
+                      ...monitorDraft,
+                      screenKey: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sc-name">Nombre</Label>
+                <Input
+                  id="sc-name"
+                  value={monitorDraft.name}
+                  onChange={(e) =>
+                    setMonitorDraft({
+                      ...monitorDraft,
+                      name: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sc-loc">Ubicación</Label>
+                <Input
+                  id="sc-loc"
+                  value={monitorDraft.location}
+                  onChange={(e) =>
+                    setMonitorDraft({
+                      ...monitorDraft,
+                      location: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Orientación</Label>
+                <Select
+                  value={monitorDraft.orientation}
+                  onValueChange={(v) =>
+                    setMonitorDraft({
+                      ...monitorDraft,
+                      orientation: v as ScreenCastOrientation,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {monitors.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name} ({m.screenKey})
+                    <SelectItem value="LANDSCAPE">
+                      Horizontal (Landscape)
+                    </SelectItem>
+                    <SelectItem value="PORTRAIT">
+                      Vertical (Portrait)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Playlist</Label>
+                <Select
+                  value={monitorDraft.playlistId || '__none__'}
+                  onValueChange={(v) =>
+                    setMonitorDraft({
+                      ...monitorDraft,
+                      playlistId: v === '__none__' ? '' : v,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin playlist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sin playlist</SelectItem>
+                    {playlists.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-sm text-muted">
-                {previewMonitor.playlistName
-                  ? `Playlist: ${previewMonitor.playlistName}`
-                  : 'Sin playlist asignada'}
-              </p>
             </div>
-            <div className="flex justify-center">
-              <div
-                key={`${previewKey}-${previewMonitor.id}`}
-                className={cn(
-                  'overflow-hidden rounded-lg border border-border bg-black shadow-sm',
-                  previewMonitor.orientation === 'PORTRAIT'
-                    ? 'aspect-9/16 w-[min(100%,360px)]'
-                    : 'aspect-video w-full max-w-4xl',
-                )}
-              >
-                <iframe
-                  title={`Vista previa ${previewMonitor.name}`}
-                  src={`/screen-cast?id=${encodeURIComponent(previewScreenKey)}&preview=1`}
-                  className="h-full w-full border-0 bg-black"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <EmptyState
-            title="Sin vista previa"
-            description="Crea un monitor para previsualizar el reproductor."
-          />
-        )
-      }
-    />
+          ) : null}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeMonitorDialog}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={savingMonitor || !monitorDraft}
+              onClick={() => void saveMonitorDraft()}
+            >
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -575,6 +575,14 @@ export const api = {
       method: 'DELETE',
     }),
 
+  duplicateScreenCastPlaylist: (id: string) =>
+    request<
+      import('@mali-one/shared').ScreenCastPlaylistDto & {
+        items?: import('@mali-one/shared').ScreenCastPlaylistItemDto[];
+        _count?: { monitors: number; items: number };
+      }
+    >(`/api/screen-cast/playlists/${id}/duplicate`, { method: 'POST' }),
+
   createScreenCastPlaylistItem: (
     playlistId: string,
     body: {
@@ -588,6 +596,21 @@ export const api = {
     request<import('@mali-one/shared').ScreenCastPlaylistItemDto>(
       `/api/screen-cast/playlists/${playlistId}/items`,
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  reorderScreenCastPlaylistItems: (
+    playlistId: string,
+    orderedIds: string[],
+  ) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistItemDto[]>(
+      `/api/screen-cast/playlists/${playlistId}/items/reorder`,
+      { method: 'POST', body: JSON.stringify({ orderedIds }) },
+    ),
+
+  duplicateScreenCastPlaylistItem: (id: string) =>
+    request<import('@mali-one/shared').ScreenCastPlaylistItemDto>(
+      `/api/screen-cast/items/${id}/duplicate`,
+      { method: 'POST' },
     ),
 
   updateScreenCastPlaylistItem: (
@@ -658,6 +681,12 @@ export const api = {
       { method: 'POST' },
     ),
 
+  syncScreenCastMonitor: (id: string) =>
+    request<{ ok: boolean; notified: number; screenKey: string }>(
+      `/api/screen-cast/monitors/${id}/sync`,
+      { method: 'POST' },
+    ),
+
   getScreenCastPublicConfig: (screenKey: string) =>
     request<import('@mali-one/shared').ScreenCastPublicConfigDto>(
       `/api/screen-cast/screens/${encodeURIComponent(screenKey)}/config`,
@@ -690,15 +719,13 @@ export const api = {
   uploadScreenCastMedia: (file: File) => {
     const form = new FormData();
     form.append('file', file);
-    return request<{
-      url: string;
-      key: string;
-      mediaType: import('@mali-one/shared').ScreenCastMediaType;
-      fileName: string;
-    }>('/api/screen-cast/s3/upload', {
-      method: 'POST',
-      body: form,
-    });
+    return request<import('@mali-one/shared').ScreenCastUploadResultDto>(
+      '/api/screen-cast/s3/upload',
+      {
+        method: 'POST',
+        body: form,
+      },
+    );
   },
 
   getBsaleOffices: () =>

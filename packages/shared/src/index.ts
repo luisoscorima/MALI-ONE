@@ -49,8 +49,23 @@ export interface ScreenCastMonitorDto {
   playlistName?: string | null;
   lastSeenAt: string | null;
   online: boolean;
+  /** 0-based index of current slide when online, else null. */
+  playbackIndex?: number | null;
+  playbackTotal?: number | null;
+  lastError?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ScreenCastUploadResultDto {
+  url: string;
+  key: string;
+  mediaType: ScreenCastMediaType;
+  fileName: string;
+  originalBytes: number;
+  optimizedBytes: number;
+  width: number | null;
+  height: number | null;
 }
 
 export interface ScreenCastPublicItemDto {

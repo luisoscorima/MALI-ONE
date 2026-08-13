@@ -250,6 +250,21 @@ export function ScreenCastPlayerPage() {
     };
   }, [screenKey, isPreview, loadConfig]);
 
+  const emitStatus = useCallback(
+    (payload: { index: number; total: number; lastError?: string | null }) => {
+      if (isPreview) return;
+      const socket = socketRef.current;
+      if (!socket?.connected || !screenKey) return;
+      socket.emit('status', {
+        screenKey,
+        index: payload.index,
+        total: payload.total,
+        lastError: payload.lastError ?? null,
+      });
+    },
+    [isPreview, screenKey],
+  );
+
   useEffect(() => {
     clearTimer();
     destroyVideo(videoRef.current);
@@ -258,11 +273,14 @@ export function ScreenCastPlayerPage() {
     const items = itemsRef.current;
     const item = items[index];
     if (!item || !config || config.empty) {
+      emitStatus({ index: 0, total: 0 });
       return () => {
         clearTimer();
         destroyVideo(videoRef.current);
       };
     }
+
+    emitStatus({ index, total: items.length });
 
     const nextItem = items[(index + 1) % items.length];
     if (
@@ -280,7 +298,14 @@ export function ScreenCastPlayerPage() {
       if (!video) return;
 
       const onEnded = () => advance();
-      const onError = () => advance();
+      const onError = () => {
+        emitStatus({
+          index,
+          total: items.length,
+          lastError: 'Error al reproducir video',
+        });
+        advance();
+      };
 
       if (isCorsCacheableMediaUrl(item.mediaUrl)) {
         video.crossOrigin = 'anonymous';
@@ -309,7 +334,7 @@ export function ScreenCastPlayerPage() {
     return () => {
       clearTimer();
     };
-  }, [index, config, advance, clearTimer]);
+  }, [index, config, advance, clearTimer, emitStatus]);
 
   useEffect(() => {
     return () => {
@@ -330,6 +355,11 @@ export function ScreenCastPlayerPage() {
   const isPortrait = orientation === 'PORTRAIT';
 
   function handleImageError(_e: SyntheticEvent<HTMLImageElement>) {
+    emitStatus({
+      index,
+      total: itemsRef.current.length,
+      lastError: 'Error al cargar imagen',
+    });
     advance();
   }
 

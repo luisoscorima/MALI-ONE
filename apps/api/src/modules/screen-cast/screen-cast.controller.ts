@@ -81,6 +81,12 @@ export class ScreenCastController {
     return playlist;
   }
 
+  @Post('playlists/:id/duplicate')
+  @RequireModule(AppModule.screen_cast)
+  duplicatePlaylist(@Param('id') id: string) {
+    return this.service.duplicatePlaylist(id);
+  }
+
   @Delete('playlists/:id')
   @RequireModule(AppModule.screen_cast)
   async deletePlaylist(@Param('id') id: string) {
@@ -98,6 +104,31 @@ export class ScreenCastController {
   ) {
     const item = await this.service.createPlaylistItem(playlistId, body);
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
+    this.gateway.notifyPlaylistUpdated(keys);
+    return item;
+  }
+
+  @Post('playlists/:id/items/reorder')
+  @RequireModule(AppModule.screen_cast)
+  async reorderItems(
+    @Param('id') playlistId: string,
+    @Body() body: { orderedIds?: string[] },
+  ) {
+    const orderedIds = Array.isArray(body?.orderedIds) ? body.orderedIds : [];
+    const items = await this.service.reorderPlaylistItems(
+      playlistId,
+      orderedIds,
+    );
+    const keys = await this.service.getScreenKeysForPlaylist(playlistId);
+    this.gateway.notifyPlaylistUpdated(keys);
+    return items;
+  }
+
+  @Post('items/:id/duplicate')
+  @RequireModule(AppModule.screen_cast)
+  async duplicateItem(@Param('id') id: string) {
+    const item = await this.service.duplicatePlaylistItem(id);
+    const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
     this.gateway.notifyPlaylistUpdated(keys);
     return item;
   }
@@ -138,6 +169,14 @@ export class ScreenCastController {
     const keys = await this.service.getAllScreenKeys();
     this.gateway.notifyPlaylistUpdated(keys);
     return { ok: true, notified: keys.length };
+  }
+
+  @Post('monitors/:id/sync')
+  @RequireModule(AppModule.screen_cast)
+  async syncMonitor(@Param('id') id: string) {
+    const monitor = await this.service.getMonitor(id);
+    this.gateway.notifyPlaylistUpdated([monitor.screenKey]);
+    return { ok: true, notified: 1, screenKey: monitor.screenKey };
   }
 
   @Get('monitors/:id')
@@ -210,12 +249,20 @@ export class ScreenCastController {
     return this.s3Manager.getPublicUrl(bucket, key);
   }
 
-  private withLivePresence<T extends { screenKey: string; online: boolean }>(
-    monitor: T,
-  ): T {
+  private withLivePresence<
+    T extends { screenKey: string; online: boolean },
+  >(monitor: T): T & {
+    playbackIndex: number | null;
+    playbackTotal: number | null;
+    lastError: string | null;
+  } {
+    const playback = this.gateway.getPlaybackStatus(monitor.screenKey);
     return {
       ...monitor,
       online: this.gateway.isScreenConnected(monitor.screenKey),
+      playbackIndex: playback?.index ?? null,
+      playbackTotal: playback?.total ?? null,
+      lastError: playback?.lastError ?? null,
     };
   }
 }

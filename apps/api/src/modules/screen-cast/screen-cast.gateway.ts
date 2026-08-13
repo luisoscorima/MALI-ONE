@@ -56,6 +56,11 @@ export class ScreenCastGateway
   private readonly logger = new Logger(ScreenCastGateway.name);
   /** Live player sockets per screenKey (excludes preview tabs). */
   private readonly connections = new Map<string, Set<string>>();
+  /** Last playback status reported by each screen. */
+  private readonly playback = new Map<
+    string,
+    { index: number; total: number; lastError: string | null; updatedAt: number }
+  >();
 
   @WebSocketServer()
   server!: Server;
@@ -116,9 +121,53 @@ export class ScreenCastGateway
     return result;
   }
 
+  @SubscribeMessage('status')
+  handleStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body: {
+      screenKey?: string;
+      index?: number;
+      total?: number;
+      lastError?: string | null;
+    },
+  ) {
+    const key = (
+      body?.screenKey?.trim() ||
+      (client.data.screenKey as string | undefined) ||
+      ''
+    ).toLowerCase();
+    if (!key) return { ok: false };
+    const index = Number(body?.index);
+    const total = Number(body?.total);
+    this.playback.set(key, {
+      index: Number.isFinite(index) ? index : 0,
+      total: Number.isFinite(total) ? total : 0,
+      lastError: body?.lastError?.trim() || null,
+      updatedAt: Date.now(),
+    });
+    return { ok: true };
+  }
+
   isScreenConnected(screenKey: string): boolean {
     const set = this.connections.get(screenKey.trim().toLowerCase());
     return !!set && set.size > 0;
+  }
+
+  getPlaybackStatus(screenKey: string): {
+    index: number;
+    total: number;
+    lastError: string | null;
+  } | null {
+    const row = this.playback.get(screenKey.trim().toLowerCase());
+    if (!row) return null;
+    // Stale after 2 minutes without updates.
+    if (Date.now() - row.updatedAt > 120_000) return null;
+    return {
+      index: row.index,
+      total: row.total,
+      lastError: row.lastError,
+    };
   }
 
   notifyPlaylistUpdated(screenKeys: string[]) {
@@ -142,6 +191,7 @@ export class ScreenCastGateway
     set.delete(socketId);
     if (set.size === 0) {
       this.connections.delete(screenKey);
+      this.playback.delete(screenKey);
     }
   }
 

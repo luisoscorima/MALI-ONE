@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react';
 import { FolderOpen, Loader2, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
@@ -18,20 +18,62 @@ import {
 
 type MediaType = 'image' | 'video' | 'gif';
 
+export type ScreenCastUploadMeta = {
+  originalBytes: number;
+  optimizedBytes: number;
+  width: number | null;
+  height: number | null;
+};
+
 type Props = {
   value: string;
-  onChange: (url: string, inferredType?: MediaType) => void;
+  onChange: (
+    url: string,
+    inferredType?: MediaType,
+    meta?: ScreenCastUploadMeta,
+  ) => void;
   id?: string;
   placeholder?: string;
+  /** Monitors linked to this playlist — used for orientation mismatch warnings. */
+  hasPortraitMonitors?: boolean;
+  hasLandscapeMonitors?: boolean;
 };
 
 const ACCEPT = 'image/jpeg,image/png,image/gif,video/mp4,.jpg,.jpeg,.png,.gif,.mp4';
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function orientationWarning(
+  width: number | null,
+  height: number | null,
+  opts: {
+    hasPortraitMonitors?: boolean;
+    hasLandscapeMonitors?: boolean;
+  },
+): string | null {
+  if (!width || !height) return null;
+  const isLandscape = width > height;
+  const isPortrait = height > width;
+  if (opts.hasPortraitMonitors && isLandscape) {
+    return `La imagen es horizontal (${width}×${height}) y hay monitores verticales en esta playlist.`;
+  }
+  if (opts.hasLandscapeMonitors && !opts.hasPortraitMonitors && isPortrait) {
+    return `La imagen es vertical (${width}×${height}) y hay monitores horizontales en esta playlist.`;
+  }
+  return null;
+}
 
 export function ScreenCastMediaUrlField({
   value,
   onChange,
   id,
   placeholder = 'https://…',
+  hasPortraitMonitors = false,
+  hasLandscapeMonitors = false,
 }: Props) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,22 +82,52 @@ export function ScreenCastMediaUrlField({
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const [uploadMeta, setUploadMeta] = useState<ScreenCastUploadMeta | null>(
+    null,
+  );
+  const [orientWarn, setOrientWarn] = useState<string | null>(null);
+
+  const orientOpts = useMemo(
+    () => ({ hasPortraitMonitors, hasLandscapeMonitors }),
+    [hasPortraitMonitors, hasLandscapeMonitors],
+  );
+
+  const applyMeta = useCallback(
+    (meta: ScreenCastUploadMeta | null) => {
+      setUploadMeta(meta);
+      setOrientWarn(
+        meta
+          ? orientationWarning(meta.width, meta.height, orientOpts)
+          : null,
+      );
+    },
+    [orientOpts],
+  );
 
   const uploadFile = useCallback(
     async (file: File) => {
       setUploading(true);
       try {
         const result = await api.uploadScreenCastMedia(file);
+        const meta: ScreenCastUploadMeta = {
+          originalBytes: result.originalBytes,
+          optimizedBytes: result.optimizedBytes,
+          width: result.width,
+          height: result.height,
+        };
         setUploadedName(result.fileName);
-        onChange(result.url, result.mediaType);
+        applyMeta(meta);
+        onChange(result.url, result.mediaType, meta);
         toast.success('Archivo subido a S3');
+        const warn = orientationWarning(meta.width, meta.height, orientOpts);
+        if (warn) toast.error(warn);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Error al subir');
       } finally {
         setUploading(false);
       }
     },
-    [onChange, toast],
+    [onChange, toast, applyMeta, orientOpts],
   );
 
   function onFileChosen(file: File | undefined) {
@@ -89,6 +161,8 @@ export function ScreenCastMediaUrlField({
               placeholder={placeholder}
               onChange={(e) => {
                 const url = e.target.value;
+                applyMeta(null);
+                setUploadedName(null);
                 onChange(url, url ? inferScreenCastMediaType(url) : undefined);
               }}
               className="flex-1"
@@ -181,10 +255,22 @@ export function ScreenCastMediaUrlField({
           </div>
           {(uploadedName || value) && mode === 'upload' && (
             <p className="mt-2 truncate text-xs text-muted">
-              {uploadedName
-                ? `Listo: ${uploadedName}`
-                : `URL: ${value}`}
+              {uploadedName ? `Listo: ${uploadedName}` : `URL: ${value}`}
             </p>
+          )}
+          {uploadMeta && (
+            <p className="mt-1 text-xs text-muted">
+              {uploadMeta.width && uploadMeta.height
+                ? `${uploadMeta.width}×${uploadMeta.height} · `
+                : ''}
+              {formatBytes(uploadMeta.originalBytes)}
+              {uploadMeta.optimizedBytes !== uploadMeta.originalBytes
+                ? ` → ${formatBytes(uploadMeta.optimizedBytes)}`
+                : ''}
+            </p>
+          )}
+          {orientWarn && (
+            <p className="mt-1 text-xs text-amber-500">{orientWarn}</p>
           )}
         </TabsContent>
       </Tabs>

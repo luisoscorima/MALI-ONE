@@ -78,9 +78,12 @@ export class ScreenCastService {
       throw new BadRequestException(`El archivo supera ${maxMb} MB`);
     }
 
+    const originalBytes = file.size;
     let uploadBuffer = file.buffer;
     let uploadMime = mime;
     let uploadName = file.originalname;
+    let width: number | null = null;
+    let height: number | null = null;
 
     if (OPTIMIZE_TO_JPEG.has(mime)) {
       try {
@@ -95,6 +98,9 @@ export class ScreenCastService {
           .flatten({ background: { r: 0, g: 0, b: 0 } })
           .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
           .toBuffer();
+        const outMeta = await sharp(uploadBuffer).metadata();
+        width = outMeta.width ?? null;
+        height = outMeta.height ?? null;
         uploadMime = 'image/jpeg';
         uploadName = toJpegFileName(file.originalname);
       } catch {
@@ -111,7 +117,16 @@ export class ScreenCastService {
     if (mime === 'video/mp4') mediaType = ScreenCastMediaType.video;
     else if (mime === 'image/gif') mediaType = ScreenCastMediaType.gif;
 
-    return { url, key, mediaType, fileName: uploadName };
+    return {
+      url,
+      key,
+      mediaType,
+      fileName: uploadName,
+      originalBytes,
+      optimizedBytes: uploadBuffer.length,
+      width,
+      height,
+    };
   }
 
   // --- Playlists ---
@@ -166,6 +181,34 @@ export class ScreenCastService {
     return { ok: true };
   }
 
+  async duplicatePlaylist(id: string) {
+    const source = await this.prisma.screenCastPlaylist.findUnique({
+      where: { id },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!source) throw new NotFoundException('Playlist no encontrada');
+
+    return this.prisma.screenCastPlaylist.create({
+      data: {
+        name: `${source.name} (copia)`,
+        activo: source.activo,
+        items: {
+          create: source.items.map((item) => ({
+            mediaUrl: item.mediaUrl,
+            mediaType: item.mediaType,
+            durationMs: item.durationMs,
+            sortOrder: item.sortOrder,
+            activo: item.activo,
+          })),
+        },
+      },
+      include: {
+        items: { orderBy: { sortOrder: 'asc' } },
+        _count: { select: { monitors: true, items: true } },
+      },
+    });
+  }
+
   async createPlaylistItem(playlistId: string, dto: CreateScreenCastPlaylistItemDto) {
     await this.findPlaylist(playlistId);
     return this.prisma.screenCastPlaylistItem.create({
@@ -198,6 +241,55 @@ export class ScreenCastService {
     const item = await this.findPlaylistItem(id);
     await this.prisma.screenCastPlaylistItem.delete({ where: { id } });
     return { ok: true, playlistId: item.playlistId };
+  }
+
+  async duplicatePlaylistItem(id: string) {
+    const item = await this.findPlaylistItem(id);
+    const maxOrder = await this.prisma.screenCastPlaylistItem.aggregate({
+      where: { playlistId: item.playlistId },
+      _max: { sortOrder: true },
+    });
+    return this.prisma.screenCastPlaylistItem.create({
+      data: {
+        playlistId: item.playlistId,
+        mediaUrl: item.mediaUrl,
+        mediaType: item.mediaType,
+        durationMs: item.durationMs,
+        sortOrder: (maxOrder._max.sortOrder ?? item.sortOrder) + 1,
+        activo: item.activo,
+      },
+    });
+  }
+
+  async reorderPlaylistItems(
+    playlistId: string,
+    orderedIds: string[],
+  ): Promise<ScreenCastPlaylistItem[]> {
+    await this.findPlaylist(playlistId);
+    const items = await this.prisma.screenCastPlaylistItem.findMany({
+      where: { playlistId },
+    });
+    if (items.length !== orderedIds.length) {
+      throw new BadRequestException('La lista de orden no coincide');
+    }
+    const idSet = new Set(items.map((i) => i.id));
+    for (const id of orderedIds) {
+      if (!idSet.has(id)) {
+        throw new BadRequestException('Ítem no pertenece a la playlist');
+      }
+    }
+    await this.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        this.prisma.screenCastPlaylistItem.update({
+          where: { id },
+          data: { sortOrder: index },
+        }),
+      ),
+    );
+    return this.prisma.screenCastPlaylistItem.findMany({
+      where: { playlistId },
+      orderBy: { sortOrder: 'asc' },
+    });
   }
 
   async getScreenKeysForPlaylist(playlistId: string): Promise<string[]> {
