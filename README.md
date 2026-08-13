@@ -11,6 +11,7 @@ Sistema de operaciones internas (backoffice) para **mali.pe**.
 - Configuradores de widgets embebidos (educación, biblioteca, museo) y membresías PAM
 - **Boletines** (`/admin/newsletters`): editor por bloques, URL pública `/n/{slug}`
 - **CRM PAM** (`/admin/crm-pam`): lista de contactos (fuente WhatsApp) y envío SES de boletines
+- Leads Educación (widget): captura en `EducacionLead` → sync a WhatsApp vía `POST /api/crm/origins` (sin attrs de campaña). Ver [docs/EDUCACION-LEADS.md](docs/EDUCACION-LEADS.md).
 
 Ver ownership CRM/producto/vitrina en [docs/OWNERSHIP-PAM-CRM.md](docs/OWNERSHIP-PAM-CRM.md).
 

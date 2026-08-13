@@ -35,7 +35,7 @@ Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLe
 5. **Prueba E2E** (curso EP de prueba):
    - Enviar formulario «Conversemos»
    - Verificar fila en tabla `EducacionLead` (`waStatus=ok`)
-   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con attrs `source=educacion_lead_widget`, `fuente=Web MALI Educación`, `programa`, `curso`, `curso_url`
+   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con origen `channel=widget` (curso/fuente en payload del origen; **no** attrs `source`/`fuente`/`curso`)
    - Si Sheets está on: fila nueva en el rango configurado
    - Apagar Sheet a propósito (`ENABLED=false`) y confirmar que el submit sigue OK y WA sync funciona
 

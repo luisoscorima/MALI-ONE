@@ -210,34 +210,38 @@ export class WhatsappCrmClientService {
     }
 
     const phone = this.toE164Pe(lead.celular);
-    if (!phone) {
-      throw new Error(`Teléfono inválido en lead ${lead.id}`);
+    const email = String(lead.email ?? '').trim() || undefined;
+    const dni = String(lead.dni ?? '').trim() || null;
+    if (!phone && !email && !dni) {
+      throw new Error(
+        `Lead ${lead.id} sin phone, email ni dni; no se puede sincronizar`,
+      );
     }
 
     const area = String(lead.whatsappArea || 'educacion_ep').trim();
-    await this.ensureEducacionLeadAttributeDefinitions(area);
-
     const lastName = String(lead.apellidos ?? '').trim();
 
-    const attributes: Record<string, string> = {
-      source: lead.source,
-      fuente: lead.fuente,
-      programa: this.resolveEducacionPrograma(lead),
-    };
-    this.setAttr(attributes, 'curso', lead.courseTitle ?? lead.courseSlug);
-    this.setAttr(attributes, 'curso_url', lead.pageUrl);
-
-    await this.syncContact({
+    await this.request('POST', '/api/crm/origins', {
       area,
+      channel: 'widget',
+      external_id: String(lead.id),
+      source_key: 'educacion_lead_widget',
+      source_label: lead.fuente || 'Web MALI Educación',
       name: lead.nombres,
       last_name: lastName,
-      phone,
-      email: lead.email || undefined,
-      dni: lead.dni || null,
+      phone: phone || undefined,
+      email,
+      dni,
       opt_in: true,
-      opt_in_email: Boolean(lead.optInMarketing && lead.email),
-      attributes,
-      external_id: lead.id,
+      opt_in_email: Boolean(lead.optInMarketing && email),
+      payload: {
+        fuente: lead.fuente,
+        source: lead.source,
+        programa: this.resolveEducacionPrograma(lead),
+        curso: lead.courseTitle ?? lead.courseSlug,
+        curso_url: lead.pageUrl,
+        educacion_lead_id: lead.id,
+      },
     });
   }
 
