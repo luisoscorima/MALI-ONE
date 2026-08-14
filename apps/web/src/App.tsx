@@ -32,6 +32,8 @@ import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 import { NewslettersPage } from '@/pages/newsletters-page';
 import { CrmPamPage } from '@/pages/crm-pam-page';
 import { PresentacionPage } from '@/pages/presentacion-page';
+import { TodosPage } from '@/pages/todos-page';
+import { FilesPage } from '@/pages/files-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -45,6 +47,9 @@ function AuthenticatedApp() {
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
                   <Route index element={<DashboardPage />} />
+                  <Route element={<ModuleGuard module="todos" />}>
+                    <Route path="todos" element={<TodosPage />} />
+                  </Route>
                   <Route element={<ModuleGuard module="links" />}>
                     <Route path="links" element={<LinksPage />} />
                   </Route>
@@ -53,6 +58,9 @@ function AuthenticatedApp() {
                   </Route>
                   <Route element={<ModuleGuard module="s3_manager" />}>
                     <Route path="admin/s3" element={<S3ManagerPage />} />
+                  </Route>
+                  <Route element={<ModuleGuard module="files" />}>
+                    <Route path="files" element={<FilesPage />} />
                   </Route>
                   <Route element={<ModuleGuard module="screen_cast" />}>
                     <Route

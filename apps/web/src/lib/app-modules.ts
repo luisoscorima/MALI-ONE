@@ -67,4 +67,14 @@ export const APP_MODULES: {
     description:
       'Contactos WhatsApp + ledger de pagos MP (manual) y envío de boletines.',
   },
+  {
+    id: 'todos',
+    label: 'Pendientes',
+    description: 'Lista personal de tareas con vistas Kanban y calendario.',
+  },
+  {
+    id: 'files',
+    label: 'Archivos (disco)',
+    description: 'Explorar el disco compartido vía SFTPGo.',
+  },
 ];

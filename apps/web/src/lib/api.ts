@@ -1019,4 +1019,112 @@ export const api = {
       `/api/crm-pam/campaigns/${id}/send`,
       { method: 'POST' },
     ),
+
+  getTodoMeta: () =>
+    request<import('@mali-one/shared').TodoMetaDto>('/api/todos/meta'),
+
+  listTodos: (ownerId?: string) => {
+    const qs = ownerId
+      ? `?ownerId=${encodeURIComponent(ownerId)}`
+      : '';
+    return request<import('@mali-one/shared').TodoItemDto[]>(
+      `/api/todos${qs}`,
+    );
+  },
+
+  createTodo: (body: import('@mali-one/shared').CreateTodoItemDto) =>
+    request<import('@mali-one/shared').TodoItemDto>('/api/todos', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateTodo: (
+    id: string,
+    body: import('@mali-one/shared').UpdateTodoItemDto,
+  ) =>
+    request<import('@mali-one/shared').TodoItemDto>(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  addTodoTime: (id: string, minutes: number) =>
+    request<import('@mali-one/shared').TodoItemDto>(`/api/todos/${id}/time`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes }),
+    }),
+
+  deleteTodo: (id: string) =>
+    request<{ ok: boolean }>(`/api/todos/${id}`, { method: 'DELETE' }),
+
+  createTodoType: (body: import('@mali-one/shared').CreateTodoTypeDto) =>
+    request<import('@mali-one/shared').TodoTypeDto>('/api/todos/meta/types', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateTodoType: (
+    id: string,
+    body: import('@mali-one/shared').UpdateTodoTypeDto,
+  ) =>
+    request<import('@mali-one/shared').TodoTypeDto>(
+      `/api/todos/meta/types/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  createTodoStatus: (body: import('@mali-one/shared').CreateTodoStatusDto) =>
+    request<import('@mali-one/shared').TodoStatusDto>(
+      '/api/todos/meta/statuses',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateTodoStatus: (
+    id: string,
+    body: import('@mali-one/shared').UpdateTodoStatusDto,
+  ) =>
+    request<import('@mali-one/shared').TodoStatusDto>(
+      `/api/todos/meta/statuses/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  listFiles: (path?: string) => {
+    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
+    return request<import('@mali-one/shared').FilesListResultDto>(
+      `/api/files${qs}`,
+    );
+  },
+
+  mkdirFile: (path: string) =>
+    request<{ ok: boolean; path: string }>('/api/files/mkdir', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    }),
+
+  renameFile: (from: string, to: string) =>
+    request<{ ok: boolean }>('/api/files/rename', {
+      method: 'POST',
+      body: JSON.stringify({ from, to }),
+    }),
+
+  deleteFile: (path: string, isFolder: boolean) => {
+    const params = new URLSearchParams({
+      path,
+      isFolder: isFolder ? 'true' : 'false',
+    });
+    return request<{ ok: boolean }>(`/api/files?${params}`, {
+      method: 'DELETE',
+    });
+  },
+
+  uploadDiskFile: async (dirPath: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const qs = `?path=${encodeURIComponent(dirPath || '/')}`;
+    return request<{ ok: boolean; path: string }>(`/api/files/upload${qs}`, {
+      method: 'POST',
+      body: form,
+    });
+  },
+
+  downloadDiskFileUrl: (path: string) =>
+    `/api/files/download?path=${encodeURIComponent(path)}`,
 };

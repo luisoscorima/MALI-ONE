@@ -13,7 +13,124 @@ export type AppModule =
   | 'bsale_reports'
   | 'mailing'
   | 'newsletters'
-  | 'crm_pam';
+  | 'crm_pam'
+  | 'todos'
+  | 'files';
+
+export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type TodoEffort = 'xs' | 's' | 'm' | 'l' | 'xl';
+
+export interface TodoTypeDto {
+  id: string;
+  name: string;
+  color: string | null;
+  active: boolean;
+  sortOrder: number;
+}
+
+export interface TodoStatusDto {
+  id: string;
+  key: string;
+  name: string;
+  color: string | null;
+  isDone: boolean;
+  sortOrder: number;
+}
+
+export interface TodoItemDto {
+  id: string;
+  title: string;
+  detail: string | null;
+  notes: string | null;
+  typeId: string | null;
+  type: TodoTypeDto | null;
+  priority: TodoPriority;
+  effort: TodoEffort | null;
+  statusId: string;
+  status: TodoStatusDto;
+  ownerId: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  registeredAt: string;
+  dueAt: string | null;
+  statusChangedAt: string;
+  timeSpentMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TodoMetaDto {
+  types: TodoTypeDto[];
+  statuses: TodoStatusDto[];
+}
+
+export interface CreateTodoItemDto {
+  title: string;
+  detail?: string;
+  notes?: string;
+  typeId?: string | null;
+  priority?: TodoPriority;
+  effort?: TodoEffort | null;
+  statusId?: string;
+  dueAt?: string | null;
+}
+
+export interface UpdateTodoItemDto {
+  title?: string;
+  detail?: string | null;
+  notes?: string | null;
+  typeId?: string | null;
+  priority?: TodoPriority;
+  effort?: TodoEffort | null;
+  statusId?: string;
+  dueAt?: string | null;
+}
+
+export interface AddTodoTimeDto {
+  minutes: number;
+}
+
+export interface CreateTodoTypeDto {
+  name: string;
+  color?: string;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateTodoTypeDto {
+  name?: string;
+  color?: string | null;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface CreateTodoStatusDto {
+  key: string;
+  name: string;
+  color?: string;
+  isDone?: boolean;
+  sortOrder?: number;
+}
+
+export interface UpdateTodoStatusDto {
+  name?: string;
+  color?: string | null;
+  isDone?: boolean;
+  sortOrder?: number;
+}
+
+export interface FilesListItemDto {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  size: number | null;
+  lastModified: string | null;
+}
+
+export interface FilesListResultDto {
+  path: string;
+  items: FilesListItemDto[];
+}
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
 

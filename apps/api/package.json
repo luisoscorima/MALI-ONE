@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
-    "prisma:seed:widgets": "tsx prisma/seed-widgets.ts"
+    "prisma:seed:widgets": "tsx prisma/seed-widgets.ts",
+    "prisma:seed:todos": "tsx prisma/seed-todos.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

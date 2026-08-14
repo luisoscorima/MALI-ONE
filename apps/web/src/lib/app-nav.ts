@@ -8,12 +8,14 @@ import {
   Landmark,
   LayoutDashboard,
   Link2,
+  ListTodo,
   MonitorPlay,
   PackageSearch,
   Shield,
   Users,
   Newspaper,
   Contact,
+  FolderOpen,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -35,7 +37,10 @@ export type AppNavSection = {
 export const appNavSections: AppNavSection[] = [
   {
     label: 'General',
-    items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+    items: [
+      { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/todos', label: 'Pendientes', icon: ListTodo, module: 'todos' },
+    ],
   },
   {
     label: 'Operaciones',
@@ -52,6 +57,12 @@ export const appNavSections: AppNavSection[] = [
         label: 'Gestor S3',
         icon: HardDrive,
         module: 's3_manager',
+      },
+      {
+        to: '/files',
+        label: 'Archivos (disco)',
+        icon: FolderOpen,
+        module: 'files',
       },
       {
         to: '/admin/screen-cast',

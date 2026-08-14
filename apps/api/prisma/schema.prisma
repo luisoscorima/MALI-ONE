@@ -26,6 +26,23 @@ enum AppModule {
   mailing
   newsletters
   crm_pam
+  todos
+  files
+}
+
+enum TodoPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum TodoEffort {
+  xs
+  s
+  m
+  l
+  xl
 }
 
 enum ScreenCastMediaType {
@@ -77,6 +94,7 @@ model User {
   moduleAccess   UserModuleAccess[]
   newsletters    Newsletter[]
   emailCampaigns EmailCampaign[]
+  todoItems      TodoItem[]
 }
 
 model UserModuleAccess {
@@ -516,5 +534,54 @@ model EmailEvent {
   @@index([campaignId, createdAt])
   @@index([sendId])
   @@index([type])
+}
+
+model TodoType {
+  id        String     @id @default(cuid())
+  name      String
+  color     String?
+  active    Boolean    @default(true)
+  sortOrder Int        @default(0)
+  todos     TodoItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model TodoStatus {
+  id        String     @id @default(cuid())
+  key       String     @unique
+  name      String
+  color     String?
+  isDone    Boolean    @default(false)
+  sortOrder Int        @default(0)
+  todos     TodoItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model TodoItem {
+  id               String       @id @default(cuid())
+  title            String
+  detail           String?      @db.Text
+  notes            String?      @db.Text
+  typeId           String?
+  type             TodoType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  priority         TodoPriority @default(medium)
+  effort           TodoEffort?
+  statusId         String
+  status           TodoStatus   @relation(fields: [statusId], references: [id])
+  ownerId          String
+  owner            User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  registeredAt     DateTime     @default(now())
+  dueAt            DateTime?
+  statusChangedAt  DateTime     @default(now())
+  timeSpentMinutes Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([ownerId])
+  @@index([statusId])
+  @@index([dueAt])
+  @@index([typeId])
 }
 

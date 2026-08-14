@@ -7,12 +7,14 @@ import {
   KeyRound,
   Landmark,
   Link2,
+  ListTodo,
   Mail,
   MonitorPlay,
   PackageSearch,
   Users,
   Newspaper,
   Contact,
+  FolderOpen,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
@@ -21,10 +23,16 @@ export const moduleMeta: Record<
   {
     to: string;
     icon: typeof Link2;
-    group: 'operaciones' | 'crms' | 'widgets' | 'herramientas';
+    group: 'operaciones' | 'crms' | 'widgets' | 'herramientas' | 'general';
     accent: ModuleCardAccent;
   }
 > = {
+  todos: {
+    to: '/todos',
+    icon: ListTodo,
+    group: 'general',
+    accent: 'blue',
+  },
   links: { to: '/links', icon: Link2, group: 'operaciones', accent: 'blue' },
   workspace_users: {
     to: '/admin/users',
@@ -35,6 +43,12 @@ export const moduleMeta: Record<
   s3_manager: {
     to: '/admin/s3',
     icon: HardDrive,
+    group: 'operaciones',
+    accent: 'emerald',
+  },
+  files: {
+    to: '/files',
+    icon: FolderOpen,
     group: 'operaciones',
     accent: 'emerald',
   },
@@ -101,6 +115,7 @@ export const moduleMeta: Record<
 };
 
 export const groupLabels: Record<string, string> = {
+  general: 'General',
   operaciones: 'Operaciones',
   crms: 'CRMs',
   widgets: 'Widgets y sitios',

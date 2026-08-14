@@ -24,6 +24,8 @@ import { BsaleModule } from './modules/bsale/bsale.module';
 import { CrmClientModule } from './modules/crm/crm-client.module';
 import { NewslettersModule } from './modules/newsletters/newsletters.module';
 import { CrmPamModule } from './modules/crm-pam/crm-pam.module';
+import { TodosModule } from './modules/todos/todos.module';
+import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
 
 @Module({
   imports: [
@@ -45,6 +47,8 @@ import { CrmPamModule } from './modules/crm-pam/crm-pam.module';
     BsaleModule,
     NewslettersModule,
     CrmPamModule,
+    TodosModule,
+    SftpgoFilesModule,
   ],
   controllers: [HealthController],
   providers: [
