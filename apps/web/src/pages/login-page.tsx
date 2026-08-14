@@ -52,7 +52,7 @@ export function LoginPage() {
           to="/"
           className="login-fade-up login-stagger-1 flex items-center gap-3 self-center font-medium"
         >
-          <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
+          <div className="login-logo-glass flex size-9 items-center justify-center overflow-hidden rounded-lg bg-white/10 ring-1 ring-white/20 backdrop-blur-md">
             <img
               src={MALI_LOGO_URL}
               alt=""
