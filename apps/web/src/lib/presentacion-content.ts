@@ -1,13 +1,13 @@
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
-/** Base path for isometric assets under `public/presentacion/`. */
-export const PRESENTACION_ASSETS = '/presentacion';
+/** Base path for isometric assets under `public/presentacion-assets/`. */
+export const PRESENTACION_ASSETS = '/presentacion-assets';
 
 export type PresentacionModule = {
   id: string;
   title: string;
   description: string;
-  /** Filename under `public/presentacion/` (e.g. `links.png`). */
+  /** Filename under `public/presentacion-assets/` (e.g. `links.png`). */
   image?: string;
   accent: ModuleCardAccent;
 };
@@ -24,7 +24,7 @@ export const presentacionHero = {
   title: 'MALI ONE',
   subtitle: 'Sistema de operaciones internas para mali.pe',
   lead: 'Una plataforma centralizada para que el equipo del museo gestione enlaces, contenidos embebidos, CRM, pantallas y herramientas operativas con acceso seguro.',
-  /** Optional hero isometric: place as `public/presentacion/hero.png` (or .webp). */
+  /** Optional hero isometric: place as `public/presentacion-assets/hero.png` (or .webp). */
   image: 'hero.png',
 };
 

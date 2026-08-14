@@ -165,6 +165,7 @@ export function App() {
           {/* Public routes — outside AuthProvider to avoid /api/auth/me 401 */}
           <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
           <Route path="/presentacion" element={<PresentacionPage />} />
+          <Route path="/presentacion/" element={<PresentacionPage />} />
           <Route path="*" element={<AuthenticatedApp />} />
         </Routes>
       </BrowserRouter>
