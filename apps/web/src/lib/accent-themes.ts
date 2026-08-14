@@ -82,28 +82,49 @@ function applyThemeColor(id: AccentThemeId, primary: string) {
 
 let faviconGeneration = 0;
 
+function loadImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+    img.src = src;
+  });
+}
+
 function applyThemedFavicon(primary: string) {
   const generation = ++faviconGeneration;
-  const img = new Image();
-  img.onload = () => {
-    if (generation !== faviconGeneration) return;
-    const size = 64;
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = primary;
-    ctx.fillRect(0, 0, size, size);
-    ctx.drawImage(img, 0, 0, size, size);
-    const href = canvas.toDataURL('image/png');
-    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
-      link.type = 'image/png';
-      link.removeAttribute('sizes');
-      link.href = href;
-    });
-  };
-  img.src = '/favicon.svg';
+  void Promise.all([loadImage('/favicon.svg'), loadImage('/mali-mark-mask.svg')]).then(
+    ([mark, mask]) => {
+      if (generation !== faviconGeneration) return;
+      const size = 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, size * 0.22);
+      ctx.clip();
+
+      ctx.fillStyle = primary;
+      ctx.fillRect(0, 0, size, size);
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.drawImage(mask, 0, 0, size, size);
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.fillStyle = APP_BACKGROUND;
+      ctx.fillRect(0, 0, size, size);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(mark, 0, 0, size, size);
+
+      const href = canvas.toDataURL('image/png');
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
+        link.type = 'image/png';
+        link.removeAttribute('sizes');
+        link.href = href;
+      });
+    },
+  );
 }
 
 /** Colores decorativos del fondo del login (esmeralda, violeta, azul). */

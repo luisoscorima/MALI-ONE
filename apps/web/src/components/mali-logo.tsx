@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 /** M de vidrio: favicon, PWA, login y chrome de la app. */
 export const MALI_MARK_URL = '/favicon.svg';
 
-/** Marca con placa del acento elegido. */
+/** Marca: acento solo dentro de la M, capa oscura alrededor. */
 export function MaliMark({
   className,
   imageClassName,
@@ -15,14 +15,15 @@ export function MaliMark({
   return (
     <div
       className={cn(
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary',
+        'mali-mark flex shrink-0 items-center justify-center',
         className,
       )}
     >
+      <div className="mali-mark-fill" aria-hidden />
       <img
         src={MALI_MARK_URL}
         alt=""
-        className={cn('size-full object-contain', imageClassName)}
+        className={cn('relative z-10 size-full object-contain', imageClassName)}
       />
     </div>
   );
