@@ -39,7 +39,8 @@ type Props = {
   hasLandscapeMonitors?: boolean;
 };
 
-const ACCEPT = 'image/jpeg,image/png,image/gif,video/mp4,.jpg,.jpeg,.png,.gif,.mp4';
+const ACCEPT =
+  'image/jpeg,image/png,image/gif,video/mp4,video/quicktime,.jpg,.jpeg,.png,.gif,.mp4,.mov';
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -225,8 +226,8 @@ export function ScreenCastMediaUrlField({
                   : 'Arrastra un archivo o haz clic para elegir'}
               </p>
               <p className="text-xs text-muted">
-                JPG, PNG, GIF o MP4. PNG/JPG se optimizan a JPEG al subir (las
-                URLs externas no se procesan).
+                JPG, PNG, GIF, MP4 o MOV (iPhone). PNG/JPG → JPEG; MOV → MP4
+                H.264 al subir.
               </p>
             </div>
             <Button

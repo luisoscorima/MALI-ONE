@@ -22,12 +22,18 @@ import {
   UpdateScreenCastPlaylistDto,
   UpdateScreenCastPlaylistItemDto,
 } from './dto/screen-cast.dto';
+import {
+  convertMovBufferToMp4,
+  isMovUpload,
+} from './screen-cast-video.util';
 
 const ALLOWED_MIME = new Set([
   'image/jpeg',
   'image/png',
   'image/gif',
   'video/mp4',
+  'video/quicktime',
+  'video/x-quicktime',
 ]);
 
 /** Still images (not GIF) are normalized to JPEG for TV decode + size. */
@@ -49,6 +55,17 @@ function toJpegFileName(originalName: string): string {
   return `${base}.jpg`;
 }
 
+function toMp4FileName(originalName: string): string {
+  const base = originalName.replace(/\.[^.]+$/, '') || 'video';
+  return `${base}.mp4`;
+}
+
+function isAllowedUpload(mime: string, fileName: string): boolean {
+  if (ALLOWED_MIME.has(mime)) return true;
+  // iPhone sometimes sends odd MIME; trust .mov extension.
+  return isMovUpload(mime, fileName);
+}
+
 @Injectable()
 export class ScreenCastService {
   constructor(
@@ -63,9 +80,10 @@ export class ScreenCastService {
     }
 
     const mime = (file.mimetype || '').toLowerCase();
-    if (!ALLOWED_MIME.has(mime)) {
+    const originalName = file.originalname || 'upload';
+    if (!isAllowedUpload(mime, originalName)) {
       throw new BadRequestException(
-        'Formato no permitido. Usa JPG, PNG, GIF o MP4.',
+        'Formato no permitido. Usa JPG, PNG, GIF, MP4 o MOV (iPhone).',
       );
     }
 
@@ -81,7 +99,7 @@ export class ScreenCastService {
     const originalBytes = file.size;
     let uploadBuffer = file.buffer;
     let uploadMime = mime;
-    let uploadName = file.originalname;
+    let uploadName = originalName;
     let width: number | null = null;
     let height: number | null = null;
 
@@ -102,10 +120,21 @@ export class ScreenCastService {
         width = outMeta.width ?? null;
         height = outMeta.height ?? null;
         uploadMime = 'image/jpeg';
-        uploadName = toJpegFileName(file.originalname);
+        uploadName = toJpegFileName(originalName);
       } catch {
         throw new BadRequestException(
           'No se pudo procesar la imagen. Prueba otro JPG/PNG.',
+        );
+      }
+    } else if (isMovUpload(mime, originalName)) {
+      try {
+        uploadBuffer = await convertMovBufferToMp4(file.buffer);
+        uploadMime = 'video/mp4';
+        uploadName = toMp4FileName(originalName);
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'error desconocido';
+        throw new BadRequestException(
+          `No se pudo convertir el MOV a MP4. ${detail}`,
         );
       }
     }
@@ -114,8 +143,11 @@ export class ScreenCastService {
     const url = await this.s3.uploadFile(key, uploadBuffer, uploadMime);
 
     let mediaType: ScreenCastMediaType = ScreenCastMediaType.image;
-    if (mime === 'video/mp4') mediaType = ScreenCastMediaType.video;
-    else if (mime === 'image/gif') mediaType = ScreenCastMediaType.gif;
+    if (uploadMime === 'video/mp4' || mime === 'video/mp4') {
+      mediaType = ScreenCastMediaType.video;
+    } else if (mime === 'image/gif') {
+      mediaType = ScreenCastMediaType.gif;
+    }
 
     return {
       url,

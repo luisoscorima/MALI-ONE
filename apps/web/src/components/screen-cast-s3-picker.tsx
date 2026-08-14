@@ -202,7 +202,8 @@ export function inferScreenCastMediaType(
   url: string,
 ): 'image' | 'video' | 'gif' {
   const path = url.toLowerCase().split('?')[0] ?? '';
-  if (path.endsWith('.mp4') || path.endsWith('.webm')) return 'video';
+  if (path.endsWith('.mp4') || path.endsWith('.webm') || path.endsWith('.mov'))
+    return 'video';
   if (path.endsWith('.gif')) return 'gif';
   return 'image';
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
 import {
   Badge,
   Button,
-  Card,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -190,7 +189,9 @@ export function ScreenCastAdminPage() {
 
   const [activeTab, setActiveTab] = useState<AdminTab>('config');
 
-  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
+  const [createPlaylistName, setCreatePlaylistName] = useState('');
+  const [createPlaylistActivo, setCreatePlaylistActivo] = useState(true);
   const [creatingPlaylist, setCreatingPlaylist] = useState(false);
 
   const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false);
@@ -207,6 +208,9 @@ export function ScreenCastAdminPage() {
   const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
   const [savingItem, setSavingItem] = useState(false);
+  /** Avoid closing playlist dialog when nested item dialog dismisses (Radix). */
+  const itemDialogOpenRef = useRef(false);
+  const suppressPlaylistCloseRef = useRef(false);
 
   const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
@@ -305,24 +309,45 @@ export function ScreenCastAdminPage() {
   function closePlaylistEditor() {
     setPlaylistDialogOpen(false);
     setEditingPlaylistId(null);
+    itemDialogOpenRef.current = false;
+    suppressPlaylistCloseRef.current = false;
     setItemDialogOpen(false);
     setItemDraft(null);
     setItems([]);
   }
 
+  function openCreatePlaylist() {
+    setCreatePlaylistName('');
+    setCreatePlaylistActivo(true);
+    setCreatePlaylistOpen(true);
+  }
+
+  function closeCreatePlaylist() {
+    if (creatingPlaylist) return;
+    setCreatePlaylistOpen(false);
+    setCreatePlaylistName('');
+    setCreatePlaylistActivo(true);
+  }
+
   async function createPlaylist() {
-    const trimmed = newPlaylistName.trim();
+    const trimmed = createPlaylistName.trim();
     if (!trimmed) {
       toast.error('El nombre es obligatorio');
       return;
     }
     setCreatingPlaylist(true);
     try {
-      const created = await api.createScreenCastPlaylist({ name: trimmed });
+      const created = await api.createScreenCastPlaylist({
+        name: trimmed,
+        activo: createPlaylistActivo,
+      });
       toast.success('Playlist creada');
-      setNewPlaylistName('');
+      setCreatePlaylistOpen(false);
+      setCreatePlaylistName('');
+      setCreatePlaylistActivo(true);
       await loadLists();
       openPlaylistEditor(created.id);
+      openItemCreate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear');
     } finally {
@@ -383,11 +408,13 @@ export function ScreenCastAdminPage() {
   }
 
   function openItemCreate() {
+    itemDialogOpenRef.current = true;
     setItemDraft(emptyItem());
     setItemDialogOpen(true);
   }
 
   function openItemEdit(item: ScreenCastPlaylistItemDto) {
+    itemDialogOpenRef.current = true;
     setItemDraft({
       id: item.id,
       mediaUrl: item.mediaUrl,
@@ -399,8 +426,14 @@ export function ScreenCastAdminPage() {
   }
 
   function closeItemDialog() {
+    // Nested Dialog close can bubble and close the playlist dialog; suppress briefly.
+    suppressPlaylistCloseRef.current = true;
+    itemDialogOpenRef.current = false;
     setItemDialogOpen(false);
     setItemDraft(null);
+    window.setTimeout(() => {
+      suppressPlaylistCloseRef.current = false;
+    }, 100);
   }
 
   async function persistItem() {
@@ -652,35 +685,18 @@ export function ScreenCastAdminPage() {
 
         <TabsContent value="config" className="space-y-8">
           <section className="space-y-4">
-            <div>
-              <h3 className="text-lg font-medium">Listas de reproducción</h3>
-              <p className="mt-1 text-sm text-muted">
-                Playlists reutilizables con imágenes, GIFs y videos.
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-medium">Listas de reproducción</h3>
+                <p className="mt-1 text-sm text-muted">
+                  Playlists reutilizables con imágenes, GIFs y videos.
+                </p>
+              </div>
+              <Button type="button" onClick={openCreatePlaylist}>
+                <Plus size={16} />
+                Nueva playlist
+              </Button>
             </div>
-
-            <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2">
-              <Label htmlFor="pl-name">Nueva playlist</Label>
-              <Input
-                id="pl-name"
-                value={newPlaylistName}
-                placeholder="Lobby principal"
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void createPlaylist();
-                }}
-              />
-            </div>
-            <Button
-              type="button"
-              disabled={creatingPlaylist}
-              onClick={() => void createPlaylist()}
-            >
-              <Plus size={16} />
-              Crear
-            </Button>
-          </Card>
 
           {playlists.length === 0 ? (
             <EmptyState
@@ -1006,17 +1022,94 @@ export function ScreenCastAdminPage() {
       </Tabs>
 
       <Dialog
-        open={playlistDialogOpen}
+        open={createPlaylistOpen}
         onOpenChange={(open) => {
-          if (!open) closePlaylistEditor();
-          else setPlaylistDialogOpen(true);
+          if (!open) closeCreatePlaylist();
+          else setCreatePlaylistOpen(true);
         }}
       >
-        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),42rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nueva playlist</DialogTitle>
+            <DialogDescription>
+              Ponle un nombre. Después podrás añadir imágenes y videos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pl-create-name">Nombre</Label>
+              <Input
+                id="pl-create-name"
+                autoFocus
+                value={createPlaylistName}
+                placeholder="Ej. Lobby principal"
+                onChange={(e) => setCreatePlaylistName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void createPlaylist();
+                  }
+                }}
+              />
+            </div>
+            <SettingSwitchInline
+              label="Activa"
+              checked={createPlaylistActivo}
+              onCheckedChange={setCreatePlaylistActivo}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={creatingPlaylist}
+              onClick={closeCreatePlaylist}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={creatingPlaylist || !createPlaylistName.trim()}
+              onClick={() => void createPlaylist()}
+            >
+              {creatingPlaylist ? 'Creando…' : 'Crear y editar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={playlistDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (itemDialogOpenRef.current || suppressPlaylistCloseRef.current) {
+              return;
+            }
+            closePlaylistEditor();
+            return;
+          }
+          setPlaylistDialogOpen(true);
+        }}
+      >
+        <DialogContent
+          className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),42rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          onPointerDownOutside={(e) => {
+            if (itemDialogOpenRef.current) e.preventDefault();
+          }}
+          onFocusOutside={(e) => {
+            if (itemDialogOpenRef.current) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            if (itemDialogOpenRef.current) e.preventDefault();
+          }}
+        >
           <DialogHeader className="shrink-0 border-b px-6 py-4">
             <DialogTitle>Editar playlist</DialogTitle>
             <DialogDescription>
-              JPG, PNG, GIF y MP4. Pega una URL o elige desde S3.
+              JPG, PNG, GIF, MP4 o MOV (iPhone → MP4). Pega una URL o elige desde
+              S3.
             </DialogDescription>
           </DialogHeader>
 
@@ -1042,13 +1135,6 @@ export function ScreenCastAdminPage() {
                     />
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  disabled={savingMeta}
-                  onClick={() => void savePlaylistMeta()}
-                >
-                  Guardar playlist
-                </Button>
 
                 <div className="flex items-center justify-between border-t pt-4">
                   <h4 className="font-medium">Ítems ({items.length})</h4>
@@ -1133,9 +1219,19 @@ export function ScreenCastAdminPage() {
                     </div>
                   ))}
                   {items.length === 0 ? (
-                    <p className="text-sm text-muted">
-                      Aún no hay ítems en esta playlist.
-                    </p>
+                    <div className="rounded-md border border-dashed px-4 py-8 text-center">
+                      <p className="text-sm text-muted">
+                        Esta playlist aún no tiene contenido.
+                      </p>
+                      <Button
+                        type="button"
+                        className="mt-3"
+                        onClick={openItemCreate}
+                      >
+                        <Plus size={16} />
+                        Añadir primer ítem
+                      </Button>
+                    </div>
                   ) : null}
                 </div>
               </>
@@ -1145,6 +1241,13 @@ export function ScreenCastAdminPage() {
           <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={closePlaylistEditor}>
               Cerrar
+            </Button>
+            <Button
+              type="button"
+              disabled={savingMeta || loadingPlaylist}
+              onClick={() => void savePlaylistMeta()}
+            >
+              {savingMeta ? 'Guardando…' : 'Guardar playlist'}
             </Button>
           </DialogFooter>
         </DialogContent>
