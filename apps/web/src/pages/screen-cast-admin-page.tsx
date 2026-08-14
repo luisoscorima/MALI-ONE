@@ -1374,7 +1374,17 @@ export function ScreenCastAdminPage() {
           else setMonitorDialogOpen(true);
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent
+          className="max-w-lg"
+          onPointerDownOutside={(e) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest('[data-slot="select-content"]')) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            const t = e.target as HTMLElement | null;
+            if (t?.closest('[data-slot="select-content"]')) e.preventDefault();
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {monitorDraft?.id ? 'Editar monitor' : 'Nuevo monitor'}
@@ -1437,10 +1447,10 @@ export function ScreenCastAdminPage() {
                     })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="LANDSCAPE">
                       Horizontal (Landscape)
                     </SelectItem>
@@ -1461,10 +1471,10 @@ export function ScreenCastAdminPage() {
                     })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Sin playlist" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="__none__">Sin playlist</SelectItem>
                     {playlists.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
