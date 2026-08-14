@@ -24,9 +24,9 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="h-16 p-1 [&_svg]:size-full" asChild>
+            <SidebarMenuButton size="lg" className="h-14 p-1 [&_svg]:size-full" asChild>
               <Link to="/">
-                <MaliMark className="size-14" />
+                <MaliMark className="size-12" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">MALI ONE</span>
                   <span className="truncate text-xs text-muted-foreground">

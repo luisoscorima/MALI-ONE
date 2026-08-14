@@ -47,7 +47,7 @@ export function LoginPage() {
         <div className="login-grid-overlay" />
       </div>
 
-      <div className="relative flex w-full max-w-sm flex-col gap-6">
+      <div className="login-stage relative flex w-full max-w-sm flex-col gap-6">
         <Link
           to="/"
           className="login-fade-up login-stagger-1 flex items-center gap-3 self-center font-medium"

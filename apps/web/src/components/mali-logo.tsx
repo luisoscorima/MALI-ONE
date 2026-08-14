@@ -34,21 +34,21 @@ function MaliMarkSvg({ className }: { className?: string }) {
           <stop offset="1" stopColor={MALI_MARK_NAVY.outer} />
         </radialGradient>
         <linearGradient id={glass} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="#35d8ff" stopOpacity=".22" />
-          <stop offset=".35" stopColor="#a9c8ff" stopOpacity=".30" />
-          <stop offset=".72" stopColor="#8879ff" stopOpacity=".25" />
-          <stop offset="1" stopColor="#cf5fff" stopOpacity=".30" />
+          <stop offset="0" stopColor="var(--mali-glass-0)" stopOpacity=".22" />
+          <stop offset=".35" stopColor="var(--mali-glass-1)" stopOpacity=".30" />
+          <stop offset=".72" stopColor="var(--mali-glass-2)" stopOpacity=".25" />
+          <stop offset="1" stopColor="var(--mali-glass-3)" stopOpacity=".30" />
         </linearGradient>
         <linearGradient id={edge} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stopColor="#3ce6ff" />
-          <stop offset=".38" stopColor="#d8f3ff" />
-          <stop offset=".7" stopColor="#aeb5ff" />
-          <stop offset="1" stopColor="#d663ff" />
+          <stop offset="0" stopColor="var(--mali-edge-0)" />
+          <stop offset=".38" stopColor="var(--mali-edge-1)" />
+          <stop offset=".7" stopColor="var(--mali-edge-2)" />
+          <stop offset="1" stopColor="var(--mali-edge-3)" />
         </linearGradient>
         <linearGradient id={letterGlass} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#ffffff" stopOpacity=".92" />
-          <stop offset=".42" stopColor="#dbe8ff" stopOpacity=".62" />
-          <stop offset="1" stopColor="#a996ff" stopOpacity=".70" />
+          <stop offset="0" stopColor="var(--mali-letter-0)" stopOpacity=".92" />
+          <stop offset=".42" stopColor="var(--mali-letter-1)" stopOpacity=".62" />
+          <stop offset="1" stopColor="var(--mali-letter-2)" stopOpacity=".70" />
         </linearGradient>
         <filter
           id={panelFx}
@@ -59,7 +59,7 @@ function MaliMarkSvg({ className }: { className?: string }) {
           colorInterpolationFilters="sRGB"
         >
           <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur" />
-          <feFlood floodColor="#3a78ff" floodOpacity=".68" result="blue" />
+          <feFlood floodColor="var(--mali-glow-panel)" floodOpacity=".68" result="blue" />
           <feComposite in="blue" in2="blur" operator="in" result="glow" />
           <feMerge>
             <feMergeNode in="glow" />
@@ -75,7 +75,7 @@ function MaliMarkSvg({ className }: { className?: string }) {
           colorInterpolationFilters="sRGB"
         >
           <feGaussianBlur in="SourceAlpha" stdDeviation="3.3" result="blur" />
-          <feFlood floodColor="#74a9ff" floodOpacity=".75" />
+          <feFlood floodColor="var(--mali-glow-letter)" floodOpacity=".75" />
           <feComposite in2="blur" operator="in" result="glow" />
           <feSpecularLighting
             in="SourceAlpha"
@@ -113,10 +113,6 @@ function MaliMarkSvg({ className }: { className?: string }) {
         fill={MALI_MARK_NAVY.orbViolet}
         opacity="0.08"
       />
-
-      <g fill="var(--primary)" stroke="var(--primary)" strokeWidth="2.2" strokeLinejoin="round">
-        {panels('fill')}
-      </g>
 
       <g
         fill={`url(#${glass})`}
@@ -166,7 +162,7 @@ function MaliMarkSvg({ className }: { className?: string }) {
   );
 }
 
-/** Marca: acento solo dentro de la M, capa oscura alrededor. */
+/** Marca glassmorphism; el vidrio sigue el acento. */
 export function MaliMark({
   className,
   imageClassName,

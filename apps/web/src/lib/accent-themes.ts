@@ -1,7 +1,9 @@
 import {
-  maliMarkAccentFillMarkup,
+  applyMaliGlassCssVars,
+  getMaliGlassPalette,
   maliMarkNavyBackdropMarkup,
   maliMarkNavyGradientMarkup,
+  recolorFaviconGlass,
   MALI_MARK_NAVY,
 } from '@/lib/mali-mark-geometry';
 
@@ -98,14 +100,15 @@ function loadImage(src: string) {
 
 let faviconGeneration = 0;
 
-function applyThemedFavicon(primary: string) {
+function applyThemedFavicon(id: AccentThemeId) {
+  const palette = getMaliGlassPalette(id);
   const generation = ++faviconGeneration;
   void fetch('/favicon.svg')
     .then((response) => response.text())
     .then((svgText) => {
-      const composed = svgText.replace(
+      const composed = recolorFaviconGlass(svgText, palette).replace(
         '</defs>',
-        `${maliMarkNavyGradientMarkup('mark-navy')}</defs>${maliMarkNavyBackdropMarkup('mark-navy')}${maliMarkAccentFillMarkup(primary)}`,
+        `${maliMarkNavyGradientMarkup('mark-navy')}</defs>${maliMarkNavyBackdropMarkup('mark-navy')}`,
       );
       const blob = new Blob([composed], { type: 'image/svg+xml' });
       return loadImage(URL.createObjectURL(blob)).then((mark) => {
@@ -193,5 +196,6 @@ export function applyAccentTheme(id: AccentThemeId) {
   root.style.setProperty('--sidebar-ring', theme.primary);
   root.style.setProperty('--chart-1', theme.primary);
   applyThemeColor(id, theme.primary);
-  applyThemedFavicon(theme.primary);
+  applyMaliGlassCssVars(getMaliGlassPalette(id));
+  applyThemedFavicon(id);
 }

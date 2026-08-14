@@ -55,6 +55,19 @@
 
 :root {
   --radius: 0.625rem;
+  --mali-glass-0: #35d8ff;
+  --mali-glass-1: #a9c8ff;
+  --mali-glass-2: #8879ff;
+  --mali-glass-3: #cf5fff;
+  --mali-edge-0: #3ce6ff;
+  --mali-edge-1: #d8f3ff;
+  --mali-edge-2: #aeb5ff;
+  --mali-edge-3: #d663ff;
+  --mali-letter-0: #ffffff;
+  --mali-letter-1: #dbe8ff;
+  --mali-letter-2: #a996ff;
+  --mali-glow-panel: #3a78ff;
+  --mali-glow-letter: #74a9ff;
 }
 
 .dark {
@@ -224,6 +237,17 @@ body {
   background: radial-gradient(ellipse 72% 55% at 50% 45%, #101d5a 0%, #071337 52%, #020615 100%);
 }
 
+.login-stage {
+  zoom: 1.5;
+}
+
+@supports not (zoom: 1) {
+  .login-stage {
+    transform: scale(1.5);
+    transform-origin: center center;
+  }
+}
+
 .mali-mark {
   position: relative;
   overflow: hidden;
@@ -235,7 +259,7 @@ body {
   width: 100% !important;
   height: 100% !important;
   max-width: none;
-  transform: scale(1.22);
+  transform: scale(1.1);
 }
 
 .login-card-interactive {
