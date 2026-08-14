@@ -28,7 +28,7 @@ export function LoginForm({
 }: LoginFormProps) {
   return (
     <div className={cn('flex flex-col gap-6', className)} {...props}>
-      <Card className="login-card-interactive login-glass border-white/10 bg-card/55 shadow-lg backdrop-blur-xl">
+      <Card className="login-card-interactive login-glass border-white/15 bg-white/8 shadow-lg backdrop-blur-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Bienvenido</CardTitle>
           <CardDescription>
@@ -45,8 +45,10 @@ export function LoginForm({
                 className={cn(
                   'login-google-btn group relative h-10 w-full overflow-hidden',
                   'border-[#dadce0] bg-white text-[15px] font-medium text-[#3c4043]',
+                  'dark:border-[#dadce0] dark:bg-white dark:text-[#3c4043]',
                   'shadow-sm transition-all duration-200',
-                  'hover:border-[#c6c9cc] hover:bg-[#f8f9fa] hover:shadow-md',
+                  'hover:border-[#c6c9cc] hover:bg-[#f8f9fa] hover:text-[#3c4043] hover:shadow-md',
+                  'dark:hover:border-[#c6c9cc] dark:hover:bg-[#f8f9fa] dark:hover:text-[#3c4043]',
                   'active:scale-[0.99]',
                   'disabled:cursor-wait disabled:opacity-90',
                 )}

@@ -105,17 +105,17 @@ function drawGlassFavicon(
   ctx.fillStyle = '#0c1016';
   ctx.fillRect(0, 0, size, size);
 
-  // Orbes de color (degradados vivos)
+  // Orbes de color (degradados vivos, saturación alta para leerse a 16–32px)
   const orbs: Array<{ x: number; y: number; r: number; color: string }> = [
-    { x: size * 0.15, y: size * 0.1, r: size * 0.55, color: palette[0] },
-    { x: size * 0.85, y: size * 0.25, r: size * 0.5, color: palette[1] },
-    { x: size * 0.45, y: size * 0.9, r: size * 0.55, color: palette[2] },
+    { x: size * 0.12, y: size * 0.08, r: size * 0.62, color: palette[0] },
+    { x: size * 0.9, y: size * 0.22, r: size * 0.58, color: palette[1] },
+    { x: size * 0.42, y: size * 0.95, r: size * 0.62, color: palette[2] },
   ];
 
   for (const orb of orbs) {
     const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.r);
-    g.addColorStop(0, hexToRgba(orb.color, 0.85));
-    g.addColorStop(0.55, hexToRgba(orb.color, 0.28));
+    g.addColorStop(0, hexToRgba(orb.color, 0.95));
+    g.addColorStop(0.45, hexToRgba(orb.color, 0.45));
     g.addColorStop(1, hexToRgba(orb.color, 0));
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -124,26 +124,26 @@ function drawGlassFavicon(
   }
 
   // Capa glass
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-  roundRect(ctx, size * 0.06, size * 0.06, size * 0.88, size * 0.88, size * 0.16);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+  roundRect(ctx, size * 0.05, size * 0.05, size * 0.9, size * 0.9, size * 0.16);
   ctx.fill();
 
   // Highlight superior
-  const highlight = ctx.createLinearGradient(0, size * 0.06, 0, size * 0.42);
-  highlight.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+  const highlight = ctx.createLinearGradient(0, size * 0.05, 0, size * 0.4);
+  highlight.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
   highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = highlight;
-  roundRect(ctx, size * 0.08, size * 0.08, size * 0.84, size * 0.32, size * 0.12);
+  roundRect(ctx, size * 0.07, size * 0.07, size * 0.86, size * 0.3, size * 0.12);
   ctx.fill();
 
   // Borde glass
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
-  ctx.lineWidth = Math.max(1, size * 0.03);
-  roundRect(ctx, size * 0.06, size * 0.06, size * 0.88, size * 0.88, size * 0.16);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.lineWidth = Math.max(1.5, size * 0.035);
+  roundRect(ctx, size * 0.05, size * 0.05, size * 0.9, size * 0.9, size * 0.16);
   ctx.stroke();
 
-  // Logo centrado
-  const pad = size * 0.16;
+  // Logo un poco más grande para legibilidad en pestaña
+  const pad = size * 0.12;
   const maxW = size - pad * 2;
   const maxH = size - pad * 2;
   const scale = Math.min(maxW / logo.naturalWidth, maxH / logo.naturalHeight);
