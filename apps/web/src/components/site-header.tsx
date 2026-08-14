@@ -1,4 +1,4 @@
-import { MALI_LOGO_URL } from '@/components/mali-logo';
+import { MALI_MARK_URL } from '@/components/mali-logo';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -18,9 +18,9 @@ function SidebarLogoTrigger({ className }: { className?: string }) {
       aria-label="Abrir menú"
     >
       <img
-        src={MALI_LOGO_URL}
+        src={MALI_MARK_URL}
         alt=""
-        className="h-7 w-auto max-w-[2.75rem] object-contain"
+        className="size-7 object-contain"
       />
     </Button>
   );

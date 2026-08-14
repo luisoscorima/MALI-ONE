@@ -63,6 +63,19 @@ export const accentThemes: AccentTheme[] = [
 
 export const defaultAccentThemeId: AccentThemeId = 'neutral';
 
+const APP_BACKGROUND = '#0f1419';
+
+function applyThemeColor(id: AccentThemeId, primary: string) {
+  const themeColor = id === 'neutral' ? APP_BACKGROUND : primary;
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'theme-color');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', themeColor);
+}
+
 /** Colores decorativos del fondo del login (esmeralda, violeta, azul). */
 export const loginAmbientColors = {
   emerald: accentThemes.find((t) => t.id === 'emerald')!.primary,
@@ -106,4 +119,5 @@ export function applyAccentTheme(id: AccentThemeId) {
   root.style.setProperty('--sidebar-primary-foreground', theme.primaryForeground);
   root.style.setProperty('--sidebar-ring', theme.primary);
   root.style.setProperty('--chart-1', theme.primary);
+  applyThemeColor(id, theme.primary);
 }

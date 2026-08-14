@@ -1,0 +1,23 @@
+{
+  "name": "MALI ONE",
+  "short_name": "MALI ONE",
+  "start_url": "/",
+  "display": "standalone",
+  "lang": "es",
+  "background_color": "#071337",
+  "theme_color": "#0f1419",
+  "icons": [
+    {
+      "src": "/icons/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

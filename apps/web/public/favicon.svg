@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 682.73065 684.15997">
+  <defs>
+    <linearGradient id="glass" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#35d8ff" stop-opacity=".22"/>
+      <stop offset=".35" stop-color="#a9c8ff" stop-opacity=".30"/>
+      <stop offset=".72" stop-color="#8879ff" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#cf5fff" stop-opacity=".30"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3ce6ff"/>
+      <stop offset=".38" stop-color="#d8f3ff"/>
+      <stop offset=".7" stop-color="#aeb5ff"/>
+      <stop offset="1" stop-color="#d663ff"/>
+    </linearGradient>
+    <linearGradient id="letterGlass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".92"/>
+      <stop offset=".42" stop-color="#dbe8ff" stop-opacity=".62"/>
+      <stop offset="1" stop-color="#a996ff" stop-opacity=".70"/>
+    </linearGradient>
+    <filter id="panelFx" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur"/>
+      <feFlood flood-color="#3a78ff" flood-opacity=".68" result="blue"/>
+      <feComposite in="blue" in2="blur" operator="in" result="glow"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="letterFx" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3.3" result="blur"/>
+      <feFlood flood-color="#74a9ff" flood-opacity=".75"/>
+      <feComposite in2="blur" operator="in" result="glow"/>
+      <feSpecularLighting in="SourceAlpha" surfaceScale="4" specularConstant=".75" specularExponent="18" lighting-color="#ffffff" result="spec">
+        <fePointLight x="180" y="90" z="170"/>
+      </feSpecularLighting>
+      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip"/>
+      <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/><feMergeNode in="specClip"/></feMerge>
+    </filter>
+  </defs>
+
+  <g fill="url(#glass)" stroke="url(#edge)" stroke-width="2.2" stroke-linejoin="round" filter="url(#panelFx)">
+    <path d="M 155.699,137.972 H 60.941 v 237.175 h 94.758 z" transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"/>
+    <path d="m 0,0 -118.588,-205.399 -82.062,47.378 118.587,205.4 z" transform="matrix(1.3333333,0,0,-1.3333333,475.13267,236.7332)"/>
+    <path d="m 451.107,137.972 h -94.758 v 237.175 h 94.758 z" transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"/>
+  </g>
+
+  <g fill="none" stroke="#ffffff" stroke-opacity=".22" stroke-width=".9" stroke-linejoin="round">
+    <path d="M 155.699,137.972 H 60.941 v 237.175 h 94.758 z" transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"/>
+    <path d="m 0,0 -118.588,-205.399 -82.062,47.378 118.587,205.4 z" transform="matrix(1.3333333,0,0,-1.3333333,475.13267,236.7332)"/>
+    <path d="m 451.107,137.972 h -94.758 v 237.175 h 94.758 z" transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"/>
+  </g>
+
+  <g fill="url(#letterGlass)" stroke="url(#edge)" stroke-width=".72" stroke-linejoin="round" filter="url(#letterFx)">
+    <path d="M 0,0 V 19.147 L 48.447,33.842 V 34.02 L 0,47.735 V 67.328 H 65.902 V 53.346 H 20.929 v -0.179 c 5.699,-0.979 9.884,-2.227 14.694,-3.65 L 65.902,39.631 V 26.806 L 35.623,17.009 C 30.636,15.497 27.785,14.604 20.216,13.181 V 13.002 H 65.902 V 0 Z" transform="matrix(1.3333333,0,0,-1.3333333,100.49213,480.95973)"/>
+    <path d="M 0,0 -22.443,-7.571 V -7.748 L 0,-15.497 Z m -40.967,-14.161 v 13.804 l 66.17,23.335 V 8.282 L 10.509,3.383 v -22.442 l 14.694,-5.076 v -13.359 z" transform="matrix(1.3333333,0,0,-1.3333333,154.75773,331.81133)"/>
+    <path d="M 0,0 V 14.516 H 54.146 V 43.55 H 65.902 V 0 Z" transform="matrix(1.3333333,0,0,-1.3333333,100.49213,291.78787)"/>
+    <path d="m 75.369,360.72 h 65.902 V 346.292 H 75.369 Z" transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"/>
+  </g>
+</svg>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/auth-context';
 import { api } from '@/lib/api';
-import { MALI_LOGO_URL } from '@/components/mali-logo';
+import { MALI_MARK_URL } from '@/components/mali-logo';
 import { LoginForm } from '@/components/login-form';
 import { FullPageLoading } from '@/components/feedback';
 
@@ -27,7 +27,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="login-shell relative flex h-svh max-h-svh flex-col items-center justify-center gap-6 overflow-hidden bg-muted p-6 md:p-10">
+    <div className="login-shell relative flex h-svh max-h-svh flex-col items-center justify-center gap-6 overflow-hidden p-6 md:p-10">
       {redirecting && (
         <div
           className="login-progress-track"
@@ -52,13 +52,11 @@ export function LoginPage() {
           to="/"
           className="login-fade-up login-stagger-1 flex items-center gap-3 self-center font-medium"
         >
-          <div className="flex size-9 items-center justify-center overflow-hidden rounded-lg bg-primary/15 ring-1 ring-primary/25">
-            <img
-              src={MALI_LOGO_URL}
-              alt=""
-              className="h-6 w-auto object-contain"
-            />
-          </div>
+          <img
+            src={MALI_MARK_URL}
+            alt=""
+            className="login-logo-glow h-14 w-14 object-contain"
+          />
           <div className="text-left leading-tight">
             <span className="block text-sm font-semibold tracking-wide">MALI ONE</span>
             <span className="block text-xs text-muted-foreground">

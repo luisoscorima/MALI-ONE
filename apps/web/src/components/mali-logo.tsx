@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-export const MALI_LOGO_URL =
-  'https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Blanco.png';
+/** M de vidrio: favicon, PWA, login y chrome de la app. */
+export const MALI_MARK_URL = '/favicon.svg';
 
 interface MaliLogoProps {
   className?: string;
@@ -22,9 +22,9 @@ export function MaliLogo({
   const content = (
     <>
       <img
-        src={MALI_LOGO_URL}
+        src={MALI_MARK_URL}
         alt="MALI"
-        className={cn('h-10 w-auto object-contain', imageClassName)}
+        className={cn('size-10 object-contain', imageClassName)}
       />
       {showSubtitle && (
         <p className="mt-2 text-xs text-muted">Operaciones internas</p>
