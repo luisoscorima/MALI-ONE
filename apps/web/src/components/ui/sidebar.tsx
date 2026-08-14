@@ -191,6 +191,26 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          onPointerDownOutside={(event) => {
+            const target = event.target as HTMLElement | null
+            if (
+              target?.closest(
+                '[data-slot="dropdown-menu-content"], [data-radix-popper-content-wrapper]',
+              )
+            ) {
+              event.preventDefault()
+            }
+          }}
+          onFocusOutside={(event) => {
+            const target = event.target as HTMLElement | null
+            if (
+              target?.closest(
+                '[data-slot="dropdown-menu-content"], [data-radix-popper-content-wrapper]',
+              )
+            ) {
+              event.preventDefault()
+            }
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>

@@ -45,7 +45,7 @@ export function NavUser({ user, onLogout }: Props) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -67,11 +67,12 @@ export function NavUser({ user, onLogout }: Props) {
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 max-w-[calc(100vw-1rem)] rounded-lg"
+            className="z-[110] w-[--radix-dropdown-menu-trigger-width] min-w-56 max-w-[calc(100vw-1rem)] rounded-lg"
             side={isMobile ? 'top' : 'right'}
             align={isMobile ? 'start' : 'end'}
             sideOffset={4}
             collisionPadding={8}
+            onCloseAutoFocus={(event) => event.preventDefault()}
           >
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
