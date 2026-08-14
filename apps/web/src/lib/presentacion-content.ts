@@ -2,6 +2,16 @@ import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
 /** Base path for isometric assets under `public/presentacion-assets/`. */
 export const PRESENTACION_ASSETS = '/presentacion-assets';
+export const PRESENTACION_LOGOS = `${PRESENTACION_ASSETS}/logos`;
+
+export type PresentacionLogo = {
+  id: string;
+  name: string;
+  /** Path under `/presentacion-assets/logos/`. */
+  file: string;
+  /** Fondo oscuro del asset (mejor sobre chip negro). */
+  darkBg?: boolean;
+};
 
 export type PresentacionModule = {
   id: string;
@@ -11,6 +21,8 @@ export type PresentacionModule = {
   /** Filename under `public/presentacion-assets/` (opcional). */
   image?: string;
   accent: ModuleCardAccent;
+  /** Herramientas que este módulo reemplaza o articula. */
+  replaces?: PresentacionLogo[];
 };
 
 export type PresentacionGroup = {
@@ -27,6 +39,86 @@ export type PresentacionDiagram = {
   caption: string;
   image: string;
 };
+
+const logos = {
+  bitly: {
+    id: 'bitly',
+    name: 'Bitly',
+    file: 'bitly.png',
+    darkBg: true,
+  },
+  walink: {
+    id: 'walink',
+    name: 'WaLink',
+    file: 'walink.png',
+    darkBg: true,
+  },
+  qrcodemonkey: {
+    id: 'qrcodemonkey',
+    name: 'QRCode Monkey',
+    file: 'qrcodemonkey.svg',
+    darkBg: true,
+  },
+  googleWorkspace: {
+    id: 'google-workspace',
+    name: 'Google Workspace',
+    file: 'google-workspace.jpg',
+  },
+  awsS3: {
+    id: 'aws-s3',
+    name: 'Amazon S3',
+    file: 'aws-s3.jpg',
+  },
+  magicInfo: {
+    id: 'magic-info',
+    name: 'MagicInfo',
+    file: 'magic-info.png',
+    darkBg: true,
+  },
+  bsale: {
+    id: 'bsale',
+    name: 'Bsale',
+    file: 'bsale.png',
+    darkBg: true,
+  },
+  mailchimp: {
+    id: 'mailchimp',
+    name: 'Mailchimp',
+    file: 'mailchimp.jpg',
+  },
+  wordpress: {
+    id: 'wordpress',
+    name: 'WordPress',
+    file: 'wordpress.png',
+    darkBg: true,
+  },
+  vaultwarden: {
+    id: 'vaultwarden',
+    name: 'Vaultwarden',
+    file: 'vaultwarden.jpg',
+  },
+  maliWhatsapp: {
+    id: 'mali-whatsapp',
+    name: 'MALI WhatsApp',
+    file: 'mali-whatsapp.png',
+    darkBg: true,
+  },
+} as const satisfies Record<string, PresentacionLogo>;
+
+/** Franja visual: herramientas externas que MALI ONE suplanta o centraliza. */
+export const presentacionReplacedTools: PresentacionLogo[] = [
+  logos.bitly,
+  logos.walink,
+  logos.qrcodemonkey,
+  logos.googleWorkspace,
+  logos.awsS3,
+  logos.magicInfo,
+  logos.bsale,
+  logos.mailchimp,
+  logos.wordpress,
+  logos.vaultwarden,
+  logos.maliWhatsapp,
+];
 
 export const presentacionHero = {
   title: 'MALI ONE',
@@ -96,6 +188,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Nace del uso y el pago a Bitly, WaLink y QRCodeMonkey. Reduce costos y recupera el control sobre enlaces, WhatsApp, archivos y QR con estadísticas propias.',
         accent: 'blue',
+        replaces: [logos.bitly, logos.walink, logos.qrcodemonkey],
       },
       {
         id: 'workspace_users',
@@ -103,6 +196,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Control centralizado y seguro de usuarios: se hereda la seguridad de Google y el acceso es solo para cuentas @mali.pe, con módulos asignables por persona.',
         accent: 'violet',
+        replaces: [logos.googleWorkspace],
       },
       {
         id: 's3_manager',
@@ -110,6 +204,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Almacenamiento centralizado de contenido actual e histórico: backups, multimedia y assets. En desarrollo cercano: imágenes en alta calidad para TMS, Historias, Archi y otros proyectos.',
         accent: 'emerald',
+        replaces: [logos.awsS3],
       },
       {
         id: 'screen_cast',
@@ -117,6 +212,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Respuesta a fallas y complejidad de MagicInfo (conexión por IPs, servidor local encendido). Solo requiere internet, mantiene caché si se pierde la red y se controla desde PC o celular.',
         accent: 'cyan',
+        replaces: [logos.magicInfo],
       },
       {
         id: 'bsale_reports',
@@ -124,6 +220,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'El kardex propio de Bsale podía tomar hasta una semana en armarse en Contabilidad. Ahora el kardex consolidado sale en tiempo real en un par de clics.',
         accent: 'emerald',
+        replaces: [logos.bsale],
       },
     ],
   },
@@ -139,6 +236,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Editor y URLs públicas de boletines desde MALI ONE, sin depender de Mailchimp para crear y publicar piezas de comunicación.',
         accent: 'blue',
+        replaces: [logos.mailchimp],
       },
       {
         id: 'crm_pam',
@@ -146,6 +244,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Contactos, ledger de pagos y envío de boletines en un mismo lugar. Los contactos se centralizan vía MALI WhatsApp para evitar múltiples bases de datos de campañas y comunicaciones.',
         accent: 'violet',
+        replaces: [logos.mailchimp, logos.maliWhatsapp],
       },
     ],
   },
@@ -161,6 +260,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Mapa, selector, calendario, aliados y formulario de leads para educacion.mali.pe, gestionados de forma intuitiva desde MALI ONE.',
         accent: 'cyan',
+        replaces: [logos.wordpress],
       },
       {
         id: 'widget_biblioteca',
@@ -168,6 +268,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Carrusel y piezas embebibles para biblioteca.mali.pe (Koha), sin tocar el CMS para cada ajuste visual.',
         accent: 'blue',
+        replaces: [logos.wordpress],
       },
       {
         id: 'widget_museo',
@@ -175,6 +276,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Popup e interfaz embebible en mali.pe: cambios rápidos de contenido desde el panel, no desde configuraciones pesadas de WordPress.',
         accent: 'violet',
+        replaces: [logos.wordpress],
       },
       {
         id: 'widget_pam',
@@ -182,6 +284,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Vitrina de planes y beneficios del Programa de Amigos. La gestión de contenido queda en MALI ONE; los pagos se articulan con el CRM PAM.',
         accent: 'rose',
+        replaces: [logos.wordpress],
       },
     ],
   },
@@ -196,6 +299,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Enlace a Vaultwarden, ya instalado y configurado. Centraliza credenciales del equipo; falta principalmente la adopción interna.',
         accent: 'amber',
+        replaces: [logos.vaultwarden],
       },
     ],
   },
