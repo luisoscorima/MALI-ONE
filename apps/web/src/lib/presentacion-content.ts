@@ -6,8 +6,9 @@ export const PRESENTACION_ASSETS = '/presentacion-assets';
 export type PresentacionModule = {
   id: string;
   title: string;
+  /** Qué resuelve / por qué existe (lenguaje gerencia). */
   description: string;
-  /** Filename under `public/presentacion-assets/` (e.g. `links.png`). */
+  /** Filename under `public/presentacion-assets/` (opcional). */
   image?: string;
   accent: ModuleCardAccent;
 };
@@ -15,86 +16,113 @@ export type PresentacionModule = {
 export type PresentacionGroup = {
   id: string;
   label: string;
-  /** Optional group-level isometric (e.g. `widgets.png`). */
+  summary?: string;
   image?: string;
   modules: PresentacionModule[];
 };
 
+export type PresentacionDiagram = {
+  id: string;
+  title: string;
+  caption: string;
+  image: string;
+};
+
 export const presentacionHero = {
   title: 'MALI ONE',
-  subtitle: 'Sistema de operaciones internas para mali.pe',
-  lead: 'Una plataforma centralizada para que el equipo del museo gestione enlaces, contenidos embebidos, CRM, pantallas y herramientas operativas con acceso seguro.',
-  /** Optional hero isometric: place as `public/presentacion-assets/hero.png` (or .webp). */
-  image: 'hero.png',
+  subtitle: 'Centralizar el control de las operaciones digitales del MALI',
+  lead: 'Hoy el museo opera con muchos sistemas dispersos que no conversan entre sí. MALI ONE conecta esas piezas en un solo lugar: menos herramientas externas, menos costos y más control sobre el contenido y los procesos.',
+  image: 'infra-antes-vs-ahora.png',
 };
 
 export const presentacionValueProps = [
   {
-    title: 'Operaciones en un solo lugar',
+    title: 'De lo disperso a lo centralizado',
     description:
-      'Enlaces, archivos, widgets de sitios públicos, boletines y reportes dejan de estar dispersos en herramientas sueltas.',
+      'Bitly, WaLink, QRCodeMonkey, Mailchimp, MagicInfo y otras herramientas sueltas dejan de ser islas. MALI ONE las reemplaza o las articula desde un panel único.',
   },
   {
-    title: 'Acceso con Google Workspace',
+    title: 'Acceso seguro @mali.pe',
     description:
-      'Solo cuentas @mali.pe. Cada persona ve únicamente los módulos que la gerencia o el administrador le habilitan.',
+      'Auth con Google Workspace: solo el dominio mali.pe, seguridad heredada de Google y permisos por módulo según cada persona.',
   },
   {
-    title: 'Presencia digital del museo',
+    title: 'Un almacenamiento para el museo',
     description:
-      'Configuradores para educación, biblioteca, museo y PAM que alimentan los sitios públicos sin tocar código.',
+      'S3 concentra backups, multimedia y assets actuales e históricos; a futuro, imágenes en alta calidad para TMS, Historias, Archi y más.',
   },
   {
-    title: 'Control y trazabilidad',
+    title: 'Menos costo, más velocidad',
     description:
-      'Estadísticas de enlaces y QR, contactos y envíos, playlists en pantallas y gestión de accesos por módulo.',
+      'Menos suscripciones externas y menos dependencias frágiles. Cambios de contenido y reportes en minutos, no en días o semanas.',
   },
 ] as const;
+
+/** Diagramas isométricos para la narrativa “antes → centralización”. */
+export const presentacionDiagrams: PresentacionDiagram[] = [
+  {
+    id: 'sistemas',
+    title: 'Sistemas actuales por área',
+    caption:
+      'Contables, planilla y ventas viven en plataformas distintas (BDO, Consorcio, AWS, Shopify, Bsale…) conectadas al cloud, pero sin un control operativo unificado.',
+    image: 'sistemas-dispersos.png',
+  },
+  {
+    id: 'red',
+    title: 'Red y áreas del MALI',
+    caption:
+      'Administración, taller, gerencia y aulas ya comparten infraestructura. MALI ONE aprovecha esa base para centralizar herramientas y contenidos.',
+    image: 'red-areas.png',
+  },
+  {
+    id: 'infra',
+    title: 'Infraestructura: antes vs ahora',
+    caption:
+      'De servidores sueltos y costos fragmentados a contenedores en EC2 y bases en RDS: una base técnica para operar MALI ONE con control y menor fricción.',
+    image: 'infra-antes-vs-ahora.png',
+  },
+];
 
 export const presentacionGroups: PresentacionGroup[] = [
   {
     id: 'operaciones',
     label: 'Operaciones',
-    image: 'operaciones.png',
+    summary:
+      'Reemplazan o reducen dependencias externas costosas o frágiles, con control propio del museo.',
     modules: [
       {
         id: 'links',
         title: 'Enlaces y QR',
         description:
-          'Acortar URLs, WhatsApp y archivos; QR personalizable; carga masiva y estadísticas de clics y escaneos.',
-        image: 'links.png',
+          'Nace del uso y el pago a Bitly, WaLink y QRCodeMonkey. Reduce costos y recupera el control sobre enlaces, WhatsApp, archivos y QR con estadísticas propias.',
         accent: 'blue',
       },
       {
         id: 'workspace_users',
-        title: 'Usuarios Workspace',
+        title: 'Usuarios Workspace y Auth Google',
         description:
-          'Gestión de cuentas Google Workspace del dominio mali.pe desde un panel interno.',
-        image: 'workspace-users.png',
+          'Control centralizado y seguro de usuarios: se hereda la seguridad de Google y el acceso es solo para cuentas @mali.pe, con módulos asignables por persona.',
         accent: 'violet',
       },
       {
         id: 's3_manager',
         title: 'Gestor S3',
         description:
-          'Explorar y administrar archivos en buckets AWS usados por el museo y MALI ONE.',
-        image: 's3-manager.png',
+          'Almacenamiento centralizado de contenido actual e histórico: backups, multimedia y assets. En desarrollo cercano: imágenes en alta calidad para TMS, Historias, Archi y otros proyectos.',
         accent: 'emerald',
       },
       {
         id: 'screen_cast',
         title: 'Transmisión a pantallas',
         description:
-          'Playlists y monitores para tótems y quioscos en salas y espacios del museo.',
-        image: 'screen-cast.png',
+          'Respuesta a fallas y complejidad de MagicInfo (conexión por IPs, servidor local encendido). Solo requiere internet, mantiene caché si se pierde la red y se controla desde PC o celular.',
         accent: 'cyan',
       },
       {
         id: 'bsale_reports',
         title: 'Reportes Bsale',
         description:
-          'Kardex consolidado de stock por almacén y período para seguimiento operativo.',
-        image: 'bsale-reports.png',
+          'El kardex propio de Bsale podía tomar hasta una semana en armarse en Contabilidad. Ahora el kardex consolidado sale en tiempo real en un par de clics.',
         accent: 'emerald',
       },
     ],
@@ -102,22 +130,21 @@ export const presentacionGroups: PresentacionGroup[] = [
   {
     id: 'crms',
     label: 'CRM y comunicación',
-    image: 'crm.png',
+    summary:
+      'Sustituye el uso costoso de Mailchimp como CRM, editor de boletines y mailing, y centraliza contactos con MALI WhatsApp.',
     modules: [
       {
         id: 'newsletters',
         title: 'Boletines',
         description:
-          'Editor visual de boletines con URL pública compartible para campañas y novedades.',
-        image: 'newsletters.png',
+          'Editor y URLs públicas de boletines desde MALI ONE, sin depender de Mailchimp para crear y publicar piezas de comunicación.',
         accent: 'blue',
       },
       {
         id: 'crm_pam',
         title: 'CRM PAM',
         description:
-          'Contactos desde WhatsApp, registro de pagos y envío de boletines al programa de amigos.',
-        image: 'crm-pam.png',
+          'Contactos, ledger de pagos y envío de boletines en un mismo lugar. Los contactos se centralizan vía MALI WhatsApp para evitar múltiples bases de datos de campañas y comunicaciones.',
         accent: 'violet',
       },
     ],
@@ -125,38 +152,35 @@ export const presentacionGroups: PresentacionGroup[] = [
   {
     id: 'widgets',
     label: 'Widgets y sitios públicos',
-    image: 'widgets.png',
+    summary:
+      'Soluciones para WordPress y Koha: cambios de color, enlace o imagen sin la curva tediosa (y a veces desarrollo) de WordPress.',
     modules: [
       {
         id: 'widget_educacion',
         title: 'Widgets Educación',
         description:
-          'Mapa, selector de sedes, calendario, aliados y formulario de leads para educacion.mali.pe.',
-        image: 'widget-educacion.png',
+          'Mapa, selector, calendario, aliados y formulario de leads para educacion.mali.pe, gestionados de forma intuitiva desde MALI ONE.',
         accent: 'cyan',
       },
       {
         id: 'widget_biblioteca',
         title: 'Widgets Biblioteca',
         description:
-          'Carrusel y piezas embebibles para biblioteca.mali.pe (catálogo Koha).',
-        image: 'widget-biblioteca.png',
+          'Carrusel y piezas embebibles para biblioteca.mali.pe (Koha), sin tocar el CMS para cada ajuste visual.',
         accent: 'blue',
       },
       {
         id: 'widget_museo',
         title: 'Widgets Museo',
         description:
-          'Popup e interfaz embebible en el sitio principal mali.pe.',
-        image: 'widget-museo.png',
+          'Popup e interfaz embebible en mali.pe: cambios rápidos de contenido desde el panel, no desde configuraciones pesadas de WordPress.',
         accent: 'violet',
       },
       {
         id: 'widget_pam',
         title: 'Widget PAM',
         description:
-          'Vitrina de planes y beneficios del Programa de Amigos del Museo.',
-        image: 'widget-pam.png',
+          'Vitrina de planes y beneficios del Programa de Amigos. La gestión de contenido queda en MALI ONE; los pagos se articulan con el CRM PAM.',
         accent: 'rose',
       },
     ],
@@ -164,22 +188,37 @@ export const presentacionGroups: PresentacionGroup[] = [
   {
     id: 'herramientas',
     label: 'Herramientas',
-    image: 'herramientas.png',
+    summary: 'Infraestructura ya instalada; el siguiente paso es la adopción del equipo.',
     modules: [
       {
         id: 'password_vault',
         title: 'Bóveda de contraseñas',
         description:
-          'Acceso centralizado a Vaultwarden para credenciales del equipo.',
-        image: 'password-vault.png',
+          'Enlace a Vaultwarden, ya instalado y configurado. Centraliza credenciales del equipo; falta principalmente la adopción interna.',
         accent: 'amber',
       },
     ],
   },
 ];
 
+export const presentacionRoadmap = {
+  title: 'Integraciones a futuro',
+  items: [
+    {
+      title: 'SIGE — matrículas y gestión',
+      description:
+        'Conectar el sistema de matrículas y gestión educativa (SIGE) con el ecosistema MALI ONE.',
+    },
+    {
+      title: 'Mercado Pago en CRM PAM',
+      description:
+        'Pasarela de pagos Mercado Pago para el CRM PAM (hoy el ledger de pagos opera de forma manual).',
+    },
+  ],
+};
+
 export const presentacionClosing = {
-  title: 'Hecho para el equipo MALI',
+  title: 'Un solo lugar para operar',
   description:
-    'MALI ONE concentra las operaciones digitales del museo: menos fricción entre áreas, más control sobre lo que se publica y se mide.',
+    'MALI ONE no es otra herramienta suelta: es la capa que concentra control, reduce costos de terceros y hace que los sistemas del museo conversen entre sí.',
 };
