@@ -1,3 +1,5 @@
+import { maliMarkAccentFillMarkup, MALI_MARK_NAVY } from '@/lib/mali-mark-geometry';
+
 export const ACCENT_STORAGE_KEY = 'mali-one-accent-theme';
 
 export type AccentThemeId =
@@ -80,8 +82,6 @@ function applyThemeColor(id: AccentThemeId, primary: string) {
   meta.setAttribute('content', themeColor);
 }
 
-let faviconGeneration = 0;
-
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
@@ -91,10 +91,24 @@ function loadImage(src: string) {
   });
 }
 
+let faviconGeneration = 0;
+
 function applyThemedFavicon(primary: string) {
   const generation = ++faviconGeneration;
-  void Promise.all([loadImage('/favicon.svg'), loadImage('/mali-mark-mask.svg')]).then(
-    ([mark, mask]) => {
+  void fetch('/favicon.svg')
+    .then((response) => response.text())
+    .then((svgText) => {
+      const composed = svgText.replace(
+        '</defs>',
+        `</defs>${maliMarkAccentFillMarkup(primary)}`,
+      );
+      const blob = new Blob([composed], { type: 'image/svg+xml' });
+      return loadImage(URL.createObjectURL(blob)).then((mark) => {
+        URL.revokeObjectURL(mark.src);
+        return mark;
+      });
+    })
+    .then((mark) => {
       if (generation !== faviconGeneration) return;
       const size = 64;
       const canvas = document.createElement('canvas');
@@ -106,15 +120,19 @@ function applyThemedFavicon(primary: string) {
       ctx.beginPath();
       ctx.roundRect(0, 0, size, size, size * 0.22);
       ctx.clip();
-
-      ctx.fillStyle = primary;
+      const navy = ctx.createRadialGradient(
+        size * 0.5,
+        size * 0.45,
+        0,
+        size * 0.5,
+        size * 0.45,
+        size * 0.72,
+      );
+      navy.addColorStop(0, MALI_MARK_NAVY.inner);
+      navy.addColorStop(0.52, MALI_MARK_NAVY.mid);
+      navy.addColorStop(1, MALI_MARK_NAVY.outer);
+      ctx.fillStyle = navy;
       ctx.fillRect(0, 0, size, size);
-      ctx.globalCompositeOperation = 'destination-in';
-      ctx.drawImage(mask, 0, 0, size, size);
-      ctx.globalCompositeOperation = 'destination-over';
-      ctx.fillStyle = APP_BACKGROUND;
-      ctx.fillRect(0, 0, size, size);
-      ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(mark, 0, 0, size, size);
 
       const href = canvas.toDataURL('image/png');
@@ -123,8 +141,7 @@ function applyThemedFavicon(primary: string) {
         link.removeAttribute('sizes');
         link.href = href;
       });
-    },
-  );
+    });
 }
 
 /** Colores decorativos del fondo del login (esmeralda, violeta, azul). */

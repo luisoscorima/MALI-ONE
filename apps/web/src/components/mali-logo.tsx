@@ -1,8 +1,146 @@
+import { useId } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { MALI_MARK_VIEW_BOX, maliMarkPanelPaths } from '@/lib/mali-mark-geometry';
 
-/** M de vidrio: favicon, PWA, login y chrome de la app. */
+/** M de vidrio: favicon, PWA, login. */
 export const MALI_MARK_URL = '/favicon.svg';
+
+function MaliMarkSvg({ className }: { className?: string }) {
+  const uid = useId().replace(/:/g, '');
+  const glass = `${uid}-glass`;
+  const edge = `${uid}-edge`;
+  const letterGlass = `${uid}-letter`;
+  const panelFx = `${uid}-panelFx`;
+  const letterFx = `${uid}-letterFx`;
+
+  const panels = (key: string) =>
+    maliMarkPanelPaths.map((panel) => (
+      <path key={`${key}-${panel.d}`} d={panel.d} transform={panel.transform} />
+    ));
+
+  return (
+    <svg
+      viewBox={MALI_MARK_VIEW_BOX}
+      className={className}
+      aria-hidden
+      overflow="hidden"
+    >
+      <defs>
+        <linearGradient id={glass} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#35d8ff" stopOpacity=".22" />
+          <stop offset=".35" stopColor="#a9c8ff" stopOpacity=".30" />
+          <stop offset=".72" stopColor="#8879ff" stopOpacity=".25" />
+          <stop offset="1" stopColor="#cf5fff" stopOpacity=".30" />
+        </linearGradient>
+        <linearGradient id={edge} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stopColor="#3ce6ff" />
+          <stop offset=".38" stopColor="#d8f3ff" />
+          <stop offset=".7" stopColor="#aeb5ff" />
+          <stop offset="1" stopColor="#d663ff" />
+        </linearGradient>
+        <linearGradient id={letterGlass} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity=".92" />
+          <stop offset=".42" stopColor="#dbe8ff" stopOpacity=".62" />
+          <stop offset="1" stopColor="#a996ff" stopOpacity=".70" />
+        </linearGradient>
+        <filter
+          id={panelFx}
+          x="-30%"
+          y="-30%"
+          width="160%"
+          height="160%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="blur" />
+          <feFlood floodColor="#3a78ff" floodOpacity=".68" result="blue" />
+          <feComposite in="blue" in2="blur" operator="in" result="glow" />
+          <feMerge>
+            <feMergeNode in="glow" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter
+          id={letterFx}
+          x="-35%"
+          y="-35%"
+          width="170%"
+          height="170%"
+          colorInterpolationFilters="sRGB"
+        >
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3.3" result="blur" />
+          <feFlood floodColor="#74a9ff" floodOpacity=".75" />
+          <feComposite in2="blur" operator="in" result="glow" />
+          <feSpecularLighting
+            in="SourceAlpha"
+            surfaceScale="4"
+            specularConstant=".75"
+            specularExponent="18"
+            lightingColor="#ffffff"
+            result="spec"
+          >
+            <fePointLight x="180" y="90" z="170" />
+          </feSpecularLighting>
+          <feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip" />
+          <feMerge>
+            <feMergeNode in="glow" />
+            <feMergeNode in="SourceGraphic" />
+            <feMergeNode in="specClip" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <g fill="var(--primary)" stroke="var(--primary)" strokeWidth="2.2" strokeLinejoin="round">
+        {panels('fill')}
+      </g>
+
+      <g
+        fill={`url(#${glass})`}
+        stroke={`url(#${edge})`}
+        strokeWidth="2.2"
+        strokeLinejoin="round"
+        filter={`url(#${panelFx})`}
+      >
+        {panels('glass')}
+      </g>
+
+      <g
+        fill="none"
+        stroke="#ffffff"
+        strokeOpacity=".22"
+        strokeWidth=".9"
+        strokeLinejoin="round"
+      >
+        {panels('shine')}
+      </g>
+
+      <g
+        fill={`url(#${letterGlass})`}
+        stroke={`url(#${edge})`}
+        strokeWidth=".72"
+        strokeLinejoin="round"
+        filter={`url(#${letterFx})`}
+      >
+        <path
+          d="M 0,0 V 19.147 L 48.447,33.842 V 34.02 L 0,47.735 V 67.328 H 65.902 V 53.346 H 20.929 v -0.179 c 5.699,-0.979 9.884,-2.227 14.694,-3.65 L 65.902,39.631 V 26.806 L 35.623,17.009 C 30.636,15.497 27.785,14.604 20.216,13.181 V 13.002 H 65.902 V 0 Z"
+          transform="matrix(1.3333333,0,0,-1.3333333,100.49213,480.95973)"
+        />
+        <path
+          d="M 0,0 -22.443,-7.571 V -7.748 L 0,-15.497 Z m -40.967,-14.161 v 13.804 l 66.17,23.335 V 8.282 L 10.509,3.383 v -22.442 l 14.694,-5.076 v -13.359 z"
+          transform="matrix(1.3333333,0,0,-1.3333333,154.75773,331.81133)"
+        />
+        <path
+          d="M 0,0 V 14.516 H 54.146 V 43.55 H 65.902 V 0 Z"
+          transform="matrix(1.3333333,0,0,-1.3333333,100.49213,291.78787)"
+        />
+        <path
+          d="m 75.369,360.72 h 65.902 V 346.292 H 75.369 Z"
+          transform="matrix(1.3333333,0,0,-1.3333333,0,684.16)"
+        />
+      </g>
+    </svg>
+  );
+}
 
 /** Marca: acento solo dentro de la M, capa oscura alrededor. */
 export function MaliMark({
@@ -19,12 +157,7 @@ export function MaliMark({
         className,
       )}
     >
-      <div className="mali-mark-fill" aria-hidden />
-      <img
-        src={MALI_MARK_URL}
-        alt=""
-        className={cn('relative z-10 size-full object-contain', imageClassName)}
-      />
+      <MaliMarkSvg className={cn('size-full', imageClassName)} />
     </div>
   );
 }

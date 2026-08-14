@@ -228,16 +228,7 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: 22%;
-  background: #0f1419;
-}
-
-.mali-mark-fill {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: var(--primary);
-  -webkit-mask: url('/mali-mark-mask.svg') center / contain no-repeat;
-  mask: url('/mali-mark-mask.svg') center / contain no-repeat;
+  background: radial-gradient(circle at 50% 45%, #101d5a 0%, #071337 52%, #020615 100%);
 }
 
 .login-card-interactive {
