@@ -92,6 +92,11 @@ const logos = {
     file: 'wordpress.png',
     darkBg: true,
   },
+  koha: {
+    id: 'koha',
+    name: 'Koha',
+    file: 'koha.png',
+  },
   vaultwarden: {
     id: 'vaultwarden',
     name: 'Vaultwarden',
@@ -116,6 +121,7 @@ export const presentacionReplacedTools: PresentacionLogo[] = [
   logos.bsale,
   logos.mailchimp,
   logos.wordpress,
+  logos.koha,
   logos.vaultwarden,
   logos.maliWhatsapp,
 ];
@@ -124,7 +130,6 @@ export const presentacionHero = {
   title: 'MALI ONE',
   subtitle: 'Centralizar el control de las operaciones digitales del MALI',
   lead: 'Hoy el museo opera con muchos sistemas dispersos que no conversan entre sí. MALI ONE conecta esas piezas en un solo lugar: menos herramientas externas, menos costos y más control sobre el contenido y los procesos.',
-  image: 'infra-antes-vs-ahora.png',
 };
 
 export const presentacionValueProps = [
@@ -268,7 +273,7 @@ export const presentacionGroups: PresentacionGroup[] = [
         description:
           'Carrusel y piezas embebibles para biblioteca.mali.pe (Koha), sin tocar el CMS para cada ajuste visual.',
         accent: 'blue',
-        replaces: [logos.wordpress],
+        replaces: [logos.wordpress, logos.koha],
       },
       {
         id: 'widget_museo',
