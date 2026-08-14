@@ -1,7 +1,7 @@
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { MALI_MARK_VIEW_BOX, maliMarkPanelPaths } from '@/lib/mali-mark-geometry';
+import { MALI_MARK_NAVY, MALI_MARK_VIEW_BOX, maliMarkPanelPaths } from '@/lib/mali-mark-geometry';
 
 /** M de vidrio: favicon, PWA, login. */
 export const MALI_MARK_URL = '/favicon.svg';
@@ -13,6 +13,7 @@ function MaliMarkSvg({ className }: { className?: string }) {
   const letterGlass = `${uid}-letter`;
   const panelFx = `${uid}-panelFx`;
   const letterFx = `${uid}-letterFx`;
+  const navyBg = `${uid}-navy`;
 
   const panels = (key: string) =>
     maliMarkPanelPaths.map((panel) => (
@@ -27,6 +28,11 @@ function MaliMarkSvg({ className }: { className?: string }) {
       overflow="hidden"
     >
       <defs>
+        <radialGradient id={navyBg} cx="50%" cy="45%" r="72%">
+          <stop offset="0" stopColor={MALI_MARK_NAVY.inner} />
+          <stop offset="0.52" stopColor={MALI_MARK_NAVY.mid} />
+          <stop offset="1" stopColor={MALI_MARK_NAVY.outer} />
+        </radialGradient>
         <linearGradient id={glass} x1="0" y1="1" x2="1" y2="0">
           <stop offset="0" stopColor="#35d8ff" stopOpacity=".22" />
           <stop offset=".35" stopColor="#a9c8ff" stopOpacity=".30" />
@@ -89,6 +95,24 @@ function MaliMarkSvg({ className }: { className?: string }) {
           </feMerge>
         </filter>
       </defs>
+
+      <rect x="54" y="54" width="576" height="576" fill={`url(#${navyBg})`} />
+      <ellipse
+        cx="175"
+        cy="472"
+        rx="210"
+        ry="205"
+        fill={MALI_MARK_NAVY.orbBlue}
+        opacity="0.09"
+      />
+      <ellipse
+        cx="554"
+        cy="197"
+        rx="190"
+        ry="185"
+        fill={MALI_MARK_NAVY.orbViolet}
+        opacity="0.08"
+      />
 
       <g fill="var(--primary)" stroke="var(--primary)" strokeWidth="2.2" strokeLinejoin="round">
         {panels('fill')}

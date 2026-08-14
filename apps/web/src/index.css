@@ -231,6 +231,13 @@ body {
   background: radial-gradient(circle at 50% 45%, #101d5a 0%, #071337 52%, #020615 100%);
 }
 
+.mali-mark > svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none;
+  transform: scale(1.22);
+}
+
 .login-card-interactive {
   position: relative;
   isolation: isolate;

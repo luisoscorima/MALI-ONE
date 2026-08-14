@@ -1,4 +1,9 @@
-import { maliMarkAccentFillMarkup, MALI_MARK_NAVY } from '@/lib/mali-mark-geometry';
+import {
+  maliMarkAccentFillMarkup,
+  maliMarkNavyBackdropMarkup,
+  maliMarkNavyGradientMarkup,
+  MALI_MARK_NAVY,
+} from '@/lib/mali-mark-geometry';
 
 export const ACCENT_STORAGE_KEY = 'mali-one-accent-theme';
 
@@ -100,7 +105,7 @@ function applyThemedFavicon(primary: string) {
     .then((svgText) => {
       const composed = svgText.replace(
         '</defs>',
-        `</defs>${maliMarkAccentFillMarkup(primary)}`,
+        `${maliMarkNavyGradientMarkup('mark-navy')}</defs>${maliMarkNavyBackdropMarkup('mark-navy')}${maliMarkAccentFillMarkup(primary)}`,
       );
       const blob = new Blob([composed], { type: 'image/svg+xml' });
       return loadImage(URL.createObjectURL(blob)).then((mark) => {

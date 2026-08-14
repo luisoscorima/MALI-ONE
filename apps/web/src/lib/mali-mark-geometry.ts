@@ -5,7 +5,23 @@ export const MALI_MARK_NAVY = {
   inner: '#101d5a',
   mid: '#071337',
   outer: '#020615',
+  orbBlue: '#087dff',
+  orbViolet: '#8a2dff',
 } as const;
+
+export function maliMarkNavyGradientMarkup(id: string) {
+  return `<radialGradient id="${id}" cx="50%" cy="45%" r="72%">
+    <stop offset="0" stop-color="${MALI_MARK_NAVY.inner}"/>
+    <stop offset="0.52" stop-color="${MALI_MARK_NAVY.mid}"/>
+    <stop offset="1" stop-color="${MALI_MARK_NAVY.outer}"/>
+  </radialGradient>`;
+}
+
+export function maliMarkNavyBackdropMarkup(gradientId: string) {
+  return `<rect x="54" y="54" width="576" height="576" fill="url(#${gradientId})"/>
+    <ellipse cx="175" cy="472" rx="210" ry="205" fill="${MALI_MARK_NAVY.orbBlue}" opacity=".09"/>
+    <ellipse cx="554" cy="197" rx="190" ry="185" fill="${MALI_MARK_NAVY.orbViolet}" opacity=".08"/>`;
+}
 
 export const maliMarkPanelPaths = [
   {
