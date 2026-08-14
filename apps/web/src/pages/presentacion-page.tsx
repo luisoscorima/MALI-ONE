@@ -198,28 +198,49 @@ function ValuesSlide({ slide }: { slide: PresentacionSlide }) {
   );
 }
 
-function DiagramSlide({ slide }: { slide: PresentacionSlide }) {
+function ContextSlide({ slide }: { slide: PresentacionSlide }) {
   return (
-    <SlideShell className="justify-start pt-10 sm:justify-center sm:pt-16">
+    <SlideShell className="justify-start pt-10 sm:justify-center sm:pt-12">
       {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
       <SlideTitle>{slide.title}</SlideTitle>
-      {slide.image ? (
-        <div className="mt-6 flex min-h-0 flex-1 flex-col gap-4">
-          <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-white/25 sm:p-4">
+      {slide.body ? <SlideBody>{slide.body}</SlideBody> : null}
+
+      <div className="mt-8 grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-8">
+        <ol className="flex flex-col gap-3 sm:gap-4">
+          {slide.points?.map((point, i) => (
+            <li
+              key={point.title}
+              className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/15 backdrop-blur-sm sm:p-5"
+            >
+              <div className="mb-2 flex items-center gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500/25 text-sm font-bold text-sky-200">
+                  {i + 1}
+                </span>
+                <h3 className="text-base font-semibold text-white sm:text-lg">
+                  {point.title}
+                </h3>
+              </div>
+              <p className="pl-11 text-sm leading-relaxed text-zinc-200 sm:text-base">
+                {point.description}
+              </p>
+            </li>
+          ))}
+        </ol>
+
+        <div className="relative overflow-hidden rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-white/25 sm:p-4">
+          {slide.image ? (
             <img
               src={`${PRESENTACION_ASSETS}/${slide.image}`}
               alt={slide.title}
-              className="mx-auto max-h-[min(52vh,560px)] w-full object-contain"
+              className="mx-auto max-h-[min(42vh,420px)] w-full object-contain"
               draggable={false}
             />
-          </div>
-          {slide.caption ? (
-            <p className="mx-auto max-w-3xl text-center text-base leading-relaxed text-zinc-200 sm:text-lg">
-              {slide.caption}
-            </p>
           ) : null}
+          <p className="mt-3 text-center text-xs font-medium text-zinc-500">
+            Imagen temporal — reemplazar por diagrama consolidado
+          </p>
         </div>
-      ) : null}
+      </div>
     </SlideShell>
   );
 }
@@ -341,8 +362,8 @@ function renderSlide(slide: PresentacionSlide) {
       return <ToolsSlide slide={slide} />;
     case 'values':
       return <ValuesSlide slide={slide} />;
-    case 'diagram':
-      return <DiagramSlide slide={slide} />;
+    case 'context':
+      return <ContextSlide slide={slide} />;
     case 'group':
       return <GroupSlide slide={slide} />;
     case 'roadmap':

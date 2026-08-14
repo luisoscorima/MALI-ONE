@@ -1,7 +1,7 @@
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 import {
   presentacionClosing,
-  presentacionDiagrams,
+  presentacionContext,
   presentacionGroups,
   presentacionHero,
   presentacionReplacedTools,
@@ -15,7 +15,7 @@ export type SlideKind =
   | 'title'
   | 'tools'
   | 'values'
-  | 'diagram'
+  | 'context'
   | 'group'
   | 'roadmap'
   | 'closing';
@@ -32,6 +32,7 @@ export type PresentacionSlide = {
   caption?: string;
   image?: string;
   values?: readonly { title: string; description: string }[];
+  points?: readonly { title: string; description: string }[];
   logos?: PresentacionLogo[];
   modules?: PresentacionModule[];
   groupSummary?: string;
@@ -66,17 +67,16 @@ export const presentacionSlides: PresentacionSlide[] = [
     title: 'Por qué centralizar con MALI ONE',
     values: presentacionValueProps,
   },
-  ...presentacionDiagrams.map(
-    (diagram): PresentacionSlide => ({
-      id: `diagram-${diagram.id}`,
-      kind: 'diagram',
-      navLabel: diagram.title,
-      eyebrow: 'Contexto',
-      title: diagram.title,
-      caption: diagram.caption,
-      image: diagram.image,
-    }),
-  ),
+  {
+    id: 'context',
+    kind: 'context',
+    navLabel: 'Contexto',
+    eyebrow: presentacionContext.eyebrow,
+    title: presentacionContext.title,
+    body: presentacionContext.body,
+    image: presentacionContext.image,
+    points: presentacionContext.points,
+  },
   ...presentacionGroups.map(
     (group): PresentacionSlide => ({
       id: `group-${group.id}`,

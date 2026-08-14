@@ -56,8 +56,7 @@ const logos = {
   qrcodemonkey: {
     id: 'qrcodemonkey',
     name: 'QRCode Monkey',
-    file: 'qrcodemonkey.svg',
-    darkBg: true,
+    file: 'qrcodemonkey.png',
   },
   googleWorkspace: {
     id: 'google-workspace',
@@ -155,7 +154,33 @@ export const presentacionValueProps = [
   },
 ] as const;
 
-/** Diagramas isométricos para la narrativa “antes → centralización”. */
+/** Un solo slide de contexto (reemplaza los 3 diagramas anteriores). */
+export const presentacionContext = {
+  eyebrow: 'Contexto',
+  title: 'El ecosistema digital del MALI',
+  body: 'Hoy conviven redes, sistemas por área e infraestructura en la nube — pero sin una capa operativa única. MALI ONE es esa capa.',
+  /** Sustituir por tu imagen consolidada cuando la tengas. */
+  image: 'contexto.png',
+  points: [
+    {
+      title: 'Sistemas por área',
+      description:
+        'Contables, planilla y ventas en plataformas distintas (BDO, Consorcio, AWS, Shopify, Bsale…) sin control operativo unificado.',
+    },
+    {
+      title: 'Red y áreas',
+      description:
+        'Administración, taller, gerencia y aulas ya comparten infraestructura; MALI ONE aprovecha esa base para centralizar herramientas.',
+    },
+    {
+      title: 'Infraestructura',
+      description:
+        'De servidores sueltos a contenedores en EC2 y bases en RDS: la base técnica para operar con menos fricción y más control.',
+    },
+  ],
+};
+
+/** @deprecated Conservados por si reutilizas las imágenes sueltas. */
 export const presentacionDiagrams: PresentacionDiagram[] = [
   {
     id: 'sistemas',
