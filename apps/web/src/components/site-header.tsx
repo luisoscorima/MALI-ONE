@@ -1,4 +1,4 @@
-import { MALI_MARK_URL } from '@/components/mali-logo';
+import { MaliMark } from '@/components/mali-logo';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -13,15 +13,11 @@ function SidebarLogoTrigger({ className }: { className?: string }) {
       variant="ghost"
       size="icon"
       data-sidebar="trigger"
-      className={cn('size-9 shrink-0 p-1 md:hidden', className)}
+      className={cn('size-9 shrink-0 p-0.5 md:hidden', className)}
       onClick={toggleSidebar}
       aria-label="Abrir menú"
     >
-      <img
-        src={MALI_MARK_URL}
-        alt=""
-        className="size-7 object-contain"
-      />
+      <MaliMark className="size-8" />
     </Button>
   );
 }

@@ -55,7 +55,7 @@ export function LoginPage() {
           <img
             src={MALI_MARK_URL}
             alt=""
-            className="login-logo-glow h-14 w-14 object-contain"
+            className="login-logo-glow h-20 w-20 object-contain"
           />
           <div className="text-left leading-tight">
             <span className="block text-sm font-semibold tracking-wide">MALI ONE</span>

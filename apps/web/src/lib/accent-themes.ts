@@ -65,8 +65,12 @@ export const defaultAccentThemeId: AccentThemeId = 'neutral';
 
 const APP_BACKGROUND = '#0f1419';
 
+function markBackground(id: AccentThemeId, primary: string) {
+  return id === 'neutral' ? APP_BACKGROUND : primary;
+}
+
 function applyThemeColor(id: AccentThemeId, primary: string) {
-  const themeColor = id === 'neutral' ? APP_BACKGROUND : primary;
+  const themeColor = markBackground(id, primary);
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement('meta');
@@ -74,6 +78,32 @@ function applyThemeColor(id: AccentThemeId, primary: string) {
     document.head.appendChild(meta);
   }
   meta.setAttribute('content', themeColor);
+}
+
+let faviconGeneration = 0;
+
+function applyThemedFavicon(primary: string) {
+  const generation = ++faviconGeneration;
+  const img = new Image();
+  img.onload = () => {
+    if (generation !== faviconGeneration) return;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = primary;
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(img, 0, 0, size, size);
+    const href = canvas.toDataURL('image/png');
+    document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
+      link.type = 'image/png';
+      link.removeAttribute('sizes');
+      link.href = href;
+    });
+  };
+  img.src = '/favicon.svg';
 }
 
 /** Colores decorativos del fondo del login (esmeralda, violeta, azul). */
@@ -120,4 +150,5 @@ export function applyAccentTheme(id: AccentThemeId) {
   root.style.setProperty('--sidebar-ring', theme.primary);
   root.style.setProperty('--chart-1', theme.primary);
   applyThemeColor(id, theme.primary);
+  applyThemedFavicon(theme.primary);
 }

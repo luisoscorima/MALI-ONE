@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { ComponentProps } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { MALI_MARK_URL } from '@/components/mali-logo';
+import { MaliMark } from '@/components/mali-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { getVisibleNavSections } from '@/lib/app-nav';
@@ -24,13 +24,9 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" className="h-14 p-1.5" asChild>
               <Link to="/">
-                <img
-                  src={MALI_MARK_URL}
-                  alt=""
-                  className="size-8 object-contain"
-                />
+                <MaliMark className="size-11" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">MALI ONE</span>
                   <span className="truncate text-xs text-muted-foreground">
