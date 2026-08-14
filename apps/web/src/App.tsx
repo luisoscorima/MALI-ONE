@@ -31,6 +31,7 @@ import { WidgetPamPage } from '@/pages/widget-pam-page';
 import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 import { NewslettersPage } from '@/pages/newsletters-page';
 import { CrmPamPage } from '@/pages/crm-pam-page';
+import { PresentacionPage } from '@/pages/presentacion-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -161,8 +162,9 @@ export function App() {
     <AccentThemeProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public kiosk — outside AuthProvider to avoid /api/auth/me 401 */}
+          {/* Public routes — outside AuthProvider to avoid /api/auth/me 401 */}
           <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
+          <Route path="/presentacion" element={<PresentacionPage />} />
           <Route path="*" element={<AuthenticatedApp />} />
         </Routes>
       </BrowserRouter>
