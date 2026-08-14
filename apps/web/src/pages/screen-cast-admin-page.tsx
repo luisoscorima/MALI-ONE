@@ -189,11 +189,6 @@ export function ScreenCastAdminPage() {
 
   const [activeTab, setActiveTab] = useState<AdminTab>('config');
 
-  const [createPlaylistOpen, setCreatePlaylistOpen] = useState(false);
-  const [createPlaylistName, setCreatePlaylistName] = useState('');
-  const [createPlaylistActivo, setCreatePlaylistActivo] = useState(true);
-  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
-
   const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false);
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(
     null,
@@ -301,6 +296,22 @@ export function ScreenCastAdminPage() {
 
   function openPlaylistEditor(id: string) {
     setEditingPlaylistId(id);
+    setLoadingPlaylist(true);
+    itemDialogOpenRef.current = false;
+    suppressPlaylistCloseRef.current = false;
+    setItemDraft(null);
+    setItemDialogOpen(false);
+    setPlaylistDialogOpen(true);
+  }
+
+  function openCreatePlaylist() {
+    setEditingPlaylistId(null);
+    setPlaylistName('');
+    setPlaylistActivo(true);
+    setItems([]);
+    setLoadingPlaylist(false);
+    itemDialogOpenRef.current = false;
+    suppressPlaylistCloseRef.current = false;
     setItemDraft(null);
     setItemDialogOpen(false);
     setPlaylistDialogOpen(true);
@@ -316,47 +327,33 @@ export function ScreenCastAdminPage() {
     setItems([]);
   }
 
-  function openCreatePlaylist() {
-    setCreatePlaylistName('');
-    setCreatePlaylistActivo(true);
-    setCreatePlaylistOpen(true);
-  }
-
-  function closeCreatePlaylist() {
-    if (creatingPlaylist) return;
-    setCreatePlaylistOpen(false);
-    setCreatePlaylistName('');
-    setCreatePlaylistActivo(true);
-  }
-
-  async function createPlaylist() {
-    const trimmed = createPlaylistName.trim();
+  async function ensurePlaylistSaved(): Promise<string | null> {
+    const trimmed = playlistName.trim();
     if (!trimmed) {
-      toast.error('El nombre es obligatorio');
-      return;
+      toast.error('Pon un nombre a la playlist antes de continuar');
+      return null;
     }
-    setCreatingPlaylist(true);
+    if (editingPlaylistId) return editingPlaylistId;
+
+    setSavingMeta(true);
     try {
       const created = await api.createScreenCastPlaylist({
         name: trimmed,
-        activo: createPlaylistActivo,
+        activo: playlistActivo,
       });
-      toast.success('Playlist creada');
-      setCreatePlaylistOpen(false);
-      setCreatePlaylistName('');
-      setCreatePlaylistActivo(true);
+      setEditingPlaylistId(created.id);
       await loadLists();
-      openPlaylistEditor(created.id);
-      openItemCreate();
+      await loadPlaylistDetail(created.id);
+      return created.id;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear');
+      return null;
     } finally {
-      setCreatingPlaylist(false);
+      setSavingMeta(false);
     }
   }
 
   async function savePlaylistMeta() {
-    if (!editingPlaylistId) return;
     const trimmed = playlistName.trim();
     if (!trimmed) {
       toast.error('El nombre es obligatorio');
@@ -364,13 +361,21 @@ export function ScreenCastAdminPage() {
     }
     setSavingMeta(true);
     try {
-      await api.updateScreenCastPlaylist(editingPlaylistId, {
-        name: trimmed,
-        activo: playlistActivo,
-      });
-      toast.success('Playlist guardada');
+      if (!editingPlaylistId) {
+        await api.createScreenCastPlaylist({
+          name: trimmed,
+          activo: playlistActivo,
+        });
+        toast.success('Playlist creada');
+      } else {
+        await api.updateScreenCastPlaylist(editingPlaylistId, {
+          name: trimmed,
+          activo: playlistActivo,
+        });
+        toast.success('Playlist guardada');
+      }
       await loadLists();
-      await loadPlaylistDetail(editingPlaylistId);
+      closePlaylistEditor();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar');
     } finally {
@@ -407,7 +412,9 @@ export function ScreenCastAdminPage() {
     }
   }
 
-  function openItemCreate() {
+  async function openItemCreate() {
+    const playlistId = await ensurePlaylistSaved();
+    if (!playlistId) return;
     itemDialogOpenRef.current = true;
     setItemDraft(emptyItem());
     setItemDialogOpen(true);
@@ -1022,65 +1029,6 @@ export function ScreenCastAdminPage() {
       </Tabs>
 
       <Dialog
-        open={createPlaylistOpen}
-        onOpenChange={(open) => {
-          if (!open) closeCreatePlaylist();
-          else setCreatePlaylistOpen(true);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Nueva playlist</DialogTitle>
-            <DialogDescription>
-              Ponle un nombre. Después podrás añadir imágenes y videos.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pl-create-name">Nombre</Label>
-              <Input
-                id="pl-create-name"
-                autoFocus
-                value={createPlaylistName}
-                placeholder="Ej. Lobby principal"
-                onChange={(e) => setCreatePlaylistName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    void createPlaylist();
-                  }
-                }}
-              />
-            </div>
-            <SettingSwitchInline
-              label="Activa"
-              checked={createPlaylistActivo}
-              onCheckedChange={setCreatePlaylistActivo}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={creatingPlaylist}
-              onClick={closeCreatePlaylist}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={creatingPlaylist || !createPlaylistName.trim()}
-              onClick={() => void createPlaylist()}
-            >
-              {creatingPlaylist ? 'Creando…' : 'Crear y editar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
         open={playlistDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -1106,7 +1054,9 @@ export function ScreenCastAdminPage() {
           }}
         >
           <DialogHeader className="shrink-0 border-b px-6 py-4">
-            <DialogTitle>Editar playlist</DialogTitle>
+            <DialogTitle>
+              {editingPlaylistId ? 'Editar playlist' : 'Nueva playlist'}
+            </DialogTitle>
             <DialogDescription>
               JPG, PNG, GIF, MP4 o MOV (iPhone → MP4). Pega una URL o elige desde
               S3.
@@ -1123,7 +1073,9 @@ export function ScreenCastAdminPage() {
                     <Label htmlFor="pl-detail-name">Nombre</Label>
                     <Input
                       id="pl-detail-name"
+                      autoFocus={!editingPlaylistId}
                       value={playlistName}
+                      placeholder="Ej. Lobby principal"
                       onChange={(e) => setPlaylistName(e.target.value)}
                     />
                   </div>
@@ -1138,7 +1090,10 @@ export function ScreenCastAdminPage() {
 
                 <div className="flex items-center justify-between border-t pt-4">
                   <h4 className="font-medium">Ítems ({items.length})</h4>
-                  <Button type="button" onClick={openItemCreate}>
+                  <Button
+                    type="button"
+                    onClick={() => void openItemCreate()}
+                  >
                     <Plus size={16} />
                     Añadir ítem
                   </Button>
@@ -1226,7 +1181,7 @@ export function ScreenCastAdminPage() {
                       <Button
                         type="button"
                         className="mt-3"
-                        onClick={openItemCreate}
+                        onClick={() => void openItemCreate()}
                       >
                         <Plus size={16} />
                         Añadir primer ítem
@@ -1247,7 +1202,11 @@ export function ScreenCastAdminPage() {
               disabled={savingMeta || loadingPlaylist}
               onClick={() => void savePlaylistMeta()}
             >
-              {savingMeta ? 'Guardando…' : 'Guardar playlist'}
+              {savingMeta
+                ? 'Guardando…'
+                : editingPlaylistId
+                  ? 'Guardar playlist'
+                  : 'Crear playlist'}
             </Button>
           </DialogFooter>
         </DialogContent>
