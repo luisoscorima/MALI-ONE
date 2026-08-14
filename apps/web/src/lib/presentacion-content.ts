@@ -158,7 +158,7 @@ export const presentacionValueProps = [
 export const presentacionContext = {
   eyebrow: 'Contexto',
   title: 'El ecosistema digital del MALI',
-  body: 'Hoy conviven redes, sistemas por área e infraestructura en la nube — pero sin una capa operativa única. MALI ONE es esa capa.',
+  body: 'Hoy conviven redes, sistemas por área e infraestructura en la nube pero sin una capa operativa única. MALI ONE es esa capa.',
   /** Sustituir por tu imagen consolidada cuando la tengas. */
   image: 'contexto.png',
   points: [
