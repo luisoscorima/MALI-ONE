@@ -4,6 +4,7 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { isFloatingLayerBlockingDismiss } from "@/lib/floating-layer"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
@@ -47,13 +48,6 @@ function DialogOverlay({
   )
 }
 
-function isFloatingDismissLayerOpen() {
-  return Boolean(
-    document.querySelector("[data-slot='select-content']") ||
-      document.querySelector("[data-radix-select-content]"),
-  )
-}
-
 function DialogContent({
   className,
   children,
@@ -76,15 +70,15 @@ function DialogContent({
         )}
         {...props}
         onPointerDownOutside={(event) => {
-          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          if (isFloatingLayerBlockingDismiss()) event.preventDefault()
           onPointerDownOutside?.(event)
         }}
         onFocusOutside={(event) => {
-          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          if (isFloatingLayerBlockingDismiss()) event.preventDefault()
           onFocusOutside?.(event)
         }}
         onInteractOutside={(event) => {
-          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          if (isFloatingLayerBlockingDismiss()) event.preventDefault()
           onInteractOutside?.(event)
         }}
       >

@@ -18,6 +18,8 @@ import {
   CreateTodoItemDto,
   CreateTodoStatusDto,
   CreateTodoTypeDto,
+  ListTodosQueryDto,
+  ReorderTodosDto,
   UpdateTodoItemDto,
   UpdateTodoStatusDto,
   UpdateTodoTypeDto,
@@ -46,6 +48,12 @@ export class TodosController {
     return this.todos.updateType(id, body);
   }
 
+  @Delete('meta/types/:id')
+  @Roles(UserRole.admin)
+  deleteType(@Param('id') id: string) {
+    return this.todos.deleteType(id);
+  }
+
   @Post('meta/statuses')
   @Roles(UserRole.admin)
   createStatus(@Body() body: CreateTodoStatusDto) {
@@ -58,9 +66,20 @@ export class TodosController {
     return this.todos.updateStatus(id, body);
   }
 
+  @Delete('meta/statuses/:id')
+  @Roles(UserRole.admin)
+  deleteStatus(@Param('id') id: string) {
+    return this.todos.deleteStatus(id);
+  }
+
   @Get()
-  list(@Req() req: Request, @Query('ownerId') ownerId?: string) {
-    return this.todos.list(req.user as User, ownerId);
+  list(@Req() req: Request, @Query() query: ListTodosQueryDto) {
+    return this.todos.list(req.user as User, query);
+  }
+
+  @Patch('reorder')
+  reorder(@Req() req: Request, @Body() body: ReorderTodosDto) {
+    return this.todos.reorder(req.user as User, body);
   }
 
   @Get(':id')

@@ -574,6 +574,9 @@ model TodoItem {
   registeredAt     DateTime     @default(now())
   dueAt            DateTime?
   statusChangedAt  DateTime     @default(now())
+  completedAt      DateTime?
+  archivedAt       DateTime?
+  sortOrder        Int          @default(0)
   timeSpentMinutes Int          @default(0)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -582,5 +585,8 @@ model TodoItem {
   @@index([statusId])
   @@index([dueAt])
   @@index([typeId])
+  @@index([ownerId, statusId])
+  @@index([ownerId, dueAt])
+  @@index([ownerId, archivedAt])
 }
 

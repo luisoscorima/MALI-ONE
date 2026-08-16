@@ -53,6 +53,9 @@ export interface TodoItemDto {
   registeredAt: string;
   dueAt: string | null;
   statusChangedAt: string;
+  completedAt: string | null;
+  archivedAt: string | null;
+  sortOrder: number;
   timeSpentMinutes: number;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +64,17 @@ export interface TodoItemDto {
 export interface TodoMetaDto {
   types: TodoTypeDto[];
   statuses: TodoStatusDto[];
+}
+
+export interface ListTodosQuery {
+  ownerId?: string;
+  statusId?: string;
+  typeId?: string;
+  priority?: TodoPriority;
+  includeDone?: boolean;
+  includeArchived?: boolean;
+  dueBefore?: string;
+  dueAfter?: string;
 }
 
 export interface CreateTodoItemDto {
@@ -81,6 +95,13 @@ export interface UpdateTodoItemDto {
   effort?: TodoEffort | null;
   statusId?: string;
   dueAt?: string | null;
+  sortOrder?: number;
+  archived?: boolean;
+}
+
+export interface ReorderTodosDto {
+  statusId: string;
+  orderedIds: string[];
 }
 
 export interface AddTodoTimeDto {

@@ -4,12 +4,23 @@ import * as React from "react"
 import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { notifyFloatingLayerOpen } from "@/lib/floating-layer"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 function Select({
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      onOpenChange={(open) => {
+        notifyFloatingLayerOpen(open)
+        onOpenChange?.(open)
+      }}
+      {...props}
+    />
+  )
 }
 
 function SelectGroup({

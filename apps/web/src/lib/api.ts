@@ -1023,12 +1023,23 @@ export const api = {
   getTodoMeta: () =>
     request<import('@mali-one/shared').TodoMetaDto>('/api/todos/meta'),
 
-  listTodos: (ownerId?: string) => {
-    const qs = ownerId
-      ? `?ownerId=${encodeURIComponent(ownerId)}`
-      : '';
+  listTodos: (params?: import('@mali-one/shared').ListTodosQuery) => {
+    const qs = new URLSearchParams();
+    if (params?.ownerId) qs.set('ownerId', params.ownerId);
+    if (params?.statusId) qs.set('statusId', params.statusId);
+    if (params?.typeId) qs.set('typeId', params.typeId);
+    if (params?.priority) qs.set('priority', params.priority);
+    if (params?.includeDone !== undefined) {
+      qs.set('includeDone', String(params.includeDone));
+    }
+    if (params?.includeArchived !== undefined) {
+      qs.set('includeArchived', String(params.includeArchived));
+    }
+    if (params?.dueBefore) qs.set('dueBefore', params.dueBefore);
+    if (params?.dueAfter) qs.set('dueAfter', params.dueAfter);
+    const query = qs.toString();
     return request<import('@mali-one/shared').TodoItemDto[]>(
-      `/api/todos${qs}`,
+      `/api/todos${query ? `?${query}` : ''}`,
     );
   },
 
@@ -1043,6 +1054,12 @@ export const api = {
     body: import('@mali-one/shared').UpdateTodoItemDto,
   ) =>
     request<import('@mali-one/shared').TodoItemDto>(`/api/todos/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  reorderTodos: (body: import('@mali-one/shared').ReorderTodosDto) =>
+    request<{ ok: boolean }>('/api/todos/reorder', {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
@@ -1071,6 +1088,11 @@ export const api = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
 
+  deleteTodoType: (id: string) =>
+    request<{ ok: boolean }>(`/api/todos/meta/types/${id}`, {
+      method: 'DELETE',
+    }),
+
   createTodoStatus: (body: import('@mali-one/shared').CreateTodoStatusDto) =>
     request<import('@mali-one/shared').TodoStatusDto>(
       '/api/todos/meta/statuses',
@@ -1085,6 +1107,11 @@ export const api = {
       `/api/todos/meta/statuses/${id}`,
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
+
+  deleteTodoStatus: (id: string) =>
+    request<{ ok: boolean }>(`/api/todos/meta/statuses/${id}`, {
+      method: 'DELETE',
+    }),
 
   listFiles: (path?: string) => {
     const qs = path ? `?path=${encodeURIComponent(path)}` : '';

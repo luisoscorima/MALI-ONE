@@ -1,16 +1,61 @@
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { TodoEffort, TodoPriority } from '@prisma/client';
+
+function toOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === true || value === 'true' || value === '1') return true;
+  if (value === false || value === 'false' || value === '0') return false;
+  return undefined;
+}
+
+export class ListTodosQueryDto {
+  @IsOptional()
+  @IsString()
+  ownerId?: string;
+
+  @IsOptional()
+  @IsString()
+  statusId?: string;
+
+  @IsOptional()
+  @IsString()
+  typeId?: string;
+
+  @IsOptional()
+  @IsEnum(TodoPriority)
+  priority?: TodoPriority;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  includeDone?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => toOptionalBoolean(value))
+  @IsBoolean()
+  includeArchived?: boolean;
+
+  @IsOptional()
+  @IsDateString()
+  dueBefore?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dueAfter?: string;
+}
 
 export class CreateTodoItemDto {
   @IsString()
@@ -73,12 +118,32 @@ export class UpdateTodoItemDto {
   @IsOptional()
   @IsDateString()
   dueAt?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+}
+
+export class ReorderTodosDto {
+  @IsString()
+  statusId!: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  orderedIds!: string[];
 }
 
 export class AddTodoTimeDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(480)
   minutes!: number;
 }
 
