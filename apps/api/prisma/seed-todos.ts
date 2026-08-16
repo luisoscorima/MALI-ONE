@@ -1,7 +1,7 @@
 /**
  * Seed de catálogos TODO (tipos y estados).
  * Uso: pnpm --filter @mali-one/api prisma:seed:todos
- * También se auto-siembra al primer GET /api/todos/meta si la tabla está vacía.
+ * También se auto-siembra al primer GET /api/todos/meta si faltan filas.
  */
 import { PrismaClient } from '@prisma/client';
 
@@ -22,21 +22,23 @@ const DEFAULT_STATUSES = [
 ];
 
 async function main() {
-  const typeCount = await prisma.todoType.count();
-  if (typeCount === 0) {
-    await prisma.todoType.createMany({ data: DEFAULT_TYPES });
-    console.log(`Created ${DEFAULT_TYPES.length} todo types`);
-  } else {
-    console.log(`TodoType already has ${typeCount} rows — skip`);
+  for (const type of DEFAULT_TYPES) {
+    await prisma.todoType.upsert({
+      where: { name: type.name },
+      create: type,
+      update: {},
+    });
   }
+  console.log(`Upserted ${DEFAULT_TYPES.length} todo types`);
 
-  const statusCount = await prisma.todoStatus.count();
-  if (statusCount === 0) {
-    await prisma.todoStatus.createMany({ data: DEFAULT_STATUSES });
-    console.log(`Created ${DEFAULT_STATUSES.length} todo statuses`);
-  } else {
-    console.log(`TodoStatus already has ${statusCount} rows — skip`);
+  for (const status of DEFAULT_STATUSES) {
+    await prisma.todoStatus.upsert({
+      where: { key: status.key },
+      create: status,
+      update: {},
+    });
   }
+  console.log(`Upserted ${DEFAULT_STATUSES.length} todo statuses`);
 }
 
 main()

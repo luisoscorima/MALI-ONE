@@ -41,7 +41,6 @@ export interface TodoItemDto {
   id: string;
   title: string;
   detail: string | null;
-  notes: string | null;
   typeId: string | null;
   type: TodoTypeDto | null;
   priority: TodoPriority;
@@ -67,7 +66,6 @@ export interface TodoMetaDto {
 export interface CreateTodoItemDto {
   title: string;
   detail?: string;
-  notes?: string;
   typeId?: string | null;
   priority?: TodoPriority;
   effort?: TodoEffort | null;
@@ -78,7 +76,6 @@ export interface CreateTodoItemDto {
 export interface UpdateTodoItemDto {
   title?: string;
   detail?: string | null;
-  notes?: string | null;
   typeId?: string | null;
   priority?: TodoPriority;
   effort?: TodoEffort | null;

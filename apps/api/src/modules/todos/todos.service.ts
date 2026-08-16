@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -69,15 +70,46 @@ export class TodosService {
   constructor(private readonly prisma: PrismaService) {}
 
   async ensureMeta() {
-    const [typeCount, statusCount] = await Promise.all([
-      this.prisma.todoType.count(),
-      this.prisma.todoStatus.count(),
-    ]);
-    if (typeCount === 0) {
-      await this.prisma.todoType.createMany({ data: DEFAULT_TYPES });
+    await this.ensureDefaultTypes();
+    await this.ensureDefaultStatuses();
+  }
+
+  private async ensureDefaultTypes() {
+    const existing = await this.prisma.todoType.findMany({
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const keepers = new Map<string, string>();
+    for (const row of existing) {
+      const key = row.name.trim().toLowerCase();
+      const keeperId = keepers.get(key);
+      if (!keeperId) {
+        keepers.set(key, row.id);
+        continue;
+      }
+      await this.prisma.$transaction([
+        this.prisma.todoItem.updateMany({
+          where: { typeId: row.id },
+          data: { typeId: keeperId },
+        }),
+        this.prisma.todoType.delete({ where: { id: row.id } }),
+      ]);
     }
-    if (statusCount === 0) {
-      await this.prisma.todoStatus.createMany({ data: DEFAULT_STATUSES });
+    for (const def of DEFAULT_TYPES) {
+      if (!keepers.has(def.name.toLowerCase())) {
+        const created = await this.prisma.todoType.create({ data: def });
+        keepers.set(def.name.toLowerCase(), created.id);
+      }
+    }
+  }
+
+  private async ensureDefaultStatuses() {
+    const existing = await this.prisma.todoStatus.findMany();
+    const byKey = new Set(existing.map((row) => row.key));
+    for (const def of DEFAULT_STATUSES) {
+      if (!byKey.has(def.key)) {
+        await this.prisma.todoStatus.create({ data: def });
+        byKey.add(def.key);
+      }
     }
   }
 
@@ -136,7 +168,6 @@ export class TodosService {
       data: {
         title: dto.title.trim(),
         detail: dto.detail?.trim() || null,
-        notes: dto.notes?.trim() || null,
         typeId: dto.typeId ?? null,
         priority: dto.priority ?? TodoPriority.medium,
         effort: dto.effort ?? null,
@@ -163,9 +194,6 @@ export class TodosService {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.detail !== undefined
           ? { detail: dto.detail?.trim() || null }
-          : {}),
-        ...(dto.notes !== undefined
-          ? { notes: dto.notes?.trim() || null }
           : {}),
         ...(dto.typeId !== undefined ? { typeId: dto.typeId } : {}),
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
@@ -198,9 +226,11 @@ export class TodosService {
   }
 
   async createType(dto: CreateTodoTypeDto) {
+    const name = dto.name.trim();
+    await this.assertTypeNameAvailable(name);
     const row = await this.prisma.todoType.create({
       data: {
-        name: dto.name.trim(),
+        name,
         color: dto.color ?? null,
         active: dto.active ?? true,
         sortOrder: dto.sortOrder ?? 0,
@@ -211,10 +241,12 @@ export class TodosService {
 
   async updateType(id: string, dto: UpdateTodoTypeDto) {
     await this.assertType(id);
+    const name = dto.name !== undefined ? dto.name.trim() : undefined;
+    if (name) await this.assertTypeNameAvailable(name, id);
     const row = await this.prisma.todoType.update({
       where: { id },
       data: {
-        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(name !== undefined ? { name } : {}),
         ...(dto.color !== undefined ? { color: dto.color } : {}),
         ...(dto.active !== undefined ? { active: dto.active } : {}),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
@@ -260,6 +292,16 @@ export class TodosService {
       throw new ForbiddenException('No tienes acceso a esta tarea');
     }
     return item;
+  }
+
+  private async assertTypeNameAvailable(name: string, excludeId?: string) {
+    const row = await this.prisma.todoType.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+    if (row) throw new ConflictException('Ya existe un tipo con ese nombre');
   }
 
   private async assertType(id: string) {
@@ -312,7 +354,6 @@ export class TodosService {
     id: string;
     title: string;
     detail: string | null;
-    notes: string | null;
     typeId: string | null;
     type: {
       id: string;
@@ -345,7 +386,6 @@ export class TodosService {
       id: item.id,
       title: item.title,
       detail: item.detail,
-      notes: item.notes,
       typeId: item.typeId,
       type: item.type ? this.mapType(item.type) : null,
       priority: item.priority,

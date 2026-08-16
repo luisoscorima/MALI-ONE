@@ -24,10 +24,6 @@ export class CreateTodoItemDto {
 
   @IsOptional()
   @IsString()
-  notes?: string;
-
-  @IsOptional()
-  @IsString()
   typeId?: string | null;
 
   @IsOptional()
@@ -57,10 +53,6 @@ export class UpdateTodoItemDto {
   @IsOptional()
   @IsString()
   detail?: string | null;
-
-  @IsOptional()
-  @IsString()
-  notes?: string | null;
 
   @IsOptional()
   @IsString()

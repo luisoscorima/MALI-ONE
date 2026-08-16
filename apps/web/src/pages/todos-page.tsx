@@ -85,7 +85,6 @@ type ViewMode = 'kanban' | 'calendar' | 'list';
 type FormState = {
   title: string;
   detail: string;
-  notes: string;
   typeId: string;
   priority: TodoPriority;
   effort: string;
@@ -97,7 +96,6 @@ type FormState = {
 const emptyForm = (statusId = ''): FormState => ({
   title: '',
   detail: '',
-  notes: '',
   typeId: '',
   priority: 'medium',
   effort: '',
@@ -185,7 +183,6 @@ export function TodosPage() {
     setForm({
       title: item.title,
       detail: item.detail ?? '',
-      notes: item.notes ?? '',
       typeId: item.typeId ?? '',
       priority: item.priority,
       effort: item.effort ?? '',
@@ -206,7 +203,6 @@ export function TodosPage() {
       const payload = {
         title: form.title.trim(),
         detail: form.detail.trim() || undefined,
-        notes: form.notes.trim() || undefined,
         typeId: form.typeId || null,
         priority: form.priority,
         effort: (form.effort || null) as TodoEffort | null,
@@ -500,7 +496,18 @@ export function TodosPage() {
         )}
       </Tabs>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (
+            !open &&
+            document.querySelector('[data-slot="select-content"]')
+          ) {
+            return;
+          }
+          setDialogOpen(open);
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
@@ -522,21 +529,11 @@ export function TodosPage() {
               <Label htmlFor="todo-detail">Detalle</Label>
               <Textarea
                 id="todo-detail"
-                rows={3}
+                rows={4}
+                placeholder="Qué hay que hacer y el contexto de la tarea"
                 value={form.detail}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, detail: e.target.value }))
-                }
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="todo-notes">Anotaciones</Label>
-              <Textarea
-                id="todo-notes"
-                rows={2}
-                value={form.notes}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, notes: e.target.value }))
                 }
               />
             </div>
@@ -555,7 +552,7 @@ export function TodosPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Sin tipo" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="__none__">Sin tipo</SelectItem>
                     {activeTypes.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
@@ -576,7 +573,7 @@ export function TodosPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     {statuses.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.name}
@@ -599,7 +596,7 @@ export function TodosPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     {(
                       Object.keys(PRIORITY_LABEL) as TodoPriority[]
                     ).map((p) => (
@@ -624,7 +621,7 @@ export function TodosPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="—" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper">
                     <SelectItem value="__none__">—</SelectItem>
                     {(Object.keys(EFFORT_LABEL) as TodoEffort[]).map((e) => (
                       <SelectItem key={e} value={e}>

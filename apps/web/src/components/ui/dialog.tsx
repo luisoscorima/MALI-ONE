@@ -47,10 +47,20 @@ function DialogOverlay({
   )
 }
 
+function isFloatingDismissLayerOpen() {
+  return Boolean(
+    document.querySelector("[data-slot='select-content']") ||
+      document.querySelector("[data-radix-select-content]"),
+  )
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onPointerDownOutside,
+  onFocusOutside,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -65,6 +75,18 @@ function DialogContent({
           className
         )}
         {...props}
+        onPointerDownOutside={(event) => {
+          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          onPointerDownOutside?.(event)
+        }}
+        onFocusOutside={(event) => {
+          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          onFocusOutside?.(event)
+        }}
+        onInteractOutside={(event) => {
+          if (isFloatingDismissLayerOpen()) event.preventDefault()
+          onInteractOutside?.(event)
+        }}
       >
         {children}
         {showCloseButton && (
