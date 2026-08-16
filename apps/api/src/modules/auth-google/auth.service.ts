@@ -6,9 +6,17 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { User, UserRole, AppModule } from '@prisma/client';
+import { isAccentHex, isAccentThemeId } from '@mali-one/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { resolveUserModules } from '../../core/permissions/user-modules';
 import { JwtPayload } from './jwt.strategy';
+
+function parseAccentTheme(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (isAccentThemeId(value)) return value;
+  if (isAccentHex(value)) return value.toLowerCase();
+  return null;
+}
 
 @Injectable()
 export class AuthService {
@@ -81,6 +89,7 @@ export class AuthService {
       role: user.role,
       isSuperAdmin: !!bootstrap && user.email === bootstrap,
       modules: resolveUserModules(user),
+      accentTheme: parseAccentTheme(user.accentTheme),
     };
   }
 
@@ -92,6 +101,18 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException();
     }
+    return this.toAuthUser(user);
+  }
+
+  async updateAccentTheme(userId: string, accentTheme: string) {
+    const normalized =
+      parseAccentTheme(accentTheme) ??
+      (isAccentHex(accentTheme) ? accentTheme.toLowerCase() : accentTheme);
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { accentTheme: normalized },
+      include: { moduleAccess: true },
+    });
     return this.toAuthUser(user);
   }
 }

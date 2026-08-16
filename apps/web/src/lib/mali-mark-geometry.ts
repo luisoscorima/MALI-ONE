@@ -69,6 +69,51 @@ export function getMaliGlassPalette(id: string): MaliGlassPalette {
   return maliGlassPalettes[id] ?? MALI_GLASS_ORIGINAL;
 }
 
+function clampByte(n: number) {
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const raw = hex.replace('#', '');
+  return {
+    r: parseInt(raw.slice(0, 2), 16),
+    g: parseInt(raw.slice(2, 4), 16),
+    b: parseInt(raw.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b]
+    .map((c) => clampByte(c).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/** Mezcla hacia blanco (t>0) o negro (t<0). t en [-1, 1]. */
+function mixHex(hex: string, t: number) {
+  const { r, g, b } = hexToRgb(hex);
+  if (t >= 0) {
+    return rgbToHex(
+      r + (255 - r) * t,
+      g + (255 - g) * t,
+      b + (255 - b) * t,
+    );
+  }
+  const k = 1 + t;
+  return rgbToHex(r * k, g * k, b * k);
+}
+
+/** Paleta glass derivada de un color libre (#RRGGBB). */
+export function buildMaliGlassPaletteFromHex(hex: string): MaliGlassPalette {
+  const base = hex.toLowerCase();
+  return {
+    glass: [mixHex(base, 0.35), mixHex(base, 0.55), base, mixHex(base, -0.12)],
+    edge: [mixHex(base, 0.5), mixHex(base, 0.75), mixHex(base, 0.28), mixHex(base, -0.05)],
+    letter: ['#ffffff', mixHex(base, 0.7), mixHex(base, 0.35)],
+    glowPanel: base,
+    glowLetter: mixHex(base, 0.4),
+  };
+}
+
 export function applyMaliGlassCssVars(palette: MaliGlassPalette) {
   const root = document.documentElement;
   palette.glass.forEach((color, index) => {

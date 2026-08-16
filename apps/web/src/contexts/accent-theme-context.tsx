@@ -11,19 +11,33 @@ import {
   ACCENT_STORAGE_KEY,
   applyAccentTheme,
   defaultAccentThemeId,
+  isAccentHex,
+  persistCustomAccentHex,
   readStoredAccentTheme,
-  type AccentThemeId,
+  type AccentThemeValue,
 } from '@/lib/accent-themes';
 
 type AccentThemeContextValue = {
-  accentId: AccentThemeId;
-  setAccentId: (id: AccentThemeId) => void;
+  accentId: AccentThemeValue;
+  setAccentId: (id: AccentThemeValue) => void;
 };
 
 const AccentThemeContext = createContext<AccentThemeContextValue | null>(null);
 
+function persistLocal(id: AccentThemeValue) {
+  try {
+    localStorage.setItem(ACCENT_STORAGE_KEY, id);
+  } catch {
+    /* ignore */
+  }
+  if (isAccentHex(id)) {
+    persistCustomAccentHex(id);
+  }
+}
+
 export function AccentThemeProvider({ children }: { children: ReactNode }) {
-  const [accentId, setAccentIdState] = useState<AccentThemeId>(defaultAccentThemeId);
+  const [accentId, setAccentIdState] =
+    useState<AccentThemeValue>(defaultAccentThemeId);
 
   useEffect(() => {
     const stored = readStoredAccentTheme();
@@ -31,14 +45,11 @@ export function AccentThemeProvider({ children }: { children: ReactNode }) {
     applyAccentTheme(stored);
   }, []);
 
-  const setAccentId = useCallback((id: AccentThemeId) => {
-    setAccentIdState(id);
-    applyAccentTheme(id);
-    try {
-      localStorage.setItem(ACCENT_STORAGE_KEY, id);
-    } catch {
-      /* ignore */
-    }
+  const setAccentId = useCallback((id: AccentThemeValue) => {
+    const next = isAccentHex(id) ? id.toLowerCase() : id;
+    setAccentIdState(next);
+    applyAccentTheme(next);
+    persistLocal(next);
   }, []);
 
   const value = useMemo(

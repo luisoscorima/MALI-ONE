@@ -241,6 +241,35 @@ export { DEFAULT_QR_STYLE } from './qr-style';
 export type { QrLogoPresetId } from './qr-logo-presets';
 export { QR_LOGO_PRESETS } from './qr-logo-presets';
 
+export const ACCENT_THEME_IDS = [
+  'neutral',
+  'amber',
+  'terracotta',
+  'emerald',
+  'violet',
+  'blue',
+] as const;
+
+export type AccentThemeId = (typeof ACCENT_THEME_IDS)[number];
+
+/** Preset (`amber`) o color personalizado (`#3b82f6`). */
+export type AccentThemeValue = AccentThemeId | string;
+
+const ACCENT_HEX_RE = /^#[0-9A-Fa-f]{6}$/;
+
+export function isAccentThemeId(value: string): value is AccentThemeId {
+  return (ACCENT_THEME_IDS as readonly string[]).includes(value);
+}
+
+export function isAccentHex(value: string): boolean {
+  return ACCENT_HEX_RE.test(value);
+}
+
+/** Valida preset o #RRGGBB. */
+export function isValidAccentTheme(value: string): boolean {
+  return isAccentThemeId(value) || isAccentHex(value);
+}
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -249,6 +278,8 @@ export interface AuthUser {
   role: UserRole;
   isSuperAdmin: boolean;
   modules: AppModule[];
+  /** Color de interfaz: preset o #RRGGBB; null = aún no guardado. */
+  accentTheme: string | null;
 }
 
 export interface AppUserDto {

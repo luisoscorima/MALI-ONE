@@ -1,21 +1,25 @@
 import {
   applyMaliGlassCssVars,
+  buildMaliGlassPaletteFromHex,
   getMaliGlassPalette,
   maliMarkNavyBackdropMarkup,
   maliMarkNavyGradientMarkup,
   recolorFaviconGlass,
   MALI_MARK_NAVY,
+  type MaliGlassPalette,
 } from '@/lib/mali-mark-geometry';
+import {
+  isAccentHex,
+  isAccentThemeId,
+  isValidAccentTheme,
+  type AccentThemeId,
+} from '@mali-one/shared';
 
 export const ACCENT_STORAGE_KEY = 'mali-one-accent-theme';
+export const ACCENT_CUSTOM_STORAGE_KEY = 'mali-one-accent-custom';
 
-export type AccentThemeId =
-  | 'neutral'
-  | 'amber'
-  | 'terracotta'
-  | 'emerald'
-  | 'violet'
-  | 'blue';
+export type { AccentThemeId };
+export type AccentThemeValue = string;
 
 export type AccentTheme = {
   id: AccentThemeId;
@@ -71,15 +75,69 @@ export const accentThemes: AccentTheme[] = [
 ];
 
 export const defaultAccentThemeId: AccentThemeId = 'neutral';
+export const defaultCustomAccentHex = '#3b82f6';
 
 const APP_BACKGROUND = '#0f1419';
 
-function markBackground(id: AccentThemeId, primary: string) {
-  return id === 'neutral' ? APP_BACKGROUND : primary;
+function hexToRgb(hex: string) {
+  const raw = hex.replace('#', '');
+  return {
+    r: parseInt(raw.slice(0, 2), 16),
+    g: parseInt(raw.slice(2, 4), 16),
+    b: parseInt(raw.slice(4, 6), 16),
+  };
 }
 
-function applyThemeColor(id: AccentThemeId, primary: string) {
-  const themeColor = markBackground(id, primary);
+/** Texto legible sobre el color de acento (WCAG relative luminance). */
+export function contrastForeground(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  const toLin = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const L = 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+  return L > 0.45 ? '#0f1419' : '#ffffff';
+}
+
+function normalizeHex(value: string): string {
+  return value.toLowerCase();
+}
+
+export function getAccentTheme(id: AccentThemeId): AccentTheme {
+  return accentThemes.find((t) => t.id === id) ?? accentThemes[0];
+}
+
+export { isAccentThemeId, isAccentHex, isValidAccentTheme };
+
+export function resolveAccentColors(value: AccentThemeValue): {
+  primary: string;
+  primaryForeground: string;
+  palette: MaliGlassPalette;
+  datasetAccent: string;
+  themeColor: string;
+} {
+  if (isAccentThemeId(value)) {
+    const theme = getAccentTheme(value);
+    return {
+      primary: theme.primary,
+      primaryForeground: theme.primaryForeground,
+      palette: getMaliGlassPalette(value),
+      datasetAccent: value,
+      themeColor: value === 'neutral' ? APP_BACKGROUND : theme.primary,
+    };
+  }
+
+  const primary = normalizeHex(value);
+  return {
+    primary,
+    primaryForeground: contrastForeground(primary),
+    palette: buildMaliGlassPaletteFromHex(primary),
+    datasetAccent: 'custom',
+    themeColor: primary,
+  };
+}
+
+function applyThemeColorMeta(themeColor: string) {
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement('meta');
@@ -100,8 +158,7 @@ function loadImage(src: string) {
 
 let faviconGeneration = 0;
 
-function applyThemedFavicon(id: AccentThemeId) {
-  const palette = getMaliGlassPalette(id);
+function applyThemedFavicon(palette: MaliGlassPalette) {
   const generation = ++faviconGeneration;
   void fetch('/favicon.svg')
     .then((response) => response.text())
@@ -159,22 +216,34 @@ export const loginAmbientColors = {
   blue: accentThemes.find((t) => t.id === 'blue')!.primary,
 } as const;
 
-export function getAccentTheme(id: AccentThemeId): AccentTheme {
-  return accentThemes.find((t) => t.id === id) ?? accentThemes[0];
-}
-
-export function isAccentThemeId(value: string): value is AccentThemeId {
-  return accentThemes.some((t) => t.id === value);
-}
-
-export function readStoredAccentTheme(): AccentThemeId {
+export function readStoredAccentTheme(): AccentThemeValue {
   try {
     const stored = localStorage.getItem(ACCENT_STORAGE_KEY);
-    if (stored && isAccentThemeId(stored)) return stored;
+    if (stored && isValidAccentTheme(stored)) {
+      return isAccentHex(stored) ? normalizeHex(stored) : stored;
+    }
   } catch {
     /* localStorage no disponible */
   }
   return defaultAccentThemeId;
+}
+
+export function readStoredCustomAccentHex(): string {
+  try {
+    const stored = localStorage.getItem(ACCENT_CUSTOM_STORAGE_KEY);
+    if (stored && isAccentHex(stored)) return normalizeHex(stored);
+  } catch {
+    /* ignore */
+  }
+  return defaultCustomAccentHex;
+}
+
+export function persistCustomAccentHex(hex: string) {
+  try {
+    localStorage.setItem(ACCENT_CUSTOM_STORAGE_KEY, normalizeHex(hex));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function applyLoginAmbientColors() {
@@ -184,18 +253,18 @@ export function applyLoginAmbientColors() {
   root.style.setProperty('--login-ambient-blue', loginAmbientColors.blue);
 }
 
-export function applyAccentTheme(id: AccentThemeId) {
-  const theme = getAccentTheme(id);
+export function applyAccentTheme(value: AccentThemeValue) {
+  const resolved = resolveAccentColors(value);
   const root = document.documentElement;
-  root.dataset.accent = id;
-  root.style.setProperty('--primary', theme.primary);
-  root.style.setProperty('--primary-foreground', theme.primaryForeground);
-  root.style.setProperty('--ring', theme.primary);
-  root.style.setProperty('--sidebar-primary', theme.primary);
-  root.style.setProperty('--sidebar-primary-foreground', theme.primaryForeground);
-  root.style.setProperty('--sidebar-ring', theme.primary);
-  root.style.setProperty('--chart-1', theme.primary);
-  applyThemeColor(id, theme.primary);
-  applyMaliGlassCssVars(getMaliGlassPalette(id));
-  applyThemedFavicon(id);
+  root.dataset.accent = resolved.datasetAccent;
+  root.style.setProperty('--primary', resolved.primary);
+  root.style.setProperty('--primary-foreground', resolved.primaryForeground);
+  root.style.setProperty('--ring', resolved.primary);
+  root.style.setProperty('--sidebar-primary', resolved.primary);
+  root.style.setProperty('--sidebar-primary-foreground', resolved.primaryForeground);
+  root.style.setProperty('--sidebar-ring', resolved.primary);
+  root.style.setProperty('--chart-1', resolved.primary);
+  applyThemeColorMeta(resolved.themeColor);
+  applyMaliGlassCssVars(resolved.palette);
+  applyThemedFavicon(resolved.palette);
 }

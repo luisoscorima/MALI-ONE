@@ -4,6 +4,7 @@ import { AccentThemeProvider } from '@/contexts/accent-theme-context';
 import { ToastProvider } from '@/contexts/toast-context';
 import { ConfirmProvider } from '@/hooks/use-confirm';
 import { TooltipProvider } from '@/components/ui';
+import { AccentThemeUserSync } from '@/components/accent-theme-user-sync';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, ModuleGuard, SuperAdminGuard } from '@/components/auth-guard';
 import { AdminUsersPage } from '@/pages/admin-users-page';
@@ -39,6 +40,7 @@ import { FilesPage } from '@/pages/files-page';
 function AuthenticatedApp() {
   return (
     <AuthProvider>
+      <AccentThemeUserSync />
       <ToastProvider>
         <ConfirmProvider>
           <TooltipProvider>

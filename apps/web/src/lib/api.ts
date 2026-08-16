@@ -49,6 +49,11 @@ export const api = {
   getMe: () => request<AuthUser>('/api/auth/me'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   googleLoginUrl: () => '/api/auth/google',
+  updateAccentTheme: (accentTheme: string) =>
+    request<AuthUser>('/api/auth/me/accent-theme', {
+      method: 'PUT',
+      body: JSON.stringify({ accentTheme }),
+    }),
 
   listWorkspaceUsers: (q?: string, pageToken?: string) => {
     const params = new URLSearchParams();

@@ -88,6 +88,7 @@ model User {
   picture        String?
   role           UserRole           @default(operator)
   qrDefaultStyle Json?
+  accentTheme    String?
   createdAt      DateTime           @default(now())
   shortLinks     ShortLink[]
   auditLogs      AdminAuditLog[]    @relation("ActorAuditLogs")

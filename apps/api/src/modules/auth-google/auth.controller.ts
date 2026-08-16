@@ -1,7 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
   Post,
+  Put,
   Req,
   Res,
   UnauthorizedException,
@@ -13,6 +15,7 @@ import { User } from '@prisma/client';
 import { Request, Response } from 'express';
 import { Public } from '../../core/guards/public.decorator';
 import { AuthService } from './auth.service';
+import { UpdateAccentThemeDto } from './dto/update-accent-theme.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -58,6 +61,12 @@ export class AuthController {
   me(@Req() req: Request) {
     const user = req.user as User;
     return this.authService.toAuthUser(user);
+  }
+
+  @Put('me/accent-theme')
+  updateAccentTheme(@Req() req: Request, @Body() body: UpdateAccentThemeDto) {
+    const user = req.user as User;
+    return this.authService.updateAccentTheme(user.id, body.accentTheme);
   }
 
   @Post('logout')
