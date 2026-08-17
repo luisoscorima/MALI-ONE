@@ -5,6 +5,7 @@ import {
   Download,
   Folder,
   FolderPlus,
+  Info,
   Lock,
   Pencil,
   RefreshCw,
@@ -21,6 +22,8 @@ import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
+import { FilesFolderPickerDialog } from '@/components/files-folder-picker-dialog';
+import { FilesItemInfoDialog } from '@/components/files-item-info-dialog';
 import { cn } from '@/lib/utils';
 import {
   Breadcrumb,
@@ -94,9 +97,8 @@ export function FilesPage() {
   );
   const [renameValue, setRenameValue] = useState('');
   const [moveTarget, setMoveTarget] = useState<FilesListItemDto | null>(null);
-  const [moveDest, setMoveDest] = useState('');
   const [copyTarget, setCopyTarget] = useState<FilesListItemDto | null>(null);
-  const [copyDest, setCopyDest] = useState('');
+  const [infoTarget, setInfoTarget] = useState<FilesListItemDto | null>(null);
 
   useEffect(() => {
     void api.filesConfig().then(setFilesConfig).catch(() => {});
@@ -193,8 +195,14 @@ export function FilesPage() {
     }
   }
 
-  function openFolder(item: FilesListItemDto) {
-    if (item.isFolder) setPath(item.path);
+  function openItem(item: FilesListItemDto) {
+    if (item.isFolder) {
+      setPath(item.path);
+      return;
+    }
+    if (isImageFile(item.name)) {
+      setPreviewPath(item.path);
+    }
   }
 
   function enterTrashMode() {
@@ -308,15 +316,6 @@ export function FilesPage() {
     }
   }
 
-  async function copyPath(pathValue: string) {
-    try {
-      await navigator.clipboard.writeText(pathValue);
-      toast.success('Ruta copiada');
-    } catch {
-      toast.error('No se pudo copiar la ruta');
-    }
-  }
-
   function openRename(item: FilesListItemDto) {
     setRenameTarget(item);
     setRenameValue(item.name);
@@ -344,16 +343,18 @@ export function FilesPage() {
 
   function openMove(item: FilesListItemDto) {
     setMoveTarget(item);
-    setMoveDest(path);
   }
 
-  async function submitMove() {
+  async function submitMove(destDir: string) {
     if (!moveTarget) return;
-    const destDir = moveDest.trim() || '/';
     const to =
       destDir === '/'
         ? `/${moveTarget.name}`
         : `${destDir.replace(/\/$/, '')}/${moveTarget.name}`;
+    if (to === moveTarget.path) {
+      toast.error('El destino es la misma ubicación');
+      return;
+    }
     try {
       await api.renameFile(moveTarget.path, to);
       toast.success('Movido');
@@ -366,12 +367,10 @@ export function FilesPage() {
 
   function openCopy(item: FilesListItemDto) {
     setCopyTarget(item);
-    setCopyDest(path);
   }
 
-  async function submitCopy() {
+  async function submitCopy(destDir: string) {
     if (!copyTarget) return;
-    const destDir = copyDest.trim() || '/';
     const to =
       destDir === '/'
         ? `/${copyTarget.name}`
@@ -703,9 +702,15 @@ export function FilesPage() {
                       ) : null}
                       <button
                         type="button"
-                        className="text-left font-medium hover:underline"
-                        onClick={() => openFolder(item)}
-                        disabled={!item.isFolder}
+                        className={cn(
+                          'text-left font-medium',
+                          (item.isFolder || isImageFile(item.name)) &&
+                            'hover:underline',
+                        )}
+                        onClick={() => openItem(item)}
+                        disabled={
+                          !item.isFolder && !isImageFile(item.name)
+                        }
                       >
                         {item.name}
                       </button>
@@ -728,10 +733,10 @@ export function FilesPage() {
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       <IconActionButton
-                        label="Copiar ruta"
-                        onClick={() => void copyPath(item.path)}
+                        label="Información"
+                        onClick={() => setInfoTarget(item)}
                       >
-                        <Copy className="size-4" />
+                        <Info className="size-4" />
                       </IconActionButton>
                       {!item.isFolder ? (
                         <IconActionButton
@@ -835,57 +840,36 @@ export function FilesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <FilesItemInfoDialog
+        open={infoTarget !== null}
+        onOpenChange={(open) => !open && setInfoTarget(null)}
+        item={infoTarget}
+        trashMode={trashMode}
+      />
+
+      <FilesFolderPickerDialog
         open={moveTarget !== null}
         onOpenChange={(open) => !open && setMoveTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mover {moveTarget?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="move-dest">Carpeta destino</Label>
-            <Input
-              id="move-dest"
-              value={moveDest}
-              onChange={(e) => setMoveDest(e.target.value)}
-              placeholder="/"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveTarget(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void submitMove()}>Mover</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title={moveTarget ? `Mover «${moveTarget.name}»` : 'Mover'}
+        description="Navega y elige la carpeta de destino."
+        confirmLabel="Mover aquí"
+        initialPath={dirname(moveTarget?.path ?? path)}
+        sourcePath={moveTarget?.path}
+        sourceIsFolder={moveTarget?.isFolder}
+        trashPath={filesConfig?.trashPath}
+        onConfirm={submitMove}
+      />
 
-      <Dialog
+      <FilesFolderPickerDialog
         open={copyTarget !== null}
         onOpenChange={(open) => !open && setCopyTarget(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Copiar {copyTarget?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="copy-dest">Carpeta destino</Label>
-            <Input
-              id="copy-dest"
-              value={copyDest}
-              onChange={(e) => setCopyDest(e.target.value)}
-              placeholder="/"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCopyTarget(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={() => void submitCopy()}>Copiar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title={copyTarget ? `Copiar «${copyTarget.name}»` : 'Copiar'}
+        description="Navega y elige la carpeta de destino."
+        confirmLabel="Copiar aquí"
+        initialPath={path}
+        trashPath={filesConfig?.trashPath}
+        onConfirm={submitCopy}
+      />
     </div>
   );
 }

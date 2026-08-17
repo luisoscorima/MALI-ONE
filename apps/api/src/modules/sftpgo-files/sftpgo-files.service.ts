@@ -387,31 +387,31 @@ export class SftpgoFilesService {
     return Array.isArray(data) ? data : [];
   }
 
-  private async mkdirAbs(abs: string) {
+  private async mkdirAbs(abs: string, mkdirParents = false) {
+    const qs = mkdirParents ? '&mkdir_parents=true' : '';
     await this.requestJson(
       'POST',
-      `/api/v2/user/dirs?path=${encodeURIComponent(abs)}`,
+      `/api/v2/user/dirs?path=${encodeURIComponent(abs)}${qs}`,
     );
   }
 
   private async renameAbs(absFrom: string, absTo: string) {
     await this.requestJson(
       'POST',
-      `/api/v2/user/rename?path=${encodeURIComponent(absFrom)}&target=${encodeURIComponent(absTo)}`,
+      `/api/v2/user/file-actions/move?path=${encodeURIComponent(absFrom)}&target=${encodeURIComponent(absTo)}`,
     );
   }
 
   private async ensureDir(relPath: string) {
     const rel = relPath === '' ? '/' : this.toRelativePath(this.toAbsolutePath(relPath));
     if (rel === '/') return;
-    const parent = this.dirname(rel);
-    await this.ensureDir(parent);
-    const name = this.basename(rel);
-    const siblings = await this.listRaw(parent);
-    if (siblings.some((e) => (e.name || this.basename(e.path || '')) === name)) {
-      return;
+    const abs = this.toAbsolutePath(rel);
+    try {
+      await this.mkdirAbs(abs, true);
+    } catch (error) {
+      const exists = await this.entryExists(rel);
+      if (!exists) throw error;
     }
-    await this.mkdirAbs(this.toAbsolutePath(rel));
   }
 
   private async entryExists(relPath: string): Promise<boolean> {
