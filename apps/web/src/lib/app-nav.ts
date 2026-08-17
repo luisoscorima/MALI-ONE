@@ -60,7 +60,7 @@ export const appNavSections: AppNavSection[] = [
       },
       {
         to: '/files',
-        label: 'Archivos (disco)',
+        label: 'Archivos TMS',
         icon: FolderOpen,
         module: 'files',
       },

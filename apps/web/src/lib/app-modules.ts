@@ -74,7 +74,7 @@ export const APP_MODULES: {
   },
   {
     id: 'files',
-    label: 'Archivos (disco)',
-    description: 'Explorar el disco compartido vía SFTPGo.',
+    label: 'Archivos TMS',
+    description: 'Explorar el disco de TMS.',
   },
 ];

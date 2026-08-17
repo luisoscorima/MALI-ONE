@@ -20,11 +20,19 @@ export class S3ManagerService {
   private readonly client: S3Client;
   private readonly region: string;
   private readonly allowedBuckets: string[];
+  private readonly screenCastBucket: string;
+  private readonly screenCastPrefix: string;
 
   constructor(private readonly config: ConfigService) {
     this.region = config.getOrThrow<string>('AWS_REGION');
     this.allowedBuckets = this.parseBuckets(
       config.get<string>('AWS_S3_MANAGER_BUCKETS') ?? '',
+    );
+    this.screenCastBucket =
+      config.get<string>('AWS_S3_SCREEN_CAST_BUCKET')?.trim() ||
+      config.getOrThrow<string>('AWS_S3_BUCKET');
+    this.screenCastPrefix = this.normalizePrefix(
+      config.get<string>('AWS_S3_SCREEN_CAST_PREFIX') ?? 'screen-cast',
     );
 
     this.client = new S3Client({
@@ -38,6 +46,33 @@ export class S3ManagerService {
 
   listBuckets() {
     return this.allowedBuckets.map((name) => ({ name }));
+  }
+
+  getScreenCastPickerConfig() {
+    return {
+      bucket: this.screenCastBucket,
+      defaultPrefix: this.screenCastPrefix
+        ? `${this.screenCastPrefix}/`
+        : '',
+    };
+  }
+
+  listScreenCastBuckets() {
+    return [{ name: this.screenCastBucket }];
+  }
+
+  async listScreenCastObjects(
+    bucket: string,
+    prefix = '',
+    continuationToken?: string,
+  ) {
+    this.assertScreenCastBucket(bucket);
+    return this.listObjects(bucket, prefix, continuationToken);
+  }
+
+  async getScreenCastPublicUrl(bucket: string, key: string) {
+    this.assertScreenCastBucket(bucket);
+    return this.getPublicUrl(bucket, key);
   }
 
   async listObjects(
@@ -177,6 +212,23 @@ export class S3ManagerService {
     if (!this.allowedBuckets.includes(bucket)) {
       throw new ForbiddenException(`Bucket no permitido: ${bucket}`);
     }
+  }
+
+  private assertScreenCastBucket(bucket: string) {
+    if (bucket !== this.screenCastBucket) {
+      throw new ForbiddenException(
+        `Bucket no permitido para transmisión: ${bucket}`,
+      );
+    }
+    if (!this.allowedBuckets.includes(bucket)) {
+      throw new ForbiddenException(
+        `Bucket ${bucket} no está en AWS_S3_MANAGER_BUCKETS`,
+      );
+    }
+  }
+
+  private normalizePrefix(raw: string): string {
+    return raw.replace(/^\/+|\/+$/g, '').replace(/\\/g, '/').trim();
   }
 
   private parseBuckets(raw: string): string[] {

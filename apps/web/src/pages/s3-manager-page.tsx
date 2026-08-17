@@ -27,6 +27,10 @@ import {
   BreadcrumbSeparator,
   Button,
   Card,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   Input,
   Table,
   TableBody,
@@ -36,6 +40,15 @@ import {
   TableRow,
 } from '@/components/ui';
 import { cn } from '@/lib/utils';
+
+const PREVIEW_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
+function isPreviewImage(name: string): boolean {
+  const lower = name.toLowerCase();
+  const dot = lower.lastIndexOf('.');
+  if (dot < 0) return false;
+  return PREVIEW_IMAGE_EXT.has(lower.slice(dot));
+}
 
 export function S3ManagerPage() {
   const toast = useToast();
@@ -49,6 +62,9 @@ export function S3ManagerPage() {
   const [loadingObjects, setLoadingObjects] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(
+    null,
+  );
 
   const loadBuckets = useCallback(async () => {
     setLoadingBuckets(true);
@@ -171,6 +187,16 @@ export function S3ManagerPage() {
       toast.error(
         e instanceof Error ? e.message : 'Error al obtener enlace público',
       );
+    }
+  }
+
+  async function openPreview(item: S3ObjectItem) {
+    if (!selectedBucket || item.isFolder || !isPreviewImage(item.name)) return;
+    try {
+      const { url } = await api.getS3DownloadUrl(selectedBucket, item.key);
+      setPreview({ url, name: item.name });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al previsualizar');
     }
   }
 
@@ -324,8 +350,26 @@ export function S3ManagerPage() {
                           </button>
                         ) : (
                           <span className="flex items-center gap-2">
-                            <span className="text-muted">📄</span>
-                            {item.name}
+                            {isPreviewImage(item.name) && selectedBucket ? (
+                              <S3ImageThumb
+                                bucket={selectedBucket}
+                                item={item}
+                                onOpen={() => void openPreview(item)}
+                              />
+                            ) : (
+                              <span className="text-muted">📄</span>
+                            )}
+                            {isPreviewImage(item.name) ? (
+                              <button
+                                type="button"
+                                className="font-medium hover:underline"
+                                onClick={() => void openPreview(item)}
+                              >
+                                {item.name}
+                              </button>
+                            ) : (
+                              item.name
+                            )}
                           </span>
                         )}
                       </TableCell>
@@ -379,7 +423,69 @@ export function S3ManagerPage() {
           )}
         </Card>
       </div>
+
+      <Dialog
+        open={preview !== null}
+        onOpenChange={(open) => !open && setPreview(null)}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{preview?.name ?? 'Vista previa'}</DialogTitle>
+          </DialogHeader>
+          {preview ? (
+            <img
+              src={preview.url}
+              alt={preview.name}
+              className="max-h-[70vh] w-full rounded-lg object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function S3ImageThumb({
+  bucket,
+  item,
+  onOpen,
+}: {
+  bucket: string;
+  item: S3ObjectItem;
+  onOpen: () => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getS3DownloadUrl(bucket, item.key)
+      .then((res) => {
+        if (!cancelled) setUrl(res.url);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [bucket, item.key]);
+
+  if (!url) {
+    return <span className="size-8 shrink-0 rounded border bg-muted/30" />;
+  }
+
+  return (
+    <button
+      type="button"
+      className="size-8 shrink-0 overflow-hidden rounded border"
+      onClick={onOpen}
+    >
+      <img
+        src={url}
+        alt=""
+        className="size-full object-cover"
+        loading="lazy"
+      />
+    </button>
   );
 }
 

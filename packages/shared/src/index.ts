@@ -143,11 +143,17 @@ export interface FilesListItemDto {
   isFolder: boolean;
   size: number | null;
   lastModified: string | null;
+  locked: boolean;
 }
 
 export interface FilesListResultDto {
   path: string;
   items: FilesListItemDto[];
+}
+
+export interface FilesConfigDto {
+  trashPath: string;
+  protectedPaths: string[];
 }
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
@@ -295,6 +301,12 @@ export interface AppUserDto {
 export interface S3BucketInfo {
   name: string;
   creationDate?: string;
+}
+
+/** Screen-cast S3 picker: un solo bucket y prefijo inicial. */
+export interface S3ScreenCastPickerConfigDto {
+  bucket: string;
+  defaultPrefix: string;
 }
 
 export interface S3ObjectItem {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Folder, HardDrive } from 'lucide-react';
-import type { S3BucketInfo, S3ObjectItem } from '@mali-one/shared';
+import { Folder } from 'lucide-react';
+import type { S3ObjectItem } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { formatBytes } from '@/lib/format-bytes';
 import { useToast } from '@/contexts/toast-context';
@@ -29,20 +29,21 @@ type Props = {
 
 export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
   const toast = useToast();
-  const [buckets, setBuckets] = useState<S3BucketInfo[]>([]);
   const [bucket, setBucket] = useState<string | null>(null);
+  const [defaultPrefix, setDefaultPrefix] = useState('');
   const [prefix, setPrefix] = useState('');
   const [items, setItems] = useState<S3ObjectItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const loadBuckets = useCallback(async () => {
+  const loadConfig = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.listScreenCastS3Buckets();
-      setBuckets(data);
-      setBucket((current) => current ?? data[0]?.name ?? null);
+      const config = await api.getScreenCastS3PickerConfig();
+      setBucket(config.bucket);
+      setDefaultPrefix(config.defaultPrefix);
+      setPrefix(config.defaultPrefix);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al cargar buckets');
+      toast.error(e instanceof Error ? e.message : 'Error al cargar S3');
     } finally {
       setLoading(false);
     }
@@ -62,8 +63,8 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
   }, [bucket, prefix, toast]);
 
   useEffect(() => {
-    if (open) void loadBuckets();
-  }, [open, loadBuckets]);
+    if (open) void loadConfig();
+  }, [open, loadConfig]);
 
   useEffect(() => {
     if (open && bucket) void loadObjects();
@@ -84,6 +85,20 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
     }
   }
 
+  function goUpOneLevel() {
+    const current = prefix.replace(/\/$/, '');
+    const min = defaultPrefix.replace(/\/$/, '');
+    const parts = current.split('/').filter(Boolean);
+    parts.pop();
+    const next = parts.length ? `${parts.join('/')}/` : '';
+    const nextDepth = parts.length;
+    const minDepth = min ? min.split('/').filter(Boolean).length : 0;
+    setPrefix(nextDepth < minDepth ? defaultPrefix : next || defaultPrefix);
+  }
+
+  const canGoUp =
+    prefix.replace(/\/$/, '') !== defaultPrefix.replace(/\/$/, '');
+
   const visible = items.filter(
     (item) => item.isFolder || MEDIA_EXT.test(item.name),
   );
@@ -94,43 +109,23 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
         <DialogHeader>
           <DialogTitle>Elegir de S3</DialogTitle>
           <DialogDescription>
-            Selecciona un JPG, PNG, GIF o MP4 con URL pública.
+            {bucket
+              ? `Bucket ${bucket} · carpeta screen-cast`
+              : 'Selecciona un JPG, PNG, GIF o MP4 con URL pública.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-wrap gap-2">
-          {buckets.map((b) => (
-            <Button
-              key={b.name}
-              type="button"
-              size="sm"
-              variant={bucket === b.name ? 'default' : 'outline'}
-              onClick={() => {
-                setBucket(b.name);
-                setPrefix('');
-              }}
-            >
-              <HardDrive size={14} />
-              {b.name}
-            </Button>
-          ))}
-        </div>
-
-        {prefix && (
+        {canGoUp ? (
           <Button
             type="button"
             variant="ghost"
             size="sm"
             className="w-fit"
-            onClick={() => {
-              const parts = prefix.replace(/\/$/, '').split('/');
-              parts.pop();
-              setPrefix(parts.length ? `${parts.join('/')}/` : '');
-            }}
+            onClick={goUpOneLevel}
           >
             ← Subir un nivel
           </Button>
-        )}
+        ) : null}
 
         <div className="max-h-80 overflow-auto rounded-md border">
           <Table>

@@ -109,6 +109,10 @@ Debe listar `Objetos`, `thumbnails`, etc.
 SFTPGO_BASE_URL=http://172.26.4.218:8080
 SFTPGO_API_KEY=tu_api_key_de_usuario
 # SFTPGO_ROOT_PREFIX=
+# Rutas relativas al home (sin / inicial), separadas por coma
+SFTPGO_PROTECTED_PATHS=Objetos,thumbnails
+SFTPGO_TRASH_DIR=.trash
+SFTPGO_TRASH_RETENTION_DAYS=30
 ```
 
 Sin barra final. `http://` es correcto en esta topología.
@@ -121,12 +125,17 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps 
 
 El módulo `files` proxyfica:
 
+- `GET /api/files/config` — rutas protegidas y papelera
 - `GET /api/files` — listar
+- `GET /api/files/trash` — listar papelera
 - `POST /api/files/mkdir`
 - `POST /api/files/upload`
 - `GET /api/files/download`
+- `GET /api/files/preview` — imágenes inline (JPG/PNG/GIF/WebP; TIFF se convierte a JPEG al vuelo)
 - `POST /api/files/rename`
-- `DELETE /api/files`
+- `POST /api/files/copy`
+- `POST /api/files/restore`
+- `DELETE /api/files` — mueve a papelera (no borra físico)
 
 ## 7. Hardening
 

@@ -15,3 +15,19 @@ export class RenameFileDto {
   @MinLength(1)
   to!: string;
 }
+
+export class CopyFileDto {
+  @IsString()
+  @MinLength(1)
+  from!: string;
+
+  @IsString()
+  @MinLength(1)
+  to!: string;
+}
+
+export class RestoreFileDto {
+  @IsString()
+  @MinLength(1)
+  path!: string;
+}

@@ -224,10 +224,16 @@ export class ScreenCastController {
     return this.service.uploadMedia(file);
   }
 
+  @Get('s3/config')
+  @RequireModule(AppModule.screen_cast)
+  getS3PickerConfig() {
+    return this.s3Manager.getScreenCastPickerConfig();
+  }
+
   @Get('s3/buckets')
   @RequireModule(AppModule.screen_cast)
   listS3Buckets() {
-    return this.s3Manager.listBuckets();
+    return this.s3Manager.listScreenCastBuckets();
   }
 
   @Get('s3/buckets/:bucket/objects')
@@ -237,7 +243,11 @@ export class ScreenCastController {
     @Query('prefix') prefix?: string,
     @Query('continuationToken') continuationToken?: string,
   ) {
-    return this.s3Manager.listObjects(bucket, prefix ?? '', continuationToken);
+    return this.s3Manager.listScreenCastObjects(
+      bucket,
+      prefix ?? '',
+      continuationToken,
+    );
   }
 
   @Get('s3/buckets/:bucket/public-url')
@@ -246,7 +256,7 @@ export class ScreenCastController {
     @Param('bucket') bucket: string,
     @Query('key') key: string,
   ) {
-    return this.s3Manager.getPublicUrl(bucket, key);
+    return this.s3Manager.getScreenCastPublicUrl(bucket, key);
   }
 
   private withLivePresence<

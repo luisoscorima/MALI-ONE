@@ -702,6 +702,11 @@ export const api = {
       '/api/screen-cast/s3/buckets',
     ),
 
+  getScreenCastS3PickerConfig: () =>
+    request<import('@mali-one/shared').S3ScreenCastPickerConfigDto>(
+      '/api/screen-cast/s3/config',
+    ),
+
   listScreenCastS3Objects: (
     bucket: string,
     prefix?: string,
@@ -1125,6 +1130,16 @@ export const api = {
     );
   },
 
+  filesConfig: () =>
+    request<import('@mali-one/shared').FilesConfigDto>('/api/files/config'),
+
+  listTrashFiles: (path?: string) => {
+    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
+    return request<import('@mali-one/shared').FilesListResultDto>(
+      `/api/files/trash${qs}`,
+    );
+  },
+
   mkdirFile: (path: string) =>
     request<{ ok: boolean; path: string }>('/api/files/mkdir', {
       method: 'POST',
@@ -1135,6 +1150,18 @@ export const api = {
     request<{ ok: boolean }>('/api/files/rename', {
       method: 'POST',
       body: JSON.stringify({ from, to }),
+    }),
+
+  copyFile: (from: string, to: string) =>
+    request<{ ok: boolean; path: string }>('/api/files/copy', {
+      method: 'POST',
+      body: JSON.stringify({ from, to }),
+    }),
+
+  restoreFile: (path: string) =>
+    request<{ ok: boolean; path: string }>('/api/files/restore', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
     }),
 
   deleteFile: (path: string, isFolder: boolean) => {
@@ -1159,4 +1186,7 @@ export const api = {
 
   downloadDiskFileUrl: (path: string) =>
     `/api/files/download?path=${encodeURIComponent(path)}`,
+
+  previewDiskFileUrl: (path: string) =>
+    `/api/files/preview?path=${encodeURIComponent(path)}`,
 };
