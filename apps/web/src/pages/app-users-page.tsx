@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Input,
   Table,
   TableBody,
   TableCell,
@@ -23,6 +24,7 @@ type DraftModules = Record<string, AppModule[]>;
 export function AppUsersPage() {
   const toast = useToast();
   const [users, setUsers] = useState<AppUserDto[]>([]);
+  const [query, setQuery] = useState('');
   const [drafts, setDrafts] = useState<DraftModules>({});
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -88,6 +90,15 @@ export function AppUsersPage() {
     }
   }
 
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers = normalizedQuery
+    ? users.filter(
+        (user) =>
+          user.name.toLowerCase().includes(normalizedQuery) ||
+          user.email.toLowerCase().includes(normalizedQuery),
+      )
+    : users;
+
   return (
     <div>
       <PageHeader
@@ -105,6 +116,14 @@ export function AppUsersPage() {
           automáticamente. Aquí defines qué módulos ven en el menú y pueden usar.
           El administrador del sistema siempre tiene acceso completo.
         </p>
+      </Card>
+
+      <Card className="mb-6 p-4">
+        <Input
+          placeholder="Buscar por nombre o email..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </Card>
 
       <Card className="overflow-hidden p-0">
@@ -126,20 +145,24 @@ export function AppUsersPage() {
               <TableBody>
                 <TableSkeleton rows={5} cols={3 + APP_MODULES.length} />
               </TableBody>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <TableBody>
                 <TableRow>
                   <TableCell colSpan={3 + APP_MODULES.length}>
                     <EmptyState
-                      title="Aún no hay usuarios"
-                      description="Los usuarios aparecerán aquí después de su primer inicio de sesión con Google."
+                      title={normalizedQuery ? 'Sin coincidencias' : 'Aún no hay usuarios'}
+                      description={
+                        normalizedQuery
+                          ? 'Prueba con otro término de búsqueda.'
+                          : 'Los usuarios aparecerán aquí después de su primer inicio de sesión con Google.'
+                      }
                     />
                   </TableCell>
                 </TableRow>
               </TableBody>
             ) : (
               <TableBody>
-                {users.map((user) => {
+                {filteredUsers.map((user) => {
                   const isAdmin = user.role === 'admin';
                   const draft = drafts[user.id] ?? user.modules;
                   const changed = hasChanges(user);

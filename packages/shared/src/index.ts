@@ -377,6 +377,7 @@ export interface CreateWorkspaceUserDto {
   familyName: string;
   password: string;
   orgUnitPath?: string;
+  forceChangePassword?: boolean;
 }
 
 export interface UpdateWorkspaceUserDto {
@@ -385,6 +386,26 @@ export interface UpdateWorkspaceUserDto {
   familyName?: string;
   suspended?: boolean;
   orgUnitPath?: string;
+}
+
+export interface ResetWorkspacePasswordDto {
+  forceChangePassword?: boolean;
+  signOutAfterReset?: boolean;
+}
+
+export interface ResetWorkspacePasswordResult {
+  temporaryPassword: string;
+  forceChangePassword: boolean;
+  signedOut: boolean;
+}
+
+export interface AdminAuditLogDto {
+  id: string;
+  actorEmail: string;
+  action: string;
+  targetEmail: string | null;
+  payload: unknown;
+  createdAt: string;
 }
 
 export interface EducacionWidgetSettingsDto {

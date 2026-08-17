@@ -14,6 +14,7 @@ import { Request } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { GoogleAdminService } from './google-admin.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin/users')
@@ -29,6 +30,11 @@ export class GoogleAdminController {
     return this.googleAdmin.listUsers(q, pageToken);
   }
 
+  @Get('generate-password')
+  generatePassword() {
+    return { password: this.googleAdmin.generateTempPassword() };
+  }
+
   @Get(':email')
   get(@Param('email') email: string) {
     return this.googleAdmin.getUser(email);
@@ -40,6 +46,7 @@ export class GoogleAdminController {
     const user = await this.googleAdmin.createUser(body);
     await this.googleAdmin.logAction(actor, 'CREATE_USER', body.primaryEmail, {
       orgUnitPath: body.orgUnitPath,
+      forceChangePassword: body.forceChangePassword ?? true,
     });
     return user;
   }
@@ -59,10 +66,22 @@ export class GoogleAdminController {
   }
 
   @Post(':email/reset-password')
-  async resetPassword(@Req() req: Request, @Param('email') email: string) {
+  async resetPassword(
+    @Req() req: Request,
+    @Param('email') email: string,
+    @Body() body: ResetPasswordDto,
+  ) {
     const actor = req.user as User;
-    const result = await this.googleAdmin.resetPassword(email);
-    await this.googleAdmin.logAction(actor, 'RESET_PASSWORD', email);
+    const forceChangePassword = body.forceChangePassword ?? true;
+    const signOutAfterReset = body.signOutAfterReset ?? false;
+    const result = await this.googleAdmin.resetPassword(email, {
+      forceChangePassword,
+      signOutAfterReset,
+    });
+    await this.googleAdmin.logAction(actor, 'RESET_PASSWORD', email, {
+      forceChangePassword,
+      signOutAfterReset,
+    });
     return result;
   }
 

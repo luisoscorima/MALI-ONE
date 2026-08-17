@@ -68,6 +68,12 @@ export const api = {
   createWorkspaceUser: (body: import('@mali-one/shared').CreateWorkspaceUserDto) =>
     request('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
 
+  generateWorkspacePassword: () =>
+    request<{ password: string }>('/api/admin/users/generate-password'),
+
+  getGoogleAdminHealth: () =>
+    request<{ ok: boolean; error?: string }>('/api/health/google-admin'),
+
   updateWorkspaceUser: (
     email: string,
     body: import('@mali-one/shared').UpdateWorkspaceUserDto,
@@ -77,10 +83,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  resetWorkspacePassword: (email: string) =>
-    request<{ temporaryPassword: string }>(
+  resetWorkspacePassword: (
+    email: string,
+    options: import('@mali-one/shared').ResetWorkspacePasswordDto = {},
+  ) =>
+    request<import('@mali-one/shared').ResetWorkspacePasswordResult>(
       `/api/admin/users/${encodeURIComponent(email)}/reset-password`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        body: JSON.stringify(options),
+      },
     ),
 
   signOutWorkspaceUser: (email: string) =>
@@ -95,6 +107,16 @@ export const api = {
     }),
 
   listAppUsers: () => request<AppUserDto[]>('/api/admin/app-users'),
+
+  listAdminAuditLogs: (cursor?: string) => {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', cursor);
+    const qs = params.toString();
+    return request<{
+      logs: import('@mali-one/shared').AdminAuditLogDto[];
+      nextCursor: string | null;
+    }>(`/api/admin/audit-logs${qs ? `?${qs}` : ''}`);
+  },
 
   updateAppUserModules: (id: string, modules: AppModule[]) =>
     request<AppUserDto>(`/api/admin/app-users/${id}/modules`, {

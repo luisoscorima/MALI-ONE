@@ -16,6 +16,7 @@ import {
   Newspaper,
   Contact,
   FolderOpen,
+  ScrollText,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -137,6 +138,12 @@ export const appNavSections: AppNavSection[] = [
         to: '/admin/app-users',
         label: 'Accesos MALI ONE',
         icon: Shield,
+        superAdminOnly: true,
+      },
+      {
+        to: '/admin/audit',
+        label: 'Auditoría admin',
+        icon: ScrollText,
         superAdminOnly: true,
       },
     ],

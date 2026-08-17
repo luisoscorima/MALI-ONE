@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, User } from '@prisma/client';
+import { randomInt } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { google, admin_directory_v1 } from 'googleapis';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -182,6 +183,7 @@ export class GoogleAdminService {
     familyName: string;
     password: string;
     orgUnitPath?: string;
+    forceChangePassword?: boolean;
   }) {
     return this.run('createUser', async () => {
       const admin = this.getDirectory();
@@ -193,7 +195,7 @@ export class GoogleAdminService {
             familyName: data.familyName,
           },
           password: data.password,
-          changePasswordAtNextLogin: true,
+          changePasswordAtNextLogin: data.forceChangePassword ?? true,
           orgUnitPath: data.orgUnitPath ?? '/',
         },
       });
@@ -239,7 +241,16 @@ export class GoogleAdminService {
     });
   }
 
-  async resetPassword(email: string) {
+  async resetPassword(
+    email: string,
+    options: {
+      forceChangePassword?: boolean;
+      signOutAfterReset?: boolean;
+    } = {},
+  ) {
+    const forceChangePassword = options.forceChangePassword ?? true;
+    const signOutAfterReset = options.signOutAfterReset ?? false;
+
     return this.run('resetPassword', async () => {
       const admin = this.getDirectory();
       const tempPassword = this.generateTempPassword();
@@ -247,10 +258,17 @@ export class GoogleAdminService {
         userKey: email,
         requestBody: {
           password: tempPassword,
-          changePasswordAtNextLogin: true,
+          changePasswordAtNextLogin: forceChangePassword,
         },
       });
-      return { temporaryPassword: tempPassword };
+      if (signOutAfterReset) {
+        await admin.users.signOut({ userKey: email });
+      }
+      return {
+        temporaryPassword: tempPassword,
+        forceChangePassword,
+        signedOut: signOutAfterReset,
+      };
     });
   }
 
@@ -283,14 +301,28 @@ export class GoogleAdminService {
     });
   }
 
-  private generateTempPassword(): string {
-    const chars =
-      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
-    let password = '';
-    for (let i = 0; i < 16; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
+  /** Contraseña legible (12 chars en 3 bloques). */
+  generateTempPassword(): string {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnopqrstuvwxyz';
+    const digits = '23456789';
+    const all = upper + lower + digits;
+
+    const pick = (charset: string) =>
+      charset.charAt(randomInt(charset.length));
+
+    const chars = [pick(upper), pick(lower), pick(digits)];
+    while (chars.length < 12) {
+      chars.push(pick(all));
     }
-    return password;
+
+    for (let i = chars.length - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+
+    const raw = chars.join('');
+    return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8)}`;
   }
 
   private mapUser(u: admin_directory_v1.Schema$User) {

@@ -1,17 +1,29 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { KeyRound, LogOut, Pencil } from 'lucide-react';
+import { KeyRound, LogOut, Pencil, RefreshCw } from 'lucide-react';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { GoogleAdminIcon, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
+import { formatDate } from '@/lib/format-bytes';
 import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
   Button,
   Card,
+  Checkbox,
   Input,
+  Label,
   Switch,
   Table,
   TableBody,
@@ -21,21 +33,36 @@ import {
   TableRow,
 } from '@/components/ui';
 
+const TEMP_PASSWORD_TTL_MS = 90_000;
+
 export function AdminUsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
-  const [search, setSearch] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingPassword, setGeneratingPassword] = useState(false);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [createForceChange, setCreateForceChange] = useState(true);
+  const [googleAdminHealth, setGoogleAdminHealth] = useState<
+    'loading' | 'ok' | 'error'
+  >('loading');
+  const [googleAdminError, setGoogleAdminError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<GoogleWorkspaceUser | null>(
     null,
   );
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [tempPassword, setTempPassword] = useState<{
+    password: string;
+    forceChange: boolean;
+  } | null>(null);
+  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [resetForceChange, setResetForceChange] = useState(true);
+  const [resetSignOut, setResetSignOut] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -73,16 +100,44 @@ export function AdminUsersPage() {
   );
 
   useEffect(() => {
-    void loadUsers(search);
-  }, [loadUsers, search]);
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    void loadUsers(debouncedQuery);
+  }, [loadUsers, debouncedQuery]);
+
+  useEffect(() => {
+    void api
+      .getGoogleAdminHealth()
+      .then((result) => {
+        setGoogleAdminHealth(result.ok ? 'ok' : 'error');
+        setGoogleAdminError(result.error ?? null);
+      })
+      .catch(() => {
+        setGoogleAdminHealth('error');
+        setGoogleAdminError('No se pudo verificar la conexión');
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!tempPassword) return;
+    const timer = setTimeout(() => setTempPassword(null), TEMP_PASSWORD_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [tempPassword]);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError('');
     try {
-      await api.createWorkspaceUser(form);
+      await api.createWorkspaceUser({
+        ...form,
+        forceChangePassword: createForceChange,
+      });
       setShowCreate(false);
+      setCreateForceChange(true);
       setForm({
         primaryEmail: '',
         givenName: '',
@@ -91,7 +146,7 @@ export function AdminUsersPage() {
         orgUnitPath: '/',
       });
       toast.success('Usuario creado en Workspace');
-      await loadUsers(search);
+      await loadUsers(debouncedQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al crear usuario';
       setError(msg);
@@ -101,30 +156,61 @@ export function AdminUsersPage() {
     }
   }
 
-  async function handleReset(email: string) {
-    const ok = await confirm({
-      title: `¿Resetear contraseña de ${email}?`,
-      confirmLabel: 'Resetear',
-    });
-    if (!ok) return;
+  function openResetDialog(email: string) {
+    setResetForceChange(true);
+    setResetSignOut(false);
+    setResetTarget(email);
+  }
+
+  function closeResetDialog() {
+    if (resetting) return;
+    setResetTarget(null);
+  }
+
+  async function confirmReset() {
+    if (!resetTarget) return;
+    setResetting(true);
+    setError('');
     try {
-      const result = await api.resetWorkspacePassword(email);
-      setTempPassword(result.temporaryPassword);
-      toast.success('Contraseña temporal generada');
+      const result = await api.resetWorkspacePassword(resetTarget, {
+        forceChangePassword: resetForceChange,
+        signOutAfterReset: resetSignOut,
+      });
+      setTempPassword({
+        password: result.temporaryPassword,
+        forceChange: result.forceChangePassword,
+      });
+      setResetTarget(null);
+      toast.success('Contraseña generada');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al resetear';
       setError(msg);
       toast.error(msg);
+    } finally {
+      setResetting(false);
     }
   }
 
   async function copyPassword() {
     if (!tempPassword) return;
     try {
-      await navigator.clipboard.writeText(tempPassword);
+      await navigator.clipboard.writeText(tempPassword.password);
       toast.success('Contraseña copiada al portapapeles');
     } catch {
       toast.error('No se pudo copiar');
+    }
+  }
+
+  async function handleGeneratePassword() {
+    setGeneratingPassword(true);
+    try {
+      const result = await api.generateWorkspacePassword();
+      setForm((prev) => ({ ...prev, password: result.password }));
+      toast.success('Contraseña generada');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al generar');
+    } finally {
+      setGeneratingPassword(false);
     }
   }
 
@@ -171,7 +257,7 @@ export function AdminUsersPage() {
       toast.success(
         emailChanged ? 'Usuario actualizado (correo renombrado)' : 'Usuario actualizado',
       );
-      await loadUsers(search);
+      await loadUsers(debouncedQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al actualizar';
       setError(msg);
@@ -191,7 +277,7 @@ export function AdminUsersPage() {
     try {
       await api.suspendWorkspaceUser(email);
       toast.success('Usuario suspendido');
-      await loadUsers(search);
+      await loadUsers(debouncedQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al suspender';
       setError(msg);
@@ -208,7 +294,7 @@ export function AdminUsersPage() {
     try {
       await api.updateWorkspaceUser(email, { suspended: false });
       toast.success('Usuario reactivado');
-      await loadUsers(search);
+      await loadUsers(debouncedQuery);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al reactivar';
       setError(msg);
@@ -253,14 +339,27 @@ export function AdminUsersPage() {
         title="Usuarios Workspace"
         description="Gestión manual vía Google Admin SDK"
         actions={
-          <Button
-            onClick={() => {
-              setEditingUser(null);
-              setShowCreate((v) => !v);
-            }}
-          >
-            {showCreate ? 'Cancelar' : 'Crear usuario'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {googleAdminHealth === 'loading' ? (
+              <Badge variant="secondary">Verificando Google Admin…</Badge>
+            ) : googleAdminHealth === 'ok' ? (
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                Google Admin conectado
+              </Badge>
+            ) : (
+              <Badge variant="destructive" title={googleAdminError ?? undefined}>
+                Google Admin sin conexión
+              </Badge>
+            )}
+            <Button
+              onClick={() => {
+                setEditingUser(null);
+                setShowCreate((v) => !v);
+              }}
+            >
+              {showCreate ? 'Cancelar' : 'Crear usuario'}
+            </Button>
+          </div>
         }
       />
 
@@ -272,8 +371,12 @@ export function AdminUsersPage() {
         <AlertBanner variant="success" onDismiss={() => setTempPassword(null)}>
           <div className="flex flex-wrap items-center gap-3">
             <span>
-              Contraseña temporal:{' '}
-              <strong className="font-mono">{tempPassword}</strong>
+              Contraseña:{' '}
+              <strong className="font-mono">{tempPassword.password}</strong>
+              {tempPassword.forceChange
+                ? ' · Deberá cambiarla al iniciar sesión.'
+                : ' · Lista para usar tal cual.'}
+              {' · Se ocultará sola en 90 s.'}
             </span>
             <Button variant="outline" onClick={() => void copyPassword()}>
               Copiar
@@ -282,23 +385,75 @@ export function AdminUsersPage() {
         </AlertBanner>
       )}
 
-      <Card className="mb-6">
-        <form
-          className="flex flex-col gap-2 sm:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSearch(query);
-          }}
-        >
-          <Input
-            placeholder="Buscar por email o nombre..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <Button type="submit" className="shrink-0">
-            Buscar
-          </Button>
-        </form>
+      <AlertDialog
+        open={resetTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) closeResetDialog();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ¿Resetear contraseña de {resetTarget}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generará una contraseña nueva para compartir con el usuario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="reset-force-change"
+                checked={resetForceChange}
+                onCheckedChange={(checked) =>
+                  setResetForceChange(checked === true)
+                }
+              />
+              <Label htmlFor="reset-force-change" className="font-normal leading-snug">
+                Forzar cambio al iniciar sesión
+                <span className="mt-1 block text-sm text-muted">
+                  Recomendado si la contraseña se comparte por un canal poco
+                  seguro.
+                </span>
+              </Label>
+            </div>
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="reset-sign-out"
+                checked={resetSignOut}
+                onCheckedChange={(checked) =>
+                  setResetSignOut(checked === true)
+                }
+              />
+              <Label htmlFor="reset-sign-out" className="font-normal leading-snug">
+                Cerrar sesiones activas
+                <span className="mt-1 block text-sm text-muted">
+                  Útil si sospechas acceso no autorizado.
+                </span>
+              </Label>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resetting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={resetting}
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmReset();
+              }}
+            >
+              {resetting ? 'Generando…' : 'Resetear'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card className="mb-6 p-4">
+        <Input
+          placeholder="Buscar por email o nombre..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
       </Card>
 
       {editingUser && (
@@ -391,15 +546,51 @@ export function AdminUsersPage() {
               }
               required
             />
-            <Input
-              className="md:col-span-2"
-              type="password"
-              placeholder="Contraseña temporal"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-              minLength={8}
-            />
+            <div className="flex flex-col gap-2 md:col-span-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input
+                  type="text"
+                  placeholder="Contraseña"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                  minLength={8}
+                  className="font-mono"
+                  autoComplete="new-password"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  disabled={generatingPassword}
+                  onClick={() => void handleGeneratePassword()}
+                >
+                  {generatingPassword ? (
+                    <Spinner className="h-4 w-4" />
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-1 size-4" />
+                      Generar
+                    </>
+                  )}
+                </Button>
+              </div>
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="create-force-change"
+                  checked={createForceChange}
+                  onCheckedChange={(checked) =>
+                    setCreateForceChange(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="create-force-change"
+                  className="font-normal leading-snug"
+                >
+                  Forzar cambio al iniciar sesión
+                </Label>
+              </div>
+            </div>
             <div className="flex gap-2 md:col-span-2">
               <Button type="submit" className="w-fit" disabled={submitting}>
                 {submitting ? (
@@ -424,24 +615,25 @@ export function AdminUsersPage() {
 
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <Table className="min-w-[960px]">
+          <Table className="min-w-[1080px]">
             <TableHeader>
               <TableRow className="text-muted">
                 <TableHead className="p-4">Email</TableHead>
                 <TableHead className="p-4">Nombre</TableHead>
                 <TableHead className="p-4">OU</TableHead>
+                <TableHead className="p-4">Último acceso</TableHead>
                 <TableHead className="p-4">Estado</TableHead>
                 <TableHead className="p-4">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             {loading && users.length === 0 ? (
               <TableBody>
-                <TableSkeleton rows={6} cols={5} />
+                <TableSkeleton rows={6} cols={6} />
               </TableBody>
             ) : users.length === 0 ? (
               <TableBody>
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={6}>
                     <EmptyState
                       title="No se encontraron usuarios"
                       description="Prueba otra búsqueda o crea un usuario nuevo."
@@ -458,6 +650,9 @@ export function AdminUsersPage() {
                       {u.name.givenName} {u.name.familyName}
                     </TableCell>
                     <TableCell className="p-4 text-muted">{u.orgUnitPath}</TableCell>
+                    <TableCell className="p-4 whitespace-nowrap text-muted">
+                      {formatDate(u.lastLoginTime ?? null)}
+                    </TableCell>
                     <TableCell className="p-4">
                       <div className="flex items-center gap-2">
                         <Switch
@@ -487,7 +682,7 @@ export function AdminUsersPage() {
                         </IconActionButton>
                         <IconActionButton
                           label="Resetear contraseña"
-                          onClick={() => void handleReset(u.primaryEmail)}
+                          onClick={() => openResetDialog(u.primaryEmail)}
                         >
                           <KeyRound className="size-4" />
                         </IconActionButton>
@@ -520,7 +715,7 @@ export function AdminUsersPage() {
           <div className="border-t border-border p-4">
             <Button
               variant="outline"
-              onClick={() => void loadUsers(search, nextPageToken)}
+              onClick={() => void loadUsers(debouncedQuery, nextPageToken)}
             >
               Cargar más
             </Button>

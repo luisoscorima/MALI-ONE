@@ -8,6 +8,7 @@ import {
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import {
   Button,
@@ -30,6 +31,7 @@ type EditorMode = 'closed' | 'create' | 'edit';
 
 export function NewslettersPage() {
   const toast = useToast();
+  const confirm = useConfirm();
   const editorRef = useRef<NewsletterEditorHandle>(null);
 
   const [loading, setLoading] = useState(true);
@@ -165,7 +167,12 @@ export function NewslettersPage() {
   }
 
   async function handleDelete(n: NewsletterDto) {
-    if (!window.confirm(`¿Eliminar el boletín “${n.title}”?`)) return;
+    const ok = await confirm({
+      title: `¿Eliminar el boletín “${n.title}”?`,
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
       await api.deleteNewsletter(n.id);
       if (editingId === n.id) closeEditor();

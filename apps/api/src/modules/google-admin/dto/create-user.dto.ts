@@ -25,4 +25,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   orgUnitPath?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  forceChangePassword?: boolean;
 }

@@ -8,6 +8,7 @@ import { AccentThemeUserSync } from '@/components/accent-theme-user-sync';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, ModuleGuard, SuperAdminGuard } from '@/components/auth-guard';
 import { AdminUsersPage } from '@/pages/admin-users-page';
+import { AdminAuditPage } from '@/pages/admin-audit-page';
 import { AppUsersPage } from '@/pages/app-users-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { LinksPage } from '@/pages/links-page';
@@ -155,6 +156,7 @@ function AuthenticatedApp() {
                   />
                   <Route element={<SuperAdminGuard />}>
                     <Route path="admin/app-users" element={<AppUsersPage />} />
+                    <Route path="admin/audit" element={<AdminAuditPage />} />
                   </Route>
                 </Route>
               </Route>

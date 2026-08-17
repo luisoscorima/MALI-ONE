@@ -12,6 +12,7 @@ import { PermissionGuard } from './core/guards/permission.guard';
 import { RolesGuard } from './core/guards/roles.guard';
 import { SuperAdminGuard } from './core/guards/super-admin.guard';
 import { HealthController } from './health.controller';
+import { AdminAuditModule } from './modules/admin-audit/admin-audit.module';
 import { AppUsersModule } from './modules/app-users/app-users.module';
 import { AuthGoogleModule } from './modules/auth-google/auth-google.module';
 import { GoogleAdminModule } from './modules/google-admin/google-admin.module';
@@ -41,6 +42,7 @@ import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
     LinksModule,
     S3ManagerModule,
     AppUsersModule,
+    AdminAuditModule,
     WidgetsModule,
     PamModule,
     ScreenCastModule,

@@ -80,6 +80,7 @@ export function FilesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mkdirOpen, setMkdirOpen] = useState(false);
   const [mkdirName, setMkdirName] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
@@ -285,11 +286,17 @@ export function FilesPage() {
     try {
       await api.mkdirFile(next);
       setMkdirName('');
+      setMkdirOpen(false);
       toast.success('Carpeta creada');
       void load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear carpeta');
     }
+  }
+
+  function openMkdirDialog() {
+    setMkdirName('');
+    setMkdirOpen(true);
   }
 
   async function handleUpload(files: FileList | File[] | null) {
@@ -528,25 +535,10 @@ export function FilesPage() {
             />
           </div>
           {!trashMode ? (
-            <div className="flex gap-1.5">
-              <Input
-                className="h-8 w-40"
-                placeholder="Nueva carpeta"
-                value={mkdirName}
-                onChange={(e) => setMkdirName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleMkdir();
-                }}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void handleMkdir()}
-                disabled={!mkdirName.trim()}
-              >
-                <FolderPlus className="size-4" />
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={openMkdirDialog}>
+              <FolderPlus className="size-4" />
+              Nueva carpeta
+            </Button>
           ) : null}
         </div>
       </div>
@@ -809,6 +801,48 @@ export function FilesPage() {
               className="max-h-[70vh] w-full rounded-lg object-contain"
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={mkdirOpen}
+        onOpenChange={(open) => {
+          setMkdirOpen(open);
+          if (!open) setMkdirName('');
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva carpeta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="mkdir-input">Nombre</Label>
+            <Input
+              id="mkdir-input"
+              placeholder="Mi carpeta"
+              value={mkdirName}
+              onChange={(e) => setMkdirName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleMkdir();
+              }}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground">
+              Se creará en{' '}
+              <span className="font-mono">{path === '/' ? '/' : path}</span>
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMkdirOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => void handleMkdir()}
+              disabled={!mkdirName.trim()}
+            >
+              Crear
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
