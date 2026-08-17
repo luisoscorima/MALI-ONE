@@ -54,11 +54,9 @@ export class SftpgoFilesService {
       return {
         name,
         path: entryPath,
-        isFolder: Boolean(entry.is_dir ?? entry.type === 2),
+        isFolder: this.isDirEntry(entry),
         size: entry.size ?? null,
-        lastModified: entry.last_modified
-          ? new Date(entry.last_modified * 1000).toISOString()
-          : null,
+        lastModified: this.parseLastModified(entry.last_modified),
       };
     });
     items.sort((a, b) => {
@@ -245,14 +243,45 @@ export class SftpgoFilesService {
     if (!dir || dir === '/') return `/${name}`;
     return `${dir.replace(/\/$/, '')}/${name}`;
   }
+
+  /** SFTPGo 2.7+ uses Go os.FileMode (dir bit 0x80000000) when is_dir is omitted. */
+  private isDirEntry(entry: SftpgoDirEntry): boolean {
+    if (typeof entry.is_dir === 'boolean') return entry.is_dir;
+    if (entry.type === 2) return true;
+    if (entry.type === 1) return false;
+    if (typeof entry.mode === 'number') {
+      return ((entry.mode >>> 0) & 0x80000000) !== 0;
+    }
+    return false;
+  }
+
+  /** Unix seconds, Unix ms, or RFC3339 (SFTPGo 2.7 Community). */
+  private parseLastModified(value: unknown): string | null {
+    if (value == null || value === '') return null;
+    if (typeof value === 'string') {
+      const ms = Date.parse(value);
+      if (!Number.isNaN(ms)) return new Date(ms).toISOString();
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return null;
+      return this.parseLastModified(numeric);
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const millis = value > 1e12 ? value : value * 1000;
+      const date = new Date(millis);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    }
+    return null;
+  }
 }
 
 type SftpgoDirEntry = {
   name?: string;
   path?: string;
   size?: number;
-  last_modified?: number;
+  last_modified?: number | string;
   is_dir?: boolean;
+  /** Go os.FileMode; directory bit is 1<<31 (SFTPGo 2.7 Community). */
+  mode?: number;
   /** 1=file, 2=directory in some SFTPGo versions */
   type?: number;
 };
