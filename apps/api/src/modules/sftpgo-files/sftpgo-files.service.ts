@@ -58,7 +58,7 @@ export class SftpgoFilesService {
       config.get<string>('SFTPGO_PROTECTED_PATHS') ?? '',
     );
     this.trashDir = this.normalizePrefix(
-      config.get<string>('SFTPGO_TRASH_DIR') ?? '',
+      config.get<string>('SFTPGO_TRASH_DIR') ?? '_trash',
     );
     const days = Number(config.get<string>('SFTPGO_TRASH_RETENTION_DAYS') ?? '30');
     this.trashRetentionDays =

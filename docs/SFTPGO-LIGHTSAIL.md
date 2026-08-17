@@ -111,9 +111,11 @@ SFTPGO_API_KEY=tu_api_key_de_usuario
 # SFTPGO_ROOT_PREFIX=
 # Rutas relativas al home (sin / inicial), separadas por coma
 SFTPGO_PROTECTED_PATHS=Objetos,thumbnails
-SFTPGO_TRASH_DIR=.trash
+SFTPGO_TRASH_DIR=_trash
 SFTPGO_TRASH_RETENTION_DAYS=30
 ```
+
+**Papelera en Windows:** el Explorador de archivos no deja crear carpetas como `.trash` (“You must type a file name”). Usa `_trash` (recomendado) o crea `.trash` solo por PowerShell: `New-Item -ItemType Directory -Force -Path "D:\tms_media\.trash"`. No hace falta crearla a mano: al mover el primer archivo a la papelera, MALI ONE crea la ruta vía SFTPGo.
 
 Sin barra final. `http://` es correcto en esta topología.
 
