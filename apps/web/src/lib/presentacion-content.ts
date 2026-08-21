@@ -107,6 +107,11 @@ const logos = {
     file: 'mali-whatsapp.png',
     darkBg: true,
   },
+  filezilla: {
+    id: 'filezilla',
+    name: 'FileZilla',
+    file: 'filezilla.png',
+  },
 } as const satisfies Record<string, PresentacionLogo>;
 
 /** Franja visual: herramientas externas que MALI ONE suplanta o centraliza. */
@@ -123,6 +128,7 @@ export const presentacionReplacedTools: PresentacionLogo[] = [
   logos.koha,
   logos.vaultwarden,
   logos.maliWhatsapp,
+  logos.filezilla,
 ];
 
 export const presentacionHero = {
@@ -251,6 +257,14 @@ export const presentacionGroups: PresentacionGroup[] = [
           'El kardex propio de Bsale podía tomar hasta una semana en armarse en Contabilidad. Ahora el kardex consolidado sale en tiempo real en un par de clics.',
         accent: 'emerald',
         replaces: [logos.bsale],
+      },
+      {
+        id: 'files_tms',
+        title: 'Archivos TMS',
+        description:
+          'Solución a FileZilla: los usuarios finales deben cargar archivos al disco de TMS, pero FileZilla es complejo de usar y configurar, y al conectarse por Remote Desktop 3 o 4 usuarios cuelgan el servidor. Archivos TMS nace como gestor web para subir y explorar sin saturar el servidor.',
+        accent: 'amber',
+        replaces: [logos.filezilla],
       },
     ],
   },

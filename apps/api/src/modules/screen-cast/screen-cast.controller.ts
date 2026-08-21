@@ -77,7 +77,7 @@ export class ScreenCastController {
   ) {
     const playlist = await this.service.updatePlaylist(id, body);
     const keys = await this.service.getScreenKeysForPlaylist(id);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return playlist;
   }
 
@@ -92,7 +92,7 @@ export class ScreenCastController {
   async deletePlaylist(@Param('id') id: string) {
     const keys = await this.service.getScreenKeysForPlaylist(id);
     const result = await this.service.deletePlaylist(id);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return result;
   }
 
@@ -104,7 +104,7 @@ export class ScreenCastController {
   ) {
     const item = await this.service.createPlaylistItem(playlistId, body);
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return item;
   }
 
@@ -120,7 +120,7 @@ export class ScreenCastController {
       orderedIds,
     );
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return items;
   }
 
@@ -129,7 +129,7 @@ export class ScreenCastController {
   async duplicateItem(@Param('id') id: string) {
     const item = await this.service.duplicatePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return item;
   }
 
@@ -141,7 +141,7 @@ export class ScreenCastController {
   ) {
     const item = await this.service.updatePlaylistItem(id, body);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return item;
   }
 
@@ -150,7 +150,7 @@ export class ScreenCastController {
   async deleteItem(@Param('id') id: string) {
     const result = await this.service.deletePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(result.playlistId);
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return { ok: true };
   }
 
@@ -167,7 +167,7 @@ export class ScreenCastController {
   @RequireModule(AppModule.screen_cast)
   async syncAllMonitors() {
     const keys = await this.service.getAllScreenKeys();
-    this.gateway.notifyPlaylistUpdated(keys);
+    await this.gateway.restartSync(keys);
     return { ok: true, notified: keys.length };
   }
 
@@ -175,7 +175,7 @@ export class ScreenCastController {
   @RequireModule(AppModule.screen_cast)
   async syncMonitor(@Param('id') id: string) {
     const monitor = await this.service.getMonitor(id);
-    this.gateway.notifyPlaylistUpdated([monitor.screenKey]);
+    await this.gateway.catchUpScreen(monitor.screenKey);
     return { ok: true, notified: 1, screenKey: monitor.screenKey };
   }
 
@@ -191,7 +191,7 @@ export class ScreenCastController {
   async createMonitor(@Body() body: CreateScreenCastMonitorDto) {
     const monitor = await this.service.createMonitor(body);
     if (monitor.screenKey) {
-      this.gateway.notifyPlaylistUpdated([monitor.screenKey]);
+      await this.gateway.catchUpScreen(monitor.screenKey);
     }
     return monitor;
   }
@@ -205,7 +205,9 @@ export class ScreenCastController {
     const before = await this.service.getMonitor(id);
     const monitor = await this.service.updateMonitor(id, body);
     const keys = new Set<string>([before.screenKey, monitor.screenKey]);
-    this.gateway.notifyPlaylistUpdated([...keys]);
+    for (const key of keys) {
+      await this.gateway.catchUpScreen(key);
+    }
     return monitor;
   }
 

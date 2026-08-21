@@ -339,6 +339,33 @@ export class ScreenCastService {
     return monitors.map((m) => m.screenKey);
   }
 
+  async getMonitorPlaylistId(screenKey: string): Promise<string | null> {
+    const row = await this.prisma.screenCastMonitor.findUnique({
+      where: { screenKey: screenKey.trim().toLowerCase() },
+      select: { playlistId: true },
+    });
+    return row?.playlistId ?? null;
+  }
+
+  async getScreenPlaylistMap(
+    screenKeys: string[],
+  ): Promise<Map<string, string | null>> {
+    const map = new Map<string, string | null>();
+    for (const raw of screenKeys) {
+      const key = raw.trim().toLowerCase();
+      if (key) map.set(key, null);
+    }
+    if (map.size === 0) return map;
+    const rows = await this.prisma.screenCastMonitor.findMany({
+      where: { screenKey: { in: [...map.keys()] } },
+      select: { screenKey: true, playlistId: true },
+    });
+    for (const row of rows) {
+      map.set(row.screenKey, row.playlistId);
+    }
+    return map;
+  }
+
   // --- Monitors ---
 
   async listMonitors() {

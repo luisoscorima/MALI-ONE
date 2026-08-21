@@ -20,6 +20,20 @@ import {
   isCorsCacheableMediaUrl,
   registerScreenCastServiceWorker,
 } from '@/lib/screen-cast-offline';
+import {
+  CLIENT_GO_FALLBACK_MS,
+  DRIFT_INTERVAL_MS,
+  DRIFT_SEEK_MS,
+  MEASURE_TIMEOUT_MS,
+  clockOffsetFromAck,
+  measureAllDurations,
+  positionAt,
+  resolveDurations,
+  warmupItem,
+  type PlayGoPayload,
+  type PlaylistClock,
+  type PlaylistSyncPayload,
+} from '@/lib/screen-cast-sync';
 
 const HEARTBEAT_MS = 30_000;
 const KIOSK_CLASS = 'screen-cast-kiosk';
@@ -55,10 +69,18 @@ function isViewportPortrait(): boolean {
   return window.innerHeight > window.innerWidth;
 }
 
-/**
- * Socket.IO over WebSocket only (no long-polling).
- * Uses the page origin so https → wss and http → ws automatically via /socket.io/.
- */
+function KioskLoader() {
+  return (
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+      <div
+        className="h-16 w-16 rounded-full border-[3px] border-white/20 border-t-white animate-spin"
+        role="status"
+        aria-label="Cargando"
+      />
+    </div>
+  );
+}
+
 function connectScreenCastSocket(screenKey: string): Socket {
   const isSecure = window.location.protocol === 'https:';
   return io(`${window.location.origin}/screen-cast`, {
@@ -75,10 +97,6 @@ function connectScreenCastSocket(screenKey: string): Socket {
   });
 }
 
-/**
- * Portrait on landscape browser: size stage to vh×vw and center with margins
- * (not translate+rotate — that mis-centers on Tizen and leaves a top gap).
- */
 function stageStyle(
   isPortraitConfig: boolean,
   viewportPortrait: boolean,
@@ -96,11 +114,8 @@ function stageStyle(
   };
 
   if (!isPortraitConfig) return fill;
-
-  // Panel/browser already portrait (1080×1920): no CSS rotate.
   if (viewportPortrait) return fill;
 
-  // Landscape browser + portrait content (Samsung Signage pattern).
   return {
     position: 'absolute',
     width: `${vh}px`,
@@ -112,6 +127,12 @@ function stageStyle(
   };
 }
 
+type JoinAck = {
+  ok?: boolean;
+  serverNow?: number;
+  clock?: PlaylistClock | null;
+};
+
 export function ScreenCastPlayerPage() {
   const [params] = useSearchParams();
   const screenKey = (params.get('id') ?? '').trim().toLowerCase();
@@ -120,6 +141,8 @@ export function ScreenCastPlayerPage() {
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [playbackGen, setPlaybackGen] = useState(0);
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
   );
@@ -130,16 +153,47 @@ export function ScreenCastPlayerPage() {
 
   const timerRef = useRef<number | null>(null);
   const heartbeatRef = useRef<number | null>(null);
+  const goFallbackRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const warmVideoRef = useRef<HTMLVideoElement | null>(null);
   const indexRef = useRef(0);
   const itemsRef = useRef<ScreenCastPublicItemDto[]>([]);
   const preloadRef = useRef<HTMLImageElement | null>(null);
+  const pendingConfigRef = useRef<ScreenCastPublicConfigDto | null>(null);
+  const pendingGoRef = useRef<PlayGoPayload | null>(null);
+  const joinClockRef = useRef<PlaylistClock | null>(null);
+  const waitingGoRef = useRef(false);
+  const readyForGoRef = useRef(false);
+  const syncIdRef = useRef<string | null>(null);
+  const epochMsRef = useRef<number | null>(null);
+  const durationsRef = useRef<number[]>([]);
+  const localDurationsRef = useRef<number[]>([]);
+  const clockOffsetRef = useRef(0);
+  const syncTokenRef = useRef(0);
+
+  const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
+
+  const applyClockOffset = useCallback((serverNow: number | undefined, sentAt: number) => {
+    if (!serverNow) return;
+    clockOffsetRef.current = clockOffsetFromAck(
+      serverNow,
+      sentAt,
+      Date.now(),
+    );
+  }, []);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current);
       timerRef.current = null;
+    }
+  }, []);
+
+  const clearGoFallback = useCallback(() => {
+    if (goFallbackRef.current !== null) {
+      window.clearTimeout(goFallbackRef.current);
+      goFallbackRef.current = null;
     }
   }, []);
 
@@ -156,31 +210,288 @@ export function ScreenCastPlayerPage() {
     setIndex(next);
   }, []);
 
-  const loadConfig = useCallback(async () => {
+  const holdForSync = useCallback(() => {
+    setSyncing(true);
+    try {
+      videoRef.current?.pause();
+    } catch {
+      // Tizen may throw if the element is mid-load
+    }
+  }, []);
+
+  const applyConfig = useCallback(
+    (data: ScreenCastPublicConfigDto, startIndex: number) => {
+      pendingConfigRef.current = data;
+      itemsRef.current = data.items;
+      indexRef.current = startIndex;
+      setConfig(data);
+      setIndex(startIndex);
+      setError('');
+      setLoading(false);
+      setSyncing(false);
+      void cacheScreenCastPlaylist(screenKey, data);
+    },
+    [screenKey],
+  );
+
+  const applyGo = useCallback(
+    (payload: PlayGoPayload) => {
+      const data = pendingConfigRef.current;
+      if (!data) {
+        pendingGoRef.current = payload;
+        return;
+      }
+      if (payload.syncId && syncIdRef.current && payload.syncId !== syncIdRef.current) {
+        return;
+      }
+      waitingGoRef.current = false;
+      clearGoFallback();
+      pendingGoRef.current = null;
+      readyForGoRef.current = false;
+      applyClockOffset(payload.serverNow, Date.now());
+      const durations = resolveDurations(
+        data.items,
+        payload.durationsMs,
+        localDurationsRef.current,
+      );
+      durationsRef.current = durations;
+      epochMsRef.current = payload.epochMs;
+      itemsRef.current = data.items;
+      const pos = positionAt(durations, payload.epochMs, nowServer());
+      const nextIndex = pos?.index ?? 0;
+      indexRef.current = nextIndex;
+      setConfig(data);
+      setIndex(nextIndex);
+      setError('');
+      setLoading(false);
+      setSyncing(false);
+      setPlaybackGen((g) => g + 1);
+      void cacheScreenCastPlaylist(screenKey, data);
+    },
+    [applyClockOffset, clearGoFallback, nowServer, screenKey],
+  );
+
+  const fetchConfig = useCallback(async () => {
+    if (!screenKey) {
+      throw new Error('Falta el parámetro id en la URL');
+    }
+    const data = await api.getScreenCastPublicConfig(screenKey);
+    pendingConfigRef.current = data;
+    return data;
+  }, [screenKey]);
+
+  const emitReady = useCallback(
+    (syncId: string | null, playlistId: string | null, durationsMs: number[]) => {
+      if (isPreview) return;
+      const socket = socketRef.current;
+      if (!socket?.connected || !screenKey) return;
+      socket.emit('ready', {
+        screenKey,
+        syncId,
+        playlistId,
+        durationsMs,
+      });
+    },
+    [isPreview, screenKey],
+  );
+
+  const prepareAndReady = useCallback(
+    async (data: ScreenCastPublicConfigDto, syncId: string | null) => {
+      if (data.empty || data.items.length === 0) {
+        epochMsRef.current = null;
+        applyConfig(data, 0);
+        return;
+      }
+      const durations = await measureAllDurations(data.items, MEASURE_TIMEOUT_MS);
+      localDurationsRef.current = durations;
+      const pos =
+        epochMsRef.current != null
+          ? positionAt(durations, epochMsRef.current, nowServer())
+          : null;
+      await warmupItem(
+        data.items[pos?.index ?? 0],
+        MEASURE_TIMEOUT_MS,
+        warmVideoRef.current,
+      );
+      emitReady(syncId, data.playlistId, durations);
+    },
+    [applyConfig, emitReady, nowServer],
+  );
+
+  const loadConfigImmediate = useCallback(async () => {
     if (!screenKey) {
       setError('Falta el parámetro id en la URL');
       setLoading(false);
       return;
     }
-    cleanupMedia();
     try {
-      const data = await api.getScreenCastPublicConfig(screenKey);
-      setConfig(data);
-      itemsRef.current = data.items;
-      indexRef.current = 0;
-      setIndex(0);
-      setError('');
-      void cacheScreenCastPlaylist(screenKey, data);
+      const data = await fetchConfig();
+      const joinClock = joinClockRef.current;
+      if (joinClock?.epochMs && !isPreview && !data.empty) {
+        const durations = await measureAllDurations(
+          data.items,
+          MEASURE_TIMEOUT_MS,
+        );
+        localDurationsRef.current = durations;
+        applyGo({
+          syncId: joinClock.syncId,
+          epochMs: joinClock.epochMs,
+          durationsMs: joinClock.durationsMs,
+          serverNow: nowServer(),
+        });
+        return;
+      }
+      applyConfig(data, 0);
+      if (!isPreview && !data.empty) {
+        void prepareAndReady(data, null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar contenido');
       setConfig(null);
       itemsRef.current = [];
-    } finally {
       setLoading(false);
+      setSyncing(false);
     }
-  }, [screenKey, cleanupMedia]);
+  }, [
+    screenKey,
+    fetchConfig,
+    applyConfig,
+    applyGo,
+    isPreview,
+    prepareAndReady,
+    nowServer,
+  ]);
 
-  // Before paint: lock kiosk styles so the first frame is already full-bleed.
+  const handleSync = useCallback(
+    async (payload: PlaylistSyncPayload) => {
+      if (!screenKey) return;
+      const token = ++syncTokenRef.current;
+      applyClockOffset(payload.serverNow, Date.now());
+      syncIdRef.current = payload.syncId ?? null;
+      pendingGoRef.current = null;
+      readyForGoRef.current = false;
+
+      if (payload.empty) {
+        waitingGoRef.current = false;
+        clearGoFallback();
+        setSyncing(false);
+        try {
+          const data = await fetchConfig();
+          if (token !== syncTokenRef.current) return;
+          epochMsRef.current = null;
+          applyConfig(data, 0);
+        } catch (e) {
+          if (token !== syncTokenRef.current) return;
+          setError(e instanceof Error ? e.message : 'Error al cargar contenido');
+          setLoading(false);
+          setSyncing(false);
+        }
+        return;
+      }
+
+      if (payload.catchUp) {
+        waitingGoRef.current = false;
+        holdForSync();
+        try {
+          const data = await fetchConfig();
+          if (token !== syncTokenRef.current) return;
+          pendingConfigRef.current = data;
+          if (data.empty) {
+            epochMsRef.current = null;
+            applyConfig(data, 0);
+            return;
+          }
+          const durations = await measureAllDurations(
+            data.items,
+            MEASURE_TIMEOUT_MS,
+          );
+          if (token !== syncTokenRef.current) return;
+          localDurationsRef.current = durations;
+          if (payload.epochMs) {
+            const pos = positionAt(durations, payload.epochMs, nowServer());
+            await warmupItem(
+              data.items[pos?.index ?? 0],
+              MEASURE_TIMEOUT_MS,
+              warmVideoRef.current,
+            );
+            if (token !== syncTokenRef.current) return;
+            applyGo({
+              syncId: payload.syncId ?? undefined,
+              playlistId: payload.playlistId ?? data.playlistId ?? undefined,
+              epochMs: payload.epochMs,
+              durationsMs: payload.durationsMs?.length
+                ? payload.durationsMs
+                : durations,
+              serverNow: payload.serverNow,
+            });
+            return;
+          }
+          applyConfig(data, 0);
+          emitReady(null, data.playlistId, durations);
+        } catch (e) {
+          if (token !== syncTokenRef.current) return;
+          setError(e instanceof Error ? e.message : 'Error al cargar contenido');
+          setLoading(false);
+          setSyncing(false);
+        }
+        return;
+      }
+
+      waitingGoRef.current = true;
+      holdForSync();
+      clearGoFallback();
+      goFallbackRef.current = window.setTimeout(() => {
+        if (!waitingGoRef.current) return;
+        applyGo({
+          syncId: payload.syncId ?? undefined,
+          epochMs: nowServer(),
+          durationsMs: localDurationsRef.current,
+          serverNow: nowServer(),
+        });
+      }, CLIENT_GO_FALLBACK_MS);
+
+      try {
+        const data = await fetchConfig();
+        if (token !== syncTokenRef.current) return;
+        pendingConfigRef.current = data;
+
+        if (data.empty) {
+          waitingGoRef.current = false;
+          clearGoFallback();
+          epochMsRef.current = null;
+          applyConfig(data, 0);
+          return;
+        }
+
+        await prepareAndReady(data, payload.syncId ?? null);
+        if (token !== syncTokenRef.current) return;
+        readyForGoRef.current = true;
+        if (pendingGoRef.current) {
+          applyGo(pendingGoRef.current);
+        }
+      } catch (e) {
+        if (token !== syncTokenRef.current) return;
+        waitingGoRef.current = false;
+        clearGoFallback();
+        setError(e instanceof Error ? e.message : 'Error al cargar contenido');
+        setLoading(false);
+        setSyncing(false);
+      }
+    },
+    [
+      screenKey,
+      applyClockOffset,
+      fetchConfig,
+      applyConfig,
+      applyGo,
+      clearGoFallback,
+      nowServer,
+      prepareAndReady,
+      emitReady,
+      holdForSync,
+    ],
+  );
+
   useLayoutEffect(() => {
     document.documentElement.classList.add(KIOSK_CLASS);
     const meta = document.querySelector('meta[name="viewport"]');
@@ -213,8 +524,8 @@ export function ScreenCastPlayerPage() {
 
   useEffect(() => {
     void registerScreenCastServiceWorker();
-    void loadConfig();
-  }, [loadConfig]);
+    void loadConfigImmediate();
+  }, [loadConfigImmediate]);
 
   useEffect(() => {
     if (!screenKey || isPreview) return;
@@ -223,17 +534,79 @@ export function ScreenCastPlayerPage() {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('join', { screenKey });
+      const sentAt = Date.now();
+      socket.emit('join', { screenKey }, (ack: JoinAck) => {
+        applyClockOffset(ack?.serverNow, sentAt);
+        if (ack?.clock?.epochMs) {
+          joinClockRef.current = ack.clock;
+          if (pendingConfigRef.current && !waitingGoRef.current) {
+            applyGo({
+              syncId: ack.clock.syncId,
+              epochMs: ack.clock.epochMs,
+              durationsMs: ack.clock.durationsMs,
+              serverNow: ack.serverNow,
+            });
+          }
+        }
+      });
     });
 
-    socket.on('playlist:updated', () => {
-      void loadConfig();
+    socket.on('playlist:sync', (payload: PlaylistSyncPayload) => {
+      void handleSync(payload ?? {});
+    });
+
+    socket.on('play:go', (payload: PlayGoPayload) => {
+      if (!payload?.epochMs) return;
+      if (payload.syncId && syncIdRef.current && payload.syncId !== syncIdRef.current) {
+        return;
+      }
+      applyClockOffset(payload.serverNow, Date.now());
+      pendingGoRef.current = payload;
+      if (waitingGoRef.current && !readyForGoRef.current) return;
+      applyGo(payload);
+    });
+
+    socket.on('play:tick', (payload: PlayGoPayload) => {
+      if (!payload?.epochMs) return;
+      if (
+        payload.syncId &&
+        syncIdRef.current &&
+        payload.syncId !== syncIdRef.current
+      ) {
+        return;
+      }
+      applyClockOffset(payload.serverNow, Date.now());
+      if (waitingGoRef.current) {
+        pendingGoRef.current = payload;
+        if (readyForGoRef.current) applyGo(payload);
+        return;
+      }
+      if (payload.durationsMs?.length) {
+        durationsRef.current = resolveDurations(
+          itemsRef.current,
+          payload.durationsMs,
+          localDurationsRef.current,
+        );
+      }
+      epochMsRef.current = payload.epochMs;
     });
 
     const sendHeartbeat = () => {
-      if (socket.connected) {
-        socket.emit('heartbeat', { screenKey });
-      }
+      if (!socket.connected) return;
+      const sentAt = Date.now();
+      socket.emit('heartbeat', { screenKey }, (ack: JoinAck) => {
+        applyClockOffset(ack?.serverNow, sentAt);
+        if (ack?.clock?.epochMs && !waitingGoRef.current) {
+          epochMsRef.current = ack.clock.epochMs;
+          if (ack.clock.durationsMs?.length) {
+            durationsRef.current = resolveDurations(
+              itemsRef.current,
+              ack.clock.durationsMs,
+              localDurationsRef.current,
+            );
+          }
+        }
+      });
     };
 
     sendHeartbeat();
@@ -244,11 +617,19 @@ export function ScreenCastPlayerPage() {
         window.clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
       }
+      clearGoFallback();
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [screenKey, isPreview, loadConfig]);
+  }, [
+    screenKey,
+    isPreview,
+    applyClockOffset,
+    applyGo,
+    handleSync,
+    clearGoFallback,
+  ]);
 
   const emitStatus = useCallback(
     (payload: { index: number; total: number; lastError?: string | null }) => {
@@ -264,6 +645,19 @@ export function ScreenCastPlayerPage() {
     },
     [isPreview, screenKey],
   );
+
+  const jumpToClock = useCallback(() => {
+    const epoch = epochMsRef.current;
+    if (epoch == null || itemsRef.current.length === 0) return false;
+    const pos = positionAt(durationsRef.current, epoch, nowServer());
+    if (!pos) return false;
+    if (pos.index !== indexRef.current) {
+      indexRef.current = pos.index;
+      setIndex(pos.index);
+      return true;
+    }
+    return false;
+  }, [nowServer]);
 
   useEffect(() => {
     clearTimer();
@@ -283,28 +677,91 @@ export function ScreenCastPlayerPage() {
     emitStatus({ index, total: items.length });
 
     const nextItem = items[(index + 1) % items.length];
-    if (
-      nextItem &&
-      nextItem !== item &&
-      (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif')
-    ) {
-      const pre = new Image();
-      preloadRef.current = pre;
-      pre.src = nextItem.mediaUrl;
+    if (nextItem && nextItem !== item) {
+      if (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif') {
+        const pre = new Image();
+        preloadRef.current = pre;
+        pre.src = nextItem.mediaUrl;
+      } else if (nextItem.mediaType === 'video' && warmVideoRef.current) {
+        const warm = warmVideoRef.current;
+        if (isCorsCacheableMediaUrl(nextItem.mediaUrl)) {
+          warm.crossOrigin = 'anonymous';
+        } else {
+          warm.removeAttribute('crossorigin');
+        }
+        if (warm.src !== nextItem.mediaUrl) {
+          warm.preload = 'auto';
+          warm.muted = true;
+          warm.src = nextItem.mediaUrl;
+        }
+      }
     }
+
+    const epoch = epochMsRef.current;
+    let startOffsetMs = 0;
+    let remainingMs = item.durationMs || 10_000;
+    if (epoch != null) {
+      const pos = positionAt(durationsRef.current, epoch, nowServer());
+      if (pos?.waitMs) {
+        timerRef.current = window.setTimeout(() => {
+          setPlaybackGen((g) => g + 1);
+        }, pos.waitMs);
+        return () => {
+          clearTimer();
+        };
+      }
+      if (pos && pos.index !== index) {
+        indexRef.current = pos.index;
+        setIndex(pos.index);
+        return;
+      }
+      if (pos && pos.index === index) {
+        startOffsetMs = pos.offsetMs;
+        remainingMs = pos.remainingMs;
+      }
+    }
+
+    const scheduleAdvance = () => {
+      if (epoch != null) {
+        timerRef.current = window.setTimeout(() => {
+          if (!jumpToClock()) {
+            const pos = positionAt(
+              durationsRef.current,
+              epochMsRef.current ?? epoch,
+              nowServer(),
+            );
+            const wait = Math.max(40, pos?.remainingMs ?? 40);
+            timerRef.current = window.setTimeout(() => {
+              if (!jumpToClock()) advance();
+            }, wait);
+          }
+        }, Math.max(40, remainingMs));
+        return;
+      }
+      timerRef.current = window.setTimeout(advance, remainingMs);
+    };
 
     if (item.mediaType === 'video') {
       const video = videoRef.current;
       if (!video) return;
 
-      const onEnded = () => advance();
+      const onEnded = () => {
+        if (epochMsRef.current != null) {
+          if (!jumpToClock()) {
+            // Hold last frame until the shared clock advances.
+          }
+          return;
+        }
+        advance();
+      };
       const onError = () => {
         emitStatus({
           index,
           total: items.length,
           lastError: 'Error al reproducir video',
         });
-        advance();
+        if (epochMsRef.current != null) jumpToClock();
+        else advance();
       };
 
       if (isCorsCacheableMediaUrl(item.mediaUrl)) {
@@ -312,17 +769,28 @@ export function ScreenCastPlayerPage() {
       } else {
         video.removeAttribute('crossorigin');
       }
-      video.src = item.mediaUrl;
+
+      const onMeta = () => {
+        if (startOffsetMs > 120 && Number.isFinite(video.duration)) {
+          const t = Math.min(
+            startOffsetMs / 1000,
+            Math.max(0, video.duration - 0.12),
+          );
+          if (t > 0.08) video.currentTime = t;
+        }
+        void video.play().catch(() => {
+          if (epoch == null) scheduleAdvance();
+        });
+      };
+
+      video.addEventListener('loadedmetadata', onMeta);
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
-      void video.play().catch(() => {
-        timerRef.current = window.setTimeout(
-          advance,
-          item.durationMs || 10_000,
-        );
-      });
+      video.src = item.mediaUrl;
+      if (epoch != null) scheduleAdvance();
 
       return () => {
+        video.removeEventListener('loadedmetadata', onMeta);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
         destroyVideo(video);
@@ -330,22 +798,64 @@ export function ScreenCastPlayerPage() {
       };
     }
 
-    timerRef.current = window.setTimeout(advance, item.durationMs || 10_000);
+    scheduleAdvance();
     return () => {
       clearTimer();
     };
-  }, [index, config, advance, clearTimer, emitStatus]);
+  }, [
+    index,
+    config,
+    playbackGen,
+    advance,
+    clearTimer,
+    emitStatus,
+    jumpToClock,
+    nowServer,
+  ]);
+
+  useEffect(() => {
+    if (isPreview) return;
+    const id = window.setInterval(() => {
+      const epoch = epochMsRef.current;
+      if (epoch == null || itemsRef.current.length === 0) return;
+      const pos = positionAt(durationsRef.current, epoch, nowServer());
+      if (!pos) return;
+      if (pos.index !== indexRef.current) {
+        indexRef.current = pos.index;
+        setIndex(pos.index);
+        return;
+      }
+      const video = videoRef.current;
+      const item = itemsRef.current[pos.index];
+      if (
+        item?.mediaType === 'video' &&
+        video &&
+        !video.paused &&
+        Number.isFinite(video.currentTime) &&
+        pos.remainingMs > 300
+      ) {
+        const drift = Math.abs(video.currentTime * 1000 - pos.offsetMs);
+        if (drift > DRIFT_SEEK_MS) {
+          video.currentTime = pos.offsetMs / 1000;
+        }
+      }
+    }, DRIFT_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [isPreview, nowServer, config]);
 
   useEffect(() => {
     return () => {
       cleanupMedia();
+      clearGoFallback();
     };
-  }, [cleanupMedia]);
+  }, [cleanupMedia, clearGoFallback]);
 
   const current = config?.items[index];
-  const showVideo = !!current && current.mediaType === 'video';
+  const holdUi = loading || syncing;
+  const showVideo = !!current && current.mediaType === 'video' && !holdUi;
   const showImage =
     !!current &&
+    !holdUi &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
   const imageUsesCors =
     !!current && isCorsCacheableMediaUrl(current.mediaUrl);
@@ -360,7 +870,8 @@ export function ScreenCastPlayerPage() {
       total: itemsRef.current.length,
       lastError: 'Error al cargar imagen',
     });
-    advance();
+    if (epochMsRef.current != null) jumpToClock();
+    else advance();
   }
 
   return (
@@ -374,20 +885,16 @@ export function ScreenCastPlayerPage() {
           viewportSize.vh,
         )}
       >
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm opacity-70">
-            Cargando…
-          </div>
-        )}
+        {(loading || syncing) && <KioskLoader />}
 
-        {!loading && error && (
+        {!holdUi && error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <p className="text-lg font-medium">No se pudo cargar la pantalla</p>
             <p className="text-sm opacity-70">{error}</p>
           </div>
         )}
 
-        {!loading && !error && config?.empty && (
+        {!holdUi && !error && config?.empty && (
           <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
             <p className="text-2xl font-medium tracking-wide">
               Sin contenido asignado
@@ -403,6 +910,14 @@ export function ScreenCastPlayerPage() {
           muted
           playsInline
           loop={false}
+          preload="auto"
+        />
+
+        <video
+          ref={warmVideoRef}
+          className="pointer-events-none hidden"
+          muted
+          playsInline
           preload="auto"
         />
 
