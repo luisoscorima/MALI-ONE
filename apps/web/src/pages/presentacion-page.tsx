@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,19 +16,126 @@ import {
   X,
 } from 'lucide-react';
 import { MALI_MARK_URL } from '@/components/mali-logo';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { moduleCardAccentStyles } from '@/lib/module-card-accents';
 import { cn } from '@/lib/utils';
 import {
   PRESENTACION_LOGOS,
   formatPresentacionUsd,
+  presentacionBlockStyles,
   presentacionCostNote,
   presentacionJourney,
+  presentacionOneShotNote,
+  presentacionSystemTimeline,
+  type InfraBlockKey,
   type PresentacionLogo,
 } from '@/lib/presentacion-content';
 import {
   presentacionSlides,
   type PresentacionSlide,
 } from '@/lib/presentacion-slides';
+
+function MaliLogoMark({
+  className,
+  intensity = 'full',
+}: {
+  className?: string;
+  intensity?: 'full' | 'subtle';
+}) {
+  const amp = intensity === 'full' ? 1 : 0.45;
+  return (
+    <motion.img
+      src={MALI_MARK_URL}
+      alt=""
+      className={cn('login-logo-glow object-contain', className)}
+      draggable={false}
+      animate={{
+        scale: [1, 1 + 0.04 * amp, 1],
+        y: [0, -3 * amp, 0],
+      }}
+      transition={{
+        duration: intensity === 'full' ? 3.2 : 4.2,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
+    />
+  );
+}
+
+function SystemBadges({ ids }: { ids: string[] }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {ids.map((id) => {
+        const entry = presentacionSystemTimeline[id];
+        const label = entry?.label ?? id;
+        const badge = (
+          <span className="inline-flex max-w-[11rem] truncate rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-medium text-zinc-100 ring-1 ring-white/15 sm:text-xs">
+            {label}
+          </span>
+        );
+
+        if (!entry) return <span key={id}>{badge}</span>;
+
+        return (
+          <Tooltip key={id}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="cursor-help rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {badge}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              sideOffset={8}
+              className="max-w-[260px] flex-col items-stretch gap-0 bg-zinc-950 px-3 py-2.5 text-left text-zinc-100 ring-1 ring-white/15"
+            >
+              <p className="mb-2 text-xs font-semibold text-white">{entry.label}</p>
+              <ol className="space-y-1.5">
+                {(
+                  [
+                    ['Antes', entry.antes],
+                    ['Ahora', entry.ahora],
+                    ['Futuro', entry.futuro],
+                  ] as const
+                ).map(([step, text], i) => (
+                  <li key={step} className="flex gap-2 text-[11px] leading-snug">
+                    <span
+                      className={cn(
+                        'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold',
+                        i === 0 && 'bg-amber-500/25 text-amber-200',
+                        i === 1 && 'bg-sky-500/25 text-sky-200',
+                        i === 2 && 'bg-emerald-500/25 text-emerald-200',
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                    <span>
+                      <span className="font-semibold text-zinc-300">{step}: </span>
+                      <span className="text-zinc-200">{text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+function blockRowClass(blockKey: InfraBlockKey) {
+  const styles = presentacionBlockStyles[blockKey];
+  return cn('border-l-4', styles.border, styles.bg);
+}
 
 function ToolLogo({
   logo,
@@ -121,12 +229,7 @@ function TitleSlide({ slide }: { slide: PresentacionSlide }) {
     <SlideShell className="items-start sm:items-center sm:text-center">
       <div className="flex max-w-3xl flex-col gap-6 sm:items-center">
         <div className="flex items-center gap-5 sm:flex-col sm:gap-6">
-          <img
-            src={MALI_MARK_URL}
-            alt=""
-            className="login-logo-glow h-28 w-28 object-contain sm:h-36 sm:w-36 md:h-44 md:w-44"
-            draggable={false}
-          />
+          <MaliLogoMark className="h-28 w-28 sm:h-36 sm:w-36 md:h-44 md:w-44" />
           <div className="sm:text-center">
             {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
             <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl">
@@ -196,7 +299,11 @@ function JourneySlide({ slide }: { slide: PresentacionSlide }) {
               <p className="mt-5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 {formatPresentacionUsd(stage.totalUsd)}
               </p>
-              <p className="mt-1 text-xs text-zinc-400">costo mensual del bloque</p>
+              <p className="mt-1 text-xs text-zinc-400">
+                {stage.id === 'antes'
+                  ? 'costo mensual recurrente'
+                  : 'costo mensual del bloque'}
+              </p>
             </div>
             {i < stages.length - 1 ? (
               <div
@@ -257,7 +364,7 @@ function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
         {slide.costTotalUsd != null ? (
           <div className="rounded-xl bg-white/5 px-4 py-2 ring-1 ring-white/15">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
-              Total
+              {variant === 'antes' ? 'Total recurrente' : 'Total'}
             </p>
             <p className="text-lg font-bold text-white sm:text-xl">
               {formatPresentacionUsd(slide.costTotalUsd)}
@@ -281,19 +388,26 @@ function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
             <tbody>
               {slide.costRowsAntes?.map((row, i) => (
                 <tr
-                  key={`${row.systems}-${i}`}
-                  className="border-t border-white/10"
+                  key={`${row.systems.join('-')}-${i}`}
+                  className={cn(
+                    'border-t border-white/10',
+                    blockRowClass(row.blockKey),
+                  )}
                 >
                   <CostCell muted={!row.provider}>{row.provider || '—'}</CostCell>
                   <CostCell muted={!row.service}>{row.service || '—'}</CostCell>
-                  <CostCell>{row.systems}</CostCell>
+                  <CostCell>
+                    <SystemBadges ids={row.systems} />
+                  </CostCell>
                   <CostCell
                     className={cn(
                       'whitespace-nowrap font-medium',
                       row.cost != null && 'text-white',
                     )}
                   >
-                    {row.cost != null ? formatPresentacionUsd(row.cost) : '—'}
+                    {row.cost != null
+                      ? `${formatPresentacionUsd(row.cost)}${row.oneShot ? '*' : ''}`
+                      : '—'}
                   </CostCell>
                   <CostCell>{row.result}</CostCell>
                 </tr>
@@ -319,14 +433,19 @@ function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
               {slide.costRowsAhora?.map((row, i) => (
                 <tr
                   key={`${row.provider}-${row.service}-${i}`}
-                  className="border-t border-white/10"
+                  className={cn(
+                    'border-t border-white/10',
+                    blockRowClass(row.blockKey),
+                  )}
                 >
                   <CostCell className="whitespace-nowrap text-sky-200/90">
                     {row.status}
                   </CostCell>
                   <CostCell>{row.provider}</CostCell>
                   <CostCell>{row.service}</CostCell>
-                  <CostCell>{row.systems}</CostCell>
+                  <CostCell>
+                    <SystemBadges ids={row.systems} />
+                  </CostCell>
                   <CostCell className="whitespace-nowrap font-medium text-white">
                     {formatPresentacionUsd(row.costCurrent)}
                   </CostCell>
@@ -354,11 +473,16 @@ function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
               {slide.costRowsFuturo?.map((row, i) => (
                 <tr
                   key={`${row.provider}-${row.service}-${i}`}
-                  className="border-t border-white/10"
+                  className={cn(
+                    'border-t border-white/10',
+                    blockRowClass(row.blockKey),
+                  )}
                 >
                   <CostCell>{row.provider}</CostCell>
                   <CostCell>{row.service}</CostCell>
-                  <CostCell>{row.systems}</CostCell>
+                  <CostCell>
+                    <SystemBadges ids={row.systems} />
+                  </CostCell>
                   <CostCell className="whitespace-nowrap font-medium text-white">
                     {row.cost != null ? formatPresentacionUsd(row.cost) : '—'}
                   </CostCell>
@@ -369,11 +493,14 @@ function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
         ) : null}
       </div>
 
-      {variant === 'ahora' || variant === 'futuro' ? (
-        <p className="mt-3 text-xs leading-relaxed text-zinc-500 sm:text-sm">
-          {presentacionCostNote}
-        </p>
-      ) : null}
+      <div className="mt-3 space-y-1.5 text-xs leading-relaxed text-zinc-500 sm:text-sm">
+        {variant === 'antes' ? (
+          <p>{presentacionOneShotNote}</p>
+        ) : null}
+        {variant === 'ahora' || variant === 'futuro' || variant === 'antes' ? (
+          <p>{presentacionCostNote}</p>
+        ) : null}
+      </div>
     </SlideShell>
   );
 }
@@ -479,12 +606,7 @@ function RoadmapSlide({ slide }: { slide: PresentacionSlide }) {
 function ClosingSlide({ slide }: { slide: PresentacionSlide }) {
   return (
     <SlideShell className="items-center text-center">
-      <img
-        src={MALI_MARK_URL}
-        alt=""
-        className="login-logo-glow mb-8 h-28 w-28 object-contain sm:h-36 sm:w-36"
-        draggable={false}
-      />
+      <MaliLogoMark className="mb-8 h-28 w-28 sm:h-36 sm:w-36" />
       <h2 className="max-w-3xl text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
         {slide.title}
       </h2>
@@ -530,6 +652,7 @@ export function PresentacionPage() {
   const [indexOpen, setIndexOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [animKey, setAnimKey] = useState(0);
+  const [direction, setDirection] = useState(1);
   const touchStartX = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -538,6 +661,7 @@ export function PresentacionPage() {
       const clamped = Math.max(0, Math.min(total - 1, next));
       setIndex((prev) => {
         if (prev === clamped) return prev;
+        setDirection(clamped > prev ? 1 : -1);
         setAnimKey((k) => k + 1);
         return clamped;
       });
@@ -606,6 +730,7 @@ export function PresentacionPage() {
   const progress = ((index + 1) / total) * 100;
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div
       ref={rootRef}
       className="login-shell relative h-svh max-h-svh overflow-hidden text-zinc-50 select-none"
@@ -642,11 +767,9 @@ export function PresentacionPage() {
       {/* Top chrome */}
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 pt-4 sm:px-6">
         <div className="flex items-center gap-3">
-          <img
-            src={MALI_MARK_URL}
-            alt=""
-            className="h-8 w-8 object-contain opacity-90 sm:h-9 sm:w-9"
-            draggable={false}
+          <MaliLogoMark
+            intensity="subtle"
+            className="h-8 w-8 opacity-90 sm:h-9 sm:w-9"
           />
           <span className="hidden text-sm font-medium text-zinc-200 sm:inline">
             MALI ONE
@@ -678,13 +801,23 @@ export function PresentacionPage() {
       </div>
 
       {/* Slide stage */}
-      <div className="relative z-10 h-full pb-16 pt-12">
-        <div
-          key={animKey}
-          className="h-full animate-[presentacion-enter_320ms_ease-out]"
-        >
-          {renderSlide(slide)}
-        </div>
+      <div className="relative z-10 h-full overflow-hidden pb-16 pt-12">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={animKey}
+            className="h-full"
+            custom={direction}
+            initial={{ opacity: 0, y: 12 * direction }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 * direction }}
+            transition={{
+              duration: 0.28,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
+            {renderSlide(slide)}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Bottom nav */}
@@ -810,13 +943,7 @@ export function PresentacionPage() {
           </aside>
         </div>
       ) : null}
-
-      <style>{`
-        @keyframes presentacion-enter {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
+    </TooltipProvider>
   );
 }
