@@ -134,8 +134,399 @@ export const presentacionReplacedTools: PresentacionLogo[] = [
 export const presentacionHero = {
   title: 'MALI ONE',
   subtitle: 'Centralizar el control de las operaciones digitales del MALI',
-  lead: 'Hoy el museo opera con muchos sistemas dispersos que no conversan entre sí. MALI ONE conecta esas piezas en un solo lugar: menos herramientas externas, menos costos y más control sobre el contenido y los procesos.',
+  lead: 'De servicios dispersos en varios proveedores a una infraestructura consolidada en AWS, con MALI ONE como capa operativa: menos costo recurrente, menos islas y más control.',
 };
+
+/** Formatea montos USD de la presentación (siempre con 2 decimales). */
+export function formatPresentacionUsd(amount: number): string {
+  return `US$ ${amount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export type InfraCostRowAntes = {
+  provider: string;
+  service: string;
+  systems: string;
+  /** null = misma fila de bloque, sin repetir costo */
+  cost: number | null;
+  result: string;
+};
+
+export type InfraCostRowAhora = {
+  status: string;
+  provider: string;
+  service: string;
+  systems: string;
+  costCurrent: number;
+  action: string;
+  costTarget: number;
+};
+
+export type InfraCostRowFuturo = {
+  provider: string;
+  service: string;
+  systems: string;
+  /** null = incluido en el bloque anterior */
+  cost: number | null;
+};
+
+export const presentacionCostNote =
+  'Los costos corresponden al bloque Infraestructura + Servicio, no a cada sistema por separado. Los US$ 55.76 de MALI ONE WhatsApp son consumo de la API de WhatsApp, no parte del costo de EC2.';
+
+export const presentacionJourney = {
+  eyebrow: 'Infraestructura',
+  title: 'De lo disperso a lo consolidado',
+  body: 'Tres momentos de la misma historia: dónde estábamos, dónde estamos y hacia dónde vamos.',
+  stages: [
+    {
+      id: 'antes',
+      label: 'Antes',
+      title: 'Servicios dispersos',
+      description: 'Varios proveedores, costos fragmentados y poca visibilidad.',
+      totalUsd: 3238.84,
+    },
+    {
+      id: 'ahora',
+      label: 'Ahora',
+      title: 'Migración y consolidación',
+      description: 'Transición activa: lo migrado, lo pendiente y lo permanente.',
+      totalUsd: 2889.46,
+    },
+    {
+      id: 'futuro',
+      label: 'Futuro',
+      title: 'AWS + servicios esenciales',
+      description: 'Arquitectura objetivo: AWS, Meta WhatsApp API, Shopify y Bsale.',
+      totalUsd: 840.2,
+    },
+  ],
+} as const;
+
+/** Tabla condensada: infraestructura descentralizada. */
+export const presentacionInfraAntes: InfraCostRowAntes[] = [
+  {
+    provider: 'AWS',
+    service: 'Lightsail',
+    systems: 'SIGE 2 + DreamFactory',
+    cost: 520.91,
+    result: 'Migrado a EC2',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'Web Educación Antigua',
+    cost: null,
+    result: 'Respaldo y baja',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'Proxy SIGE 2',
+    cost: null,
+    result: 'Migrado a EC2',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'TMS',
+    cost: null,
+    result: 'Continúa temporalmente',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'eMuseum / eMuseum2',
+    cost: null,
+    result: 'Continúa temporalmente',
+  },
+  {
+    provider: 'Google Cloud',
+    service: 'App Engine, Cloud SQL y Storage',
+    systems: 'Ecosistema Historias',
+    cost: 458.0,
+    result: 'Migración pendiente',
+  },
+  {
+    provider: 'Linode',
+    service: 'Essential Compute',
+    systems: 'Koha Antiguo',
+    cost: 96.0,
+    result: 'Respaldo y baja',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'Koha Biblioteca',
+    cost: null,
+    result: 'Migrado a AWS',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'Web MALI Antigua',
+    cost: null,
+    result: 'Respaldo y baja',
+  },
+  {
+    provider: '',
+    service: '',
+    systems: 'Todos los Faros',
+    cost: null,
+    result: 'Migrados a AWS',
+  },
+  {
+    provider: 'DreamHost',
+    service: 'Hosting, VPS y MySQL',
+    systems: 'ARCHI y componentes',
+    cost: 59.98,
+    result: 'Migración pendiente',
+  },
+  {
+    provider: 'DigitalOcean',
+    service: 'VPS',
+    systems: 'Archivo MALI y ePPA',
+    cost: 48.0,
+    result: 'Migración pendiente',
+  },
+  {
+    provider: 'Mailchimp',
+    service: 'Plan Premium',
+    systems: 'Boletines y mailing',
+    cost: 1025.0,
+    result: 'Reemplazo en desarrollo',
+  },
+  {
+    provider: 'WhatsApp Business',
+    service: 'Difusión tradicional',
+    systems: 'PAT',
+    cost: 38.07,
+    result: 'Reemplazado por MALI ONE',
+  },
+  {
+    provider: 'Bitly',
+    service: 'Plan Core',
+    systems: 'Enlaces y códigos QR',
+    cost: 10.0,
+    result: 'Reemplazado por MALI ONE',
+  },
+  {
+    provider: 'MagicInfo',
+    service: 'Configuración',
+    systems: 'Pantallas de Comunicaciones',
+    cost: 299.0,
+    result: 'Reemplazado por MALI ONE',
+  },
+  {
+    provider: 'Dropbox',
+    service: 'Plan empresarial',
+    systems: 'Contenido histórico 2020',
+    cost: 290.0,
+    result: 'Pendiente de baja',
+  },
+  {
+    provider: 'Shopify',
+    service: 'Plan Basic',
+    systems: 'Tienda Web',
+    cost: 29.0,
+    result: 'Se mantiene',
+  },
+  {
+    provider: 'Bsale',
+    service: 'Plan Standard',
+    systems: 'Tienda Física',
+    cost: 76.28,
+    result: 'Se mantiene',
+  },
+  {
+    provider: 'Eccom and More',
+    service: 'Integración',
+    systems: 'Integración Shopify–Bsale',
+    cost: 288.6,
+    result: 'Implementación concluida',
+  },
+];
+
+/** Solo servicios que generan costo hoy. */
+export const presentacionInfraAhora: InfraCostRowAhora[] = [
+  {
+    status: 'Optimización',
+    provider: 'AWS',
+    service: 'Lightsail',
+    systems: 'TMS, eMuseum y eMuseum2',
+    costCurrent: 478.28,
+    action: 'Optimizar y migrar almacenamiento',
+    costTarget: 300.0,
+  },
+  {
+    status: 'Migración',
+    provider: 'Google Cloud',
+    service: 'App Engine, SQL y Storage',
+    systems: 'Ecosistema Historias',
+    costCurrent: 458.0,
+    action: 'Actualizar y migrar a AWS',
+    costTarget: 0,
+  },
+  {
+    status: 'Migración',
+    provider: 'DreamHost',
+    service: 'Hosting, VPS y MySQL',
+    systems: 'ARCHI, API, Demo, Test y BD',
+    costCurrent: 59.98,
+    action: 'Validar y migrar a AWS',
+    costTarget: 0,
+  },
+  {
+    status: 'Migración',
+    provider: 'DigitalOcean',
+    service: 'VPS',
+    systems: 'Archivo MALI y ePPA',
+    costCurrent: 48.0,
+    action: 'Migrar a AWS EC2',
+    costTarget: 0,
+  },
+  {
+    status: 'Reemplazo',
+    provider: 'Mailchimp',
+    service: 'Plan Premium',
+    systems: 'Base global, boletines y mailing',
+    costCurrent: 1025.0,
+    action: 'Migrar a MALI ONE',
+    costTarget: 0,
+  },
+  {
+    status: 'Validación',
+    provider: 'Dropbox',
+    service: 'Plan empresarial',
+    systems: 'Contenido histórico 2020',
+    costCurrent: 290.0,
+    action: 'Validar migración y dar de baja',
+    costTarget: 0,
+  },
+  {
+    status: 'Permanente',
+    provider: 'Shopify',
+    service: 'Plan Basic',
+    systems: 'Tienda Web',
+    costCurrent: 29.0,
+    action: 'Mantener',
+    costTarget: 29.0,
+  },
+  {
+    status: 'Permanente',
+    provider: 'Bsale',
+    service: 'Plan Standard',
+    systems: 'Tienda Física',
+    costCurrent: 76.28,
+    action: 'Mantener',
+    costTarget: 76.28,
+  },
+  {
+    status: 'Consolidado',
+    provider: 'AWS',
+    service: 'EC2',
+    systems: 'Aplicaciones institucionales + MALI ONE',
+    costCurrent: 298.6,
+    action: 'Mantener y monitorear',
+    costTarget: 298.6,
+  },
+  {
+    status: 'Permanente',
+    provider: 'Meta',
+    service: 'WhatsApp Business API',
+    systems: 'Consumo API MALI ONE WhatsApp',
+    costCurrent: 55.76,
+    action: 'Mantener y monitorear',
+    costTarget: 55.76,
+  },
+  {
+    status: 'Consolidado',
+    provider: 'AWS',
+    service: 'RDS',
+    systems: 'Bases institucionales',
+    costCurrent: 62.06,
+    action: 'Mantener y monitorear',
+    costTarget: 62.06,
+  },
+  {
+    status: 'Consolidado',
+    provider: 'AWS',
+    service: 'S3',
+    systems: 'Media y respaldos',
+    costCurrent: 8.5,
+    action: 'Ampliar almacenamiento',
+    costTarget: 18.5,
+  },
+];
+
+/** Arquitectura objetivo (sin servicios que desaparecen). */
+export const presentacionInfraFuturo: InfraCostRowFuturo[] = [
+  {
+    provider: 'AWS',
+    service: 'Lightsail',
+    systems: 'TMS, eMuseum y eMuseum2 (mientras permanezcan)',
+    cost: 300.0,
+  },
+  {
+    provider: 'AWS',
+    service: 'EC2',
+    systems:
+      'SIGE 2, webs, Koha, Faros, MALI ONE (WhatsApp, Links, Pantallas, CRM, etc.)',
+    cost: 298.6,
+  },
+  {
+    provider: 'AWS',
+    service: 'RDS',
+    systems: 'Bases de SIGE, webs, Koha y MALI ONE',
+    cost: 62.06,
+  },
+  {
+    provider: 'AWS',
+    service: 'S3',
+    systems: 'Media, respaldos y almacenamiento migrado',
+    cost: 18.5,
+  },
+  {
+    provider: 'Meta',
+    service: 'WhatsApp Business API',
+    systems: 'Consumo de mensajería MALI ONE WhatsApp',
+    cost: 55.76,
+  },
+  {
+    provider: 'Shopify',
+    service: 'Plan Basic',
+    systems: 'Tienda Web',
+    cost: 29.0,
+  },
+  {
+    provider: 'Bsale',
+    service: 'Plan Standard',
+    systems: 'Tienda Física',
+    cost: 76.28,
+  },
+];
+
+export const presentacionInfraTables = {
+  antes: {
+    eyebrow: 'Antes',
+    title: 'Infraestructura descentralizada',
+    body: 'Qué existía, cuánto costaba cada bloque y qué ocurrió con él.',
+    totalUsd: 3238.84,
+  },
+  ahora: {
+    eyebrow: 'Ahora',
+    title: 'Infraestructura en transición',
+    body: 'Solo servicios que generan costo hoy: dónde se gasta y qué falta hacer.',
+    totalUsd: 2889.46,
+  },
+  futuro: {
+    eyebrow: 'Futuro',
+    title: 'Arquitectura objetivo',
+    body: 'Lo que debería quedar: AWS consolidado más los servicios esenciales que se mantienen.',
+    totalUsd: 840.2,
+  },
+} as const;
 
 export const presentacionValueProps = [
   {
@@ -368,5 +759,5 @@ export const presentacionRoadmap = {
 export const presentacionClosing = {
   title: 'Un solo lugar para operar',
   description:
-    'MALI ONE no es otra herramienta suelta: es la capa que concentra control, reduce costos de terceros y hace que los sistemas del museo conversen entre sí.',
+    'Consolidar en AWS y operar con MALI ONE reduce el costo recurrente, apaga islas de proveedores y deja al museo con control propio sobre contenido, comunicaciones e infraestructura.',
 };

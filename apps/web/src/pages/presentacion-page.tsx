@@ -18,8 +18,10 @@ import { MALI_MARK_URL } from '@/components/mali-logo';
 import { moduleCardAccentStyles } from '@/lib/module-card-accents';
 import { cn } from '@/lib/utils';
 import {
-  PRESENTACION_ASSETS,
   PRESENTACION_LOGOS,
+  formatPresentacionUsd,
+  presentacionCostNote,
+  presentacionJourney,
   type PresentacionLogo,
 } from '@/lib/presentacion-content';
 import {
@@ -169,84 +171,216 @@ function ToolsSlide({ slide }: { slide: PresentacionSlide }) {
   );
 }
 
-function ValuesSlide({ slide }: { slide: PresentacionSlide }) {
-  return (
-    <SlideShell>
-      {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
-      <SlideTitle>{slide.title}</SlideTitle>
-      <div className="mt-10 grid gap-4 sm:grid-cols-2 sm:gap-5">
-        {slide.values?.map((item, i) => (
-          <div
-            key={item.title}
-            className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/15 backdrop-blur-sm sm:p-6"
-          >
-            <div className="mb-3 flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/20 text-sm font-bold text-sky-300">
-                {i + 1}
-              </span>
-              <h3 className="text-lg font-semibold text-white sm:text-xl">
-                {item.title}
-              </h3>
-            </div>
-            <p className="text-base leading-relaxed text-zinc-200 sm:text-lg">
-              {item.description}
-            </p>
-          </div>
-        ))}
-      </div>
-    </SlideShell>
-  );
-}
+function JourneySlide({ slide }: { slide: PresentacionSlide }) {
+  const stages = presentacionJourney.stages;
 
-function ContextSlide({ slide }: { slide: PresentacionSlide }) {
   return (
     <SlideShell className="justify-start pt-10 sm:justify-center sm:pt-12">
       {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
       <SlideTitle>{slide.title}</SlideTitle>
       {slide.body ? <SlideBody>{slide.body}</SlideBody> : null}
 
-      <div className="mt-8 grid min-h-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:items-center lg:gap-8">
-        <ol className="flex flex-col gap-3 sm:gap-4">
-          {slide.points?.map((point, i) => (
-            <li
-              key={point.title}
-              className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/15 backdrop-blur-sm sm:p-5"
-            >
-              <div className="mb-2 flex items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500/25 text-sm font-bold text-sky-200">
-                  {i + 1}
-                </span>
-                <h3 className="text-base font-semibold text-white sm:text-lg">
-                  {point.title}
-                </h3>
-              </div>
-              <p className="pl-11 text-sm leading-relaxed text-zinc-200 sm:text-base">
-                {point.description}
+      <div className="mt-10 flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-0">
+        {stages.map((stage, i) => (
+          <div key={stage.id} className="flex min-w-0 flex-1 items-stretch">
+            <div className="flex w-full flex-col rounded-2xl bg-white/5 p-5 ring-1 ring-white/15 backdrop-blur-sm sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-300/90">
+                {stage.label}
               </p>
-            </li>
-          ))}
-        </ol>
-
-        <div className="relative overflow-hidden rounded-2xl bg-white p-3 shadow-2xl ring-1 ring-white/25 sm:p-4">
-          {slide.image ? (
-            <img
-              src={`${PRESENTACION_ASSETS}/${slide.image}`}
-              alt={slide.title}
-              className="mx-auto max-h-[min(42vh,420px)] w-full object-contain"
-              draggable={false}
-            />
-          ) : null}
-          <p className="mt-3 text-center text-xs font-medium text-zinc-500">
-            Imagen temporal — reemplazar por diagrama consolidado
-          </p>
-        </div>
+              <h3 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+                {stage.title}
+              </h3>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-zinc-300 sm:text-base">
+                {stage.description}
+              </p>
+              <p className="mt-5 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                {formatPresentacionUsd(stage.totalUsd)}
+              </p>
+              <p className="mt-1 text-xs text-zinc-400">costo mensual del bloque</p>
+            </div>
+            {i < stages.length - 1 ? (
+              <div
+                className="hidden shrink-0 items-center px-2 text-sky-300/80 lg:flex"
+                aria-hidden
+              >
+                <ChevronRight className="h-8 w-8" />
+              </div>
+            ) : null}
+          </div>
+        ))}
       </div>
+
+      <p className="mt-6 max-w-4xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+        {presentacionCostNote}
+      </p>
+    </SlideShell>
+  );
+}
+
+function CostCell({
+  children,
+  muted,
+  className,
+}: {
+  children: React.ReactNode;
+  muted?: boolean;
+  className?: string;
+}) {
+  return (
+    <td
+      className={cn(
+        'px-2 py-1.5 align-top sm:px-3 sm:py-2',
+        muted ? 'text-zinc-500' : 'text-zinc-200',
+        className,
+      )}
+    >
+      {children}
+    </td>
+  );
+}
+
+function CostTableSlide({ slide }: { slide: PresentacionSlide }) {
+  const variant = slide.costTableVariant ?? 'antes';
+
+  return (
+    <SlideShell className="justify-start pt-8 sm:pt-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
+          <SlideTitle>{slide.title}</SlideTitle>
+          {slide.body ? (
+            <SlideBody className="mt-2 max-w-3xl text-base sm:text-lg">
+              {slide.body}
+            </SlideBody>
+          ) : null}
+        </div>
+        {slide.costTotalUsd != null ? (
+          <div className="rounded-xl bg-white/5 px-4 py-2 ring-1 ring-white/15">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+              Total
+            </p>
+            <p className="text-lg font-bold text-white sm:text-xl">
+              {formatPresentacionUsd(slide.costTotalUsd)}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="mt-5 min-h-0 flex-1 overflow-auto rounded-xl ring-1 ring-white/15">
+        {variant === 'antes' ? (
+          <table className="w-full min-w-[640px] border-collapse text-left text-xs sm:text-sm">
+            <thead className="sticky top-0 z-10 bg-[#0a1228]/95 backdrop-blur-sm">
+              <tr className="text-[10px] uppercase tracking-wider text-zinc-400 sm:text-xs">
+                <th className="px-2 py-2 font-semibold sm:px-3">Proveedor</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Servicio</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Sistemas</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Costo</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slide.costRowsAntes?.map((row, i) => (
+                <tr
+                  key={`${row.systems}-${i}`}
+                  className="border-t border-white/10"
+                >
+                  <CostCell muted={!row.provider}>{row.provider || '—'}</CostCell>
+                  <CostCell muted={!row.service}>{row.service || '—'}</CostCell>
+                  <CostCell>{row.systems}</CostCell>
+                  <CostCell
+                    className={cn(
+                      'whitespace-nowrap font-medium',
+                      row.cost != null && 'text-white',
+                    )}
+                  >
+                    {row.cost != null ? formatPresentacionUsd(row.cost) : '—'}
+                  </CostCell>
+                  <CostCell>{row.result}</CostCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+
+        {variant === 'ahora' ? (
+          <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
+            <thead className="sticky top-0 z-10 bg-[#0a1228]/95 backdrop-blur-sm">
+              <tr className="text-[10px] uppercase tracking-wider text-zinc-400 sm:text-xs">
+                <th className="px-2 py-2 font-semibold sm:px-3">Estado</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Proveedor</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Servicio</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Sistemas</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Actual</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Acción</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Objetivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slide.costRowsAhora?.map((row, i) => (
+                <tr
+                  key={`${row.provider}-${row.service}-${i}`}
+                  className="border-t border-white/10"
+                >
+                  <CostCell className="whitespace-nowrap text-sky-200/90">
+                    {row.status}
+                  </CostCell>
+                  <CostCell>{row.provider}</CostCell>
+                  <CostCell>{row.service}</CostCell>
+                  <CostCell>{row.systems}</CostCell>
+                  <CostCell className="whitespace-nowrap font-medium text-white">
+                    {formatPresentacionUsd(row.costCurrent)}
+                  </CostCell>
+                  <CostCell>{row.action}</CostCell>
+                  <CostCell className="whitespace-nowrap font-medium text-white">
+                    {formatPresentacionUsd(row.costTarget)}
+                  </CostCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+
+        {variant === 'futuro' ? (
+          <table className="w-full min-w-[560px] border-collapse text-left text-xs sm:text-sm">
+            <thead className="sticky top-0 z-10 bg-[#0a1228]/95 backdrop-blur-sm">
+              <tr className="text-[10px] uppercase tracking-wider text-zinc-400 sm:text-xs">
+                <th className="px-2 py-2 font-semibold sm:px-3">Proveedor</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Servicio</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Sistemas</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Costo objetivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slide.costRowsFuturo?.map((row, i) => (
+                <tr
+                  key={`${row.provider}-${row.service}-${i}`}
+                  className="border-t border-white/10"
+                >
+                  <CostCell>{row.provider}</CostCell>
+                  <CostCell>{row.service}</CostCell>
+                  <CostCell>{row.systems}</CostCell>
+                  <CostCell className="whitespace-nowrap font-medium text-white">
+                    {row.cost != null ? formatPresentacionUsd(row.cost) : '—'}
+                  </CostCell>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </div>
+
+      {variant === 'ahora' || variant === 'futuro' ? (
+        <p className="mt-3 text-xs leading-relaxed text-zinc-500 sm:text-sm">
+          {presentacionCostNote}
+        </p>
+      ) : null}
     </SlideShell>
   );
 }
 
 function GroupSlide({ slide }: { slide: PresentacionSlide }) {
   const count = slide.modules?.length ?? 0;
+  const dense = count > 4;
   const cols =
     count <= 2
       ? 'sm:grid-cols-2'
@@ -259,34 +393,49 @@ function GroupSlide({ slide }: { slide: PresentacionSlide }) {
       {slide.eyebrow ? <Eyebrow>{slide.eyebrow}</Eyebrow> : null}
       <SlideTitle>{slide.title}</SlideTitle>
       {slide.groupSummary ? (
-        <SlideBody>{slide.groupSummary}</SlideBody>
+        <SlideBody className={dense ? 'mt-2 text-base sm:text-lg' : undefined}>
+          {slide.groupSummary}
+        </SlideBody>
       ) : null}
-      <div className={cn('mt-8 grid gap-3 sm:gap-4', cols)}>
+      <div className={cn('mt-6 grid gap-2.5 sm:mt-8 sm:gap-3', cols)}>
         {slide.modules?.map((mod) => {
           const styles = moduleCardAccentStyles[mod.accent];
           return (
             <div
               key={mod.id}
               className={cn(
-                'rounded-2xl bg-gradient-to-t to-white/5 p-4 ring-1 ring-white/15 backdrop-blur-sm sm:p-5',
+                'rounded-2xl bg-gradient-to-t to-white/5 ring-1 ring-white/15 backdrop-blur-sm',
+                dense ? 'p-3 sm:p-4' : 'p-4 sm:p-5',
                 styles.gradient,
               )}
             >
               <div
                 className={cn(
-                  'mb-3 h-1.5 w-10 rounded-full',
+                  'mb-2 h-1.5 w-10 rounded-full sm:mb-3',
                   styles.icon.split(' ')[0],
                 )}
                 aria-hidden
               />
-              <h3 className="mb-2 text-base font-semibold text-white sm:text-lg">
+              <h3
+                className={cn(
+                  'mb-1.5 font-semibold text-white',
+                  dense ? 'text-sm sm:text-base' : 'text-base sm:text-lg',
+                )}
+              >
                 {mod.title}
               </h3>
-              <p className="text-sm leading-relaxed text-zinc-200 sm:text-[0.95rem]">
+              <p
+                className={cn(
+                  'leading-relaxed text-zinc-200',
+                  dense
+                    ? 'line-clamp-3 text-xs sm:text-sm'
+                    : 'text-sm sm:text-[0.95rem]',
+                )}
+              >
                 {mod.description}
               </p>
               {mod.replaces && mod.replaces.length > 0 ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:mt-3 sm:gap-2">
                   {mod.replaces.map((logo) => (
                     <ToolLogo key={logo.id} logo={logo} size="sm" />
                   ))}
@@ -360,10 +509,10 @@ function renderSlide(slide: PresentacionSlide) {
       return <TitleSlide slide={slide} />;
     case 'tools':
       return <ToolsSlide slide={slide} />;
-    case 'values':
-      return <ValuesSlide slide={slide} />;
-    case 'context':
-      return <ContextSlide slide={slide} />;
+    case 'journey':
+      return <JourneySlide slide={slide} />;
+    case 'costTable':
+      return <CostTableSlide slide={slide} />;
     case 'group':
       return <GroupSlide slide={slide} />;
     case 'roadmap':
