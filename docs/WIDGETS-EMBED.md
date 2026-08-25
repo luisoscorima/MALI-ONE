@@ -161,11 +161,12 @@ WHATSAPP_CRM_BASE_URL=
 WHATSAPP_CRM_SERVICE_TOKEN=
 # Espejo transitorio Sheet (leads Educación). Apagar al activar CRM Educación.
 EDUCACION_LEADS_SHEETS_ENABLED=false
-# Libro EP+CA (ID o URL). Pestañas:
-GOOGLE_SHEETS_LEADS_ID=
+# Un libro por área (ID o URL). Pestañas:
+GOOGLE_SHEETS_LEADS_EP_ID=
 GOOGLE_SHEETS_LEADS_TAB_EP=EP
+GOOGLE_SHEETS_LEADS_CA_ID=
 GOOGLE_SHEETS_LEADS_TAB_CA=CA
-# Libro aparte Diseño y Comunicaciones (ID o URL)
+# Libro Diseño y Comunicaciones (ID o URL)
 GOOGLE_SHEETS_LEADS_DISENO_ID=
 GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
 ```
@@ -174,7 +175,7 @@ GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
 
 Flujo: widget → `POST /api/widgets/educacion/leads` → ledger `EducacionLead` → sync WhatsApp CRM (`area` por query/body) → append opcional a Google Sheets.
 
-Enrutado Sheet: `/extensionprofesional/` → pestaña EP; `/diseno-y-comunicaciones/` → libro Diseño; Cursos de Arte → pestaña CA. WhatsApp: EP sigue en `educacion_ep` también para Diseño.
+Enrutado Sheet: `/extensionprofesional/` → libro EP; `/diseno-y-comunicaciones/` → libro Diseño; Cursos de Arte → libro CA. WhatsApp: EP sigue en `educacion_ep` también para Diseño.
 
 Query params del embed:
 

@@ -11,7 +11,8 @@ export type EducacionSheetBucket = 'ep' | 'ca' | 'diseno';
  * Espejo transitorio hacia Google Sheets de leads Educación.
  * Apagar con EDUCACION_LEADS_SHEETS_ENABLED=false cuando CRM Educación reemplace el Sheet.
  *
- * - Libro principal (EP + CA): `GOOGLE_SHEETS_LEADS_ID` (ID o URL completa)
+ * - Libro EP: `GOOGLE_SHEETS_LEADS_EP_ID` (ID o URL completa)
+ * - Libro CA: `GOOGLE_SHEETS_LEADS_CA_ID` (ID o URL completa)
  * - Libro Diseño y Comunicaciones: `GOOGLE_SHEETS_LEADS_DISENO_ID` (ID o URL; aparte)
  *
  * Columnas (append):
@@ -56,11 +57,12 @@ export class EducacionLeadsSheetsService {
     const { spreadsheetId, tab } = this.resolveTarget(bucket);
 
     if (!spreadsheetId) {
-      throw new Error(
-        bucket === 'diseno'
-          ? 'GOOGLE_SHEETS_LEADS_DISENO_ID no configurado'
-          : 'GOOGLE_SHEETS_LEADS_ID no configurado',
-      );
+      const envByBucket: Record<EducacionSheetBucket, string> = {
+        ep: 'GOOGLE_SHEETS_LEADS_EP_ID',
+        ca: 'GOOGLE_SHEETS_LEADS_CA_ID',
+        diseno: 'GOOGLE_SHEETS_LEADS_DISENO_ID',
+      };
+      throw new Error(`${envByBucket[bucket]} no configurado`);
     }
 
     const sheets = this.getSheetsClient();
@@ -106,18 +108,18 @@ export class EducacionLeadsSheetsService {
         tab: this.tabName('GOOGLE_SHEETS_LEADS_TAB_DISENO', 'Diseno'),
       };
     }
-
-    const mainId = this.parseSpreadsheetRef(
-      this.config.get('GOOGLE_SHEETS_LEADS_ID'),
-    );
     if (bucket === 'ca') {
       return {
-        spreadsheetId: mainId,
+        spreadsheetId: this.parseSpreadsheetRef(
+          this.config.get('GOOGLE_SHEETS_LEADS_CA_ID'),
+        ),
         tab: this.tabName('GOOGLE_SHEETS_LEADS_TAB_CA', 'CA'),
       };
     }
     return {
-      spreadsheetId: mainId,
+      spreadsheetId: this.parseSpreadsheetRef(
+        this.config.get('GOOGLE_SHEETS_LEADS_EP_ID'),
+      ),
       tab: this.tabName('GOOGLE_SHEETS_LEADS_TAB_EP', 'EP'),
     };
   }
