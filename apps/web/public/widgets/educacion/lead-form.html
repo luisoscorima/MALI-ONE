@@ -190,7 +190,7 @@
         <label for="apellidos">Apellidos<span class="req">*</span></label>
         <input id="apellidos" name="apellidos" type="text" required autocomplete="family-name" />
       </div>
-      <div class="lead-form__field">
+      <div class="lead-form__field lead-form__field--dni" hidden>
         <label for="dni">DNI</label>
         <input id="dni" name="dni" type="text" inputmode="numeric" maxlength="20" />
       </div>
@@ -228,6 +228,9 @@
   <script src="../shared/widget-api.js"></script>
   <script>
 (function () {
+  // Temporal: quitar `hidden` del bloque DNI para volver a mostrarlo.
+  var SHOW_DNI_FIELD = false;
+
   var params = new URLSearchParams(location.search);
   var courseSlug = params.get('curso') || params.get('course') || '';
   var courseTitle = params.get('titulo') || params.get('title') || '';
@@ -252,6 +255,11 @@
   var btn = document.getElementById('submit-btn');
   var waLink = document.getElementById('wa-link');
   var api = (window.MALI_WIDGET_API || (location.origin + '/api/widgets')) + '/educacion/leads';
+
+  var dniFieldWrap = document.querySelector('.lead-form__field--dni');
+  if (dniFieldWrap) {
+    dniFieldWrap.hidden = !SHOW_DNI_FIELD;
+  }
 
   function buildWhatsAppUrl() {
     if (!waPhone) return '';
@@ -305,7 +313,7 @@
       return;
     }
 
-    var dni = val('dni');
+    var dni = SHOW_DNI_FIELD ? val('dni') : '';
     var email = val('email');
     var payload = {
       nombres: val('nombres'),
