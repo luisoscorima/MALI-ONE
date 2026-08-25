@@ -66,7 +66,7 @@ export class EducacionLeadsSheetsService {
     }
 
     const sheets = this.getSheetsClient();
-    const fecha = lead.createdAt.toISOString().slice(0, 19).replace('T', ' ');
+    const fecha = this.formatLimaTimestamp(lead.createdAt);
     const range = `'${tab.replace(/'/g, "''")}'!A:M`;
 
     await sheets.spreadsheets.values.append({
@@ -129,6 +129,25 @@ export class EducacionLeadsSheetsService {
       .trim()
       .replace(/^'+|'+$/g, '');
     return raw || fallback;
+  }
+
+  /** Fecha/hora en America/Lima (UTC-5) como `YYYY-MM-DD HH:mm:ss`. */
+  private formatLimaTimestamp(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+    const get = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((p) => p.type === type)?.value ?? '';
+    const hourRaw = get('hour');
+    const hour = hourRaw === '24' ? '00' : hourRaw;
+    return `${get('year')}-${get('month')}-${get('day')} ${hour}:${get('minute')}:${get('second')}`;
   }
 
   /** Acepta ID crudo o URL de Google Sheets. */
