@@ -56,6 +56,7 @@ export function AdminUsersPage() {
     null,
   );
   const [tempPassword, setTempPassword] = useState<{
+    email: string;
     password: string;
     forceChange: boolean;
   } | null>(null);
@@ -177,6 +178,7 @@ export function AdminUsersPage() {
         signOutAfterReset: resetSignOut,
       });
       setTempPassword({
+        email: resetTarget,
         password: result.temporaryPassword,
         forceChange: result.forceChangePassword,
       });
@@ -194,8 +196,13 @@ export function AdminUsersPage() {
   async function copyPassword() {
     if (!tempPassword) return;
     try {
-      await navigator.clipboard.writeText(tempPassword.password);
-      toast.success('Contraseña copiada al portapapeles');
+      const text = [
+        'https://accounts.google.com/',
+        tempPassword.email,
+        tempPassword.password,
+      ].join('\n');
+      await navigator.clipboard.writeText(text);
+      toast.success('Acceso copiado al portapapeles');
     } catch {
       toast.error('No se pudo copiar');
     }
@@ -370,16 +377,23 @@ export function AdminUsersPage() {
       {tempPassword && (
         <AlertBanner variant="success" onDismiss={() => setTempPassword(null)}>
           <div className="flex flex-wrap items-center gap-3">
-            <span>
-              Contraseña:{' '}
-              <strong className="font-mono">{tempPassword.password}</strong>
-              {tempPassword.forceChange
-                ? ' · Deberá cambiarla al iniciar sesión.'
-                : ' · Lista para usar tal cual.'}
-              {' · Se ocultará sola en 90 s.'}
-            </span>
+            <div className="min-w-0 space-y-1">
+              <p className="font-mono text-sm break-all">
+                https://accounts.google.com/
+                <br />
+                {tempPassword.email}
+                <br />
+                <strong>{tempPassword.password}</strong>
+              </p>
+              <p className="text-sm">
+                {tempPassword.forceChange
+                  ? 'Deberá cambiarla al iniciar sesión.'
+                  : 'Lista para usar tal cual.'}
+                {' · Se ocultará sola en 90 s.'}
+              </p>
+            </div>
             <Button variant="outline" onClick={() => void copyPassword()}>
-              Copiar
+              Copiar acceso
             </Button>
           </div>
         </AlertBanner>
