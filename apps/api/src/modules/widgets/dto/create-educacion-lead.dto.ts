@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  Equals,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -56,6 +57,7 @@ export class CreateEducacionLeadDto {
   optInMarketing!: boolean;
 
   @IsBoolean()
+  @Equals(true, { message: 'Debes aceptar las políticas de privacidad' })
   acceptPrivacy!: boolean;
 
   @IsOptional()
