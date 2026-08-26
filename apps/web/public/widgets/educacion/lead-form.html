@@ -88,6 +88,80 @@
       margin-bottom: 0;
     }
 
+    .lead-form__prefix {
+      position: relative;
+    }
+
+    .lead-form__prefix-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+      border-radius: 2px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--lead-input-text);
+      background: var(--lead-input-bg);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .lead-form__prefix-btn:focus {
+      outline: 2px solid rgba(16, 5, 159, 0.45);
+      outline-offset: 1px;
+    }
+
+    .lead-form__prefix-flag {
+      width: 22px;
+      height: 16px;
+      object-fit: cover;
+      border-radius: 1px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    .lead-form__prefix-code {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .lead-form__prefix-list {
+      position: absolute;
+      z-index: 30;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      margin: 0;
+      padding: 4px 0;
+      list-style: none;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #fff;
+      color: #1a1a1a;
+      border-radius: 2px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .lead-form__prefix-list[hidden] {
+      display: none;
+    }
+
+    .lead-form__prefix-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .lead-form__prefix-option:hover,
+    .lead-form__prefix-option--active {
+      background: rgba(16, 5, 159, 0.08);
+    }
+
     .lead-form__field input:focus {
       outline: 2px solid rgba(16, 5, 159, 0.45);
       outline-offset: 1px;
@@ -208,18 +282,29 @@
       </div>
       <div class="lead-form__phone-row">
         <div class="lead-form__field">
-          <label for="phonePrefix">Prefijo<span class="req">*</span></label>
-          <select id="phonePrefix" name="phonePrefix" required autocomplete="tel-country-code">
-            <option value="51" selected>🇵🇪 Perú (+51)</option>
-            <option value="54">🇦🇷 Argentina (+54)</option>
-            <option value="591">🇧🇴 Bolivia (+591)</option>
-            <option value="56">🇨🇱 Chile (+56)</option>
-            <option value="57">🇨🇴 Colombia (+57)</option>
-            <option value="593">🇪🇨 Ecuador (+593)</option>
-            <option value="52">🇲🇽 México (+52)</option>
-            <option value="34">🇪🇸 España (+34)</option>
-            <option value="1">🇺🇸 Estados Unidos (+1)</option>
-          </select>
+          <label for="phonePrefixBtn">Prefijo<span class="req">*</span></label>
+          <div class="lead-form__prefix" id="phonePrefixWrap">
+            <input type="hidden" id="phonePrefix" name="phonePrefix" value="51" />
+            <button
+              type="button"
+              class="lead-form__prefix-btn"
+              id="phonePrefixBtn"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="phonePrefixList"
+            >
+              <img
+                class="lead-form__prefix-flag"
+                id="phonePrefixFlag"
+                src="flags/pe.png"
+                alt="Perú"
+                width="22"
+                height="16"
+              />
+              <span class="lead-form__prefix-code" id="phonePrefixLabel">+51</span>
+            </button>
+            <ul class="lead-form__prefix-list" id="phonePrefixList" role="listbox" hidden></ul>
+          </div>
         </div>
         <div class="lead-form__field">
           <label for="celular">Celular<span class="req">*</span></label>
@@ -298,6 +383,77 @@
   if (dniFieldWrap) {
     dniFieldWrap.hidden = !SHOW_DNI_FIELD;
   }
+
+  var PHONE_PREFIXES = [
+    { value: '51', iso: 'pe', label: 'Perú' },
+    { value: '54', iso: 'ar', label: 'Argentina' },
+    { value: '591', iso: 'bo', label: 'Bolivia' },
+    { value: '56', iso: 'cl', label: 'Chile' },
+    { value: '57', iso: 'co', label: 'Colombia' },
+    { value: '593', iso: 'ec', label: 'Ecuador' },
+    { value: '52', iso: 'mx', label: 'México' },
+    { value: '34', iso: 'es', label: 'España' },
+    { value: '1', iso: 'us', label: 'Estados Unidos' },
+  ];
+
+  var prefixWrap = document.getElementById('phonePrefixWrap');
+  var prefixInput = document.getElementById('phonePrefix');
+  var prefixBtn = document.getElementById('phonePrefixBtn');
+  var prefixFlag = document.getElementById('phonePrefixFlag');
+  var prefixLabel = document.getElementById('phonePrefixLabel');
+  var prefixList = document.getElementById('phonePrefixList');
+
+  function setPhonePrefix(item) {
+    prefixInput.value = item.value;
+    prefixFlag.src = 'flags/' + item.iso + '.png';
+    prefixFlag.alt = item.label;
+    prefixLabel.textContent = '+' + item.value;
+    prefixList.querySelectorAll('.lead-form__prefix-option').forEach(function (el) {
+      el.classList.toggle(
+        'lead-form__prefix-option--active',
+        el.getAttribute('data-value') === item.value,
+      );
+    });
+    prefixList.hidden = true;
+    prefixBtn.setAttribute('aria-expanded', 'false');
+    notifyResize();
+  }
+
+  PHONE_PREFIXES.forEach(function (item) {
+    var li = document.createElement('li');
+    li.className = 'lead-form__prefix-option';
+    li.setAttribute('role', 'option');
+    li.setAttribute('data-value', item.value);
+    li.innerHTML =
+      '<img class="lead-form__prefix-flag" src="flags/' +
+      item.iso +
+      '.png" alt="" width="22" height="16" />' +
+      '<span>' +
+      item.label +
+      ' (+' +
+      item.value +
+      ')</span>';
+    li.addEventListener('click', function () {
+      setPhonePrefix(item);
+    });
+    prefixList.appendChild(li);
+  });
+
+  setPhonePrefix(PHONE_PREFIXES[0]);
+
+  prefixBtn.addEventListener('click', function () {
+    var willOpen = prefixList.hidden;
+    prefixList.hidden = !willOpen;
+    prefixBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    notifyResize();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!prefixWrap.contains(e.target)) {
+      prefixList.hidden = true;
+      prefixBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
 
   function buildWhatsAppUrl() {
     if (!waPhone) return '';
