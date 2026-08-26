@@ -377,6 +377,16 @@
     return '';
   }
 
+  function normalizePersonName(raw) {
+    var collapsed = String(raw || '').trim().replace(/\s+/g, ' ');
+    if (!collapsed) return '';
+    return collapsed.split(' ').filter(Boolean).map(function (word) {
+      var lower = word.toLocaleLowerCase('es-PE');
+      if (!lower) return '';
+      return lower.charAt(0).toLocaleUpperCase('es-PE') + lower.slice(1);
+    }).join(' ');
+  }
+
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
     setMsg('');
@@ -397,8 +407,8 @@
     }
 
     var payload = {
-      nombres: val('nombres'),
-      apellidos: val('apellidos'),
+      nombres: normalizePersonName(val('nombres')),
+      apellidos: normalizePersonName(val('apellidos')),
       dni: dni || undefined,
       celular: buildCelularE164(),
       email: email || undefined,

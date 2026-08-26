@@ -233,6 +233,7 @@ export { APP_PERMISSION_MODULES };
 export {
   EDUCACION_LEAD_FUENTE,
   EDUCACION_LEAD_SOURCE,
+  normalizePersonName,
 } from './educacion-leads';
 
 import type { QrStyleDto } from './qr-style';

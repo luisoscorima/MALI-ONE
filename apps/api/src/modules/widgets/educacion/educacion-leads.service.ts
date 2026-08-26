@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   EDUCACION_LEAD_FUENTE,
   EDUCACION_LEAD_SOURCE,
+  normalizePersonName,
 } from '@mali-one/shared';
 import type { EducacionLead } from '@prisma/client';
 import { PrismaService } from '../../../core/prisma/prisma.service';
@@ -41,8 +42,8 @@ export class EducacionLeadsService {
 
     const lead = await this.prisma.educacionLead.create({
       data: {
-        nombres: dto.nombres.trim(),
-        apellidos: dto.apellidos.trim(),
+        nombres: normalizePersonName(dto.nombres),
+        apellidos: normalizePersonName(dto.apellidos),
         dni: dto.dni?.trim() || null,
         celular: dto.celular.trim(),
         email: dto.email?.trim().toLowerCase() || null,
