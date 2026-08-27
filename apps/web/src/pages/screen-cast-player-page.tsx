@@ -310,14 +310,11 @@ export function ScreenCastPlayerPage() {
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
           : null;
-      const startItem = data.items[pos?.index ?? 0];
-      if (startItem?.mediaType !== 'video') {
-        await warmupItem(
-          startItem,
-          MEASURE_TIMEOUT_MS,
-          warmVideoRef.current,
-        );
-      }
+      await warmupItem(
+        data.items[pos?.index ?? 0],
+        MEASURE_TIMEOUT_MS,
+        warmVideoRef.current,
+      );
       emitReady(syncId, data.playlistId, durations);
     },
     [applyConfig, emitReady, nowServer],
@@ -414,14 +411,11 @@ export function ScreenCastPlayerPage() {
           localDurationsRef.current = durations;
           if (payload.epochMs) {
             const pos = positionAt(durations, payload.epochMs, nowServer());
-            const startItem = data.items[pos?.index ?? 0];
-            if (startItem?.mediaType !== 'video') {
-              await warmupItem(
-                startItem,
-                MEASURE_TIMEOUT_MS,
-                warmVideoRef.current,
-              );
-            }
+            await warmupItem(
+              data.items[pos?.index ?? 0],
+              MEASURE_TIMEOUT_MS,
+              warmVideoRef.current,
+            );
             if (token !== syncTokenRef.current) return;
             applyGo({
               syncId: payload.syncId ?? undefined,
@@ -740,14 +734,6 @@ export function ScreenCastPlayerPage() {
       }
     } else if (epoch != null && item.mediaType === 'video') {
       const pos = positionAt(durationsRef.current, epoch, nowServer());
-      if (pos?.waitMs) {
-        timerRef.current = window.setTimeout(() => {
-          setPlaybackGen((g) => g + 1);
-        }, pos.waitMs);
-        return () => {
-          clearTimer();
-        };
-      }
       if (pos && pos.index !== index) {
         indexRef.current = pos.index;
         setIndex(pos.index);
@@ -815,23 +801,42 @@ export function ScreenCastPlayerPage() {
       }
 
       const startPlayback = () => {
-        if (
-          epoch != null &&
-          startOffsetMs > VIDEO_START_SEEK_MS &&
-          Number.isFinite(video.duration)
-        ) {
-          const t = Math.min(
-            startOffsetMs / 1000,
-            Math.max(0, video.duration - 0.12),
-          );
-          if (t > 0.08) video.currentTime = t;
+        const playNow = () => {
+          const epochMs = epochMsRef.current;
+          let offset = startOffsetMs;
+          if (epochMs != null) {
+            const pos = positionAt(durationsRef.current, epochMs, nowServer());
+            if (pos && pos.index === index) offset = pos.offsetMs;
+          }
+          if (
+            offset > VIDEO_START_SEEK_MS &&
+            Number.isFinite(video.duration)
+          ) {
+            const t = Math.min(
+              offset / 1000,
+              Math.max(0, video.duration - 0.12),
+            );
+            if (t > 0.08) video.currentTime = t;
+          }
+          void video.play().catch(() => {
+            if (epoch == null) scheduleAdvance();
+          });
+        };
+
+        const epochMs = epochMsRef.current;
+        if (epochMs == null) {
+          playNow();
+          return;
         }
-        void video.play().catch(() => {
-          if (epoch == null) scheduleAdvance();
-        });
+        const delay = Math.max(0, epochMs - nowServer());
+        if (delay > 0) {
+          timerRef.current = window.setTimeout(playNow, delay);
+          return;
+        }
+        playNow();
       };
 
-      const onMeta = () => {
+      const onReady = () => {
         if (Number.isFinite(video.duration) && video.duration > 0) {
           const actualMs = Math.round(video.duration * 1000);
           const durations = [...durationsRef.current];
@@ -853,14 +858,15 @@ export function ScreenCastPlayerPage() {
       }
 
       videoUrlRef.current = item.mediaUrl;
-      video.addEventListener('loadedmetadata', onMeta);
+      const readyEvent = epoch != null ? 'canplay' : 'loadedmetadata';
+      video.addEventListener(readyEvent, onReady);
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.src = item.mediaUrl;
       if (epoch == null) scheduleAdvance();
 
       return () => {
-        video.removeEventListener('loadedmetadata', onMeta);
+        video.removeEventListener(readyEvent, onReady);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
         clearTimer();
