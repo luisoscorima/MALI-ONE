@@ -23,8 +23,8 @@ import {
 import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
-  DRIFT_SEEK_MS,
   MEASURE_TIMEOUT_MS,
+  VIDEO_START_SEEK_MS,
   clockOffsetFromAck,
   measureAllDurations,
   positionAt,
@@ -747,9 +747,8 @@ export function ScreenCastPlayerPage() {
 
       const onEnded = () => {
         if (epochMsRef.current != null) {
-          if (!jumpToClock()) {
-            // Hold last frame until the shared clock advances.
-          }
+          // Prefer the shared timeline; if the slot is longer than the file, advance.
+          if (!jumpToClock()) advance();
           return;
         }
         advance();
@@ -771,7 +770,15 @@ export function ScreenCastPlayerPage() {
       }
 
       const onMeta = () => {
-        if (startOffsetMs > 120 && Number.isFinite(video.duration)) {
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          const actualMs = Math.round(video.duration * 1000);
+          const durations = [...durationsRef.current];
+          if (durations.length > index) {
+            durations[index] = Math.max(durations[index] || 0, actualMs);
+            durationsRef.current = durations;
+          }
+        }
+        if (startOffsetMs > VIDEO_START_SEEK_MS && Number.isFinite(video.duration)) {
           const t = Math.min(
             startOffsetMs / 1000,
             Math.max(0, video.duration - 0.12),
@@ -787,7 +794,8 @@ export function ScreenCastPlayerPage() {
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.src = item.mediaUrl;
-      if (epoch != null) scheduleAdvance();
+      // Synced playlists: item changes come from the shared clock / onEnded, not timers.
+      if (epoch == null) scheduleAdvance();
 
       return () => {
         video.removeEventListener('loadedmetadata', onMeta);
@@ -823,21 +831,6 @@ export function ScreenCastPlayerPage() {
       if (pos.index !== indexRef.current) {
         indexRef.current = pos.index;
         setIndex(pos.index);
-        return;
-      }
-      const video = videoRef.current;
-      const item = itemsRef.current[pos.index];
-      if (
-        item?.mediaType === 'video' &&
-        video &&
-        !video.paused &&
-        Number.isFinite(video.currentTime) &&
-        pos.remainingMs > 300
-      ) {
-        const drift = Math.abs(video.currentTime * 1000 - pos.offsetMs);
-        if (drift > DRIFT_SEEK_MS) {
-          video.currentTime = pos.offsetMs / 1000;
-        }
       }
     }, DRIFT_INTERVAL_MS);
     return () => window.clearInterval(id);

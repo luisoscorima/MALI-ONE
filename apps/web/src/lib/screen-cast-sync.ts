@@ -1,9 +1,10 @@
 import type { ScreenCastPublicItemDto } from '@mali-one/shared';
 import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
-export const MEASURE_TIMEOUT_MS = 700;
-export const CLIENT_GO_FALLBACK_MS = 1_800;
-export const DRIFT_SEEK_MS = 450;
+export const MEASURE_TIMEOUT_MS = 10_000;
+export const CLIENT_GO_FALLBACK_MS = 15_000;
+/** Only seek videos on item start — in-playback seeks cause visible freezes on TVs. */
+export const VIDEO_START_SEEK_MS = 120;
 export const DRIFT_INTERVAL_MS = 750;
 
 export type PlaylistClock = {
@@ -119,7 +120,7 @@ export async function measureItemDurationMs(
   return new Promise((resolve) => {
     const video = document.createElement('video');
     video.muted = true;
-    video.preload = 'metadata';
+    video.preload = 'auto';
     video.playsInline = true;
     let done = false;
     const finish = (ms: number) => {
@@ -134,23 +135,31 @@ export async function measureItemDurationMs(
       }
       resolve(ms);
     };
+    const readDuration = () => {
+      const d = video.duration;
+      if (Number.isFinite(d) && d > 0) {
+        finish(Math.round(d * 1000));
+        return true;
+      }
+      return false;
+    };
     const timer = window.setTimeout(
       () => finish(fallbackDuration(item)),
       timeoutMs,
     );
     video.onloadedmetadata = () => {
-      const d = video.duration;
-      if (Number.isFinite(d) && d > 0) {
-        finish(Math.round(d * 1000));
-        return;
-      }
+      if (readDuration()) return;
       finish(fallbackDuration(item));
+    };
+    video.ondurationchange = () => {
+      readDuration();
     };
     video.onerror = () => finish(fallbackDuration(item));
     if (isCorsCacheableMediaUrl(item.mediaUrl)) {
       video.crossOrigin = 'anonymous';
     }
     video.src = item.mediaUrl;
+    video.load();
   });
 }
 

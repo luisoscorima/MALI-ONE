@@ -13,7 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
-const BARRIER_MS = 1_400;
+const BARRIER_MS = 12_000;
 const EPOCH_LEAD_MS = 50;
 const TICK_MS = 5_000;
 
