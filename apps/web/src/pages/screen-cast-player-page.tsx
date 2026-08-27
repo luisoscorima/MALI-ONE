@@ -20,6 +20,7 @@ import {
   isCorsCacheableMediaUrl,
   registerScreenCastServiceWorker,
 } from '@/lib/screen-cast-offline';
+import { startScreenCastAutoUpdate } from '@/lib/screen-cast-update';
 import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
@@ -533,6 +534,16 @@ export function ScreenCastPlayerPage() {
     void registerScreenCastServiceWorker();
     void loadConfigImmediate();
   }, [loadConfigImmediate]);
+
+  useEffect(() => {
+    if (isPreview) return;
+    startScreenCastAutoUpdate({
+      isVideoPlaying: () => {
+        const video = videoRef.current;
+        return !!video && !video.paused && !video.ended;
+      },
+    });
+  }, [isPreview]);
 
   useEffect(() => {
     if (!screenKey || isPreview) return;
