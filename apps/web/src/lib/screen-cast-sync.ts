@@ -117,6 +117,7 @@ export async function measureItemDurationMs(
   timeoutMs: number,
 ): Promise<number> {
   if (item.mediaType !== 'video') return fallbackDuration(item);
+  if (item.durationMs > 10_000) return item.durationMs;
 
   return new Promise((resolve) => {
     const video = document.createElement('video');

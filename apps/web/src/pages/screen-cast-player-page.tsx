@@ -171,6 +171,7 @@ export function ScreenCastPlayerPage() {
   const localDurationsRef = useRef<number[]>([]);
   const clockOffsetRef = useRef(0);
   const syncTokenRef = useRef(0);
+  const videoUrlRef = useRef<string | null>(null);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
 
@@ -308,11 +309,14 @@ export function ScreenCastPlayerPage() {
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
           : null;
-      await warmupItem(
-        data.items[pos?.index ?? 0],
-        MEASURE_TIMEOUT_MS,
-        warmVideoRef.current,
-      );
+      const startItem = data.items[pos?.index ?? 0];
+      if (startItem?.mediaType !== 'video') {
+        await warmupItem(
+          startItem,
+          MEASURE_TIMEOUT_MS,
+          warmVideoRef.current,
+        );
+      }
       emitReady(syncId, data.playlistId, durations);
     },
     [applyConfig, emitReady, nowServer],
@@ -409,11 +413,14 @@ export function ScreenCastPlayerPage() {
           localDurationsRef.current = durations;
           if (payload.epochMs) {
             const pos = positionAt(durations, payload.epochMs, nowServer());
-            await warmupItem(
-              data.items[pos?.index ?? 0],
-              MEASURE_TIMEOUT_MS,
-              warmVideoRef.current,
-            );
+            const startItem = data.items[pos?.index ?? 0];
+            if (startItem?.mediaType !== 'video') {
+              await warmupItem(
+                startItem,
+                MEASURE_TIMEOUT_MS,
+                warmVideoRef.current,
+              );
+            }
             if (token !== syncTokenRef.current) return;
             applyGo({
               syncId: payload.syncId ?? undefined,
@@ -661,20 +668,22 @@ export function ScreenCastPlayerPage() {
 
   useEffect(() => {
     clearTimer();
-    destroyVideo(videoRef.current);
-    window.scrollTo(0, 0);
 
     const items = itemsRef.current;
     const item = items[index];
     if (!item || !config || config.empty) {
+      destroyVideo(videoRef.current);
+      videoUrlRef.current = null;
       emitStatus({ index: 0, total: 0 });
       return () => {
         clearTimer();
         destroyVideo(videoRef.current);
+        videoUrlRef.current = null;
       };
     }
 
     emitStatus({ index, total: items.length });
+    window.scrollTo(0, 0);
 
     const nextItem = items[(index + 1) % items.length];
     if (nextItem && nextItem !== item) {
@@ -700,7 +709,25 @@ export function ScreenCastPlayerPage() {
     const epoch = epochMsRef.current;
     let startOffsetMs = 0;
     let remainingMs = item.durationMs || 10_000;
-    if (epoch != null) {
+    if (epoch != null && item.mediaType !== 'video') {
+      const pos = positionAt(durationsRef.current, epoch, nowServer());
+      if (pos?.waitMs) {
+        timerRef.current = window.setTimeout(() => {
+          setPlaybackGen((g) => g + 1);
+        }, pos.waitMs);
+        return () => {
+          clearTimer();
+        };
+      }
+      if (pos && pos.index !== index) {
+        indexRef.current = pos.index;
+        setIndex(pos.index);
+        return;
+      }
+      if (pos && pos.index === index) {
+        remainingMs = pos.remainingMs;
+      }
+    } else if (epoch != null && item.mediaType === 'video') {
       const pos = positionAt(durationsRef.current, epoch, nowServer());
       if (pos?.waitMs) {
         timerRef.current = window.setTimeout(() => {
@@ -717,7 +744,6 @@ export function ScreenCastPlayerPage() {
       }
       if (pos && pos.index === index) {
         startOffsetMs = pos.offsetMs;
-        remainingMs = pos.remainingMs;
       }
     }
 
@@ -745,10 +771,18 @@ export function ScreenCastPlayerPage() {
       const video = videoRef.current;
       if (!video) return;
 
+      const sameSource =
+        videoUrlRef.current === item.mediaUrl &&
+        (video.src === item.mediaUrl || video.src.endsWith(item.mediaUrl));
+
       const onEnded = () => {
         if (epochMsRef.current != null) {
-          // Prefer the shared timeline; if the slot is longer than the file, advance.
-          if (!jumpToClock()) advance();
+          if (jumpToClock()) return;
+          if (itemsRef.current.length === 1) {
+            setPlaybackGen((g) => g + 1);
+            return;
+          }
+          advance();
           return;
         }
         advance();
@@ -769,16 +803,12 @@ export function ScreenCastPlayerPage() {
         video.removeAttribute('crossorigin');
       }
 
-      const onMeta = () => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          const actualMs = Math.round(video.duration * 1000);
-          const durations = [...durationsRef.current];
-          if (durations.length > index) {
-            durations[index] = Math.max(durations[index] || 0, actualMs);
-            durationsRef.current = durations;
-          }
-        }
-        if (startOffsetMs > VIDEO_START_SEEK_MS && Number.isFinite(video.duration)) {
+      const startPlayback = () => {
+        if (
+          epoch != null &&
+          startOffsetMs > VIDEO_START_SEEK_MS &&
+          Number.isFinite(video.duration)
+        ) {
           const t = Math.min(
             startOffsetMs / 1000,
             Math.max(0, video.duration - 0.12),
@@ -790,21 +820,44 @@ export function ScreenCastPlayerPage() {
         });
       };
 
+      const onMeta = () => {
+        if (Number.isFinite(video.duration) && video.duration > 0) {
+          const actualMs = Math.round(video.duration * 1000);
+          const durations = [...durationsRef.current];
+          if (durations.length > index) {
+            durations[index] = Math.max(durations[index] || 0, actualMs);
+            durationsRef.current = durations;
+          }
+        }
+        startPlayback();
+      };
+
+      if (sameSource && !video.ended) {
+        videoUrlRef.current = item.mediaUrl;
+        if (video.paused) startPlayback();
+        if (epoch == null) scheduleAdvance();
+        return () => {
+          clearTimer();
+        };
+      }
+
+      videoUrlRef.current = item.mediaUrl;
       video.addEventListener('loadedmetadata', onMeta);
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.src = item.mediaUrl;
-      // Synced playlists: item changes come from the shared clock / onEnded, not timers.
       if (epoch == null) scheduleAdvance();
 
       return () => {
         video.removeEventListener('loadedmetadata', onMeta);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
-        destroyVideo(video);
         clearTimer();
       };
     }
+
+    destroyVideo(videoRef.current);
+    videoUrlRef.current = null;
 
     scheduleAdvance();
     return () => {
@@ -826,6 +879,14 @@ export function ScreenCastPlayerPage() {
     const id = window.setInterval(() => {
       const epoch = epochMsRef.current;
       if (epoch == null || itemsRef.current.length === 0) return;
+
+      const currentItem = itemsRef.current[indexRef.current];
+      if (currentItem?.mediaType === 'video') {
+        const video = videoRef.current;
+        // Videos play natively — only resync once they finish.
+        if (video && !video.ended) return;
+      }
+
       const pos = positionAt(durationsRef.current, epoch, nowServer());
       if (!pos) return;
       if (pos.index !== indexRef.current) {
