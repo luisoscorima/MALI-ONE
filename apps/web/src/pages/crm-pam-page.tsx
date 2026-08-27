@@ -8,7 +8,7 @@ import type {
   PamPlanDto,
   PamRegistrationDto,
 } from '@mali-one/shared';
-import { PAM_DEFAULT_PAYMENT_METHOD } from '@mali-one/shared';
+import { PAM_DEFAULT_PAYMENT_METHOD, formatLimaDateTime } from '@mali-one/shared';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -158,10 +158,6 @@ function loadStoredVisibleCols(): Set<string> | null {
 function formatDate(iso: string | null) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-PE');
-}
-
-function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString('es-PE');
 }
 
 function toDateInput(iso: string | null) {
@@ -1135,7 +1131,7 @@ export function CrmPamPage() {
               <span className="mr-1 text-muted-foreground">
                 {expanded ? '▾' : '▸'}
               </span>
-              {formatDateTime(p.createdAt)}
+              {formatLimaDateTime(p.createdAt)}
             </>
           );
         },

@@ -87,18 +87,29 @@ export class PamEmailService {
       return;
     }
 
-    const from =
-      this.config.get('PAM_SMTP_FROM') ?? 'pam@mali.pe';
-
     try {
       await transport.sendMail({
-        from,
+        from: 'pam@mali.pe',
         to: reg.correo,
         subject: 'Bienvenido al Programa Amigos del MALI',
-        html: `<p>Hola ${reg.nombres},</p>
-<p>Gracias por unirte al Programa Amigos del MALI (plan ${reg.plan}).</p>
-<p>Tu membresía está activa. Te esperamos en el museo.</p>
-<p>Equipo PAM — Museo de Arte de Lima</p>`,
+        html: `<p>¡Bienvenido/a al Programa Amigos del MALI!</p>
+<p>Nos alegra mucho darte la bienvenida a la comunidad PAM. 💙</p>
+<p>Desde ahora podrás disfrutar de una serie de beneficios especiales pensados para que vivas el MALI de una manera más cercana y participativa.</p>
+<p><strong>🎟️ Algunos de tus beneficios</strong></p>
+<p>Como miembro del PAM podrás disfrutar, entre otros, de:</p>
+<ul>
+<li>Ingreso gratuito al MALI durante la vigencia de tu membresía.</li>
+<li>Descuentos en talleres y actividades organizadas por el museo.</li>
+<li>Descuentos especiales en productos del MALI.</li>
+<li>Invitaciones a inauguraciones y visitas guiadas.</li>
+<li>Acceso a actividades especiales, como La Noche MALI y otras experiencias para nuestra comunidad.</li>
+<li>Una visita guiada especial durante tu mes de cumpleaños. 🎂</li>
+</ul>
+<p>Además, recibirás información sobre nuevas exposiciones, actividades y beneficios exclusivos para miembros.</p>
+<p><strong>¿Tienes alguna consulta?</strong></p>
+<p>Si tienes dudas sobre tu membresía, beneficios o cómo utilizarlos, puedes comunicarte con nosotros a través de WhatsApp al 923998190. Estaremos encantados de ayudarte.</p>
+<p>¡Gracias por ser parte del Programa Amigos del MALI!<br>Esperamos verte pronto en el museo. 💙</p>
+<p>Programa Amigos del MALI (PAM)</p>`,
       });
       await this.setWelcomeStatus(reg.id, PamEmailStatus.ENVIADO);
     } catch (err) {

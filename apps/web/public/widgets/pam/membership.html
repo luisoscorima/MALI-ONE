@@ -1792,6 +1792,97 @@
       resize: vertical;
     }
 
+    .pam-form__phone-row {
+      display: grid;
+      grid-template-columns: minmax(108px, 38%) 1fr;
+      gap: 0.9em;
+      grid-column: 1 / -1;
+    }
+
+    @media (min-width: 560px) {
+      .pam-form__phone-row {
+        grid-column: span 2;
+      }
+    }
+
+    .pam-form__phone-row .pam-field {
+      margin-bottom: 0;
+    }
+
+    .pam-field__prefix {
+      position: relative;
+    }
+
+    .pam-field__prefix-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 2px solid var(--border, rgba(0, 0, 0, 0.12));
+      border-radius: var(--radius-sm, 0);
+      padding: 0.75em 0.85em;
+      font-size: 1.15rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--bg, #fff);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .pam-field__prefix-btn:focus {
+      outline: 2px solid var(--accent-glow, rgba(108, 221, 199, 0.35));
+      outline-offset: 1px;
+    }
+
+    .pam-field__prefix-flag {
+      width: 22px;
+      height: 16px;
+      object-fit: cover;
+      border-radius: 1px;
+      flex-shrink: 0;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+    }
+
+    .pam-field__prefix-code {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .pam-field__prefix-list {
+      position: absolute;
+      z-index: 40;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      margin: 0;
+      padding: 4px 0;
+      list-style: none;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #fff;
+      color: #1a1a1a;
+      border-radius: 2px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    }
+
+    .pam-field__prefix-list[hidden] {
+      display: none;
+    }
+
+    .pam-field__prefix-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+
+    .pam-field__prefix-option:hover,
+    .pam-field__prefix-option--active {
+      background: var(--accent-soft, rgba(108, 221, 199, 0.15));
+    }
+
     .pam-field__error {
       display: none;
       font-size: 1.2rem;
@@ -2152,15 +2243,42 @@
           </div>
 
           <div class="pam-field">
-            <label for="reg-dni">DNI <span>*</span></label>
-            <input type="text" id="reg-dni" name="dni" inputmode="numeric" maxlength="8" pattern="[0-9]{8}" autocomplete="off" required>
-            <span class="pam-field__error">Ingresa un DNI válido de 8 dígitos.</span>
+            <label for="reg-dni">DNI / documento <span>*</span></label>
+            <input type="text" id="reg-dni" name="dni" inputmode="numeric" pattern="[0-9]*" autocomplete="off" required>
+            <span class="pam-field__error">Ingresa un documento válido (solo números).</span>
           </div>
 
-          <div class="pam-field">
-            <label for="reg-celular">Celular <span>*</span></label>
-            <input type="tel" id="reg-celular" name="celular" inputmode="tel" autocomplete="tel" placeholder="Ej. 987 654 321" required>
-            <span class="pam-field__error">Ingresa un celular válido.</span>
+          <div class="pam-form__phone-row">
+            <div class="pam-field">
+              <label for="reg-phone-prefix-btn">Prefijo <span>*</span></label>
+              <div class="pam-field__prefix" id="reg-phone-prefix-wrap">
+                <input type="hidden" id="reg-phone-prefix" name="phonePrefix" value="51" />
+                <button
+                  type="button"
+                  class="pam-field__prefix-btn"
+                  id="reg-phone-prefix-btn"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                  aria-controls="reg-phone-prefix-list"
+                >
+                  <img
+                    class="pam-field__prefix-flag"
+                    id="reg-phone-prefix-flag"
+                    src="../educacion/flags/pe.png"
+                    alt="Perú"
+                    width="22"
+                    height="16"
+                  />
+                  <span class="pam-field__prefix-code" id="reg-phone-prefix-label">+51</span>
+                </button>
+                <ul class="pam-field__prefix-list" id="reg-phone-prefix-list" role="listbox" hidden></ul>
+              </div>
+            </div>
+            <div class="pam-field">
+              <label for="reg-celular">Celular <span>*</span></label>
+              <input type="text" id="reg-celular" name="celular" inputmode="numeric" pattern="[0-9]*" maxlength="15" autocomplete="tel-national" placeholder="987654321" required>
+              <span class="pam-field__error">Ingresa un celular válido.</span>
+            </div>
           </div>
 
           <div class="pam-field pam-form__full">
@@ -2442,6 +2560,131 @@
         var origenOtroWrap = document.getElementById('reg-origen-otro-wrap');
         var pendingCheckout = { url: '', plan: '', billing: '' };
         var modalPlanThemes = ['pam-modal--plan-green', 'pam-modal--plan-pink', 'pam-modal--plan-blue'];
+        var PHONE_PREFIXES = [
+          { value: '51', iso: 'pe', label: 'Perú' },
+          { value: '54', iso: 'ar', label: 'Argentina' },
+          { value: '591', iso: 'bo', label: 'Bolivia' },
+          { value: '56', iso: 'cl', label: 'Chile' },
+          { value: '57', iso: 'co', label: 'Colombia' },
+          { value: '593', iso: 'ec', label: 'Ecuador' },
+          { value: '52', iso: 'mx', label: 'México' },
+          { value: '34', iso: 'es', label: 'España' },
+          { value: '1', iso: 'us', label: 'Estados Unidos' },
+        ];
+        var FLAGS_BASE = '../educacion/flags/';
+        var prefixWrap = document.getElementById('reg-phone-prefix-wrap');
+        var prefixInput = document.getElementById('reg-phone-prefix');
+        var prefixBtn = document.getElementById('reg-phone-prefix-btn');
+        var prefixFlag = document.getElementById('reg-phone-prefix-flag');
+        var prefixLabel = document.getElementById('reg-phone-prefix-label');
+        var prefixList = document.getElementById('reg-phone-prefix-list');
+        var celularInput = document.getElementById('reg-celular');
+        var dniInput = document.getElementById('reg-dni');
+
+        function digitsOnly(value) {
+          return String(value || '').replace(/\D/g, '');
+        }
+
+        function normalizePersonName(raw) {
+          var collapsed = String(raw || '').trim().replace(/\s+/g, ' ');
+          if (!collapsed) return '';
+          return collapsed.split(' ').filter(Boolean).map(function (word) {
+            var lower = word.toLocaleLowerCase('es-PE');
+            if (!lower) return '';
+            return lower.charAt(0).toLocaleUpperCase('es-PE') + lower.slice(1);
+          }).join(' ');
+        }
+
+        function setPhonePrefix(item) {
+          prefixInput.value = item.value;
+          prefixFlag.src = FLAGS_BASE + item.iso + '.png';
+          prefixFlag.alt = item.label;
+          prefixLabel.textContent = '+' + item.value;
+          prefixList.querySelectorAll('.pam-field__prefix-option').forEach(function (el) {
+            el.classList.toggle(
+              'pam-field__prefix-option--active',
+              el.getAttribute('data-value') === item.value,
+            );
+          });
+          prefixList.hidden = true;
+          prefixBtn.setAttribute('aria-expanded', 'false');
+        }
+
+        PHONE_PREFIXES.forEach(function (item) {
+          var li = document.createElement('li');
+          li.className = 'pam-field__prefix-option';
+          li.setAttribute('role', 'option');
+          li.setAttribute('data-value', item.value);
+          li.innerHTML =
+            '<img class="pam-field__prefix-flag" src="' + FLAGS_BASE + item.iso + '.png" alt="" width="22" height="16" />' +
+            '<span>' + item.label + ' (+' + item.value + ')</span>';
+          li.addEventListener('click', function () {
+            setPhonePrefix(item);
+          });
+          prefixList.appendChild(li);
+        });
+
+        setPhonePrefix(PHONE_PREFIXES[0]);
+
+        prefixBtn.addEventListener('click', function () {
+          var willOpen = prefixList.hidden;
+          prefixList.hidden = !willOpen;
+          prefixBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+
+        document.addEventListener('click', function (e) {
+          if (prefixWrap && !prefixWrap.contains(e.target)) {
+            prefixList.hidden = true;
+            prefixBtn.setAttribute('aria-expanded', 'false');
+          }
+        });
+
+        celularInput.addEventListener('input', function () {
+          var cleaned = digitsOnly(celularInput.value);
+          if (celularInput.value !== cleaned) {
+            celularInput.value = cleaned;
+          }
+        });
+
+        dniInput.addEventListener('input', function () {
+          var cleaned = digitsOnly(dniInput.value);
+          if (dniInput.value !== cleaned) {
+            dniInput.value = cleaned;
+          }
+        });
+
+        form.correo.addEventListener('blur', function () {
+          form.correo.value = form.correo.value.trim().toLowerCase();
+        });
+
+        ['nombres', 'apellidos', 'direccion', 'ciudad', 'distrito'].forEach(function (fieldName) {
+          form[fieldName].addEventListener('blur', function () {
+            form[fieldName].value = normalizePersonName(form[fieldName].value);
+          });
+        });
+
+        function buildCelularE164() {
+          var prefix = digitsOnly(prefixInput.value);
+          var local = digitsOnly(celularInput.value);
+          if (!prefix || !local) return '';
+          return prefix + local;
+        }
+
+        function validateCelular(prefix, local) {
+          if (!local) {
+            return 'Ingresa tu número de celular.';
+          }
+          if (prefix === '51') {
+            if (!/^9\d{8}$/.test(local)) {
+              return 'Ingresa un celular peruano válido (9 dígitos, empieza en 9).';
+            }
+            return '';
+          }
+          if (local.length < 7 || local.length > 15) {
+            return 'Ingresa un número de celular válido.';
+          }
+          return '';
+        }
 
         function setModalPlanTheme(btn) {
           var themeClass = modalPlanThemes[0];
@@ -2613,14 +2856,14 @@
           }
 
           return {
-            nombres: form.nombres.value.trim(),
-            apellidos: form.apellidos.value.trim(),
-            dni: form.dni.value.trim(),
-            celular: form.celular.value.trim(),
-            correo: form.correo.value.trim(),
-            direccion: form.direccion.value.trim(),
-            ciudad: form.ciudad.value.trim(),
-            distrito: form.distrito.value.trim(),
+            nombres: normalizePersonName(form.nombres.value),
+            apellidos: normalizePersonName(form.apellidos.value),
+            dni: digitsOnly(form.dni.value),
+            celular: buildCelularE164(),
+            correo: form.correo.value.trim().toLowerCase(),
+            direccion: normalizePersonName(form.direccion.value),
+            ciudad: normalizePersonName(form.ciudad.value),
+            distrito: normalizePersonName(form.distrito.value),
             genero: form.genero.value,
             fechaNacimiento: form.fecha_nacimiento.value,
             comoTeEnteraste: origen,
@@ -2655,13 +2898,17 @@
           valid = checkRequired(form.nombres, 'Ingresa tus nombres.') && valid;
           valid = checkRequired(form.apellidos, 'Ingresa tus apellidos.') && valid;
 
-          if (!/^\d{8}$/.test(form.dni.value.trim())) {
-            setFieldError(form.dni, 'Ingresa un DNI válido de 8 dígitos.');
+          var dniValue = digitsOnly(form.dni.value);
+          if (!dniValue) {
+            setFieldError(form.dni, 'Ingresa un documento válido (solo números).');
             valid = false;
           }
 
-          if (!/^\+?\d[\d\s-]{8,}$/.test(form.celular.value.trim())) {
-            setFieldError(form.celular, 'Ingresa un celular válido.');
+          var phonePrefix = digitsOnly(prefixInput.value);
+          var phoneLocal = digitsOnly(celularInput.value);
+          var celularError = validateCelular(phonePrefix, phoneLocal);
+          if (celularError) {
+            setFieldError(form.celular, celularError);
             valid = false;
           }
 

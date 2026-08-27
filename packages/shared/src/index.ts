@@ -237,6 +237,16 @@ export {
   normalizePersonName,
 } from './educacion-leads';
 
+export {
+  formatLimaDateTime,
+  normalizePamCelular,
+  normalizePamDni,
+  normalizePamEmail,
+  normalizePamPlaceName,
+  normalizePamRegistrationFields,
+} from './pam-normalize';
+export type { PamRegistrationNormalizeInput } from './pam-normalize';
+
 import type { QrStyleDto } from './qr-style';
 export type {
   QrStyleDto,

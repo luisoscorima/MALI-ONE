@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PamEmailStatus, PamMpStatus, Prisma } from '@prisma/client';
+import { normalizePamRegistrationFields } from '@mali-one/shared';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
 import {
@@ -143,6 +144,7 @@ export class PamWidgetsService {
 
   async updateRegistration(id: string, dto: UpdatePamRegistrationDto) {
     const existing = await this.findRegistration(id);
+    dto = normalizePamRegistrationFields(dto);
     const data: Prisma.PamRegistrationUpdateInput = {};
 
     if (dto.paymentMethod !== undefined) {
@@ -267,24 +269,26 @@ export class PamWidgetsService {
       throw new BadRequestException('Debes aceptar la política de privacidad');
     }
 
+    const normalized = normalizePamRegistrationFields(dto);
+
     const created = await this.prisma.pamRegistration.create({
       data: {
-        nombres: dto.nombres,
-        apellidos: dto.apellidos,
-        dni: dto.dni,
-        celular: dto.celular,
-        correo: dto.correo,
-        direccion: dto.direccion,
-        ciudad: dto.ciudad,
-        distrito: dto.distrito,
-        genero: dto.genero,
-        fechaNacimiento: dto.fechaNacimiento,
-        comoTeEnteraste: dto.comoTeEnteraste,
-        plan: dto.plan,
-        frecuencia: dto.frecuencia,
-        checkoutUrl: dto.checkoutUrl,
+        nombres: normalized.nombres,
+        apellidos: normalized.apellidos,
+        dni: normalized.dni,
+        celular: normalized.celular,
+        correo: normalized.correo,
+        direccion: normalized.direccion,
+        ciudad: normalized.ciudad,
+        distrito: normalized.distrito,
+        genero: normalized.genero,
+        fechaNacimiento: normalized.fechaNacimiento,
+        comoTeEnteraste: normalized.comoTeEnteraste,
+        plan: normalized.plan,
+        frecuencia: normalized.frecuencia,
+        checkoutUrl: normalized.checkoutUrl,
         paymentMethod: 'mercado_pago',
-        aceptaPrivacidad: dto.aceptaPrivacidad,
+        aceptaPrivacidad: normalized.aceptaPrivacidad,
       },
     });
 
