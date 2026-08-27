@@ -23,6 +23,7 @@ export type ScreenCastUploadMeta = {
   optimizedBytes: number;
   width: number | null;
   height: number | null;
+  durationMs?: number | null;
 };
 
 type Props = {
@@ -115,6 +116,7 @@ export function ScreenCastMediaUrlField({
           optimizedBytes: result.optimizedBytes,
           width: result.width,
           height: result.height,
+          durationMs: result.durationMs,
         };
         setUploadedName(result.fileName);
         applyMeta(meta);

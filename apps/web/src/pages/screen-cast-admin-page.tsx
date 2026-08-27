@@ -1260,11 +1260,16 @@ export function ScreenCastAdminPage() {
                   hasLandscapeMonitors={
                     playlistMonitorOrients.hasLandscapeMonitors
                   }
-                  onChange={(url, type) =>
+                  onChange={(url, type, meta) =>
                     setItemDraft({
                       ...itemDraft,
                       mediaUrl: url,
                       ...(type ? { mediaType: type } : {}),
+                      ...(type === 'video' &&
+                      meta?.durationMs &&
+                      meta.durationMs > 0
+                        ? { durationMs: meta.durationMs }
+                        : {}),
                     })
                   }
                 />

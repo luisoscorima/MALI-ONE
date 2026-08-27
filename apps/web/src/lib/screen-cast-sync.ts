@@ -53,15 +53,16 @@ export function resolveDurations(
   fallback: number[] | undefined,
 ): number[] {
   return items.map((item, i) => {
-    const fromServer = canonical?.[i];
-    if (Number.isFinite(fromServer) && (fromServer as number) > 0) {
-      return fromServer as number;
-    }
-    const fromLocal = fallback?.[i];
-    if (Number.isFinite(fromLocal) && (fromLocal as number) > 0) {
-      return fromLocal as number;
-    }
-    return item.durationMs || 10_000;
+    const candidates = [
+      canonical?.[i],
+      fallback?.[i],
+      item.durationMs,
+    ].filter(
+      (value): value is number =>
+        Number.isFinite(value) && (value as number) > 0,
+    );
+    if (candidates.length === 0) return 10_000;
+    return Math.max(...candidates);
   });
 }
 

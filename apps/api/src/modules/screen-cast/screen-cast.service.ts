@@ -25,6 +25,7 @@ import {
 import {
   convertMovBufferToMp4,
   isMovUpload,
+  probeVideoDurationMs,
 } from './screen-cast-video.util';
 
 const ALLOWED_MIME = new Set([
@@ -149,6 +150,11 @@ export class ScreenCastService {
       mediaType = ScreenCastMediaType.gif;
     }
 
+    let durationMs: number | null = null;
+    if (mediaType === ScreenCastMediaType.video) {
+      durationMs = await probeVideoDurationMs(uploadBuffer);
+    }
+
     return {
       url,
       key,
@@ -158,6 +164,7 @@ export class ScreenCastService {
       optimizedBytes: uploadBuffer.length,
       width,
       height,
+      durationMs,
     };
   }
 
@@ -243,12 +250,18 @@ export class ScreenCastService {
 
   async createPlaylistItem(playlistId: string, dto: CreateScreenCastPlaylistItemDto) {
     await this.findPlaylist(playlistId);
+    const mediaUrl = dto.mediaUrl.trim();
+    const durationMs = await this.resolveItemDurationMs(
+      mediaUrl,
+      dto.mediaType,
+      dto.durationMs,
+    );
     return this.prisma.screenCastPlaylistItem.create({
       data: {
         playlistId,
-        mediaUrl: dto.mediaUrl.trim(),
+        mediaUrl,
         mediaType: dto.mediaType,
-        durationMs: dto.durationMs ?? 10_000,
+        durationMs,
         sortOrder: dto.sortOrder ?? 0,
         activo: dto.activo ?? true,
       },
@@ -256,13 +269,21 @@ export class ScreenCastService {
   }
 
   async updatePlaylistItem(id: string, dto: UpdateScreenCastPlaylistItemDto) {
-    await this.findPlaylistItem(id);
+    const existing = await this.findPlaylistItem(id);
+    const mediaUrl =
+      dto.mediaUrl !== undefined ? dto.mediaUrl.trim() : existing.mediaUrl;
+    const mediaType = dto.mediaType ?? existing.mediaType;
+    const durationMs = await this.resolveItemDurationMs(
+      mediaUrl,
+      mediaType,
+      dto.durationMs ?? existing.durationMs,
+    );
     return this.prisma.screenCastPlaylistItem.update({
       where: { id },
       data: {
-        ...(dto.mediaUrl !== undefined ? { mediaUrl: dto.mediaUrl.trim() } : {}),
+        ...(dto.mediaUrl !== undefined ? { mediaUrl } : {}),
         ...(dto.mediaType !== undefined ? { mediaType: dto.mediaType } : {}),
-        ...(dto.durationMs !== undefined ? { durationMs: dto.durationMs } : {}),
+        durationMs,
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
         ...(dto.activo !== undefined ? { activo: dto.activo } : {}),
       },
@@ -507,6 +528,19 @@ export class ScreenCastService {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private async resolveItemDurationMs(
+    mediaUrl: string,
+    mediaType: ScreenCastMediaType,
+    fallback?: number,
+  ): Promise<number> {
+    if (mediaType !== ScreenCastMediaType.video) {
+      return fallback ?? 10_000;
+    }
+    const probed = await probeVideoDurationMs(mediaUrl.trim());
+    if (probed && probed > 0) return probed;
+    return fallback ?? 10_000;
   }
 
   private async findPlaylist(id: string): Promise<ScreenCastPlaylist> {

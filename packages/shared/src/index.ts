@@ -207,6 +207,7 @@ export interface ScreenCastUploadResultDto {
   optimizedBytes: number;
   width: number | null;
   height: number | null;
+  durationMs: number | null;
 }
 
 export interface ScreenCastPublicItemDto {

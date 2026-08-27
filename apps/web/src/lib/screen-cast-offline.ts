@@ -1,8 +1,8 @@
 import type { ScreenCastPublicConfigDto } from '@mali-one/shared';
 
 const SW_URL = '/screen-cast-sw.js';
-const CONFIG_CACHE = 'screen-cast-config-v4';
-const MEDIA_CACHE = 'screen-cast-media-v4';
+const CONFIG_CACHE = 'screen-cast-config-v5';
+const MEDIA_CACHE = 'screen-cast-media-v5';
 
 /**
  * True only for same-origin URLs. Safe to set crossOrigin="anonymous".
@@ -67,6 +67,7 @@ export async function cacheScreenCastPlaylist(
     const mediaCache = await caches.open(MEDIA_CACHE);
     await Promise.all(
       config.items.map(async (item) => {
+        if (item.mediaType === 'video') return;
         if (!isOfflineCacheableMediaUrl(item.mediaUrl)) return;
 
         try {
