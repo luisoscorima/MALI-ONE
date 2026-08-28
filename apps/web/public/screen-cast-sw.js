@@ -1,7 +1,7 @@
-/* Screen-cast offline cache for kiosk players (v5 — skip video streaming) */
-const CONFIG_CACHE = 'screen-cast-config-v5';
-const MEDIA_CACHE = 'screen-cast-media-v5';
-const SHELL_CACHE = 'screen-cast-shell-v5';
+/* Screen-cast offline cache for kiosk players (v6 — blob playback via API) */
+const CONFIG_CACHE = 'screen-cast-config-v6';
+const MEDIA_CACHE = 'screen-cast-media-v6';
+const SHELL_CACHE = 'screen-cast-shell-v6';
 
 const SHELL_URLS = ['/screen-cast', '/index.html'];
 
@@ -18,7 +18,6 @@ function isOfflineCacheableMediaUrl(urlString) {
   }
 }
 
-/** Videos need native range requests — SW interception breaks S3 playback. */
 function isVideoMediaRequest(url, request) {
   if (request.headers.get('range')) return true;
   const path = url.pathname.toLowerCase();
@@ -107,15 +106,6 @@ async function networkFirstSafe(request, cacheName) {
   }
 }
 
-/**
- * Media strategy for S3/CDN without requiring bucket CORS:
- * 1) Cache hit
- * 2) Network with request's natural mode (usually no-cors for <img>)
- * 3) Soft 504 — never throw
- *
- * Videos are NOT intercepted — they load directly from S3 so range
- * requests work without bucket CORS configuration.
- */
 async function mediaCacheFirstSafe(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);

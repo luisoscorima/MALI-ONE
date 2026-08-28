@@ -168,6 +168,52 @@ export class ScreenCastService {
     };
   }
 
+  /**
+   * Stream a screen-cast S3 object through the API so kiosk players can
+   * cache/play it same-origin (S3 bucket CORS is not required).
+   */
+  async getPublicMedia(src: string | undefined) {
+    const raw = (src || '').trim();
+    if (!raw) throw new BadRequestException('src requerido');
+    const key = this.parseAllowedScreenCastKey(raw);
+    return this.s3.getFileBuffer(key);
+  }
+
+  private parseAllowedScreenCastKey(raw: string): string {
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new BadRequestException('URL de media inválida');
+    }
+    const host = url.hostname.toLowerCase();
+    const bucket = this.config.getOrThrow<string>('AWS_S3_BUCKET').toLowerCase();
+    const allowedHost =
+      host.endsWith('.amazonaws.com') || host.endsWith('.cloudfront.net');
+    if (!allowedHost) {
+      throw new BadRequestException('Origen de media no permitido');
+    }
+
+    let key = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
+    if (host === 's3.amazonaws.com' || /^s3[.-]/.test(host)) {
+      const [pathBucket, ...rest] = key.split('/');
+      if (pathBucket.toLowerCase() !== bucket) {
+        throw new BadRequestException('Bucket no permitido');
+      }
+      key = rest.join('/');
+    } else if (
+      !host.startsWith(`${bucket}.`) &&
+      !host.endsWith('.cloudfront.net')
+    ) {
+      throw new BadRequestException('Bucket no permitido');
+    }
+
+    if (!key.startsWith('screen-cast/') || key.includes('..')) {
+      throw new BadRequestException('Solo media de screen-cast');
+    }
+    return key;
+  }
+
   // --- Playlists ---
 
   listPlaylists() {

@@ -13,7 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
-const BARRIER_MS = 12_000;
+const BARRIER_MS = 180_000;
 /** Short lead after every screen is already buffered — just enough for play:go to land. */
 const EPOCH_LEAD_MS = 400;
 const TICK_MS = 5_000;

@@ -18,9 +18,15 @@ import { api } from '@/lib/api';
 import {
   cacheScreenCastPlaylist,
   isCorsCacheableMediaUrl,
+  playbackSrcFor,
   registerScreenCastServiceWorker,
 } from '@/lib/screen-cast-offline';
 import { startScreenCastAutoUpdate } from '@/lib/screen-cast-update';
+import {
+  KioskToastStack,
+  type KioskToast,
+  type KioskToastTone,
+} from '@/components/screen-cast-kiosk-toasts';
 import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
@@ -72,14 +78,19 @@ function isViewportPortrait(): boolean {
   return window.innerHeight > window.innerWidth;
 }
 
-function KioskLoader() {
+function KioskLoader({ hint }: { hint?: string }) {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black">
       <div
         className="h-16 w-16 rounded-full border-[3px] border-white/20 border-t-white animate-spin"
         role="status"
         aria-label="Cargando"
       />
+      {hint ? (
+        <p className="max-w-[80vw] px-4 text-center text-sm tracking-wide text-white/70">
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -147,6 +158,9 @@ export function ScreenCastPlayerPage() {
   const [syncing, setSyncing] = useState(false);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [playbackGen, setPlaybackGen] = useState(0);
+  const [loaderHint, setLoaderHint] = useState('Cargando');
+  const [toasts, setToasts] = useState<KioskToast[]>([]);
+  const [srcTick, setSrcTick] = useState(0);
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
   );
@@ -177,8 +191,75 @@ export function ScreenCastPlayerPage() {
   const syncTokenRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
   const videoPlayTokenRef = useRef<string | null>(null);
+  const toastIdRef = useRef(0);
+  const cachedUrlsRef = useRef<Set<string>>(new Set());
+  const socketWasConnectedRef = useRef(false);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
+
+  const kioskToast = useCallback(
+    (text: string, tone: KioskToastTone = 'info') => {
+      if (isPreview) return;
+      const id = ++toastIdRef.current;
+      setToasts((prev) => [...prev.slice(-2), { id, text, tone }]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      }, 4200);
+    },
+    [isPreview],
+  );
+
+  const mediaSrc = useCallback(
+    (url: string) => playbackSrcFor(url),
+    [srcTick],
+  );
+
+  const ensurePlaylistCached = useCallback(
+    async (data: ScreenCastPublicConfigDto) => {
+      if (isPreview || data.empty || data.items.length === 0) return;
+      const urls = data.items.map((item) => item.mediaUrl);
+      const prev = cachedUrlsRef.current;
+      const isNew = urls.some((url) => !prev.has(url));
+      if (prev.size > 0 && isNew) {
+        kioskToast('Nuevo ítem — actualizando caché', 'info');
+      }
+      setLoaderHint(
+        prev.size === 0
+          ? 'Descargando playlist…'
+          : 'Actualizando caché…',
+      );
+      const result = await cacheScreenCastPlaylist(
+        screenKey,
+        data,
+        ({ index, total, status }) => {
+          if (status === 'downloaded') {
+            setLoaderHint(`Medio ${index}/${total} descargado`);
+          } else {
+            setLoaderHint(`Caché ${index}/${total}`);
+          }
+        },
+      );
+      cachedUrlsRef.current = new Set(urls);
+      setSrcTick((n) => n + 1);
+      if (result.downloaded > 0) {
+        kioskToast(
+          result.downloaded === 1
+            ? '1 medio nuevo en caché'
+            : `${result.downloaded} medios nuevos en caché`,
+          'ok',
+        );
+      } else if (result.hits > 0 && prev.size === 0) {
+        kioskToast(`Playlist en caché (${result.hits})`, 'ok');
+      }
+      if (result.failed > 0) {
+        kioskToast(
+          `No se pudo cachear ${result.failed} medio${result.failed === 1 ? '' : 's'}`,
+          'warn',
+        );
+      }
+    },
+    [isPreview, kioskToast, screenKey],
+  );
 
   const applyClockOffset = useCallback((serverNow: number | undefined, sentAt: number) => {
     if (!serverNow) return;
@@ -219,6 +300,7 @@ export function ScreenCastPlayerPage() {
   const holdForSync = useCallback(() => {
     setSyncing(true);
     setVideoPlaying(false);
+    setLoaderHint('Sincronizando…');
     try {
       videoRef.current?.pause();
     } catch {
@@ -236,7 +318,6 @@ export function ScreenCastPlayerPage() {
       setError('');
       setLoading(false);
       setSyncing(false);
-      void cacheScreenCastPlaylist(screenKey, data);
     },
     [screenKey],
   );
@@ -273,10 +354,11 @@ export function ScreenCastPlayerPage() {
       setLoading(false);
       setSyncing(false);
       setVideoPlaying(false);
+      setLoaderHint('Arrancando…');
       setPlaybackGen((g) => g + 1);
-      void cacheScreenCastPlaylist(screenKey, data);
+      kioskToast('Pantalla sincronizada', 'ok');
     },
-    [applyClockOffset, clearGoFallback, nowServer, screenKey],
+    [applyClockOffset, clearGoFallback, kioskToast, nowServer],
   );
 
   const fetchConfig = useCallback(async () => {
@@ -312,22 +394,29 @@ export function ScreenCastPlayerPage() {
       }
       const durations = await measureAllDurations(data.items, MEASURE_TIMEOUT_MS);
       localDurationsRef.current = durations;
+      await ensurePlaylistCached(data);
       const pos =
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
           : null;
       const startItem = data.items[pos?.index ?? 0];
-      const warmTarget =
-        startItem?.mediaType === 'video'
-          ? videoRef.current
-          : warmVideoRef.current;
-      await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
-      if (startItem?.mediaType === 'video') {
-        videoUrlRef.current = startItem.mediaUrl;
+      if (startItem) {
+        const warmed = {
+          ...startItem,
+          mediaUrl: mediaSrc(startItem.mediaUrl),
+        };
+        const warmTarget =
+          startItem.mediaType === 'video'
+            ? videoRef.current
+            : warmVideoRef.current;
+        await warmupItem(warmed, MEASURE_TIMEOUT_MS, warmTarget);
+        if (startItem.mediaType === 'video') {
+          videoUrlRef.current = startItem.mediaUrl;
+        }
       }
       emitReady(syncId, data.playlistId, durations);
     },
-    [applyConfig, emitReady, nowServer],
+    [applyConfig, emitReady, ensurePlaylistCached, mediaSrc, nowServer],
   );
 
   const loadConfigImmediate = useCallback(async () => {
@@ -338,6 +427,7 @@ export function ScreenCastPlayerPage() {
     }
     try {
       const data = await fetchConfig();
+      await ensurePlaylistCached(data);
       const joinClock = joinClockRef.current;
       if (joinClock?.epochMs && !isPreview && !data.empty) {
         const durations = await measureAllDurations(
@@ -371,6 +461,7 @@ export function ScreenCastPlayerPage() {
     applyGo,
     isPreview,
     prepareAndReady,
+    ensurePlaylistCached,
     nowServer,
   ]);
 
@@ -419,16 +510,24 @@ export function ScreenCastPlayerPage() {
           );
           if (token !== syncTokenRef.current) return;
           localDurationsRef.current = durations;
+          await ensurePlaylistCached(data);
+          if (token !== syncTokenRef.current) return;
           if (payload.epochMs) {
             const pos = positionAt(durations, payload.epochMs, nowServer());
             const startItem = data.items[pos?.index ?? 0];
-            const warmTarget =
-              startItem?.mediaType === 'video'
-                ? videoRef.current
-                : warmVideoRef.current;
-            await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
-            if (startItem?.mediaType === 'video') {
-              videoUrlRef.current = startItem.mediaUrl;
+            if (startItem) {
+              const warmed = {
+                ...startItem,
+                mediaUrl: mediaSrc(startItem.mediaUrl),
+              };
+              const warmTarget =
+                startItem.mediaType === 'video'
+                  ? videoRef.current
+                  : warmVideoRef.current;
+              await warmupItem(warmed, MEASURE_TIMEOUT_MS, warmTarget);
+              if (startItem.mediaType === 'video') {
+                videoUrlRef.current = startItem.mediaUrl;
+              }
             }
             if (token !== syncTokenRef.current) return;
             applyGo({
@@ -505,6 +604,8 @@ export function ScreenCastPlayerPage() {
       prepareAndReady,
       emitReady,
       holdForSync,
+      ensurePlaylistCached,
+      mediaSrc,
     ],
   );
 
@@ -561,6 +662,12 @@ export function ScreenCastPlayerPage() {
 
     socket.on('connect', () => {
       const sentAt = Date.now();
+      if (socketWasConnectedRef.current) {
+        kioskToast('Conexión restablecida', 'ok');
+      } else {
+        kioskToast('Pantalla conectada', 'ok');
+        socketWasConnectedRef.current = true;
+      }
       socket.emit('join', { screenKey }, (ack: JoinAck) => {
         applyClockOffset(ack?.serverNow, sentAt);
         if (ack?.clock?.epochMs) {
@@ -575,6 +682,10 @@ export function ScreenCastPlayerPage() {
           }
         }
       });
+    });
+
+    socket.on('disconnect', () => {
+      kioskToast('Sin conexión', 'warn');
     });
 
     socket.on('playlist:sync', (payload: PlaylistSyncPayload) => {
@@ -655,6 +766,7 @@ export function ScreenCastPlayerPage() {
     applyGo,
     handleSync,
     clearGoFallback,
+    kioskToast,
   ]);
 
   const emitStatus = useCallback(
@@ -706,25 +818,26 @@ export function ScreenCastPlayerPage() {
 
     const nextItem = items[(index + 1) % items.length];
     if (nextItem && nextItem !== item) {
+      const nextSrc = mediaSrc(nextItem.mediaUrl);
       if (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif') {
         const pre = new Image();
         preloadRef.current = pre;
-        pre.src = nextItem.mediaUrl;
+        pre.src = nextSrc;
       } else if (
         nextItem.mediaType === 'video' &&
         warmVideoRef.current &&
         item.mediaType !== 'video'
       ) {
         const warm = warmVideoRef.current;
-        if (isCorsCacheableMediaUrl(nextItem.mediaUrl)) {
+        if (isCorsCacheableMediaUrl(nextSrc)) {
           warm.crossOrigin = 'anonymous';
         } else {
           warm.removeAttribute('crossorigin');
         }
-        if (warm.src !== nextItem.mediaUrl) {
+        if (!videoSrcMatches(warm, nextSrc)) {
           warm.preload = 'auto';
           warm.muted = true;
-          warm.src = nextItem.mediaUrl;
+          warm.src = nextSrc;
         }
       }
     }
@@ -786,8 +899,11 @@ export function ScreenCastPlayerPage() {
         setVideoPlaying(false);
       }
 
+      const playSrc = mediaSrc(item.mediaUrl);
       const playToken = `${item.mediaUrl}@${epoch ?? 'local'}:${index}`;
-      const sameSource = videoSrcMatches(video, item.mediaUrl);
+      const sameSource =
+        videoUrlRef.current === item.mediaUrl &&
+        (videoSrcMatches(video, playSrc) || video.readyState > 0);
 
       const onEnded = () => {
         videoPlayTokenRef.current = null;
@@ -818,7 +934,7 @@ export function ScreenCastPlayerPage() {
         setVideoPlaying(true);
       };
 
-      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
+      if (isCorsCacheableMediaUrl(playSrc)) {
         video.crossOrigin = 'anonymous';
       } else {
         video.removeAttribute('crossorigin');
@@ -912,7 +1028,7 @@ export function ScreenCastPlayerPage() {
       videoUrlRef.current = item.mediaUrl;
       video.addEventListener('canplay', onReady, { once: true });
       if (!sameSource) {
-        video.src = item.mediaUrl;
+        video.src = playSrc;
       }
       if (epoch == null) scheduleAdvance();
 
@@ -944,6 +1060,7 @@ export function ScreenCastPlayerPage() {
     emitStatus,
     jumpToClock,
     nowServer,
+    mediaSrc,
   ]);
 
   useEffect(() => {
@@ -976,6 +1093,18 @@ export function ScreenCastPlayerPage() {
     };
   }, [cleanupMedia, clearGoFallback]);
 
+  useEffect(() => {
+    if (isPreview) return;
+    const onOffline = () => kioskToast('Sin red', 'warn');
+    const onOnline = () => kioskToast('Red restablecida', 'ok');
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [isPreview, kioskToast]);
+
   const current = config?.items[index];
   const waitingVideo =
     !!current &&
@@ -989,7 +1118,7 @@ export function ScreenCastPlayerPage() {
     !holdUi &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
   const imageUsesCors =
-    !!current && isCorsCacheableMediaUrl(current.mediaUrl);
+    !!current && isCorsCacheableMediaUrl(mediaSrc(current.mediaUrl));
   const videoActive =
     !!current && current.mediaType === 'video' && !error && !config?.empty;
 
@@ -1018,7 +1147,9 @@ export function ScreenCastPlayerPage() {
           viewportSize.vh,
         )}
       >
-        {(loading || syncing || waitingVideo) && <KioskLoader />}
+        {(loading || syncing || waitingVideo) && (
+          <KioskLoader hint={loaderHint} />
+        )}
 
         {!holdUi && error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
@@ -1059,7 +1190,7 @@ export function ScreenCastPlayerPage() {
         {showImage && current && (
           <img
             key={`${current.mediaUrl}-${index}`}
-            src={current.mediaUrl}
+            src={mediaSrc(current.mediaUrl)}
             alt=""
             style={MEDIA_FILL_STYLE}
             draggable={false}
@@ -1067,6 +1198,7 @@ export function ScreenCastPlayerPage() {
             onError={handleImageError}
           />
         )}
+        <KioskToastStack toasts={toasts} />
       </div>
     </div>
   );

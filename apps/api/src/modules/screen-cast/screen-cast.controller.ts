@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -47,6 +49,18 @@ export class ScreenCastController {
   @Get('screens/:screenKey/config')
   getPublicConfig(@Param('screenKey') screenKey: string) {
     return this.service.getPublicConfig(screenKey);
+  }
+
+  /** Same-origin media for kiosk cache/playback (S3 screen-cast keys only). */
+  @Public()
+  @Get('media')
+  @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  async proxyMedia(@Query('src') src: string) {
+    const { buffer, contentType } = await this.service.getPublicMedia(src);
+    return new StreamableFile(buffer, {
+      type: contentType,
+      length: buffer.length,
+    });
   }
 
   // --- Playlists ---

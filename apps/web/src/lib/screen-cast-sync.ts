@@ -2,7 +2,7 @@ import type { ScreenCastPublicItemDto } from '@mali-one/shared';
 import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
 export const MEASURE_TIMEOUT_MS = 10_000;
-export const CLIENT_GO_FALLBACK_MS = 15_000;
+export const CLIENT_GO_FALLBACK_MS = 185_000;
 /** Only seek videos on item start — in-playback seeks cause visible freezes on TVs. */
 export const VIDEO_START_SEEK_MS = 120;
 export const DRIFT_INTERVAL_MS = 750;
