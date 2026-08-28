@@ -14,8 +14,8 @@ import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
 const BARRIER_MS = 12_000;
-/** Buffer time after all screens report ready — lets every player decode before play(). */
-const EPOCH_LEAD_MS = 2_500;
+/** Short lead after every screen is already buffered — just enough for play:go to land. */
+const EPOCH_LEAD_MS = 400;
 const TICK_MS = 5_000;
 
 type PlaylistClock = {

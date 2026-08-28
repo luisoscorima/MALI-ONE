@@ -27,9 +27,11 @@ import {
   MEASURE_TIMEOUT_MS,
   VIDEO_START_SEEK_MS,
   clockOffsetFromAck,
+  isVideoBuffered,
   measureAllDurations,
   positionAt,
   resolveDurations,
+  videoSrcMatches,
   warmupItem,
   type PlayGoPayload,
   type PlaylistClock,
@@ -143,6 +145,7 @@ export function ScreenCastPlayerPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const [playbackGen, setPlaybackGen] = useState(0);
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
@@ -215,6 +218,7 @@ export function ScreenCastPlayerPage() {
 
   const holdForSync = useCallback(() => {
     setSyncing(true);
+    setVideoPlaying(false);
     try {
       videoRef.current?.pause();
     } catch {
@@ -268,6 +272,7 @@ export function ScreenCastPlayerPage() {
       setError('');
       setLoading(false);
       setSyncing(false);
+      setVideoPlaying(false);
       setPlaybackGen((g) => g + 1);
       void cacheScreenCastPlaylist(screenKey, data);
     },
@@ -725,7 +730,6 @@ export function ScreenCastPlayerPage() {
     }
 
     const epoch = epochMsRef.current;
-    let startOffsetMs = 0;
     let remainingMs = item.durationMs || 10_000;
     if (epoch != null && item.mediaType !== 'video') {
       const pos = positionAt(durationsRef.current, epoch, nowServer());
@@ -751,9 +755,6 @@ export function ScreenCastPlayerPage() {
         indexRef.current = pos.index;
         setIndex(pos.index);
         return;
-      }
-      if (pos && pos.index === index) {
-        startOffsetMs = pos.offsetMs;
       }
     }
 
@@ -781,14 +782,16 @@ export function ScreenCastPlayerPage() {
       const video = videoRef.current;
       if (!video) return;
 
-      const playToken = `${item.mediaUrl}@${epoch ?? 'local'}:${index}`;
+      if (video.paused) {
+        setVideoPlaying(false);
+      }
 
-      const sameSource =
-        videoUrlRef.current === item.mediaUrl &&
-        (video.src === item.mediaUrl || video.src.endsWith(item.mediaUrl));
+      const playToken = `${item.mediaUrl}@${epoch ?? 'local'}:${index}`;
+      const sameSource = videoSrcMatches(video, item.mediaUrl);
 
       const onEnded = () => {
         videoPlayTokenRef.current = null;
+        setVideoPlaying(false);
         if (epochMsRef.current != null) {
           if (jumpToClock()) return;
           if (itemsRef.current.length === 1) {
@@ -802,6 +805,7 @@ export function ScreenCastPlayerPage() {
       };
       const onError = () => {
         videoPlayTokenRef.current = null;
+        setVideoPlaying(false);
         emitStatus({
           index,
           total: items.length,
@@ -809,6 +813,9 @@ export function ScreenCastPlayerPage() {
         });
         if (epochMsRef.current != null) jumpToClock();
         else advance();
+      };
+      const onPlaying = () => {
+        setVideoPlaying(true);
       };
 
       if (isCorsCacheableMediaUrl(item.mediaUrl)) {
@@ -822,16 +829,28 @@ export function ScreenCastPlayerPage() {
         videoPlayTokenRef.current = playToken;
 
         const playNow = () => {
+          const epochMs = epochMsRef.current;
           if (
-            epoch != null &&
-            startOffsetMs > VIDEO_START_SEEK_MS &&
-            Number.isFinite(video.duration)
+            epochMs != null &&
+            Number.isFinite(video.duration) &&
+            video.duration > 0
           ) {
-            const t = Math.min(
-              startOffsetMs / 1000,
-              Math.max(0, video.duration - 0.12),
+            const pos = positionAt(
+              durationsRef.current,
+              epochMs,
+              nowServer(),
             );
-            if (t > 0.08) video.currentTime = t;
+            const offset =
+              pos && pos.index === index ? pos.offsetMs : 0;
+            if (offset > VIDEO_START_SEEK_MS) {
+              const t = Math.min(
+                offset / 1000,
+                Math.max(0, video.duration - 0.12),
+              );
+              if (t > 0.08 && Math.abs(video.currentTime - t) > 0.12) {
+                video.currentTime = t;
+              }
+            }
           }
 
           void video.play().catch(() => {
@@ -865,34 +884,43 @@ export function ScreenCastPlayerPage() {
         startPlayback();
       };
 
+      video.addEventListener('ended', onEnded);
+      video.addEventListener('error', onError);
+      video.addEventListener('playing', onPlaying);
+
       if (sameSource && !video.ended) {
         videoUrlRef.current = item.mediaUrl;
-        if (!video.paused || videoPlayTokenRef.current === playToken) {
-          if (epoch == null) scheduleAdvance();
-          return () => {
-            clearTimer();
-          };
+        if (isVideoBuffered(video) || video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+          startPlayback();
+        } else {
+          video.addEventListener('canplay', onReady, { once: true });
         }
-        startPlayback();
         if (epoch == null) scheduleAdvance();
         return () => {
+          video.removeEventListener('ended', onEnded);
+          video.removeEventListener('error', onError);
+          video.removeEventListener('playing', onPlaying);
+          video.removeEventListener('canplay', onReady);
           clearTimer();
+          if (video.paused && videoPlayTokenRef.current === playToken) {
+            videoPlayTokenRef.current = null;
+          }
         };
       }
 
       videoPlayTokenRef.current = null;
       videoUrlRef.current = item.mediaUrl;
-      const readyEvent = epoch != null ? 'canplay' : 'loadedmetadata';
-      video.addEventListener(readyEvent, onReady, { once: true });
-      video.addEventListener('ended', onEnded);
-      video.addEventListener('error', onError);
-      video.src = item.mediaUrl;
+      video.addEventListener('canplay', onReady, { once: true });
+      if (!sameSource) {
+        video.src = item.mediaUrl;
+      }
       if (epoch == null) scheduleAdvance();
 
       return () => {
-        video.removeEventListener(readyEvent, onReady);
+        video.removeEventListener('canplay', onReady);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
+        video.removeEventListener('playing', onPlaying);
         clearTimer();
         if (video.paused && videoPlayTokenRef.current === playToken) {
           videoPlayTokenRef.current = null;
@@ -949,14 +977,21 @@ export function ScreenCastPlayerPage() {
   }, [cleanupMedia, clearGoFallback]);
 
   const current = config?.items[index];
-  const holdUi = loading || syncing;
-  const showVideo = !!current && current.mediaType === 'video' && !holdUi;
+  const waitingVideo =
+    !!current &&
+    current.mediaType === 'video' &&
+    !videoPlaying &&
+    !error &&
+    !config?.empty;
+  const holdUi = loading || syncing || waitingVideo;
   const showImage =
     !!current &&
     !holdUi &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
   const imageUsesCors =
     !!current && isCorsCacheableMediaUrl(current.mediaUrl);
+  const videoActive =
+    !!current && current.mediaType === 'video' && !error && !config?.empty;
 
   const orientation: ScreenCastOrientation =
     config?.orientation === 'PORTRAIT' ? 'PORTRAIT' : 'LANDSCAPE';
@@ -983,7 +1018,7 @@ export function ScreenCastPlayerPage() {
           viewportSize.vh,
         )}
       >
-        {(loading || syncing) && <KioskLoader />}
+        {(loading || syncing || waitingVideo) && <KioskLoader />}
 
         {!holdUi && error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
@@ -1002,9 +1037,11 @@ export function ScreenCastPlayerPage() {
 
         <video
           ref={videoRef}
-          className={showVideo ? undefined : 'pointer-events-none hidden'}
-          style={showVideo ? MEDIA_FILL_STYLE : undefined}
-          autoPlay
+          className="pointer-events-none"
+          style={{
+            ...MEDIA_FILL_STYLE,
+            opacity: videoActive && videoPlaying ? 1 : 0,
+          }}
           muted
           playsInline
           loop={false}

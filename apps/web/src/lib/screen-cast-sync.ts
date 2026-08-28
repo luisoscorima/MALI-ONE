@@ -112,57 +112,27 @@ function fallbackDuration(item: ScreenCastPublicItemDto): number {
   return item.durationMs || 10_000;
 }
 
+export function videoSrcMatches(
+  video: HTMLVideoElement,
+  url: string,
+): boolean {
+  const attr = video.getAttribute('src') || '';
+  const src = video.currentSrc || video.src || '';
+  return attr === url || src === url;
+}
+
+export function isVideoBuffered(video: HTMLVideoElement): boolean {
+  return video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+}
+
 export async function measureItemDurationMs(
   item: ScreenCastPublicItemDto,
-  timeoutMs: number,
+  _timeoutMs: number,
 ): Promise<number> {
-  if (item.mediaType !== 'video') return fallbackDuration(item);
-  if (item.durationMs > 10_000) return item.durationMs;
-
-  return new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.preload = 'auto';
-    video.playsInline = true;
-    let done = false;
-    const finish = (ms: number) => {
-      if (done) return;
-      done = true;
-      window.clearTimeout(timer);
-      try {
-        video.removeAttribute('src');
-        video.load();
-      } catch {
-        // Tizen may throw on cleanup
-      }
-      resolve(ms);
-    };
-    const readDuration = () => {
-      const d = video.duration;
-      if (Number.isFinite(d) && d > 0) {
-        finish(Math.round(d * 1000));
-        return true;
-      }
-      return false;
-    };
-    const timer = window.setTimeout(
-      () => finish(fallbackDuration(item)),
-      timeoutMs,
-    );
-    video.onloadedmetadata = () => {
-      if (readDuration()) return;
-      finish(fallbackDuration(item));
-    };
-    video.ondurationchange = () => {
-      readDuration();
-    };
-    video.onerror = () => finish(fallbackDuration(item));
-    if (isCorsCacheableMediaUrl(item.mediaUrl)) {
-      video.crossOrigin = 'anonymous';
-    }
-    video.src = item.mediaUrl;
-    video.load();
-  });
+  // Never fetch the file just to read duration — that competes with playback
+  // buffering on slow kiosk TVs. Use the playlist value (probed on save).
+  void _timeoutMs;
+  return fallbackDuration(item);
 }
 
 export async function measureAllDurations(
@@ -204,6 +174,9 @@ export async function warmupItem(
   }
 
   if (item.mediaType !== 'video' || !warmVideo) return;
+  if (videoSrcMatches(warmVideo, item.mediaUrl) && isVideoBuffered(warmVideo)) {
+    return;
+  }
   await Promise.race([
     new Promise<void>((resolve) => {
       const finish = () => {
@@ -220,8 +193,9 @@ export async function warmupItem(
       }
       warmVideo.addEventListener('canplay', finish, { once: true });
       warmVideo.addEventListener('error', finish, { once: true });
-      warmVideo.src = item.mediaUrl;
-      warmVideo.load();
+      if (!videoSrcMatches(warmVideo, item.mediaUrl)) {
+        warmVideo.src = item.mediaUrl;
+      }
     }),
     waitMs(timeoutMs),
   ]);
