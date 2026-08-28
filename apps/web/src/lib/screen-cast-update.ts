@@ -65,7 +65,9 @@ async function checkForUpdate(options: UpdateOptions) {
   if (reloadScheduled || currentBuildId() === 'dev') return;
 
   const remoteBuildId = await fetchRemoteBuildId();
-  if (!remoteBuildId || remoteBuildId === currentBuildId()) return;
+  if (!remoteBuildId || remoteBuildId === 'dev' || remoteBuildId === currentBuildId()) {
+    return;
+  }
 
   scheduleReload(options);
 }
