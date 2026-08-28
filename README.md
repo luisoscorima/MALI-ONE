@@ -102,6 +102,40 @@ El contenedor `mali-one-web` se une a la red **`nginx-proxy-manager_default`**. 
    - `X-Forwarded-Proto: https`
    - `X-Forwarded-For`
 
+### WebSocket de screen-cast a través de NPM
+
+Los televisores kiosco se conectan con `transports: ['websocket']` y `upgrade: false`: **no hay fallback a long-polling**, así que si el upgrade no llega al backend la pantalla se queda sin reloj compartido.
+
+- En el Proxy Host de `dev.mali.pe` activa **Websockets Support** (pestaña *Details*). Sin esto NPM no reenvía `Upgrade`/`Connection` y el socket muere en cuanto se abre.
+- En **Advanced** añade timeouts largos; el default de nginx son 60 s de inactividad, suficiente para cortar el socket si el servidor deja de emitir `play:tick`:
+
+  ```nginx
+  location /socket.io/ {
+      proxy_pass http://mali-one-web:80;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_buffering off;
+      proxy_read_timeout 86400s;
+      proxy_send_timeout 86400s;
+  }
+  ```
+
+- Verificar el upgrade extremo a extremo (debe responder `101 Switching Protocols`):
+
+  ```bash
+  curl -i -N \
+    -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
+    -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' \
+    'https://dev.mali.pe/socket.io/?EIO=4&transport=websocket'
+  ```
+
+- El gateway solo funciona con **una** instancia de API: no hay adapter de Redis para socket.io, así que `--scale api=N` repartiría las pantallas entre relojes distintos.
+
 4. En `.env` de producción:
    - `APP_URL=https://dev.mali.pe`
    - `GOOGLE_CALLBACK_URL=https://dev.mali.pe/api/auth/google/callback`

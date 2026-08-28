@@ -11,6 +11,7 @@ import {
   ScreenCastPlaylist,
   ScreenCastPlaylistItem,
 } from '@prisma/client';
+import { createHash } from 'crypto';
 import sharp from 'sharp';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { S3Service } from '../../core/s3/s3.service';
@@ -171,12 +172,16 @@ export class ScreenCastService {
   /**
    * Stream a screen-cast S3 object through the API so kiosk players can
    * cache/play it same-origin (S3 bucket CORS is not required).
+   *
+   * The body is piped straight from S3: buffering a 20 MB clip in memory for
+   * every screen stalls the event loop long enough for every WebSocket to hit
+   * its pong deadline at once.
    */
-  async getPublicMedia(src: string | undefined) {
+  async getPublicMedia(src: string | undefined, range?: string) {
     const raw = (src || '').trim();
     if (!raw) throw new BadRequestException('src requerido');
     const key = this.parseAllowedScreenCastKey(raw);
-    return this.s3.getFileBuffer(key);
+    return this.s3.getFileStream(key, range);
   }
 
   private parseAllowedScreenCastKey(raw: string): string {
@@ -397,6 +402,35 @@ export class ScreenCastService {
       select: { screenKey: true },
     });
     return monitors.map((m) => m.screenKey);
+  }
+
+  /**
+   * Fingerprint of what a playlist actually plays. The gateway compares it
+   * against the running clock so a save that changed nothing visible (a rename,
+   * a repeated "sincronizar") does not tear the wall down.
+   */
+  async getPlaylistSignature(playlistId: string): Promise<string | null> {
+    const playlist = await this.prisma.screenCastPlaylist.findUnique({
+      where: { id: playlistId },
+      select: {
+        activo: true,
+        items: {
+          where: { activo: true },
+          orderBy: { sortOrder: 'asc' },
+          select: { id: true, mediaUrl: true, mediaType: true, durationMs: true },
+        },
+      },
+    });
+    if (!playlist) return null;
+    const items = playlist.items
+      .map(
+        (item) =>
+          `${item.id}:${item.mediaType}:${item.durationMs}:${item.mediaUrl}`,
+      )
+      .join('|');
+    return createHash('sha1')
+      .update(`${playlist.activo ? 'on' : 'off'}#${items}`)
+      .digest('hex');
   }
 
   async getAllScreenKeys(): Promise<string[]> {

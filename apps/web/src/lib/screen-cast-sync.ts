@@ -4,15 +4,37 @@ import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 export const MEASURE_TIMEOUT_MS = 10_000;
 export const CLIENT_GO_FALLBACK_MS = 18_000;
 export const DRIFT_INTERVAL_MS = 400;
-/**
- * Per-video budget for the background download. Generous on purpose: it never
- * blocks playback, and a kiosk link needs minutes for a 20 MB clip.
- */
-export const VIDEO_PRELOAD_BUDGET_MS = 4 * 60_000;
 /** Ignore clock samples with huge RTT — they shift the wall by 1–2s. */
 export const MAX_CLOCK_RTT_MS = 400;
-/** Seconds of forward buffer before a screen reports ready. */
-export const VIDEO_BUFFER_GOAL_S = 2;
+/**
+ * Seconds of forward buffer a streamed clip needs before it may start. Only
+ * reachable when the link is fast; a local copy skips the check entirely.
+ */
+export const VIDEO_BUFFER_GOAL_S = 8;
+/** Warming a local file is instant — never wait on it like a network read. */
+export const VIDEO_WARMUP_TIMEOUT_MS = 4_000;
+/** How often playback is inspected for stalls and overruns. */
+export const VIDEO_WATCHDOG_MS = 300;
+/** No decoded progress for this long means the clip is starving, not slow. */
+export const VIDEO_STALL_GIVEUP_MS = 1_400;
+/**
+ * Opening a decoder is not stalling. Until the first frame lands, playback gets
+ * this much slack — dropping a healthy clip that was merely slow to start is
+ * far worse than a few seconds of patience.
+ */
+export const VIDEO_START_GRACE_MS = 6_000;
+/** play() can be rejected silently on Tizen; nudge it again after this. */
+export const VIDEO_PLAY_RETRY_MS = 700;
+export const VIDEO_PLAY_RETRY_MAX = 4;
+/** Slack over the timeline slot before playback is considered overrun. */
+export const VIDEO_END_GRACE_MS = 2_000;
+/**
+ * currentTime cannot be assigned on Tizen, so a clip entered this far into its
+ * slot would be cut short at the end. Hold the slot instead of starting it.
+ */
+export const VIDEO_LATE_JOIN_MS = 1_000;
+/** Cooldown before a clip that starved is offered to the player again. */
+export const VIDEO_HOLD_COOLDOWN_MS = 5 * 60_000;
 
 export type PlaylistClock = {
   syncId: string;
@@ -28,6 +50,8 @@ export type PlaylistSyncPayload = {
   epochMs?: number;
   durationsMs?: number[];
   serverNow?: number;
+  /** Videos every connected screen already has locally. */
+  playableUrls?: string[];
 };
 
 export type PlayGoPayload = {
@@ -36,7 +60,19 @@ export type PlayGoPayload = {
   epochMs: number;
   durationsMs?: number[];
   serverNow?: number;
+  /** Videos every connected screen already has locally. */
+  playableUrls?: string[];
 };
+
+export function sameUrlSet(
+  a: readonly string[] | null | undefined,
+  b: readonly string[] | null | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((url) => set.has(url));
+}
 
 export function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -157,24 +193,38 @@ export function prepareKioskVideo(video: HTMLVideoElement) {
   video.disablePictureInPicture = true;
 }
 
+/** Seconds of contiguous data decoded ahead of the playhead. */
+export function bufferedAheadSeconds(video: HTMLVideoElement): number {
+  try {
+    const t = video.currentTime || 0;
+    const ranges = video.buffered;
+    for (let i = 0; i < ranges.length; i++) {
+      if (ranges.start(i) <= t + 0.15 && ranges.end(i) > t) {
+        return ranges.end(i) - t;
+      }
+    }
+  } catch {
+    // Tizen throws on buffered before metadata lands
+  }
+  return 0;
+}
+
+/** True once the buffered range reaches the end of the clip. */
+export function bufferedToEnd(video: HTMLVideoElement): boolean {
+  const duration = video.duration;
+  if (!Number.isFinite(duration) || duration <= 0) return false;
+  return bufferedAheadSeconds(video) >= duration - (video.currentTime || 0) - 0.4;
+}
+
 export function mediaHasForwardBuffer(
   video: HTMLVideoElement,
   seconds = VIDEO_BUFFER_GOAL_S,
 ): boolean {
   if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
   if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return false;
-  try {
-    const t = video.currentTime || 0;
-    if (video.buffered.length === 0) return false;
-    for (let i = 0; i < video.buffered.length; i++) {
-      if (video.buffered.start(i) <= t + 0.15 && video.buffered.end(i) >= t + seconds) {
-        return true;
-      }
-    }
-    return false;
-  } catch {
-    return video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA;
-  }
+  // A short clip can never buffer the full goal — reaching its end is enough.
+  if (bufferedToEnd(video)) return true;
+  return bufferedAheadSeconds(video) >= seconds;
 }
 
 export function primeVideoSrc(video: HTMLVideoElement, url: string) {
@@ -258,6 +308,12 @@ export async function warmupItem(
 
   if (item.mediaType !== 'video' || !warmVideo) return;
 
+  // Only a local copy is worth warming. Pulling bytes through the <video>
+  // element for a clip we may not even play competes with the background
+  // download for the same narrow link, and both end up starved.
+  if (!item.mediaUrl.startsWith('blob:')) return;
+  const warmTimeoutMs = Math.min(timeoutMs, VIDEO_WARMUP_TIMEOUT_MS);
+
   const alreadyReady =
     videoSrcMatches(warmVideo, item.mediaUrl) &&
     mediaHasForwardBuffer(warmVideo) &&
@@ -298,12 +354,7 @@ export async function warmupItem(
         resolve();
       };
       const onProgress = () => {
-        if (
-          mediaHasForwardBuffer(warmVideo) ||
-          warmVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
-        ) {
-          finish();
-        }
+        if (mediaHasForwardBuffer(warmVideo)) finish();
       };
       const onError = () => finish();
       warmVideo.addEventListener('canplay', onProgress);
@@ -313,7 +364,7 @@ export async function warmupItem(
       warmVideo.addEventListener('error', onError, { once: true });
       onProgress();
     }),
-    waitMs(timeoutMs),
+    waitMs(warmTimeoutMs),
   ]);
   try {
     warmVideo.pause();

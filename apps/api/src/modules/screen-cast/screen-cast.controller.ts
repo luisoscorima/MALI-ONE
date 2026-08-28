@@ -8,12 +8,15 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
   StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule } from '@prisma/client';
+import type { Request, Response } from 'express';
 import { Public } from '../../core/guards/public.decorator';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { S3ManagerService } from '../s3-manager/s3-manager.service';
@@ -55,11 +58,26 @@ export class ScreenCastController {
   @Public()
   @Get('media')
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
-  async proxyMedia(@Query('src') src: string) {
-    const { buffer, contentType } = await this.service.getPublicMedia(src);
-    return new StreamableFile(buffer, {
-      type: contentType,
-      length: buffer.length,
+  async proxyMedia(
+    @Query('src') src: string,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const range =
+      typeof req.headers.range === 'string' ? req.headers.range : undefined;
+    const media = await this.service.getPublicMedia(src, range);
+
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (media.etag) res.setHeader('ETag', media.etag);
+    if (media.lastModified) res.setHeader('Last-Modified', media.lastModified);
+    if (media.contentRange) {
+      res.status(206);
+      res.setHeader('Content-Range', media.contentRange);
+    }
+
+    return new StreamableFile(media.stream, {
+      type: media.contentType,
+      ...(media.contentLength ? { length: media.contentLength } : {}),
     });
   }
 
@@ -91,7 +109,7 @@ export class ScreenCastController {
   ) {
     const playlist = await this.service.updatePlaylist(id, body);
     const keys = await this.service.getScreenKeysForPlaylist(id);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'playlist:update' });
     return playlist;
   }
 
@@ -106,7 +124,7 @@ export class ScreenCastController {
   async deletePlaylist(@Param('id') id: string) {
     const keys = await this.service.getScreenKeysForPlaylist(id);
     const result = await this.service.deletePlaylist(id);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'playlist:delete' });
     return result;
   }
 
@@ -118,7 +136,7 @@ export class ScreenCastController {
   ) {
     const item = await this.service.createPlaylistItem(playlistId, body);
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'item:create' });
     return item;
   }
 
@@ -134,7 +152,7 @@ export class ScreenCastController {
       orderedIds,
     );
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'item:reorder' });
     return items;
   }
 
@@ -143,7 +161,7 @@ export class ScreenCastController {
   async duplicateItem(@Param('id') id: string) {
     const item = await this.service.duplicatePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'item:duplicate' });
     return item;
   }
 
@@ -155,7 +173,7 @@ export class ScreenCastController {
   ) {
     const item = await this.service.updatePlaylistItem(id, body);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'item:update' });
     return item;
   }
 
@@ -164,7 +182,7 @@ export class ScreenCastController {
   async deleteItem(@Param('id') id: string) {
     const result = await this.service.deletePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(result.playlistId);
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, { reason: 'item:delete' });
     return { ok: true };
   }
 
@@ -177,11 +195,20 @@ export class ScreenCastController {
     return monitors.map((m) => this.withLivePresence(m));
   }
 
+  /**
+   * Manual "sincronizar todo". Restarting the wall is only worth the black
+   * frames when the content changed; otherwise the screens are re-anchored to
+   * the clock they already share. `force=1` still allows a hard restart.
+   */
   @Post('monitors/sync')
   @RequireModule(AppModule.screen_cast)
-  async syncAllMonitors() {
+  async syncAllMonitors(@Query('force') force?: string) {
     const keys = await this.service.getAllScreenKeys();
-    await this.gateway.restartSync(keys);
+    await this.gateway.restartSync(keys, {
+      force: force === '1' || force === 'true',
+      catchUpWhenUnchanged: true,
+      reason: 'admin:sync-all',
+    });
     return { ok: true, notified: keys.length };
   }
 

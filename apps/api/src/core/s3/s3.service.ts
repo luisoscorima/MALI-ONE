@@ -8,6 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
+import { Readable } from 'stream';
 
 @Injectable()
 export class S3Service {
@@ -99,6 +100,44 @@ export class S3Service {
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: 60 * 60 * 24 * 7 },
     );
+  }
+
+  /**
+   * Pipe an object straight from S3 instead of materialising it. A 20 MB clip
+   * held in a Buffer while a slow kiosk drains it pins memory for minutes and
+   * the resulting GC pauses freeze the event loop, which takes every open
+   * WebSocket down with it. Range is forwarded so players can seek.
+   */
+  async getFileStream(
+    key: string,
+    range?: string,
+  ): Promise<{
+    stream: Readable;
+    contentType: string;
+    contentLength?: number;
+    contentRange?: string;
+    etag?: string;
+    lastModified?: string;
+  }> {
+    const result = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ...(range ? { Range: range } : {}),
+      }),
+    );
+    const body = result.Body;
+    if (!body || !(body instanceof Readable)) {
+      throw new Error(`Objeto S3 no transmitible: ${key}`);
+    }
+    return {
+      stream: body,
+      contentType: result.ContentType ?? 'application/octet-stream',
+      contentLength: result.ContentLength,
+      contentRange: result.ContentRange,
+      etag: result.ETag,
+      lastModified: result.LastModified?.toUTCString(),
+    };
   }
 
   async getFileBuffer(
