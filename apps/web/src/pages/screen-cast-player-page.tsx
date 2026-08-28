@@ -35,7 +35,8 @@ import {
   DRIFT_INTERVAL_MS,
   MEASURE_TIMEOUT_MS,
   VIDEO_PRELOAD_BUDGET_MS,
-  clockOffsetIfFresh,
+  clockSample,
+  MAX_CLOCK_RTT_MS,
   measureAllDurations,
   positionAt,
   primeVideoSrc,
@@ -60,6 +61,10 @@ const KIOSK_CLASS = 'screen-cast-kiosk';
 /** Long enough to be read from across a room on a kiosk TV. */
 const TOAST_TTL_MS = 9_000;
 const DEBUG_HUD_INTERVAL_MS = 500;
+/** Ceiling for a coordinated start; beyond this the shared clock is bogus. */
+const MAX_PLAY_SCHEDULE_MS = 5_000;
+/** Never keep the video hidden longer than this, even if play() never lands. */
+const VIDEO_COVER_MAX_MS = 2_500;
 
 const MEDIA_FILL_STYLE: CSSProperties = {
   position: 'absolute',
@@ -211,6 +216,7 @@ export function ScreenCastPlayerPage() {
   const durationsRef = useRef<number[]>([]);
   const localDurationsRef = useRef<number[]>([]);
   const clockOffsetRef = useRef(0);
+  const bestRttRef = useRef(Number.POSITIVE_INFINITY);
   const syncTokenRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
   const lastGoSyncRef = useRef<string | null>(null);
@@ -266,9 +272,17 @@ export function ScreenCastPlayerPage() {
   );
 
   const applyClockOffset = useCallback((serverNow: number | undefined, sentAt: number) => {
-    const offset = clockOffsetIfFresh(serverNow, sentAt);
-    if (offset == null) return;
-    clockOffsetRef.current = offset;
+    const sample = clockSample(serverNow, sentAt);
+    if (!sample) return;
+    // A kiosk link may never reach the ideal round trip, and dropping every
+    // slow sample leaves the TV on its own clock — routinely minutes off, which
+    // turns the shared epoch into a timer that never fires. Keep the best
+    // reading so far instead of none at all.
+    if (sample.rttMs > MAX_CLOCK_RTT_MS && sample.rttMs >= bestRttRef.current) {
+      return;
+    }
+    bestRttRef.current = sample.rttMs;
+    clockOffsetRef.current = sample.offsetMs;
   }, []);
 
   const clearTimer = useCallback(() => {
@@ -336,7 +350,10 @@ export function ScreenCastPlayerPage() {
         void video.play().catch(() => undefined);
       };
       const delay = epochMs == null ? 0 : epochMs - nowServer();
-      if (delay > 16) {
+      // A skewed TV clock can put the epoch minutes away; waiting that long is
+      // a black screen. Past the lead window the clock is not trustworthy, so
+      // start now and let the next item realign.
+      if (delay > 16 && delay <= MAX_PLAY_SCHEDULE_MS) {
         playAtTimerRef.current = window.setTimeout(start, delay);
       } else {
         start();
@@ -976,6 +993,11 @@ export function ScreenCastPlayerPage() {
       const uncover = () => {
         if (!cancelled && video.currentTime > 0.04) setVideoCovered(false);
       };
+      // The cover only exists to hide the white first frame. If playback never
+      // reports progress, showing that frame still beats a black screen.
+      const coverTimer = window.setTimeout(() => {
+        if (!cancelled) setVideoCovered(false);
+      }, VIDEO_COVER_MAX_MS);
 
       /** Restart from S3 when the local copy is truncated or unplayable. */
       const fallBackToStreaming = () => {
@@ -1051,6 +1073,7 @@ export function ScreenCastPlayerPage() {
 
       return () => {
         cancelled = true;
+        window.clearTimeout(coverTimer);
         video.removeEventListener('loadedmetadata', onMetadata);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
@@ -1127,7 +1150,8 @@ export function ScreenCastPlayerPage() {
       const dur = video && Number.isFinite(video.duration) ? video.duration : 0;
       setDebugLines([
         `build ${screenCastBuildId()}`,
-        `ws ${socketRef.current?.connected ? 'ok' : 'CAÍDA'} · sync ${syncIdRef.current?.slice(0, 6) ?? '—'} · reloj ${Math.round(clockOffsetRef.current)}ms`,
+        `ws ${socketRef.current?.connected ? 'ok' : 'CAÍDA'} · sync ${syncIdRef.current?.slice(0, 6) ?? '—'}`,
+        `reloj ${Math.round(clockOffsetRef.current)}ms · rtt ${Number.isFinite(bestRttRef.current) ? Math.round(bestRttRef.current) : '—'}ms`,
         `item ${indexRef.current + 1}/${itemsRef.current.length} ${item?.mediaType ?? '—'} · epoch ${epoch == null ? '—' : `${((nowServer() - epoch) / 1000).toFixed(1)}s`}`,
         item?.mediaType === 'video'
           ? `video ${source} · ${video ? video.currentTime.toFixed(1) : '—'}/${dur ? dur.toFixed(1) : '?'}s · ${video?.paused ? 'pausado' : 'play'}${video?.ended ? ' fin' : ''} · rs${video?.readyState ?? '—'}`

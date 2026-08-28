@@ -54,16 +54,21 @@ export function clockOffsetFromAck(
   return serverNow - localMid;
 }
 
-export function clockOffsetIfFresh(
+export type ClockSample = { offsetMs: number; rttMs: number };
+
+/**
+ * Offset plus the round trip it came from, so the caller can keep the best
+ * reading instead of discarding every slow one.
+ */
+export function clockSample(
   serverNow: number | undefined,
   sentAt: number,
   receivedAt: number = Date.now(),
-  maxRttMs: number = MAX_CLOCK_RTT_MS,
-): number | null {
+): ClockSample | null {
   if (!serverNow) return null;
-  const rtt = receivedAt - sentAt;
-  if (rtt < 0 || rtt > maxRttMs) return null;
-  return clockOffsetFromAck(serverNow, sentAt, receivedAt);
+  const rttMs = receivedAt - sentAt;
+  if (rttMs < 0) return null;
+  return { offsetMs: clockOffsetFromAck(serverNow, sentAt, receivedAt), rttMs };
 }
 
 export function resolveDurations(
