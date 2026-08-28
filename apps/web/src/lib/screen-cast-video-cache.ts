@@ -160,6 +160,8 @@ export async function preloadPlaylistVideos(
     const url = await ensureVideoBlobUrl(item.mediaUrl, timeoutMs);
     if (url) result.cached += 1;
     else result.failed += 1;
+    // Let the socket heartbeat and the player breathe between files.
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   return result;
 }

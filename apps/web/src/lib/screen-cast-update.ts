@@ -43,11 +43,51 @@ function clearDeferTimer() {
   }
 }
 
+const ATTEMPT_KEY = 'screen-cast-update-attempt';
+const MAX_ATTEMPTS = 2;
+
+/**
+ * A stale shell cache makes the reload land on the same old bundle, and the
+ * next check reloads again — a black screen every minute. Drop the cached
+ * shell first, and give up after a couple of tries instead of looping.
+ */
+function updateAttempts(target: string): number {
+  try {
+    const raw = sessionStorage.getItem(ATTEMPT_KEY);
+    const parsed = raw ? (JSON.parse(raw) as { target?: string; count?: number }) : null;
+    return parsed?.target === target ? parsed.count ?? 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function recordUpdateAttempt(target: string, count: number) {
+  try {
+    sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify({ target, count }));
+  } catch {
+    // private mode / quota — worst case we retry once more
+  }
+}
+
+async function purgeShellCache() {
+  if (!('caches' in window)) return;
+  try {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith('screen-cast-shell'))
+        .map((key) => caches.delete(key)),
+    );
+  } catch {
+    // ignore
+  }
+}
+
 function reloadForUpdate() {
   if (reloadScheduled) return;
   reloadScheduled = true;
   clearDeferTimer();
-  window.location.reload();
+  void purgeShellCache().then(() => window.location.reload());
 }
 
 function scheduleReload(options: UpdateOptions) {
@@ -73,6 +113,10 @@ async function checkForUpdate(options: UpdateOptions) {
   if (!remoteBuildId || remoteBuildId === 'dev' || remoteBuildId === currentBuildId()) {
     return;
   }
+
+  const attempts = updateAttempts(remoteBuildId);
+  if (attempts >= MAX_ATTEMPTS) return;
+  recordUpdateAttempt(remoteBuildId, attempts + 1);
 
   scheduleReload(options);
 }

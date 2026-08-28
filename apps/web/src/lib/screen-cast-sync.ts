@@ -2,10 +2,13 @@ import type { ScreenCastPublicItemDto } from '@mali-one/shared';
 import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
 export const MEASURE_TIMEOUT_MS = 10_000;
-export const CLIENT_GO_FALLBACK_MS = 30_000;
+export const CLIENT_GO_FALLBACK_MS = 18_000;
 export const DRIFT_INTERVAL_MS = 400;
-/** Per-video budget to pull the whole file into memory before reporting ready. */
-export const VIDEO_PRELOAD_TIMEOUT_MS = 15_000;
+/**
+ * Per-video budget for the background download. Generous on purpose: it never
+ * blocks playback, and a kiosk link needs minutes for a 20 MB clip.
+ */
+export const VIDEO_PRELOAD_BUDGET_MS = 4 * 60_000;
 /** Ignore clock samples with huge RTT — they shift the wall by 1–2s. */
 export const MAX_CLOCK_RTT_MS = 400;
 /** Seconds of forward buffer before a screen reports ready. */

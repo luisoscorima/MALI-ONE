@@ -1,7 +1,7 @@
-/* Screen-cast offline cache for kiosk players (v6 — blob playback via API) */
-const CONFIG_CACHE = 'screen-cast-config-v6';
-const MEDIA_CACHE = 'screen-cast-media-v6';
-const SHELL_CACHE = 'screen-cast-shell-v6';
+/* Screen-cast offline cache for kiosk players (v7 — background video download) */
+const CONFIG_CACHE = 'screen-cast-config-v7';
+const MEDIA_CACHE = 'screen-cast-media-v7';
+const SHELL_CACHE = 'screen-cast-shell-v7';
 
 const SHELL_URLS = ['/screen-cast', '/index.html'];
 

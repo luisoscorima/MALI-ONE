@@ -34,7 +34,7 @@ import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
   MEASURE_TIMEOUT_MS,
-  VIDEO_PRELOAD_TIMEOUT_MS,
+  VIDEO_PRELOAD_BUDGET_MS,
   clockOffsetIfFresh,
   measureAllDurations,
   positionAt,
@@ -218,6 +218,7 @@ export function ScreenCastPlayerPage() {
   const scheduledPlayKeyRef = useRef<string | null>(null);
   const toastIdRef = useRef(0);
   const cachedUrlsRef = useRef<Set<string>>(new Set());
+  const preloadSignatureRef = useRef<string | null>(null);
   const socketWasConnectedRef = useRef(false);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
@@ -451,22 +452,34 @@ export function ScreenCastPlayerPage() {
   );
 
   /**
-   * Pull every video fully into memory before reporting ready. Streaming a
-   * 20 MB MP4 from S3 on a kiosk TV stalls mid-clip; a blob never does.
+   * Pull videos into local storage in the background. This must never gate the
+   * first paint: on a slow kiosk link a 20 MB file takes minutes, and the screen
+   * would sit black the whole time. The first pass streams from S3; once the
+   * download lands, the next time the item comes around it plays from the blob.
    */
-  const preloadVideos = useCallback(
-    async (data: ScreenCastPublicConfigDto) => {
-      if (data.empty) return;
-      const hasVideo = data.items.some((item) => item.mediaType === 'video');
-      if (!hasVideo) return;
-      setLoaderHint('Descargando video…');
-      const result = await preloadPlaylistVideos(data, VIDEO_PRELOAD_TIMEOUT_MS);
-      releaseUnusedVideoBlobs(data.items.map((item) => item.mediaUrl));
-      if (result.failed > 0) {
-        kioskToast('Video sin caché — se reproduce en streaming', 'warn');
-      }
+  const startVideoPreload = useCallback(
+    (data: ScreenCastPublicConfigDto) => {
+      if (isPreview || data.empty) return;
+      if (!data.items.some((item) => item.mediaType === 'video')) return;
+      const signature = data.items.map((item) => item.mediaUrl).join('|');
+      if (preloadSignatureRef.current === signature) return;
+      preloadSignatureRef.current = signature;
+
+      void preloadPlaylistVideos(data, VIDEO_PRELOAD_BUDGET_MS).then(
+        (result) => {
+          releaseUnusedVideoBlobs(data.items.map((item) => item.mediaUrl));
+          if (result.cached > 0) {
+            kioskToast(`Video guardado local (${result.cached})`, 'ok');
+          }
+          if (result.failed > 0) {
+            // Allow a retry on the next sync instead of streaming forever.
+            preloadSignatureRef.current = null;
+            kioskToast('Video en streaming — sin copia local', 'warn');
+          }
+        },
+      );
     },
-    [kioskToast],
+    [isPreview, kioskToast],
   );
 
   const prepareAndReady = useCallback(
@@ -478,7 +491,7 @@ export function ScreenCastPlayerPage() {
       }
       const durations = await measureAllDurations(data.items, MEASURE_TIMEOUT_MS);
       localDurationsRef.current = durations;
-      await preloadVideos(data);
+      startVideoPreload(data);
       const pos =
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
@@ -496,7 +509,7 @@ export function ScreenCastPlayerPage() {
       }
       emitReady(syncId, data.playlistId, durations);
     },
-    [applyConfig, emitReady, nowServer, playbackUrl, preloadVideos],
+    [applyConfig, emitReady, nowServer, playbackUrl, startVideoPreload],
   );
 
   const loadConfigImmediate = useCallback(async () => {
@@ -514,7 +527,7 @@ export function ScreenCastPlayerPage() {
           MEASURE_TIMEOUT_MS,
         );
         localDurationsRef.current = durations;
-        await preloadVideos(data);
+        startVideoPreload(data);
         applyGo({
           syncId: joinClock.syncId,
           epochMs: joinClock.epochMs,
@@ -523,10 +536,7 @@ export function ScreenCastPlayerPage() {
         });
         return;
       }
-      // Download before first paint so playback never streams from S3.
-      if (!isPreview && !data.empty) {
-        await preloadVideos(data);
-      }
+      startVideoPreload(data);
       applyConfig(data, 0);
       if (!isPreview && !data.empty) {
         void prepareAndReady(data, null);
@@ -545,7 +555,7 @@ export function ScreenCastPlayerPage() {
     applyGo,
     isPreview,
     prepareAndReady,
-    preloadVideos,
+    startVideoPreload,
     nowServer,
   ]);
 
@@ -600,8 +610,7 @@ export function ScreenCastPlayerPage() {
           if (token !== syncTokenRef.current) return;
           localDurationsRef.current = durations;
           if (payload.epochMs) {
-            await preloadVideos(data);
-            if (token !== syncTokenRef.current) return;
+            startVideoPreload(data);
             const pos = positionAt(durations, payload.epochMs, nowServer());
             const startItem = data.items[pos?.index ?? 0];
             if (startItem) {
@@ -691,7 +700,7 @@ export function ScreenCastPlayerPage() {
       holdForSync,
       clearPlayAtTimer,
       playbackUrl,
-      preloadVideos,
+      startVideoPreload,
     ],
   );
 
