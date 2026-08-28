@@ -3,7 +3,11 @@ import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
 export const MEASURE_TIMEOUT_MS = 10_000;
 export const CLIENT_GO_FALLBACK_MS = 15_000;
-export const DRIFT_INTERVAL_MS = 750;
+export const DRIFT_INTERVAL_MS = 400;
+/** Ignore clock samples with huge RTT — they shift the wall by 1–2s. */
+export const MAX_CLOCK_RTT_MS = 400;
+/** Seconds of forward buffer before a screen reports ready. */
+export const VIDEO_BUFFER_GOAL_S = 2;
 
 export type PlaylistClock = {
   syncId: string;
@@ -43,6 +47,18 @@ export function clockOffsetFromAck(
 ): number {
   const localMid = (sentAt + receivedAt) / 2;
   return serverNow - localMid;
+}
+
+export function clockOffsetIfFresh(
+  serverNow: number | undefined,
+  sentAt: number,
+  receivedAt: number = Date.now(),
+  maxRttMs: number = MAX_CLOCK_RTT_MS,
+): number | null {
+  if (!serverNow) return null;
+  const rtt = receivedAt - sentAt;
+  if (rtt < 0 || rtt > maxRttMs) return null;
+  return clockOffsetFromAck(serverNow, sentAt, receivedAt);
 }
 
 export function resolveDurations(
@@ -131,6 +147,38 @@ export function prepareKioskVideo(video: HTMLVideoElement) {
   video.disablePictureInPicture = true;
 }
 
+export function mediaHasForwardBuffer(
+  video: HTMLVideoElement,
+  seconds = VIDEO_BUFFER_GOAL_S,
+): boolean {
+  if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
+  if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return false;
+  try {
+    const t = video.currentTime || 0;
+    if (video.buffered.length === 0) return false;
+    for (let i = 0; i < video.buffered.length; i++) {
+      if (video.buffered.start(i) <= t + 0.15 && video.buffered.end(i) >= t + seconds) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA;
+  }
+}
+
+export function primeVideoSrc(video: HTMLVideoElement, url: string) {
+  prepareKioskVideo(video);
+  if (isCorsCacheableMediaUrl(url)) {
+    video.crossOrigin = 'anonymous';
+  } else {
+    video.removeAttribute('crossorigin');
+  }
+  if (!videoSrcMatches(video, url)) {
+    video.src = url;
+  }
+}
+
 /**
  * Reload src to return to t=0. Never assign currentTime — Tizen/WebKit freeze.
  */
@@ -199,20 +247,13 @@ export async function warmupItem(
 
   if (item.mediaType !== 'video' || !warmVideo) return;
 
-  prepareKioskVideo(warmVideo);
-  if (isCorsCacheableMediaUrl(item.mediaUrl)) {
-    warmVideo.crossOrigin = 'anonymous';
-  } else {
-    warmVideo.removeAttribute('crossorigin');
-  }
-
-  const atStartAndReady =
+  const alreadyReady =
     videoSrcMatches(warmVideo, item.mediaUrl) &&
-    warmVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    mediaHasForwardBuffer(warmVideo) &&
     !warmVideo.ended &&
     warmVideo.currentTime < 0.25;
 
-  if (atStartAndReady) {
+  if (alreadyReady) {
     try {
       warmVideo.pause();
     } catch {
@@ -226,22 +267,40 @@ export async function warmupItem(
     warmVideo.ended ||
     warmVideo.currentTime >= 0.25;
 
+  if (needsReload) {
+    reloadVideoSource(warmVideo, item.mediaUrl);
+  } else {
+    primeVideoSrc(warmVideo, item.mediaUrl);
+  }
+
   await Promise.race([
     new Promise<void>((resolve) => {
+      let done = false;
       const finish = () => {
-        warmVideo.removeEventListener('canplay', finish);
-        warmVideo.removeEventListener('loadeddata', finish);
-        warmVideo.removeEventListener('error', finish);
+        if (done) return;
+        done = true;
+        warmVideo.removeEventListener('canplay', onProgress);
+        warmVideo.removeEventListener('canplaythrough', onProgress);
+        warmVideo.removeEventListener('loadeddata', onProgress);
+        warmVideo.removeEventListener('progress', onProgress);
+        warmVideo.removeEventListener('error', onError);
         resolve();
       };
-      warmVideo.addEventListener('canplay', finish, { once: true });
-      warmVideo.addEventListener('loadeddata', finish, { once: true });
-      warmVideo.addEventListener('error', finish, { once: true });
-      if (needsReload) {
-        reloadVideoSource(warmVideo, item.mediaUrl);
-      } else if (warmVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        finish();
-      }
+      const onProgress = () => {
+        if (
+          mediaHasForwardBuffer(warmVideo) ||
+          warmVideo.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+        ) {
+          finish();
+        }
+      };
+      const onError = () => finish();
+      warmVideo.addEventListener('canplay', onProgress);
+      warmVideo.addEventListener('canplaythrough', onProgress);
+      warmVideo.addEventListener('loadeddata', onProgress);
+      warmVideo.addEventListener('progress', onProgress);
+      warmVideo.addEventListener('error', onError, { once: true });
+      onProgress();
     }),
     waitMs(timeoutMs),
   ]);

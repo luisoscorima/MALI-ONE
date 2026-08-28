@@ -14,8 +14,8 @@ import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
 const BARRIER_MS = 12_000;
-/** Short lead after every screen is already buffered — just enough for play:go to land. */
-const EPOCH_LEAD_MS = 800;
+/** Lead after every screen is buffered so both can schedule play() before epoch. */
+const EPOCH_LEAD_MS = 1_000;
 const TICK_MS = 5_000;
 
 type PlaylistClock = {

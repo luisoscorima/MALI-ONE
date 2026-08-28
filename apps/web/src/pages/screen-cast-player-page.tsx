@@ -30,10 +30,10 @@ import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
   MEASURE_TIMEOUT_MS,
-  clockOffsetFromAck,
+  clockOffsetIfFresh,
   measureAllDurations,
   positionAt,
-  prepareKioskVideo,
+  primeVideoSrc,
   reloadVideoSource,
   resolveDurations,
   videoSrcMatches,
@@ -70,6 +70,26 @@ function destroyVideo(video: HTMLVideoElement | null) {
     video.load();
   } catch {
     // ignore cleanup errors on Tizen
+  }
+}
+
+function unloadVideoQuiet(video: HTMLVideoElement | null) {
+  if (!video) return;
+  if (!video.getAttribute('src') && !video.currentSrc) return;
+  try {
+    video.pause();
+    video.removeAttribute('src');
+  } catch {
+    // Tizen
+  }
+}
+
+function pauseVideoQuiet(video: HTMLVideoElement | null) {
+  if (!video) return;
+  try {
+    video.pause();
+  } catch {
+    // Tizen
   }
 }
 
@@ -159,6 +179,7 @@ export function ScreenCastPlayerPage() {
   const [loaderHint, setLoaderHint] = useState('Cargando');
   const [toasts, setToasts] = useState<KioskToast[]>([]);
   const [videoCovered, setVideoCovered] = useState(true);
+  const [frontVideo, setFrontVideo] = useState<'main' | 'warm'>('main');
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
   );
@@ -188,8 +209,10 @@ export function ScreenCastPlayerPage() {
   const clockOffsetRef = useRef(0);
   const syncTokenRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
-  const videoPlayTokenRef = useRef<string | null>(null);
   const lastGoSyncRef = useRef<string | null>(null);
+  const playAtTimerRef = useRef<number | null>(null);
+  const scheduledPlayKeyRef = useRef<string | null>(null);
+  const frontVideoRef = useRef<'main' | 'warm'>('main');
   const toastIdRef = useRef(0);
   const cachedUrlsRef = useRef<Set<string>>(new Set());
   const socketWasConnectedRef = useRef(false);
@@ -239,12 +262,9 @@ export function ScreenCastPlayerPage() {
   );
 
   const applyClockOffset = useCallback((serverNow: number | undefined, sentAt: number) => {
-    if (!serverNow) return;
-    clockOffsetRef.current = clockOffsetFromAck(
-      serverNow,
-      sentAt,
-      Date.now(),
-    );
+    const offset = clockOffsetIfFresh(serverNow, sentAt);
+    if (offset == null) return;
+    clockOffsetRef.current = offset;
   }, []);
 
   const clearTimer = useCallback(() => {
@@ -261,10 +281,19 @@ export function ScreenCastPlayerPage() {
     }
   }, []);
 
+  const clearPlayAtTimer = useCallback(() => {
+    if (playAtTimerRef.current != null) {
+      window.clearTimeout(playAtTimerRef.current);
+      playAtTimerRef.current = null;
+    }
+  }, []);
+
   const cleanupMedia = useCallback(() => {
     clearTimer();
+    clearPlayAtTimer();
     destroyVideo(videoRef.current);
-  }, [clearTimer]);
+    destroyVideo(warmVideoRef.current);
+  }, [clearTimer, clearPlayAtTimer]);
 
   const advance = useCallback(() => {
     const len = itemsRef.current.length;
@@ -278,9 +307,49 @@ export function ScreenCastPlayerPage() {
     setSyncing(true);
     setLoaderHint('Sincronizando…');
     setVideoCovered(true);
-    // Do not pause() here — on TVs pause+resume freezes the decoder.
-    // warmupItem reloads the source if the clip was already mid-play.
   }, []);
+
+  const pickVideoElement = useCallback((url: string): HTMLVideoElement | null => {
+    const main = videoRef.current;
+    const warm = warmVideoRef.current;
+    const warmReady =
+      !!warm &&
+      videoSrcMatches(warm, url) &&
+      warm.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+    if (warmReady) return warm;
+    if (main && videoSrcMatches(main, url)) return main;
+    return main ?? warm;
+  }, []);
+
+  const showVideoElement = useCallback((el: HTMLVideoElement | null) => {
+    if (!el) return;
+    const next: 'main' | 'warm' = el === warmVideoRef.current ? 'warm' : 'main';
+    frontVideoRef.current = next;
+    setFrontVideo(next);
+    if (next === 'warm') pauseVideoQuiet(videoRef.current);
+    else pauseVideoQuiet(warmVideoRef.current);
+  }, []);
+
+  const scheduleVideoPlay = useCallback(
+    (video: HTMLVideoElement | null, url: string, epochMs: number | null) => {
+      if (!video) return;
+      primeVideoSrc(video, url);
+      videoUrlRef.current = url;
+      scheduledPlayKeyRef.current = `${url}@${epochMs ?? 'now'}`;
+      clearPlayAtTimer();
+      const start = () => {
+        playAtTimerRef.current = null;
+        void video.play().catch(() => undefined);
+      };
+      const delay = epochMs == null ? 0 : epochMs - nowServer();
+      if (delay > 16) {
+        playAtTimerRef.current = window.setTimeout(start, delay);
+      } else {
+        start();
+      }
+    },
+    [clearPlayAtTimer, nowServer],
+  );
 
   const applyConfig = useCallback(
     (data: ScreenCastPublicConfigDto, startIndex: number) => {
@@ -340,11 +409,31 @@ export function ScreenCastPlayerPage() {
       setSyncing(false);
       setVideoCovered(true);
       setLoaderHint('Arrancando…');
-      setPlaybackGen((g) => g + 1);
+
+      const startItem = data.items[nextIndex];
+      if (startItem?.mediaType === 'video') {
+        const target = pickVideoElement(startItem.mediaUrl);
+        showVideoElement(target);
+        scheduleVideoPlay(target, startItem.mediaUrl, payload.epochMs);
+      } else {
+        scheduledPlayKeyRef.current = null;
+        clearPlayAtTimer();
+        setPlaybackGen((g) => g + 1);
+      }
       kioskToast('Pantalla sincronizada', 'ok');
       cachePlaylistInBackground(data);
     },
-    [applyClockOffset, cachePlaylistInBackground, clearGoFallback, kioskToast, nowServer],
+    [
+      applyClockOffset,
+      cachePlaylistInBackground,
+      clearGoFallback,
+      clearPlayAtTimer,
+      kioskToast,
+      nowServer,
+      pickVideoElement,
+      scheduleVideoPlay,
+      showVideoElement,
+    ],
   );
 
   const fetchConfig = useCallback(async () => {
@@ -452,6 +541,8 @@ export function ScreenCastPlayerPage() {
       readyForGoRef.current = false;
       if (!payload.catchUp && !payload.empty) {
         lastGoSyncRef.current = null;
+        scheduledPlayKeyRef.current = null;
+        clearPlayAtTimer();
       }
 
       if (payload.empty) {
@@ -576,6 +667,7 @@ export function ScreenCastPlayerPage() {
       prepareAndReady,
       emitReady,
       holdForSync,
+      clearPlayAtTimer,
     ],
   );
 
@@ -618,8 +710,9 @@ export function ScreenCastPlayerPage() {
     if (isPreview) return;
     startScreenCastAutoUpdate({
       isVideoPlaying: () => {
-        const video = videoRef.current;
-        return !!video && !video.paused && !video.ended;
+        return [videoRef.current, warmVideoRef.current].some(
+          (el) => !!el && !el.paused && !el.ended,
+        );
       },
     });
   }, [isPreview]);
@@ -773,11 +866,13 @@ export function ScreenCastPlayerPage() {
     const item = items[index];
     if (!item || !config || config.empty) {
       destroyVideo(videoRef.current);
+      destroyVideo(warmVideoRef.current);
       videoUrlRef.current = null;
       emitStatus({ index: 0, total: 0 });
       return () => {
         clearTimer();
         destroyVideo(videoRef.current);
+        destroyVideo(warmVideoRef.current);
         videoUrlRef.current = null;
       };
     }
@@ -791,22 +886,12 @@ export function ScreenCastPlayerPage() {
         const pre = new Image();
         preloadRef.current = pre;
         pre.src = nextItem.mediaUrl;
-      } else if (
-        nextItem.mediaType === 'video' &&
-        warmVideoRef.current &&
-        item.mediaType !== 'video'
-      ) {
-        const warm = warmVideoRef.current;
-        if (isCorsCacheableMediaUrl(nextItem.mediaUrl)) {
-          warm.crossOrigin = 'anonymous';
-        } else {
-          warm.removeAttribute('crossorigin');
-        }
-        if (!videoSrcMatches(warm, nextItem.mediaUrl)) {
-          warm.preload = 'auto';
-          warm.muted = true;
-          warm.src = nextItem.mediaUrl;
-        }
+      } else if (nextItem.mediaType === 'video' && item.mediaType !== 'video') {
+        const inactive =
+          frontVideoRef.current === 'main'
+            ? warmVideoRef.current
+            : videoRef.current;
+        if (inactive) primeVideoSrc(inactive, nextItem.mediaUrl);
       }
     }
 
@@ -853,55 +938,33 @@ export function ScreenCastPlayerPage() {
     };
 
     if (item.mediaType === 'video') {
-      const video = videoRef.current;
+      const video = pickVideoElement(item.mediaUrl) ?? videoRef.current;
       if (!video) return;
 
-      // TVs often have a single hardware decoder — free the warmup element.
-      if (warmVideoRef.current && warmVideoRef.current !== video) {
-        destroyVideo(warmVideoRef.current);
-      }
-
-      prepareKioskVideo(video);
+      showVideoElement(video);
+      primeVideoSrc(video, item.mediaUrl);
       video.loop = items.length <= 1;
-      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
-        video.crossOrigin = 'anonymous';
-      } else {
-        video.removeAttribute('crossorigin');
-      }
-
-      const playToken = `${item.mediaUrl}:${index}:${playbackGen}`;
-      const sameSource =
-        videoUrlRef.current === item.mediaUrl &&
-        videoSrcMatches(video, item.mediaUrl);
-      const alreadyPlaying =
-        sameSource && !video.paused && !video.ended && video.currentTime > 0.05;
+      videoUrlRef.current = item.mediaUrl;
+      const other =
+        video === warmVideoRef.current ? videoRef.current : warmVideoRef.current;
+      if (other && other !== video) unloadVideoQuiet(other);
 
       let cancelled = false;
-      let watchId: number | null = null;
-      let awaitingEpoch = false;
-      let lastMediaTime = video.currentTime;
-      let frozenTicks = 0;
-      let playAttempts = 0;
-      let hasAdvanced = video.currentTime > 0.2;
-      const startedAt = Date.now();
-
       const uncover = () => {
         if (!cancelled && video.currentTime > 0.04) setVideoCovered(false);
       };
-
       const onEnded = () => {
-        videoPlayTokenRef.current = null;
         setVideoCovered(true);
+        scheduledPlayKeyRef.current = null;
         if (itemsRef.current.length <= 1) {
           reloadVideoSource(video, item.mediaUrl);
-          void video.play().catch(() => undefined);
+          scheduleVideoPlay(video, item.mediaUrl, null);
           return;
         }
         if (epochMsRef.current != null && jumpToClock()) return;
         advance();
       };
       const onError = () => {
-        videoPlayTokenRef.current = null;
         emitStatus({
           index,
           total: items.length,
@@ -911,89 +974,23 @@ export function ScreenCastPlayerPage() {
         else advance();
       };
 
-      const start = () => {
-        if (cancelled) return;
-        awaitingEpoch = false;
-        playAttempts += 1;
-        void video.play().then(uncover).catch(() => {
-          videoPlayTokenRef.current = null;
-          if (cancelled) return;
-          if (playAttempts < 10) {
-            window.setTimeout(start, 280);
-          } else if (epoch == null) {
-            scheduleAdvance();
-          }
-        });
-      };
-
-      const tryPlay = () => {
-        if (cancelled || awaitingEpoch) return;
-        if (!videoSrcMatches(video, item.mediaUrl)) {
-          video.src = item.mediaUrl;
-        }
-        const epochMs = epochMsRef.current;
-        const delay =
-          epochMs == null ? 0 : Math.max(0, epochMs - nowServer());
-        if (delay > 50 && delay < 2_000) {
-          awaitingEpoch = true;
-          clearTimer();
-          timerRef.current = window.setTimeout(start, delay);
-          return;
-        }
-        start();
-      };
-
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.addEventListener('playing', uncover);
       video.addEventListener('timeupdate', uncover);
 
-      videoUrlRef.current = item.mediaUrl;
+      const alreadyPlaying =
+        !video.paused && !video.ended && video.currentTime > 0.05;
+      const playKey = `${item.mediaUrl}@${epochMsRef.current ?? 'now'}`;
 
       if (alreadyPlaying) {
-        videoPlayTokenRef.current = playToken;
         setVideoCovered(false);
-      } else {
-        videoPlayTokenRef.current = playToken;
+      } else if (waitingGoRef.current) {
         setVideoCovered(true);
-        tryPlay();
+      } else if (scheduledPlayKeyRef.current !== playKey) {
+        setVideoCovered(true);
+        scheduleVideoPlay(video, item.mediaUrl, epochMsRef.current);
       }
-
-      watchId = window.setInterval(() => {
-        if (cancelled || awaitingEpoch || video.ended) return;
-        if (video.currentTime > 0.2) hasAdvanced = true;
-        if (video.currentTime > 0.04) uncover();
-
-        if (!hasAdvanced) {
-          if (video.paused) tryPlay();
-          else if (Date.now() - startedAt > 2_000) {
-            void video.play().catch(() => undefined);
-          }
-          return;
-        }
-
-        if (video.paused) {
-          void video.play().catch(() => undefined);
-          return;
-        }
-        const delta = Math.abs(video.currentTime - lastMediaTime);
-        if (
-          delta < 0.04 &&
-          video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
-        ) {
-          frozenTicks += 1;
-          if (frozenTicks === 4) {
-            void video.play().catch(() => undefined);
-          } else if (frozenTicks >= 10) {
-            frozenTicks = 0;
-            reloadVideoSource(video, item.mediaUrl);
-            void video.play().catch(() => undefined);
-          }
-        } else {
-          frozenTicks = 0;
-          lastMediaTime = video.currentTime;
-        }
-      }, 500);
 
       return () => {
         cancelled = true;
@@ -1002,15 +999,11 @@ export function ScreenCastPlayerPage() {
         video.removeEventListener('playing', uncover);
         video.removeEventListener('timeupdate', uncover);
         clearTimer();
-        if (watchId != null) window.clearInterval(watchId);
-        if (video.paused && videoPlayTokenRef.current === playToken) {
-          videoPlayTokenRef.current = null;
-        }
       };
     }
 
-    destroyVideo(videoRef.current);
-    videoUrlRef.current = null;
+    pauseVideoQuiet(videoRef.current);
+    pauseVideoQuiet(warmVideoRef.current);
 
     scheduleAdvance();
     return () => {
@@ -1025,6 +1018,9 @@ export function ScreenCastPlayerPage() {
     emitStatus,
     jumpToClock,
     nowServer,
+    pickVideoElement,
+    scheduleVideoPlay,
+    showVideoElement,
   ]);
 
   useEffect(() => {
@@ -1035,9 +1031,10 @@ export function ScreenCastPlayerPage() {
 
       const currentItem = itemsRef.current[indexRef.current];
       if (currentItem?.mediaType === 'video') {
-        const video = videoRef.current;
-        // Videos play natively — only resync once they finish.
-        if (video && !video.ended) return;
+        const playing = [videoRef.current, warmVideoRef.current].some(
+          (el) => el && !el.paused && !el.ended,
+        );
+        if (playing) return;
       }
 
       const pos = positionAt(durationsRef.current, epoch, nowServer());
@@ -1128,7 +1125,24 @@ export function ScreenCastPlayerPage() {
           className="pointer-events-none"
           style={{
             ...MEDIA_FILL_STYLE,
-            opacity: isVideoItem ? 1 : 0,
+            opacity: isVideoItem && frontVideo === 'main' ? 1 : 0,
+            zIndex: frontVideo === 'main' ? 1 : 0,
+          }}
+          muted
+          playsInline
+          autoPlay={false}
+          controls={false}
+          loop={false}
+          preload="auto"
+        />
+
+        <video
+          ref={warmVideoRef}
+          className="pointer-events-none"
+          style={{
+            ...MEDIA_FILL_STYLE,
+            opacity: isVideoItem && frontVideo === 'warm' ? 1 : 0,
+            zIndex: frontVideo === 'warm' ? 1 : 0,
           }}
           muted
           playsInline
@@ -1139,16 +1153,8 @@ export function ScreenCastPlayerPage() {
         />
 
         {videoActive && videoCovered && (
-          <div className="absolute inset-0 z-1 bg-black" aria-hidden />
+          <div className="absolute inset-0 z-2 bg-black" aria-hidden />
         )}
-
-        <video
-          ref={warmVideoRef}
-          className="pointer-events-none hidden"
-          muted
-          playsInline
-          preload="auto"
-        />
 
         {showImage && current && (
           <img
