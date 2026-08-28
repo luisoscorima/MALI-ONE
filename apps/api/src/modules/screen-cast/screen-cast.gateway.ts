@@ -15,7 +15,7 @@ import { ScreenCastService } from './screen-cast.service';
 
 const BARRIER_MS = 12_000;
 /** Short lead after every screen is already buffered — just enough for play:go to land. */
-const EPOCH_LEAD_MS = 400;
+const EPOCH_LEAD_MS = 800;
 const TICK_MS = 5_000;
 
 type PlaylistClock = {
@@ -260,20 +260,18 @@ export class ScreenCastGateway
     }
 
     const clock = this.clocks.get(pid);
-    if (clock) {
-      if (durations.length && clock.durationsMs.length === 0) {
-        clock.durationsMs = durations;
-      }
-      client.emit('play:go', this.goPayload(pid, clock));
-      return { ok: true };
+    if (clock && durations.length && clock.durationsMs.length === 0) {
+      clock.durationsMs = durations;
     }
-
-    const created: PlaylistClock = {
-      syncId: 'live',
-      epochMs: Date.now(),
-      durationsMs: durations,
-    };
-    this.clocks.set(pid, created);
+    // Do not emit play:go here — that restarts every screen that reports
+    // ready (reconnect, heartbeat race) and causes mid-video seeks.
+    if (!clock) {
+      this.clocks.set(pid, {
+        syncId: 'live',
+        epochMs: Date.now(),
+        durationsMs: durations,
+      });
+    }
     return { ok: true };
   }
 

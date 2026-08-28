@@ -30,11 +30,11 @@ import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
   MEASURE_TIMEOUT_MS,
-  VIDEO_START_SEEK_MS,
   clockOffsetFromAck,
-  isVideoBuffered,
   measureAllDurations,
   positionAt,
+  prepareKioskVideo,
+  reloadVideoSource,
   resolveDurations,
   videoSrcMatches,
   warmupItem,
@@ -158,6 +158,7 @@ export function ScreenCastPlayerPage() {
   const [playbackGen, setPlaybackGen] = useState(0);
   const [loaderHint, setLoaderHint] = useState('Cargando');
   const [toasts, setToasts] = useState<KioskToast[]>([]);
+  const [videoCovered, setVideoCovered] = useState(true);
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
   );
@@ -188,6 +189,7 @@ export function ScreenCastPlayerPage() {
   const syncTokenRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
   const videoPlayTokenRef = useRef<string | null>(null);
+  const lastGoSyncRef = useRef<string | null>(null);
   const toastIdRef = useRef(0);
   const cachedUrlsRef = useRef<Set<string>>(new Set());
   const socketWasConnectedRef = useRef(false);
@@ -275,11 +277,9 @@ export function ScreenCastPlayerPage() {
   const holdForSync = useCallback(() => {
     setSyncing(true);
     setLoaderHint('Sincronizando…');
-    try {
-      videoRef.current?.pause();
-    } catch {
-      // Tizen may throw if the element is mid-load
-    }
+    setVideoCovered(true);
+    // Do not pause() here — on TVs pause+resume freezes the decoder.
+    // warmupItem reloads the source if the clip was already mid-play.
   }, []);
 
   const applyConfig = useCallback(
@@ -320,6 +320,16 @@ export function ScreenCastPlayerPage() {
       durationsRef.current = durations;
       epochMsRef.current = payload.epochMs;
       itemsRef.current = data.items;
+
+      const sameSession =
+        !!payload.syncId && payload.syncId === lastGoSyncRef.current;
+      if (sameSession) {
+        setSyncing(false);
+        setLoading(false);
+        return;
+      }
+      lastGoSyncRef.current = payload.syncId ?? lastGoSyncRef.current;
+
       const pos = positionAt(durations, payload.epochMs, nowServer());
       const nextIndex = pos?.index ?? 0;
       indexRef.current = nextIndex;
@@ -328,6 +338,7 @@ export function ScreenCastPlayerPage() {
       setError('');
       setLoading(false);
       setSyncing(false);
+      setVideoCovered(true);
       setLoaderHint('Arrancando…');
       setPlaybackGen((g) => g + 1);
       kioskToast('Pantalla sincronizada', 'ok');
@@ -439,6 +450,9 @@ export function ScreenCastPlayerPage() {
       syncIdRef.current = payload.syncId ?? null;
       pendingGoRef.current = null;
       readyForGoRef.current = false;
+      if (!payload.catchUp && !payload.empty) {
+        lastGoSyncRef.current = null;
+      }
 
       if (payload.empty) {
         waitingGoRef.current = false;
@@ -670,8 +684,7 @@ export function ScreenCastPlayerPage() {
       }
       applyClockOffset(payload.serverNow, Date.now());
       if (waitingGoRef.current) {
-        pendingGoRef.current = payload;
-        if (readyForGoRef.current) applyGo(payload);
+        // Never replace a pending play:go with a tick from the previous clock.
         return;
       }
       if (payload.durationsMs?.length) {
@@ -817,13 +830,6 @@ export function ScreenCastPlayerPage() {
       if (pos && pos.index === index) {
         remainingMs = pos.remainingMs;
       }
-    } else if (epoch != null && item.mediaType === 'video') {
-      const pos = positionAt(durationsRef.current, epoch, nowServer());
-      if (pos && pos.index !== index) {
-        indexRef.current = pos.index;
-        setIndex(pos.index);
-        return;
-      }
     }
 
     const scheduleAdvance = () => {
@@ -850,22 +856,48 @@ export function ScreenCastPlayerPage() {
       const video = videoRef.current;
       if (!video) return;
 
-      const playToken = `${item.mediaUrl}@${epoch ?? 'local'}:${index}`;
+      // TVs often have a single hardware decoder — free the warmup element.
+      if (warmVideoRef.current && warmVideoRef.current !== video) {
+        destroyVideo(warmVideoRef.current);
+      }
+
+      prepareKioskVideo(video);
+      video.loop = items.length <= 1;
+      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
+        video.crossOrigin = 'anonymous';
+      } else {
+        video.removeAttribute('crossorigin');
+      }
+
+      const playToken = `${item.mediaUrl}:${index}:${playbackGen}`;
       const sameSource =
         videoUrlRef.current === item.mediaUrl &&
         videoSrcMatches(video, item.mediaUrl);
+      const alreadyPlaying =
+        sameSource && !video.paused && !video.ended && video.currentTime > 0.05;
+
+      let cancelled = false;
+      let watchId: number | null = null;
+      let awaitingEpoch = false;
+      let lastMediaTime = video.currentTime;
+      let frozenTicks = 0;
+      let playAttempts = 0;
+      let hasAdvanced = video.currentTime > 0.2;
+      const startedAt = Date.now();
+
+      const uncover = () => {
+        if (!cancelled && video.currentTime > 0.04) setVideoCovered(false);
+      };
 
       const onEnded = () => {
         videoPlayTokenRef.current = null;
-        if (epochMsRef.current != null) {
-          if (jumpToClock()) return;
-          if (itemsRef.current.length === 1) {
-            setPlaybackGen((g) => g + 1);
-            return;
-          }
-          advance();
+        setVideoCovered(true);
+        if (itemsRef.current.length <= 1) {
+          reloadVideoSource(video, item.mediaUrl);
+          void video.play().catch(() => undefined);
           return;
         }
+        if (epochMsRef.current != null && jumpToClock()) return;
         advance();
       };
       const onError = () => {
@@ -879,107 +911,98 @@ export function ScreenCastPlayerPage() {
         else advance();
       };
 
-      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
-        video.crossOrigin = 'anonymous';
-      } else {
-        video.removeAttribute('crossorigin');
-      }
-
-      const startPlayback = () => {
-        if (videoPlayTokenRef.current === playToken) return;
-        videoPlayTokenRef.current = playToken;
-
-        const playNow = () => {
-          const epochMs = epochMsRef.current;
-          if (
-            epochMs != null &&
-            Number.isFinite(video.duration) &&
-            video.duration > 0
-          ) {
-            const pos = positionAt(
-              durationsRef.current,
-              epochMs,
-              nowServer(),
-            );
-            const offset =
-              pos && pos.index === index ? pos.offsetMs : 0;
-            if (offset > VIDEO_START_SEEK_MS) {
-              const t = Math.min(
-                offset / 1000,
-                Math.max(0, video.duration - 0.12),
-              );
-              if (t > 0.08 && Math.abs(video.currentTime - t) > 0.12) {
-                video.currentTime = t;
-              }
-            }
+      const start = () => {
+        if (cancelled) return;
+        awaitingEpoch = false;
+        playAttempts += 1;
+        void video.play().then(uncover).catch(() => {
+          videoPlayTokenRef.current = null;
+          if (cancelled) return;
+          if (playAttempts < 10) {
+            window.setTimeout(start, 280);
+          } else if (epoch == null) {
+            scheduleAdvance();
           }
-
-          void video.play().catch(() => {
-            videoPlayTokenRef.current = null;
-            if (epoch == null) scheduleAdvance();
-          });
-        };
-
-        const epochMs = epochMsRef.current;
-        if (epochMs == null) {
-          playNow();
-          return;
-        }
-        const delay = Math.max(0, epochMs - nowServer());
-        if (delay > 0) {
-          timerRef.current = window.setTimeout(playNow, delay);
-          return;
-        }
-        playNow();
+        });
       };
 
-      const onReady = () => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          const actualMs = Math.round(video.duration * 1000);
-          const durations = [...durationsRef.current];
-          if (durations.length > index) {
-            durations[index] = Math.max(durations[index] || 0, actualMs);
-            durationsRef.current = durations;
-          }
+      const tryPlay = () => {
+        if (cancelled || awaitingEpoch) return;
+        if (!videoSrcMatches(video, item.mediaUrl)) {
+          video.src = item.mediaUrl;
         }
-        startPlayback();
+        const epochMs = epochMsRef.current;
+        const delay =
+          epochMs == null ? 0 : Math.max(0, epochMs - nowServer());
+        if (delay > 50 && delay < 2_000) {
+          awaitingEpoch = true;
+          clearTimer();
+          timerRef.current = window.setTimeout(start, delay);
+          return;
+        }
+        start();
       };
 
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
+      video.addEventListener('playing', uncover);
+      video.addEventListener('timeupdate', uncover);
 
-      if (sameSource && !video.ended) {
-        videoUrlRef.current = item.mediaUrl;
-        if (isVideoBuffered(video) || video.readyState >= HTMLMediaElement.HAVE_METADATA) {
-          startPlayback();
-        } else {
-          video.addEventListener('canplay', onReady, { once: true });
-        }
-        if (epoch == null) scheduleAdvance();
-        return () => {
-          video.removeEventListener('ended', onEnded);
-          video.removeEventListener('error', onError);
-          video.removeEventListener('canplay', onReady);
-          clearTimer();
-          if (video.paused && videoPlayTokenRef.current === playToken) {
-            videoPlayTokenRef.current = null;
-          }
-        };
-      }
-
-      videoPlayTokenRef.current = null;
       videoUrlRef.current = item.mediaUrl;
-      video.addEventListener('canplay', onReady, { once: true });
-      if (!sameSource) {
-        video.src = item.mediaUrl;
+
+      if (alreadyPlaying) {
+        videoPlayTokenRef.current = playToken;
+        setVideoCovered(false);
+      } else {
+        videoPlayTokenRef.current = playToken;
+        setVideoCovered(true);
+        tryPlay();
       }
-      if (epoch == null) scheduleAdvance();
+
+      watchId = window.setInterval(() => {
+        if (cancelled || awaitingEpoch || video.ended) return;
+        if (video.currentTime > 0.2) hasAdvanced = true;
+        if (video.currentTime > 0.04) uncover();
+
+        if (!hasAdvanced) {
+          if (video.paused) tryPlay();
+          else if (Date.now() - startedAt > 2_000) {
+            void video.play().catch(() => undefined);
+          }
+          return;
+        }
+
+        if (video.paused) {
+          void video.play().catch(() => undefined);
+          return;
+        }
+        const delta = Math.abs(video.currentTime - lastMediaTime);
+        if (
+          delta < 0.04 &&
+          video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA
+        ) {
+          frozenTicks += 1;
+          if (frozenTicks === 4) {
+            void video.play().catch(() => undefined);
+          } else if (frozenTicks >= 10) {
+            frozenTicks = 0;
+            reloadVideoSource(video, item.mediaUrl);
+            void video.play().catch(() => undefined);
+          }
+        } else {
+          frozenTicks = 0;
+          lastMediaTime = video.currentTime;
+        }
+      }, 500);
 
       return () => {
-        video.removeEventListener('canplay', onReady);
+        cancelled = true;
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
+        video.removeEventListener('playing', uncover);
+        video.removeEventListener('timeupdate', uncover);
         clearTimer();
+        if (watchId != null) window.clearInterval(watchId);
         if (video.paused && videoPlayTokenRef.current === playToken) {
           videoPlayTokenRef.current = null;
         }
@@ -1054,8 +1077,9 @@ export function ScreenCastPlayerPage() {
     (current.mediaType === 'image' || current.mediaType === 'gif');
   const imageUsesCors =
     !!current && isCorsCacheableMediaUrl(current.mediaUrl);
-  const videoActive =
-    !!current && current.mediaType === 'video' && !error && !config?.empty && !holdUi;
+  const isVideoItem =
+    !!current && current.mediaType === 'video' && !error && !config?.empty;
+  const videoActive = isVideoItem && !holdUi;
 
   const orientation: ScreenCastOrientation =
     config?.orientation === 'PORTRAIT' ? 'PORTRAIT' : 'LANDSCAPE';
@@ -1104,13 +1128,19 @@ export function ScreenCastPlayerPage() {
           className="pointer-events-none"
           style={{
             ...MEDIA_FILL_STYLE,
-            opacity: videoActive ? 1 : 0,
+            opacity: isVideoItem ? 1 : 0,
           }}
           muted
           playsInline
+          autoPlay={false}
+          controls={false}
           loop={false}
           preload="auto"
         />
+
+        {videoActive && videoCovered && (
+          <div className="absolute inset-0 z-1 bg-black" aria-hidden />
+        )}
 
         <video
           ref={warmVideoRef}

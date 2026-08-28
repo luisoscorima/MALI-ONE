@@ -3,8 +3,6 @@ import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
 export const MEASURE_TIMEOUT_MS = 10_000;
 export const CLIENT_GO_FALLBACK_MS = 15_000;
-/** Only seek videos on item start — in-playback seeks cause visible freezes on TVs. */
-export const VIDEO_START_SEEK_MS = 120;
 export const DRIFT_INTERVAL_MS = 750;
 
 export type PlaylistClock = {
@@ -121,8 +119,34 @@ export function videoSrcMatches(
   return attr === url || src === url;
 }
 
-export function isVideoBuffered(video: HTMLVideoElement): boolean {
-  return video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA;
+export function prepareKioskVideo(video: HTMLVideoElement) {
+  video.muted = true;
+  video.defaultMuted = true;
+  video.autoplay = false;
+  video.controls = false;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.setAttribute('playsinline', 'true');
+  video.setAttribute('webkit-playsinline', 'true');
+  video.disablePictureInPicture = true;
+}
+
+/**
+ * Reload src to return to t=0. Never assign currentTime — Tizen/WebKit freeze.
+ */
+export function reloadVideoSource(video: HTMLVideoElement, url: string) {
+  try {
+    video.pause();
+  } catch {
+    // Tizen
+  }
+  video.removeAttribute('src');
+  try {
+    video.load();
+  } catch {
+    // Tizen
+  }
+  video.src = url;
 }
 
 export async function measureItemDurationMs(
@@ -174,29 +198,56 @@ export async function warmupItem(
   }
 
   if (item.mediaType !== 'video' || !warmVideo) return;
-  if (videoSrcMatches(warmVideo, item.mediaUrl) && isVideoBuffered(warmVideo)) {
+
+  prepareKioskVideo(warmVideo);
+  if (isCorsCacheableMediaUrl(item.mediaUrl)) {
+    warmVideo.crossOrigin = 'anonymous';
+  } else {
+    warmVideo.removeAttribute('crossorigin');
+  }
+
+  const atStartAndReady =
+    videoSrcMatches(warmVideo, item.mediaUrl) &&
+    warmVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    !warmVideo.ended &&
+    warmVideo.currentTime < 0.25;
+
+  if (atStartAndReady) {
+    try {
+      warmVideo.pause();
+    } catch {
+      // Tizen
+    }
     return;
   }
+
+  const needsReload =
+    !videoSrcMatches(warmVideo, item.mediaUrl) ||
+    warmVideo.ended ||
+    warmVideo.currentTime >= 0.25;
+
   await Promise.race([
     new Promise<void>((resolve) => {
       const finish = () => {
         warmVideo.removeEventListener('canplay', finish);
+        warmVideo.removeEventListener('loadeddata', finish);
         warmVideo.removeEventListener('error', finish);
         resolve();
       };
-      warmVideo.muted = true;
-      warmVideo.preload = 'auto';
-      if (isCorsCacheableMediaUrl(item.mediaUrl)) {
-        warmVideo.crossOrigin = 'anonymous';
-      } else {
-        warmVideo.removeAttribute('crossorigin');
-      }
       warmVideo.addEventListener('canplay', finish, { once: true });
+      warmVideo.addEventListener('loadeddata', finish, { once: true });
       warmVideo.addEventListener('error', finish, { once: true });
-      if (!videoSrcMatches(warmVideo, item.mediaUrl)) {
-        warmVideo.src = item.mediaUrl;
+      if (needsReload) {
+        reloadVideoSource(warmVideo, item.mediaUrl);
+      } else if (warmVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        finish();
       }
     }),
     waitMs(timeoutMs),
   ]);
+  try {
+    warmVideo.pause();
+  } catch {
+    // Tizen
+  }
 }
