@@ -13,7 +13,8 @@ import { Server, Socket } from 'socket.io';
 import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
-const BARRIER_MS = 12_000;
+/** Upper bound for a screen to download its videos before the wall starts. */
+const BARRIER_MS = 25_000;
 /** Lead after every screen is buffered so both can schedule play() before epoch. */
 const EPOCH_LEAD_MS = 1_000;
 const TICK_MS = 5_000;

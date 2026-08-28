@@ -30,18 +30,23 @@ import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
   MEASURE_TIMEOUT_MS,
+  VIDEO_PRELOAD_TIMEOUT_MS,
   clockOffsetIfFresh,
   measureAllDurations,
   positionAt,
   primeVideoSrc,
   reloadVideoSource,
   resolveDurations,
-  videoSrcMatches,
   warmupItem,
   type PlayGoPayload,
   type PlaylistClock,
   type PlaylistSyncPayload,
 } from '@/lib/screen-cast-sync';
+import {
+  cachedVideoUrl,
+  preloadPlaylistVideos,
+  releaseUnusedVideoBlobs,
+} from '@/lib/screen-cast-video-cache';
 
 const HEARTBEAT_MS = 30_000;
 const KIOSK_CLASS = 'screen-cast-kiosk';
@@ -70,17 +75,6 @@ function destroyVideo(video: HTMLVideoElement | null) {
     video.load();
   } catch {
     // ignore cleanup errors on Tizen
-  }
-}
-
-function unloadVideoQuiet(video: HTMLVideoElement | null) {
-  if (!video) return;
-  if (!video.getAttribute('src') && !video.currentSrc) return;
-  try {
-    video.pause();
-    video.removeAttribute('src');
-  } catch {
-    // Tizen
   }
 }
 
@@ -179,7 +173,6 @@ export function ScreenCastPlayerPage() {
   const [loaderHint, setLoaderHint] = useState('Cargando');
   const [toasts, setToasts] = useState<KioskToast[]>([]);
   const [videoCovered, setVideoCovered] = useState(true);
-  const [frontVideo, setFrontVideo] = useState<'main' | 'warm'>('main');
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
   );
@@ -193,7 +186,6 @@ export function ScreenCastPlayerPage() {
   const goFallbackRef = useRef<number | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const warmVideoRef = useRef<HTMLVideoElement | null>(null);
   const indexRef = useRef(0);
   const itemsRef = useRef<ScreenCastPublicItemDto[]>([]);
   const preloadRef = useRef<HTMLImageElement | null>(null);
@@ -212,7 +204,6 @@ export function ScreenCastPlayerPage() {
   const lastGoSyncRef = useRef<string | null>(null);
   const playAtTimerRef = useRef<number | null>(null);
   const scheduledPlayKeyRef = useRef<string | null>(null);
-  const frontVideoRef = useRef<'main' | 'warm'>('main');
   const toastIdRef = useRef(0);
   const cachedUrlsRef = useRef<Set<string>>(new Set());
   const socketWasConnectedRef = useRef(false);
@@ -292,7 +283,6 @@ export function ScreenCastPlayerPage() {
     clearTimer();
     clearPlayAtTimer();
     destroyVideo(videoRef.current);
-    destroyVideo(warmVideoRef.current);
   }, [clearTimer, clearPlayAtTimer]);
 
   const advance = useCallback(() => {
@@ -309,29 +299,15 @@ export function ScreenCastPlayerPage() {
     setVideoCovered(true);
   }, []);
 
-  const pickVideoElement = useCallback((url: string): HTMLVideoElement | null => {
-    const main = videoRef.current;
-    const warm = warmVideoRef.current;
-    const warmReady =
-      !!warm &&
-      videoSrcMatches(warm, url) &&
-      warm.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
-    if (warmReady) return warm;
-    if (main && videoSrcMatches(main, url)) return main;
-    return main ?? warm;
-  }, []);
-
-  const showVideoElement = useCallback((el: HTMLVideoElement | null) => {
-    if (!el) return;
-    const next: 'main' | 'warm' = el === warmVideoRef.current ? 'warm' : 'main';
-    frontVideoRef.current = next;
-    setFrontVideo(next);
-    if (next === 'warm') pauseVideoQuiet(videoRef.current);
-    else pauseVideoQuiet(warmVideoRef.current);
+  /** Prefer the fully downloaded copy; fall back to streaming from S3. */
+  const playbackUrl = useCallback((item: ScreenCastPublicItemDto): string => {
+    if (item.mediaType !== 'video') return item.mediaUrl;
+    return cachedVideoUrl(item.mediaUrl) ?? item.mediaUrl;
   }, []);
 
   const scheduleVideoPlay = useCallback(
-    (video: HTMLVideoElement | null, url: string, epochMs: number | null) => {
+    (url: string, epochMs: number | null) => {
+      const video = videoRef.current;
       if (!video) return;
       primeVideoSrc(video, url);
       videoUrlRef.current = url;
@@ -412,9 +388,7 @@ export function ScreenCastPlayerPage() {
 
       const startItem = data.items[nextIndex];
       if (startItem?.mediaType === 'video') {
-        const target = pickVideoElement(startItem.mediaUrl);
-        showVideoElement(target);
-        scheduleVideoPlay(target, startItem.mediaUrl, payload.epochMs);
+        scheduleVideoPlay(playbackUrl(startItem), payload.epochMs);
       } else {
         scheduledPlayKeyRef.current = null;
         clearPlayAtTimer();
@@ -430,9 +404,8 @@ export function ScreenCastPlayerPage() {
       clearPlayAtTimer,
       kioskToast,
       nowServer,
-      pickVideoElement,
+      playbackUrl,
       scheduleVideoPlay,
-      showVideoElement,
     ],
   );
 
@@ -460,6 +433,25 @@ export function ScreenCastPlayerPage() {
     [isPreview, screenKey],
   );
 
+  /**
+   * Pull every video fully into memory before reporting ready. Streaming a
+   * 20 MB MP4 from S3 on a kiosk TV stalls mid-clip; a blob never does.
+   */
+  const preloadVideos = useCallback(
+    async (data: ScreenCastPublicConfigDto) => {
+      if (data.empty) return;
+      const hasVideo = data.items.some((item) => item.mediaType === 'video');
+      if (!hasVideo) return;
+      setLoaderHint('Descargando video…');
+      const result = await preloadPlaylistVideos(data, VIDEO_PRELOAD_TIMEOUT_MS);
+      releaseUnusedVideoBlobs(data.items.map((item) => item.mediaUrl));
+      if (result.failed > 0) {
+        kioskToast('Video sin caché — se reproduce en streaming', 'warn');
+      }
+    },
+    [kioskToast],
+  );
+
   const prepareAndReady = useCallback(
     async (data: ScreenCastPublicConfigDto, syncId: string | null) => {
       if (data.empty || data.items.length === 0) {
@@ -469,22 +461,25 @@ export function ScreenCastPlayerPage() {
       }
       const durations = await measureAllDurations(data.items, MEASURE_TIMEOUT_MS);
       localDurationsRef.current = durations;
+      await preloadVideos(data);
       const pos =
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
           : null;
       const startItem = data.items[pos?.index ?? 0];
-      const warmTarget =
-        startItem?.mediaType === 'video'
-          ? videoRef.current
-          : warmVideoRef.current;
-      await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
-      if (startItem?.mediaType === 'video') {
-        videoUrlRef.current = startItem.mediaUrl;
+      if (startItem) {
+        const resolved =
+          startItem.mediaType === 'video'
+            ? { ...startItem, mediaUrl: playbackUrl(startItem) }
+            : startItem;
+        await warmupItem(resolved, MEASURE_TIMEOUT_MS, videoRef.current);
+        if (startItem.mediaType === 'video') {
+          videoUrlRef.current = resolved.mediaUrl;
+        }
       }
       emitReady(syncId, data.playlistId, durations);
     },
-    [applyConfig, emitReady, nowServer],
+    [applyConfig, emitReady, nowServer, playbackUrl, preloadVideos],
   );
 
   const loadConfigImmediate = useCallback(async () => {
@@ -502,6 +497,7 @@ export function ScreenCastPlayerPage() {
           MEASURE_TIMEOUT_MS,
         );
         localDurationsRef.current = durations;
+        await preloadVideos(data);
         applyGo({
           syncId: joinClock.syncId,
           epochMs: joinClock.epochMs,
@@ -509,6 +505,10 @@ export function ScreenCastPlayerPage() {
           serverNow: nowServer(),
         });
         return;
+      }
+      // Download before first paint so playback never streams from S3.
+      if (!isPreview && !data.empty) {
+        await preloadVideos(data);
       }
       applyConfig(data, 0);
       if (!isPreview && !data.empty) {
@@ -528,6 +528,7 @@ export function ScreenCastPlayerPage() {
     applyGo,
     isPreview,
     prepareAndReady,
+    preloadVideos,
     nowServer,
   ]);
 
@@ -582,15 +583,19 @@ export function ScreenCastPlayerPage() {
           if (token !== syncTokenRef.current) return;
           localDurationsRef.current = durations;
           if (payload.epochMs) {
+            await preloadVideos(data);
+            if (token !== syncTokenRef.current) return;
             const pos = positionAt(durations, payload.epochMs, nowServer());
             const startItem = data.items[pos?.index ?? 0];
-            const warmTarget =
-              startItem?.mediaType === 'video'
-                ? videoRef.current
-                : warmVideoRef.current;
-            await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
-            if (startItem?.mediaType === 'video') {
-              videoUrlRef.current = startItem.mediaUrl;
+            if (startItem) {
+              const resolved =
+                startItem.mediaType === 'video'
+                  ? { ...startItem, mediaUrl: playbackUrl(startItem) }
+                  : startItem;
+              await warmupItem(resolved, MEASURE_TIMEOUT_MS, videoRef.current);
+              if (startItem.mediaType === 'video') {
+                videoUrlRef.current = resolved.mediaUrl;
+              }
             }
             if (token !== syncTokenRef.current) return;
             applyGo({
@@ -668,6 +673,8 @@ export function ScreenCastPlayerPage() {
       emitReady,
       holdForSync,
       clearPlayAtTimer,
+      playbackUrl,
+      preloadVideos,
     ],
   );
 
@@ -710,9 +717,8 @@ export function ScreenCastPlayerPage() {
     if (isPreview) return;
     startScreenCastAutoUpdate({
       isVideoPlaying: () => {
-        return [videoRef.current, warmVideoRef.current].some(
-          (el) => !!el && !el.paused && !el.ended,
-        );
+        const video = videoRef.current;
+        return !!video && !video.paused && !video.ended;
       },
     });
   }, [isPreview]);
@@ -866,13 +872,11 @@ export function ScreenCastPlayerPage() {
     const item = items[index];
     if (!item || !config || config.empty) {
       destroyVideo(videoRef.current);
-      destroyVideo(warmVideoRef.current);
       videoUrlRef.current = null;
       emitStatus({ index: 0, total: 0 });
       return () => {
         clearTimer();
         destroyVideo(videoRef.current);
-        destroyVideo(warmVideoRef.current);
         videoUrlRef.current = null;
       };
     }
@@ -881,18 +885,14 @@ export function ScreenCastPlayerPage() {
     window.scrollTo(0, 0);
 
     const nextItem = items[(index + 1) % items.length];
-    if (nextItem && nextItem !== item) {
-      if (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif') {
-        const pre = new Image();
-        preloadRef.current = pre;
-        pre.src = nextItem.mediaUrl;
-      } else if (nextItem.mediaType === 'video' && item.mediaType !== 'video') {
-        const inactive =
-          frontVideoRef.current === 'main'
-            ? warmVideoRef.current
-            : videoRef.current;
-        if (inactive) primeVideoSrc(inactive, nextItem.mediaUrl);
-      }
+    if (
+      nextItem &&
+      nextItem !== item &&
+      (nextItem.mediaType === 'image' || nextItem.mediaType === 'gif')
+    ) {
+      const pre = new Image();
+      preloadRef.current = pre;
+      pre.src = nextItem.mediaUrl;
     }
 
     const epoch = epochMsRef.current;
@@ -938,16 +938,13 @@ export function ScreenCastPlayerPage() {
     };
 
     if (item.mediaType === 'video') {
-      const video = pickVideoElement(item.mediaUrl) ?? videoRef.current;
+      const video = videoRef.current;
       if (!video) return;
 
-      showVideoElement(video);
-      primeVideoSrc(video, item.mediaUrl);
+      const src = playbackUrl(item);
+      primeVideoSrc(video, src);
       video.loop = items.length <= 1;
-      videoUrlRef.current = item.mediaUrl;
-      const other =
-        video === warmVideoRef.current ? videoRef.current : warmVideoRef.current;
-      if (other && other !== video) unloadVideoQuiet(other);
+      videoUrlRef.current = src;
 
       let cancelled = false;
       const uncover = () => {
@@ -957,8 +954,8 @@ export function ScreenCastPlayerPage() {
         setVideoCovered(true);
         scheduledPlayKeyRef.current = null;
         if (itemsRef.current.length <= 1) {
-          reloadVideoSource(video, item.mediaUrl);
-          scheduleVideoPlay(video, item.mediaUrl, null);
+          reloadVideoSource(video, src);
+          scheduleVideoPlay(src, null);
           return;
         }
         if (epochMsRef.current != null && jumpToClock()) return;
@@ -981,7 +978,7 @@ export function ScreenCastPlayerPage() {
 
       const alreadyPlaying =
         !video.paused && !video.ended && video.currentTime > 0.05;
-      const playKey = `${item.mediaUrl}@${epochMsRef.current ?? 'now'}`;
+      const playKey = `${src}@${epochMsRef.current ?? 'now'}`;
 
       if (alreadyPlaying) {
         setVideoCovered(false);
@@ -989,7 +986,7 @@ export function ScreenCastPlayerPage() {
         setVideoCovered(true);
       } else if (scheduledPlayKeyRef.current !== playKey) {
         setVideoCovered(true);
-        scheduleVideoPlay(video, item.mediaUrl, epochMsRef.current);
+        scheduleVideoPlay(src, epochMsRef.current);
       }
 
       return () => {
@@ -1003,7 +1000,6 @@ export function ScreenCastPlayerPage() {
     }
 
     pauseVideoQuiet(videoRef.current);
-    pauseVideoQuiet(warmVideoRef.current);
 
     scheduleAdvance();
     return () => {
@@ -1018,9 +1014,8 @@ export function ScreenCastPlayerPage() {
     emitStatus,
     jumpToClock,
     nowServer,
-    pickVideoElement,
+    playbackUrl,
     scheduleVideoPlay,
-    showVideoElement,
   ]);
 
   useEffect(() => {
@@ -1031,10 +1026,9 @@ export function ScreenCastPlayerPage() {
 
       const currentItem = itemsRef.current[indexRef.current];
       if (currentItem?.mediaType === 'video') {
-        const playing = [videoRef.current, warmVideoRef.current].some(
-          (el) => el && !el.paused && !el.ended,
-        );
-        if (playing) return;
+        const video = videoRef.current;
+        // Videos run natively end to end — only realign once they finish.
+        if (video && !video.ended) return;
       }
 
       const pos = positionAt(durationsRef.current, epoch, nowServer());
@@ -1125,24 +1119,7 @@ export function ScreenCastPlayerPage() {
           className="pointer-events-none"
           style={{
             ...MEDIA_FILL_STYLE,
-            opacity: isVideoItem && frontVideo === 'main' ? 1 : 0,
-            zIndex: frontVideo === 'main' ? 1 : 0,
-          }}
-          muted
-          playsInline
-          autoPlay={false}
-          controls={false}
-          loop={false}
-          preload="auto"
-        />
-
-        <video
-          ref={warmVideoRef}
-          className="pointer-events-none"
-          style={{
-            ...MEDIA_FILL_STYLE,
-            opacity: isVideoItem && frontVideo === 'warm' ? 1 : 0,
-            zIndex: frontVideo === 'warm' ? 1 : 0,
+            opacity: isVideoItem ? 1 : 0,
           }}
           muted
           playsInline

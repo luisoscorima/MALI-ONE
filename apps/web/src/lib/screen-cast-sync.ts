@@ -2,8 +2,10 @@ import type { ScreenCastPublicItemDto } from '@mali-one/shared';
 import { isCorsCacheableMediaUrl } from '@/lib/screen-cast-offline';
 
 export const MEASURE_TIMEOUT_MS = 10_000;
-export const CLIENT_GO_FALLBACK_MS = 15_000;
+export const CLIENT_GO_FALLBACK_MS = 30_000;
 export const DRIFT_INTERVAL_MS = 400;
+/** Per-video budget to pull the whole file into memory before reporting ready. */
+export const VIDEO_PRELOAD_TIMEOUT_MS = 15_000;
 /** Ignore clock samples with huge RTT — they shift the wall by 1–2s. */
 export const MAX_CLOCK_RTT_MS = 400;
 /** Seconds of forward buffer before a screen reports ready. */
@@ -169,7 +171,8 @@ export function mediaHasForwardBuffer(
 
 export function primeVideoSrc(video: HTMLVideoElement, url: string) {
   prepareKioskVideo(video);
-  if (isCorsCacheableMediaUrl(url)) {
+  // blob: URLs are already local — crossOrigin would only break the load.
+  if (!url.startsWith('blob:') && isCorsCacheableMediaUrl(url)) {
     video.crossOrigin = 'anonymous';
   } else {
     video.removeAttribute('crossorigin');
