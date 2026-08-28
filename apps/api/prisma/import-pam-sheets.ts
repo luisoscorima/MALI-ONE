@@ -16,6 +16,7 @@ import {
 import {
   normalizePamCelular,
   normalizePamRegistrationFields,
+  planToPamSegmentSlug,
 } from '@mali-one/shared';
 
 const prisma = new PrismaClient();
@@ -505,6 +506,10 @@ async function syncRegistrationToCrm(reg: PamRegistration) {
     opt_in_email: true,
     attributes: buildCrmAttributes(reg),
     external_id: reg.id,
+    segment_slugs: (() => {
+      const segment = planToPamSegmentSlug(reg.plan);
+      return segment ? [segment] : undefined;
+    })(),
   });
 }
 

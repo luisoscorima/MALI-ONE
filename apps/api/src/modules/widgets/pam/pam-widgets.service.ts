@@ -230,15 +230,21 @@ export class PamWidgetsService {
       data,
     });
 
-    this.crm.syncPamRegistration(updated);
-
     const wasConfirmed =
       existing.mpStatus != null && MP_CONFIRMED.includes(existing.mpStatus);
     const nowConfirmed =
       updated.mpStatus != null && MP_CONFIRMED.includes(updated.mpStatus);
 
     if (nowConfirmed && (!wasConfirmed || mpStatusChanging)) {
+      try {
+        await this.crm.syncPamRegistrationAsync(updated);
+      } catch {
+        this.crm.syncPamRegistration(updated);
+      }
       await this.email.sendWelcomeIfNeeded(updated.id);
+      await this.crm.sendPamWelcomeIfNeeded(updated);
+    } else {
+      this.crm.syncPamRegistration(updated);
     }
 
     return updated;
@@ -364,10 +370,16 @@ export class PamWidgetsService {
       data: update,
     });
 
-    this.crm.syncPamRegistration(updated);
-
     if (mpStatus && MP_CONFIRMED.includes(mpStatus)) {
+      try {
+        await this.crm.syncPamRegistrationAsync(updated);
+      } catch {
+        this.crm.syncPamRegistration(updated);
+      }
       await this.email.sendWelcomeIfNeeded(updated.id);
+      await this.crm.sendPamWelcomeIfNeeded(updated);
+    } else {
+      this.crm.syncPamRegistration(updated);
     }
 
     return { ok: true };

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { EducacionLead, PamRegistration } from '@prisma/client';
+import { planToPamSegmentSlug } from '@mali-one/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
 /** Defs de área que el widget/ledger deben tener en WhatsApp (idempotente). */
@@ -54,6 +55,7 @@ export type CrmSyncPayload = {
   opt_in_email?: boolean;
   attributes?: Record<string, string>;
   external_id?: string;
+  segment_slugs?: string[];
 };
 
 export type CrmAttributeDefinition = {
@@ -161,6 +163,8 @@ export class WhatsappCrmClientService {
       attributes.expiry = reg.expiryDate.toISOString().slice(0, 10);
     }
 
+    const segment = planToPamSegmentSlug(reg.plan);
+
     await this.syncContact({
       area: 'pam',
       name: reg.nombres,
@@ -172,7 +176,66 @@ export class WhatsappCrmClientService {
       opt_in_email: true,
       attributes,
       external_id: reg.id,
+      segment_slugs: segment ? [segment] : undefined,
     });
+  }
+
+  /**
+   * Plantilla WhatsApp de bienvenida al confirmar pago (approved/authorized).
+   * Requiere PAM_WA_WELCOME_TEMPLATE (= nombre exacto de plantilla APPROVED en área pam).
+   */
+  async sendPamWelcomeIfNeeded(reg: PamRegistration): Promise<void> {
+    if (!this.configured) return;
+
+    const templateName = String(
+      this.config.get('PAM_WA_WELCOME_TEMPLATE') ?? '',
+    ).trim();
+    if (!templateName) {
+      this.logger.debug(
+        'PAM_WA_WELCOME_TEMPLATE no configurado; omitiendo bienvenida WhatsApp',
+      );
+      return;
+    }
+
+    if (
+      !reg.mpStatus ||
+      !(['approved', 'authorized'] as string[]).includes(reg.mpStatus)
+    ) {
+      return;
+    }
+
+    const phone = this.toE164Pe(reg.celular);
+    if (!phone) {
+      this.logger.warn(
+        `Bienvenida WA omitida: teléfono inválido en registro ${reg.id}`,
+      );
+      return;
+    }
+
+    try {
+      const result = (await this.request('POST', '/api/crm/send-template', {
+        area: 'pam',
+        phone,
+        template_name: templateName,
+        idempotency_key: reg.id,
+        body_params: [reg.nombres.trim()],
+      })) as { skipped?: boolean; reason?: string; message_id?: string };
+
+      if (result?.skipped) {
+        this.logger.debug(
+          `Bienvenida WA ya enviada para ${reg.id} (${result.reason})`,
+        );
+        return;
+      }
+
+      this.logger.log(`Bienvenida WA enviada para PamRegistration ${reg.id}`);
+    } catch (err) {
+      this.logger.warn(
+        `Bienvenida WA fallida para ${reg.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   /** Asegura defs de attrs PAM en WhatsApp (crea solo si no existen). */

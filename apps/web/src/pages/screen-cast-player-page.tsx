@@ -173,6 +173,7 @@ export function ScreenCastPlayerPage() {
   const clockOffsetRef = useRef(0);
   const syncTokenRef = useRef(0);
   const videoUrlRef = useRef<string | null>(null);
+  const videoPlayTokenRef = useRef<string | null>(null);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
 
@@ -310,11 +311,15 @@ export function ScreenCastPlayerPage() {
         epochMsRef.current != null
           ? positionAt(durations, epochMsRef.current, nowServer())
           : null;
-      await warmupItem(
-        data.items[pos?.index ?? 0],
-        MEASURE_TIMEOUT_MS,
-        warmVideoRef.current,
-      );
+      const startItem = data.items[pos?.index ?? 0];
+      const warmTarget =
+        startItem?.mediaType === 'video'
+          ? videoRef.current
+          : warmVideoRef.current;
+      await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
+      if (startItem?.mediaType === 'video') {
+        videoUrlRef.current = startItem.mediaUrl;
+      }
       emitReady(syncId, data.playlistId, durations);
     },
     [applyConfig, emitReady, nowServer],
@@ -411,11 +416,15 @@ export function ScreenCastPlayerPage() {
           localDurationsRef.current = durations;
           if (payload.epochMs) {
             const pos = positionAt(durations, payload.epochMs, nowServer());
-            await warmupItem(
-              data.items[pos?.index ?? 0],
-              MEASURE_TIMEOUT_MS,
-              warmVideoRef.current,
-            );
+            const startItem = data.items[pos?.index ?? 0];
+            const warmTarget =
+              startItem?.mediaType === 'video'
+                ? videoRef.current
+                : warmVideoRef.current;
+            await warmupItem(startItem, MEASURE_TIMEOUT_MS, warmTarget);
+            if (startItem?.mediaType === 'video') {
+              videoUrlRef.current = startItem.mediaUrl;
+            }
             if (token !== syncTokenRef.current) return;
             applyGo({
               syncId: payload.syncId ?? undefined,
@@ -696,7 +705,11 @@ export function ScreenCastPlayerPage() {
         const pre = new Image();
         preloadRef.current = pre;
         pre.src = nextItem.mediaUrl;
-      } else if (nextItem.mediaType === 'video' && warmVideoRef.current) {
+      } else if (
+        nextItem.mediaType === 'video' &&
+        warmVideoRef.current &&
+        item.mediaType !== 'video'
+      ) {
         const warm = warmVideoRef.current;
         if (isCorsCacheableMediaUrl(nextItem.mediaUrl)) {
           warm.crossOrigin = 'anonymous';
@@ -768,11 +781,14 @@ export function ScreenCastPlayerPage() {
       const video = videoRef.current;
       if (!video) return;
 
+      const playToken = `${item.mediaUrl}@${epoch ?? 'local'}:${index}`;
+
       const sameSource =
         videoUrlRef.current === item.mediaUrl &&
         (video.src === item.mediaUrl || video.src.endsWith(item.mediaUrl));
 
       const onEnded = () => {
+        videoPlayTokenRef.current = null;
         if (epochMsRef.current != null) {
           if (jumpToClock()) return;
           if (itemsRef.current.length === 1) {
@@ -785,6 +801,7 @@ export function ScreenCastPlayerPage() {
         advance();
       };
       const onError = () => {
+        videoPlayTokenRef.current = null;
         emitStatus({
           index,
           total: items.length,
@@ -801,24 +818,24 @@ export function ScreenCastPlayerPage() {
       }
 
       const startPlayback = () => {
+        if (videoPlayTokenRef.current === playToken) return;
+        videoPlayTokenRef.current = playToken;
+
         const playNow = () => {
-          const epochMs = epochMsRef.current;
-          let offset = startOffsetMs;
-          if (epochMs != null) {
-            const pos = positionAt(durationsRef.current, epochMs, nowServer());
-            if (pos && pos.index === index) offset = pos.offsetMs;
-          }
           if (
-            offset > VIDEO_START_SEEK_MS &&
+            epoch != null &&
+            startOffsetMs > VIDEO_START_SEEK_MS &&
             Number.isFinite(video.duration)
           ) {
             const t = Math.min(
-              offset / 1000,
+              startOffsetMs / 1000,
               Math.max(0, video.duration - 0.12),
             );
             if (t > 0.08) video.currentTime = t;
           }
+
           void video.play().catch(() => {
+            videoPlayTokenRef.current = null;
             if (epoch == null) scheduleAdvance();
           });
         };
@@ -850,16 +867,23 @@ export function ScreenCastPlayerPage() {
 
       if (sameSource && !video.ended) {
         videoUrlRef.current = item.mediaUrl;
-        if (video.paused) startPlayback();
+        if (!video.paused || videoPlayTokenRef.current === playToken) {
+          if (epoch == null) scheduleAdvance();
+          return () => {
+            clearTimer();
+          };
+        }
+        startPlayback();
         if (epoch == null) scheduleAdvance();
         return () => {
           clearTimer();
         };
       }
 
+      videoPlayTokenRef.current = null;
       videoUrlRef.current = item.mediaUrl;
       const readyEvent = epoch != null ? 'canplay' : 'loadedmetadata';
-      video.addEventListener(readyEvent, onReady);
+      video.addEventListener(readyEvent, onReady, { once: true });
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.src = item.mediaUrl;
@@ -870,6 +894,9 @@ export function ScreenCastPlayerPage() {
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
         clearTimer();
+        if (video.paused && videoPlayTokenRef.current === playToken) {
+          videoPlayTokenRef.current = null;
+        }
       };
     }
 

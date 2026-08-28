@@ -80,3 +80,28 @@ export function normalizePamRegistrationFields<T extends PamRegistrationNormaliz
   }
   return out;
 }
+
+export type PamPlanSegmentSlug = 'amigo' | 'circulo' | 'comunidad';
+
+const PAM_PLAN_SEGMENT_SLUGS: PamPlanSegmentSlug[] = [
+  'amigo',
+  'circulo',
+  'comunidad',
+];
+
+/** Mapea nombre/slug de plan PAM → segmento WhatsApp (amigo | circulo | comunidad). */
+export function planToPamSegmentSlug(plan: string): PamPlanSegmentSlug | null {
+  const key = String(plan ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!key) return null;
+  if (PAM_PLAN_SEGMENT_SLUGS.includes(key as PamPlanSegmentSlug)) {
+    return key as PamPlanSegmentSlug;
+  }
+  if (key.includes('circulo')) return 'circulo';
+  if (key.includes('comunidad')) return 'comunidad';
+  if (key.includes('amigo')) return 'amigo';
+  return null;
+}

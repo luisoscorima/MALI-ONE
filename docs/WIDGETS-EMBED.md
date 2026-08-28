@@ -157,6 +157,8 @@ PAM_SMTP_PORT=587
 PAM_SMTP_USER=
 PAM_SMTP_PASS=
 PAM_SMTP_FROM=pam@mali.pe
+# Plantilla WhatsApp APPROVED en área pam (nombre exacto en Meta)
+PAM_WA_WELCOME_TEMPLATE=
 WHATSAPP_CRM_BASE_URL=
 WHATSAPP_CRM_SERVICE_TOKEN=
 # Espejo transitorio Sheet (leads Educación). Apagar al activar CRM Educación.

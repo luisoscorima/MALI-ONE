@@ -244,8 +244,12 @@ export {
   normalizePamEmail,
   normalizePamPlaceName,
   normalizePamRegistrationFields,
+  planToPamSegmentSlug,
 } from './pam-normalize';
-export type { PamRegistrationNormalizeInput } from './pam-normalize';
+export type {
+  PamPlanSegmentSlug,
+  PamRegistrationNormalizeInput,
+} from './pam-normalize';
 
 import type { QrStyleDto } from './qr-style';
 export type {
