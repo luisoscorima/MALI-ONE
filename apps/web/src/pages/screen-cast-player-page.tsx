@@ -20,12 +20,16 @@ import {
   isCorsCacheableMediaUrl,
   registerScreenCastServiceWorker,
 } from '@/lib/screen-cast-offline';
-import { startScreenCastAutoUpdate } from '@/lib/screen-cast-update';
+import {
+  screenCastBuildId,
+  startScreenCastAutoUpdate,
+} from '@/lib/screen-cast-update';
 import {
   KioskToastStack,
   type KioskToast,
   type KioskToastTone,
 } from '@/components/screen-cast-kiosk-toasts';
+import { KioskDebugHud } from '@/components/screen-cast-debug-hud';
 import {
   CLIENT_GO_FALLBACK_MS,
   DRIFT_INTERVAL_MS,
@@ -37,6 +41,7 @@ import {
   primeVideoSrc,
   reloadVideoSource,
   resolveDurations,
+  videoSrcMatches,
   warmupItem,
   type PlayGoPayload,
   type PlaylistClock,
@@ -44,12 +49,17 @@ import {
 } from '@/lib/screen-cast-sync';
 import {
   cachedVideoUrl,
+  invalidateVideoBlob,
   preloadPlaylistVideos,
   releaseUnusedVideoBlobs,
 } from '@/lib/screen-cast-video-cache';
 
 const HEARTBEAT_MS = 30_000;
 const KIOSK_CLASS = 'screen-cast-kiosk';
+
+/** Long enough to be read from across a room on a kiosk TV. */
+const TOAST_TTL_MS = 9_000;
+const DEBUG_HUD_INTERVAL_MS = 500;
 
 const MEDIA_FILL_STYLE: CSSProperties = {
   position: 'absolute',
@@ -164,6 +174,7 @@ export function ScreenCastPlayerPage() {
   const [params] = useSearchParams();
   const screenKey = (params.get('id') ?? '').trim().toLowerCase();
   const isPreview = params.get('preview') === '1';
+  const isDebug = params.get('debug') === '1';
   const [config, setConfig] = useState<ScreenCastPublicConfigDto | null>(null);
   const [index, setIndex] = useState(0);
   const [error, setError] = useState('');
@@ -172,6 +183,7 @@ export function ScreenCastPlayerPage() {
   const [playbackGen, setPlaybackGen] = useState(0);
   const [loaderHint, setLoaderHint] = useState('Cargando');
   const [toasts, setToasts] = useState<KioskToast[]>([]);
+  const [debugLines, setDebugLines] = useState<string[]>([]);
   const [videoCovered, setVideoCovered] = useState(true);
   const [viewportPortrait, setViewportPortrait] = useState(() =>
     typeof window !== 'undefined' ? isViewportPortrait() : true,
@@ -217,7 +229,7 @@ export function ScreenCastPlayerPage() {
       setToasts((prev) => [...prev.slice(-2), { id, text, tone }]);
       window.setTimeout(() => {
         setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      }, 4200);
+      }, TOAST_TTL_MS);
     },
     [isPreview],
   );
@@ -309,7 +321,12 @@ export function ScreenCastPlayerPage() {
     (url: string, epochMs: number | null) => {
       const video = videoRef.current;
       if (!video) return;
-      primeVideoSrc(video, url);
+      // Reload instead of rewinding: assigning currentTime freezes Tizen.
+      const needsRewind =
+        videoSrcMatches(video, url) &&
+        (video.ended || video.currentTime > 0.25);
+      if (needsRewind) reloadVideoSource(video, url);
+      else primeVideoSrc(video, url);
       videoUrlRef.current = url;
       scheduledPlayKeyRef.current = `${url}@${epochMs ?? 'now'}`;
       clearPlayAtTimer();
@@ -950,27 +967,61 @@ export function ScreenCastPlayerPage() {
       const uncover = () => {
         if (!cancelled && video.currentTime > 0.04) setVideoCovered(false);
       };
+
+      /** Restart from S3 when the local copy is truncated or unplayable. */
+      const fallBackToStreaming = () => {
+        if (cancelled || src === item.mediaUrl) return false;
+        void invalidateVideoBlob(item.mediaUrl);
+        kioskToast('Copia local dañada — reproduciendo desde S3', 'warn');
+        scheduledPlayKeyRef.current = null;
+        scheduleVideoPlay(item.mediaUrl, null);
+        return true;
+      };
+
+      const onMetadata = () => {
+        if (cancelled) return;
+        const expected = item.durationMs || 0;
+        const actual = Number.isFinite(video.duration) ? video.duration * 1000 : 0;
+        if (expected > 0 && actual > 0 && actual < expected * 0.75) {
+          fallBackToStreaming();
+        }
+      };
+
       const onEnded = () => {
         setVideoCovered(true);
-        scheduledPlayKeyRef.current = null;
         if (itemsRef.current.length <= 1) {
-          reloadVideoSource(video, src);
           scheduleVideoPlay(src, null);
           return;
         }
-        if (epochMsRef.current != null && jumpToClock()) return;
-        advance();
+        if (epochMsRef.current == null) {
+          advance();
+          return;
+        }
+        // Let the shared timeline move us. Advancing here while the clock is
+        // still inside this item makes the drift check pull us back, which
+        // restarts the clip over and over.
+        const pos = positionAt(
+          durationsRef.current,
+          epochMsRef.current,
+          nowServer(),
+        );
+        if (pos && pos.index !== indexRef.current) {
+          indexRef.current = pos.index;
+          setIndex(pos.index);
+        }
       };
+
       const onError = () => {
         emitStatus({
           index,
           total: items.length,
           lastError: 'Error al reproducir video',
         });
-        if (epochMsRef.current != null) jumpToClock();
-        else advance();
+        if (fallBackToStreaming()) return;
+        if (epochMsRef.current == null) advance();
       };
 
+      video.addEventListener('loadedmetadata', onMetadata);
       video.addEventListener('ended', onEnded);
       video.addEventListener('error', onError);
       video.addEventListener('playing', uncover);
@@ -991,11 +1042,14 @@ export function ScreenCastPlayerPage() {
 
       return () => {
         cancelled = true;
+        video.removeEventListener('loadedmetadata', onMetadata);
         video.removeEventListener('ended', onEnded);
         video.removeEventListener('error', onError);
         video.removeEventListener('playing', uncover);
         video.removeEventListener('timeupdate', uncover);
         clearTimer();
+        // Let the next visit to this item schedule its own start.
+        scheduledPlayKeyRef.current = null;
       };
     }
 
@@ -1013,6 +1067,7 @@ export function ScreenCastPlayerPage() {
     clearTimer,
     emitStatus,
     jumpToClock,
+    kioskToast,
     nowServer,
     playbackUrl,
     scheduleVideoPlay,
@@ -1047,6 +1102,31 @@ export function ScreenCastPlayerPage() {
       clearGoFallback();
     };
   }, [cleanupMedia, clearGoFallback]);
+
+  useEffect(() => {
+    if (!isDebug) return;
+    const id = window.setInterval(() => {
+      const video = videoRef.current;
+      const item = itemsRef.current[indexRef.current];
+      const epoch = epochMsRef.current;
+      const src = video?.currentSrc || video?.getAttribute('src') || '';
+      const source = src.startsWith('blob:')
+        ? 'local'
+        : src
+          ? 'streaming'
+          : '—';
+      const dur = video && Number.isFinite(video.duration) ? video.duration : 0;
+      setDebugLines([
+        `build ${screenCastBuildId()}`,
+        `ws ${socketRef.current?.connected ? 'ok' : 'CAÍDA'} · sync ${syncIdRef.current?.slice(0, 6) ?? '—'} · reloj ${Math.round(clockOffsetRef.current)}ms`,
+        `item ${indexRef.current + 1}/${itemsRef.current.length} ${item?.mediaType ?? '—'} · epoch ${epoch == null ? '—' : `${((nowServer() - epoch) / 1000).toFixed(1)}s`}`,
+        item?.mediaType === 'video'
+          ? `video ${source} · ${video ? video.currentTime.toFixed(1) : '—'}/${dur ? dur.toFixed(1) : '?'}s · ${video?.paused ? 'pausado' : 'play'}${video?.ended ? ' fin' : ''} · rs${video?.readyState ?? '—'}`
+          : 'video —',
+      ]);
+    }, DEBUG_HUD_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [isDebug, nowServer]);
 
   useEffect(() => {
     if (isPreview) return;
@@ -1144,6 +1224,7 @@ export function ScreenCastPlayerPage() {
             onError={handleImageError}
           />
         )}
+        {isDebug && <KioskDebugHud lines={debugLines} />}
         <KioskToastStack toasts={toasts} />
       </div>
     </div>

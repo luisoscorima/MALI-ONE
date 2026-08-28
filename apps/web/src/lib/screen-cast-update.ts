@@ -17,6 +17,11 @@ function currentBuildId(): string {
     : 'dev';
 }
 
+/** Build actually running on the screen — tells stale bundles apart. */
+export function screenCastBuildId(): string {
+  return currentBuildId();
+}
+
 async function fetchRemoteBuildId(): Promise<string | null> {
   try {
     const res = await fetch(`${VERSION_URL}?_${Date.now()}`, {

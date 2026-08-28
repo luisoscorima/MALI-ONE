@@ -41,6 +41,18 @@ async function openMediaCache(): Promise<Cache | null> {
   }
 }
 
+/**
+ * A short read yields a video that ends after a couple of seconds, so the
+ * bytes must match Content-Length before we trust (or store) them.
+ */
+async function readCompleteBlob(res: Response): Promise<Blob | null> {
+  const declared = Number(res.headers.get('Content-Length') || '0');
+  const blob = await res.blob();
+  if (blob.size === 0) return null;
+  if (declared > 0 && blob.size !== declared) return null;
+  return blob;
+}
+
 async function downloadBlob(
   proxyUrl: string,
   signal: AbortSignal,
@@ -50,25 +62,42 @@ async function downloadBlob(
     try {
       const hit = await cache.match(proxyUrl);
       if (hit?.ok) {
-        const blob = await hit.blob();
-        if (blob.size > 0) return blob;
+        const blob = await readCompleteBlob(hit);
+        if (blob) return blob;
+        await cache.delete(proxyUrl);
       }
     } catch {
       // fall through to network
     }
   }
 
-  const res = await fetch(proxyUrl, { credentials: 'same-origin', signal });
+  // no-store: our own cache is the only copy we trust.
+  const res = await fetch(proxyUrl, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    signal,
+  });
   if (!res.ok) return null;
+  const blob = await readCompleteBlob(res);
+  if (!blob) return null;
+
   if (cache) {
     try {
-      await cache.put(proxyUrl, res.clone());
+      // Store the validated bytes, never the live stream.
+      await cache.put(
+        proxyUrl,
+        new Response(blob, {
+          headers: {
+            'Content-Type': blob.type || 'video/mp4',
+            'Content-Length': String(blob.size),
+          },
+        }),
+      );
     } catch {
       // quota — playback still works from memory
     }
   }
-  const blob = await res.blob();
-  return blob.size > 0 ? blob : null;
+  return blob;
 }
 
 /**
@@ -133,6 +162,22 @@ export async function preloadPlaylistVideos(
     else result.failed += 1;
   }
   return result;
+}
+
+/** Drop a local copy that turned out to be unusable, so we stream instead. */
+export async function invalidateVideoBlob(src: string): Promise<void> {
+  const objectUrl = blobUrls.get(src);
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl);
+    blobUrls.delete(src);
+  }
+  const cache = await openMediaCache();
+  if (!cache) return;
+  try {
+    await cache.delete(screenCastMediaProxyUrl(src));
+  } catch {
+    // ignore
+  }
 }
 
 export function releaseUnusedVideoBlobs(keep: Iterable<string>) {
