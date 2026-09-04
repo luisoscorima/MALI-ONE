@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Cast,
   Copy,
   Eye,
   Film,
@@ -17,6 +18,7 @@ import type {
   ScreenCastOrientation,
   ScreenCastPlaylistDto,
   ScreenCastPlaylistItemDto,
+  ScreenCastPlaylistMonitorRefDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
@@ -41,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
   SettingSwitchInline,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -58,6 +61,7 @@ import {
 
 type PlaylistSummary = ScreenCastPlaylistDto & {
   _count?: { monitors: number; items: number };
+  monitors?: ScreenCastPlaylistMonitorRefDto[];
 };
 
 type ItemDraft = {
@@ -146,6 +150,80 @@ function OnlineStatusBadge({
         {absolute ? (
           <p className="mt-0.5 text-[11px] opacity-80">{absolute}</p>
         ) : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function monitorInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
+}
+
+function MonitorAvatarStack({
+  monitors,
+}: {
+  monitors: ScreenCastPlaylistMonitorRefDto[];
+}) {
+  if (monitors.length === 0) {
+    return <span className="text-muted">—</span>;
+  }
+
+  const visible = monitors.slice(0, 3);
+  const overflow = monitors.length - visible.length;
+  const names = monitors.map((m) => m.name).join(', ');
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex cursor-default items-center">
+          {visible.map((m, index) => (
+            <span
+              key={m.id}
+              title={m.name}
+              className={cn(
+                'flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground',
+                index > 0 && '-ml-1.5',
+              )}
+            >
+              {monitorInitials(m.name)}
+            </span>
+          ))}
+          {overflow > 0 ? (
+            <span className="-ml-1.5 flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground">
+              +{overflow}
+            </span>
+          ) : null}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        {names}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function LivePlaylistBadge({
+  monitors,
+}: {
+  monitors: ScreenCastPlaylistMonitorRefDto[];
+}) {
+  const live = monitors.filter((m) => m.online);
+  if (live.length === 0) return null;
+  const names = live.map((m) => m.name).join(', ');
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="default" className="cursor-default gap-1">
+          <Cast size={12} />
+          Live
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        En pantalla: {names}
       </TooltipContent>
     </Tooltip>
   );
@@ -267,7 +345,15 @@ export function ScreenCastAdminPage() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      void api.listScreenCastMonitors().then(setMonitors).catch(() => undefined);
+      void Promise.all([
+        api.listScreenCastPlaylists(),
+        api.listScreenCastMonitors(),
+      ])
+        .then(([p, m]) => {
+          setPlaylists(p);
+          setMonitors(m);
+        })
+        .catch(() => undefined);
     }, 5_000);
     return () => window.clearInterval(timer);
   }, []);
@@ -359,6 +445,22 @@ export function ScreenCastAdminPage() {
       toast.error('El nombre es obligatorio');
       return;
     }
+
+    if (editingPlaylistId && !playlistActivo) {
+      const current = playlists.find((p) => p.id === editingPlaylistId);
+      const assigned =
+        current?.monitors?.length ?? current?._count?.monitors ?? 0;
+      if (assigned > 0) {
+        const ok = await confirm({
+          title: `¿Desactivar «${trimmed}»?`,
+          description: `Se desasignará de ${assigned} monitor${assigned === 1 ? '' : 'es'}.`,
+          confirmLabel: 'Desactivar y guardar',
+          variant: 'destructive',
+        });
+        if (!ok) return;
+      }
+    }
+
     setSavingMeta(true);
     try {
       if (!editingPlaylistId) {
@@ -409,6 +511,64 @@ export function ScreenCastAdminPage() {
       await loadLists();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al eliminar');
+    }
+  }
+
+  async function togglePlaylistActivo(
+    playlist: PlaylistSummary,
+    next: boolean,
+  ) {
+    if (!next) {
+      const assigned =
+        playlist.monitors?.length ?? playlist._count?.monitors ?? 0;
+      if (assigned > 0) {
+        const ok = await confirm({
+          title: `¿Desactivar «${playlist.name}»?`,
+          description: `Se desasignará de ${assigned} monitor${assigned === 1 ? '' : 'es'}.`,
+          confirmLabel: 'Desactivar',
+          variant: 'destructive',
+        });
+        if (!ok) return;
+      }
+    }
+
+    const previous = playlist.activo;
+    setPlaylists((prev) =>
+      prev.map((p) =>
+        p.id === playlist.id
+          ? {
+              ...p,
+              activo: next,
+              monitors: next ? p.monitors : [],
+              _count: p._count
+                ? {
+                    ...p._count,
+                    monitors: next ? p._count.monitors : 0,
+                  }
+                : p._count,
+            }
+          : p,
+      ),
+    );
+    if (editingPlaylistId === playlist.id) {
+      setPlaylistActivo(next);
+    }
+
+    try {
+      await api.updateScreenCastPlaylist(playlist.id, { activo: next });
+      await loadLists();
+    } catch (e) {
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlist.id ? { ...p, activo: previous } : p,
+        ),
+      );
+      if (editingPlaylistId === playlist.id) {
+        setPlaylistActivo(previous);
+      }
+      toast.error(
+        e instanceof Error ? e.message : 'Error al cambiar el estado',
+      );
     }
   }
 
@@ -723,57 +883,80 @@ export function ScreenCastAdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {playlists.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">
-                        <button
-                          type="button"
-                          className="text-left hover:underline"
-                          onClick={() => openPlaylistEditor(p.id)}
-                        >
-                          {p.name}
-                        </button>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={p.activo ? 'default' : 'secondary'}>
-                          {p.activo ? 'Activa' : 'Inactiva'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{p._count?.items ?? 0}</TableCell>
-                      <TableCell>{p._count?.monitors ?? 0}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            title="Editar"
-                            onClick={() => openPlaylistEditor(p.id)}
-                          >
-                            <Pencil size={16} />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            title="Duplicar"
-                            onClick={() => void duplicatePlaylist(p)}
-                          >
-                            <CopyPlus size={16} />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            title="Eliminar"
-                            onClick={() => void removePlaylist(p)}
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {playlists.map((p) => {
+                    const assigned = p.monitors ?? [];
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-left hover:underline"
+                              onClick={() => openPlaylistEditor(p.id)}
+                            >
+                              {p.name}
+                            </button>
+                            {p.activo ? (
+                              <LivePlaylistBadge monitors={assigned} />
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={p.activo}
+                              onCheckedChange={(checked) =>
+                                void togglePlaylistActivo(p, checked)
+                              }
+                              aria-label={
+                                p.activo
+                                  ? `Desactivar ${p.name}`
+                                  : `Activar ${p.name}`
+                              }
+                            />
+                            <span className="text-sm text-muted">
+                              {p.activo ? 'Activa' : 'Inactiva'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{p._count?.items ?? 0}</TableCell>
+                        <TableCell>
+                          <MonitorAvatarStack monitors={assigned} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              title="Editar"
+                              onClick={() => openPlaylistEditor(p.id)}
+                            >
+                              <Pencil size={16} />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              title="Duplicar"
+                              onClick={() => void duplicatePlaylist(p)}
+                            >
+                              <CopyPlus size={16} />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              title="Eliminar"
+                              onClick={() => void removePlaylist(p)}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -871,12 +1054,25 @@ export function ScreenCastAdminPage() {
                           {m.playlistName ? (
                             <button
                               type="button"
-                              className="text-sm underline-offset-2 hover:underline"
+                              className="flex max-w-56 items-center gap-2 text-left text-sm underline-offset-2 hover:underline"
                               onClick={() =>
                                 goToPlaylistFromMonitor(m.playlistId)
                               }
                             >
-                              {m.playlistName}
+                              {m.playlistPreview ? (
+                                <span className="size-8 shrink-0 overflow-hidden rounded bg-muted">
+                                  <MediaThumb
+                                    mediaUrl={m.playlistPreview.mediaUrl}
+                                    mediaType={m.playlistPreview.mediaType}
+                                    className="h-full w-full"
+                                  />
+                                </span>
+                              ) : (
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground">
+                                  <Film size={14} />
+                                </span>
+                              )}
+                              <span className="truncate">{m.playlistName}</span>
                             </button>
                           ) : (
                             <span className="text-muted">Sin asignar</span>
@@ -1481,11 +1677,17 @@ export function ScreenCastAdminPage() {
                   </SelectTrigger>
                   <SelectContent position="popper">
                     <SelectItem value="__none__">Sin playlist</SelectItem>
-                    {playlists.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
+                    {playlists
+                      .filter(
+                        (p) =>
+                          p.activo ||
+                          p.id === (monitorDraft.playlistId || ''),
+                      )
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.activo ? p.name : `${p.name} (inactiva)`}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

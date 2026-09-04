@@ -85,8 +85,15 @@ export class ScreenCastController {
 
   @Get('playlists')
   @RequireModule(AppModule.screen_cast)
-  listPlaylists() {
-    return this.service.listPlaylists();
+  async listPlaylists() {
+    const playlists = await this.service.listPlaylists();
+    return playlists.map((playlist) => ({
+      ...playlist,
+      monitors: playlist.monitors.map((monitor) => ({
+        ...monitor,
+        online: this.gateway.isScreenConnected(monitor.screenKey),
+      })),
+    }));
   }
 
   @Get('playlists/:id')
@@ -107,8 +114,11 @@ export class ScreenCastController {
     @Param('id') id: string,
     @Body() body: UpdateScreenCastPlaylistDto,
   ) {
+    // Capture keys before deactivate clears monitor assignments.
+    const keysBefore = await this.service.getScreenKeysForPlaylist(id);
     const playlist = await this.service.updatePlaylist(id, body);
-    const keys = await this.service.getScreenKeysForPlaylist(id);
+    const keysAfter = await this.service.getScreenKeysForPlaylist(id);
+    const keys = [...new Set([...keysBefore, ...keysAfter])];
     await this.gateway.restartSync(keys, { reason: 'playlist:update' });
     return playlist;
   }

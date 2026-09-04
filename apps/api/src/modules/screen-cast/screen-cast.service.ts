@@ -226,6 +226,10 @@ export class ScreenCastService {
       orderBy: { name: 'asc' },
       include: {
         _count: { select: { monitors: true, items: true } },
+        monitors: {
+          select: { id: true, name: true, screenKey: true },
+          orderBy: { name: 'asc' },
+        },
       },
     });
   }
@@ -253,6 +257,12 @@ export class ScreenCastService {
 
   async updatePlaylist(id: string, dto: UpdateScreenCastPlaylistDto) {
     await this.findPlaylist(id);
+    if (dto.activo === false) {
+      await this.prisma.screenCastMonitor.updateMany({
+        where: { playlistId: id },
+        data: { playlistId: null },
+      });
+    }
     return this.prisma.screenCastPlaylist.update({
       where: { id },
       data: {
@@ -261,6 +271,11 @@ export class ScreenCastService {
       },
       include: {
         items: { orderBy: { sortOrder: 'asc' } },
+        monitors: {
+          select: { id: true, name: true, screenKey: true },
+          orderBy: { name: 'asc' },
+        },
+        _count: { select: { monitors: true, items: true } },
       },
     });
   }
@@ -472,7 +487,7 @@ export class ScreenCastService {
   async listMonitors() {
     const rows = await this.prisma.screenCastMonitor.findMany({
       orderBy: { name: 'asc' },
-      include: { playlist: { select: { id: true, name: true } } },
+      include: { playlist: this.monitorPlaylistInclude },
     });
     return rows.map((row) => this.toMonitorDto(row));
   }
@@ -480,7 +495,7 @@ export class ScreenCastService {
   async getMonitor(id: string) {
     const row = await this.prisma.screenCastMonitor.findUnique({
       where: { id },
-      include: { playlist: { select: { id: true, name: true } } },
+      include: { playlist: this.monitorPlaylistInclude },
     });
     if (!row) throw new NotFoundException('Monitor no encontrado');
     return this.toMonitorDto(row);
@@ -488,7 +503,7 @@ export class ScreenCastService {
 
   async createMonitor(dto: CreateScreenCastMonitorDto) {
     await this.ensureUniqueScreenKey(dto.screenKey);
-    if (dto.playlistId) await this.findPlaylist(dto.playlistId);
+    if (dto.playlistId) await this.assertAssignablePlaylist(dto.playlistId);
     const row = await this.prisma.screenCastMonitor.create({
       data: {
         screenKey: dto.screenKey.trim().toLowerCase(),
@@ -497,7 +512,7 @@ export class ScreenCastService {
         orientation: dto.orientation ?? 'LANDSCAPE',
         playlistId: dto.playlistId || null,
       },
-      include: { playlist: { select: { id: true, name: true } } },
+      include: { playlist: this.monitorPlaylistInclude },
     });
     return this.toMonitorDto(row);
   }
@@ -507,7 +522,7 @@ export class ScreenCastService {
     if (dto.screenKey && dto.screenKey !== existing.screenKey) {
       await this.ensureUniqueScreenKey(dto.screenKey);
     }
-    if (dto.playlistId) await this.findPlaylist(dto.playlistId);
+    if (dto.playlistId) await this.assertAssignablePlaylist(dto.playlistId);
 
     const row = await this.prisma.screenCastMonitor.update({
       where: { id },
@@ -526,7 +541,7 @@ export class ScreenCastService {
           ? { playlistId: dto.playlistId || null }
           : {}),
       },
-      include: { playlist: { select: { id: true, name: true } } },
+      include: { playlist: this.monitorPlaylistInclude },
     });
     return this.toMonitorDto(row);
   }
@@ -589,11 +604,32 @@ export class ScreenCastService {
 
   // --- helpers ---
 
+  private readonly monitorPlaylistInclude = {
+    select: {
+      id: true,
+      name: true,
+      items: {
+        where: { activo: true },
+        orderBy: { sortOrder: 'asc' as const },
+        take: 1,
+        select: { mediaUrl: true, mediaType: true },
+      },
+    },
+  };
+
   private toMonitorDto(
     row: ScreenCastMonitor & {
-      playlist?: { id: string; name: string } | null;
+      playlist?: {
+        id: string;
+        name: string;
+        items?: Array<{
+          mediaUrl: string;
+          mediaType: ScreenCastMediaType;
+        }>;
+      } | null;
     },
   ) {
+    const preview = row.playlist?.items?.[0];
     return {
       id: row.id,
       screenKey: row.screenKey,
@@ -602,12 +638,24 @@ export class ScreenCastService {
       orientation: row.orientation,
       playlistId: row.playlistId,
       playlistName: row.playlist?.name ?? null,
+      playlistPreview: preview
+        ? { mediaUrl: preview.mediaUrl, mediaType: preview.mediaType }
+        : null,
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
       // Live Online/Offline comes from WebSocket presence in the controller.
       online: false,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private async assertAssignablePlaylist(playlistId: string) {
+    const playlist = await this.findPlaylist(playlistId);
+    if (!playlist.activo) {
+      throw new BadRequestException(
+        'No se puede asignar una playlist inactiva',
+      );
+    }
   }
 
   private async resolveItemDurationMs(

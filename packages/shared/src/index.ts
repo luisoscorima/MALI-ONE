@@ -170,6 +170,14 @@ export interface ScreenCastPlaylistItemDto {
   activo: boolean;
 }
 
+export interface ScreenCastPlaylistMonitorRefDto {
+  id: string;
+  name: string;
+  screenKey: string;
+  /** Live WebSocket presence; only set on list endpoints that enrich via gateway. */
+  online?: boolean;
+}
+
 export interface ScreenCastPlaylistDto {
   id: string;
   name: string;
@@ -178,6 +186,13 @@ export interface ScreenCastPlaylistDto {
   updatedAt: string;
   items?: ScreenCastPlaylistItemDto[];
   monitorCount?: number;
+  /** Assigned monitors (for avatar stack / Live badge). */
+  monitors?: ScreenCastPlaylistMonitorRefDto[];
+}
+
+export interface ScreenCastPlaylistPreviewDto {
+  mediaUrl: string;
+  mediaType: ScreenCastMediaType;
 }
 
 export interface ScreenCastMonitorDto {
@@ -188,6 +203,8 @@ export interface ScreenCastMonitorDto {
   orientation: ScreenCastOrientation;
   playlistId: string | null;
   playlistName?: string | null;
+  /** First active item of the assigned playlist, if any. */
+  playlistPreview?: ScreenCastPlaylistPreviewDto | null;
   lastSeenAt: string | null;
   online: boolean;
   /** 0-based index of current slide when online, else null. */
