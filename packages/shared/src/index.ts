@@ -174,6 +174,7 @@ export interface ScreenCastPlaylistMonitorRefDto {
   id: string;
   name: string;
   screenKey: string;
+  photoUrl?: string | null;
   /** Live WebSocket presence; only set on list endpoints that enrich via gateway. */
   online?: boolean;
 }
@@ -185,6 +186,8 @@ export interface ScreenCastPlaylistDto {
   createdAt: string;
   updatedAt: string;
   items?: ScreenCastPlaylistItemDto[];
+  /** First items for list thumbnails (mediaUrl + mediaType only). */
+  previewItems?: ScreenCastPlaylistPreviewDto[];
   monitorCount?: number;
   /** Assigned monitors (for avatar stack / Live badge). */
   monitors?: ScreenCastPlaylistMonitorRefDto[];
@@ -200,6 +203,7 @@ export interface ScreenCastMonitorDto {
   screenKey: string;
   name: string;
   location: string | null;
+  photoUrl?: string | null;
   orientation: ScreenCastOrientation;
   playlistId: string | null;
   playlistName?: string | null;

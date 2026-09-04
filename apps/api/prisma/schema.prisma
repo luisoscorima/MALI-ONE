@@ -414,6 +414,7 @@ model ScreenCastMonitor {
   screenKey   String                @unique
   name        String
   location    String?
+  photoUrl    String?
   orientation ScreenCastOrientation @default(LANDSCAPE)
   playlistId  String?
   playlist    ScreenCastPlaylist?   @relation(fields: [playlistId], references: [id], onDelete: SetNull)

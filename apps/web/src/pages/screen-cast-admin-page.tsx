@@ -1,16 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
   Cast,
   Copy,
+  CopyPlus,
   Eye,
   Film,
   Pencil,
   Plus,
   RefreshCw,
   Trash2,
-  CopyPlus,
 } from 'lucide-react';
 import type {
   ScreenCastMediaType,
@@ -19,6 +34,7 @@ import type {
   ScreenCastPlaylistDto,
   ScreenCastPlaylistItemDto,
   ScreenCastPlaylistMonitorRefDto,
+  ScreenCastPlaylistPreviewDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
@@ -62,6 +78,7 @@ import {
 type PlaylistSummary = ScreenCastPlaylistDto & {
   _count?: { monitors: number; items: number };
   monitors?: ScreenCastPlaylistMonitorRefDto[];
+  previewItems?: ScreenCastPlaylistPreviewDto[];
 };
 
 type ItemDraft = {
@@ -79,6 +96,7 @@ type MonitorDraft = {
   location: string;
   orientation: ScreenCastOrientation;
   playlistId: string;
+  photoUrl: string;
 };
 
 type AdminTab = 'config' | 'preview';
@@ -101,6 +119,7 @@ function emptyMonitorDraft(): MonitorDraft {
     location: '',
     orientation: 'LANDSCAPE',
     playlistId: '',
+    photoUrl: '',
   };
 }
 
@@ -162,73 +181,6 @@ function monitorInitials(name: string): string {
   return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase();
 }
 
-function MonitorAvatarStack({
-  monitors,
-}: {
-  monitors: ScreenCastPlaylistMonitorRefDto[];
-}) {
-  if (monitors.length === 0) {
-    return <span className="text-muted">—</span>;
-  }
-
-  const visible = monitors.slice(0, 3);
-  const overflow = monitors.length - visible.length;
-  const names = monitors.map((m) => m.name).join(', ');
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="flex cursor-default items-center">
-          {visible.map((m, index) => (
-            <span
-              key={m.id}
-              title={m.name}
-              className={cn(
-                'flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground',
-                index > 0 && '-ml-1.5',
-              )}
-            >
-              {monitorInitials(m.name)}
-            </span>
-          ))}
-          {overflow > 0 ? (
-            <span className="-ml-1.5 flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground">
-              +{overflow}
-            </span>
-          ) : null}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs">
-        {names}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function LivePlaylistBadge({
-  monitors,
-}: {
-  monitors: ScreenCastPlaylistMonitorRefDto[];
-}) {
-  const live = monitors.filter((m) => m.online);
-  if (live.length === 0) return null;
-  const names = live.map((m) => m.name).join(', ');
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Badge variant="default" className="cursor-default gap-1">
-          <Cast size={12} />
-          Live
-        </Badge>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-xs">
-        En pantalla: {names}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 function MediaThumb({
   mediaUrl,
   mediaType,
@@ -256,6 +208,219 @@ function MediaThumb({
   );
 }
 
+function MonitorAvatar({
+  name,
+  photoUrl,
+  className,
+}: {
+  name: string;
+  photoUrl?: string | null;
+  className?: string;
+}) {
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt=""
+        className={cn(
+          'size-7 rounded-full border border-background object-cover',
+          className,
+        )}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        'flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground',
+        className,
+      )}
+    >
+      {monitorInitials(name)}
+    </span>
+  );
+}
+
+function MonitorAvatarStack({
+  monitors,
+}: {
+  monitors: ScreenCastPlaylistMonitorRefDto[];
+}) {
+  if (monitors.length === 0) {
+    return <span className="text-muted">—</span>;
+  }
+
+  const visible = monitors.slice(0, 3);
+  const overflow = monitors.length - visible.length;
+  const names = monitors.map((m) => m.name).join(', ');
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex cursor-default items-center">
+          {visible.map((m, index) => (
+            <span
+              key={m.id}
+              title={m.name}
+              className={cn(index > 0 && '-ml-1.5')}
+            >
+              <MonitorAvatar name={m.name} photoUrl={m.photoUrl} />
+            </span>
+          ))}
+          {overflow > 0 ? (
+            <span className="-ml-1.5 flex size-7 items-center justify-center rounded-full border border-background bg-muted text-[10px] font-semibold text-muted-foreground">
+              +{overflow}
+            </span>
+          ) : null}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        {names}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function PlaylistPreviewStack({
+  items,
+}: {
+  items: ScreenCastPlaylistPreviewDto[];
+}) {
+  if (items.length === 0) {
+    return <span className="text-muted">—</span>;
+  }
+  return (
+    <div className="flex items-center gap-1">
+      {items.slice(0, 4).map((item, index) => (
+        <span
+          key={`${item.mediaUrl}-${index}`}
+          className="size-8 shrink-0 overflow-hidden rounded bg-muted"
+        >
+          <MediaThumb
+            mediaUrl={item.mediaUrl}
+            mediaType={item.mediaType}
+            className="h-full w-full"
+          />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LivePlaylistBadge({
+  monitors,
+}: {
+  monitors: ScreenCastPlaylistMonitorRefDto[];
+}) {
+  const live = monitors.filter((m) => m.online);
+  if (live.length === 0) return null;
+  const names = live.map((m) => m.name).join(', ');
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="default" className="cursor-default gap-1">
+          <Cast size={12} />
+          Live
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        En pantalla: {names}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SortablePlaylistItemCard({
+  item,
+  disabled,
+  onEdit,
+  onDuplicate,
+  onRemove,
+}: {
+  item: ScreenCastPlaylistItemDto;
+  disabled?: boolean;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id, disabled });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn(
+        'group relative aspect-video overflow-hidden rounded-md border bg-muted',
+        isDragging && 'z-10 opacity-80 shadow-lg ring-2 ring-primary/40',
+        !item.activo && 'opacity-60',
+      )}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 cursor-grab touch-none active:cursor-grabbing"
+        aria-label="Arrastrar para reordenar"
+        {...attributes}
+        {...listeners}
+      >
+        <MediaThumb
+          mediaUrl={item.mediaUrl}
+          mediaType={item.mediaType}
+          className="pointer-events-none h-full w-full"
+        />
+      </button>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {item.mediaType === 'video'
+          ? 'video'
+          : `${item.mediaType} · ${Math.round(item.durationMs / 1000)}s`}
+        {!item.activo ? ' · inactivo' : ''}
+      </div>
+      <div className="absolute inset-x-0 top-0 z-10 flex justify-end gap-1 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="size-7 shadow-sm"
+          title="Editar"
+          onClick={onEdit}
+        >
+          <Pencil size={14} />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="size-7 shadow-sm"
+          title="Duplicar"
+          onClick={onDuplicate}
+        >
+          <CopyPlus size={14} />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="secondary"
+          className="size-7 shadow-sm"
+          title="Eliminar"
+          onClick={onRemove}
+        >
+          <Trash2 size={14} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ScreenCastAdminPage() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -272,7 +437,6 @@ export function ScreenCastAdminPage() {
     null,
   );
   const [playlistName, setPlaylistName] = useState('');
-  const [playlistActivo, setPlaylistActivo] = useState(true);
   const [items, setItems] = useState<ScreenCastPlaylistItemDto[]>([]);
   const [loadingPlaylist, setLoadingPlaylist] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
@@ -288,6 +452,15 @@ export function ScreenCastAdminPage() {
   const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
   const [savingMonitor, setSavingMonitor] = useState(false);
+  const [uploadingMonitorPhoto, setUploadingMonitorPhoto] = useState(false);
+  const monitorPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const [previewKey, setPreviewKey] = useState(0);
   const [syncingAll, setSyncingAll] = useState(false);
@@ -318,7 +491,6 @@ export function ScreenCastAdminPage() {
       try {
         const data = await api.getScreenCastPlaylist(id);
         setPlaylistName(data.name);
-        setPlaylistActivo(data.activo);
         setItems(data.items ?? []);
       } catch (e) {
         toast.error(
@@ -393,7 +565,6 @@ export function ScreenCastAdminPage() {
   function openCreatePlaylist() {
     setEditingPlaylistId(null);
     setPlaylistName('');
-    setPlaylistActivo(true);
     setItems([]);
     setLoadingPlaylist(false);
     itemDialogOpenRef.current = false;
@@ -425,7 +596,7 @@ export function ScreenCastAdminPage() {
     try {
       const created = await api.createScreenCastPlaylist({
         name: trimmed,
-        activo: playlistActivo,
+        activo: true,
       });
       setEditingPlaylistId(created.id);
       await loadLists();
@@ -446,33 +617,17 @@ export function ScreenCastAdminPage() {
       return;
     }
 
-    if (editingPlaylistId && !playlistActivo) {
-      const current = playlists.find((p) => p.id === editingPlaylistId);
-      const assigned =
-        current?.monitors?.length ?? current?._count?.monitors ?? 0;
-      if (assigned > 0) {
-        const ok = await confirm({
-          title: `¿Desactivar «${trimmed}»?`,
-          description: `Se desasignará de ${assigned} monitor${assigned === 1 ? '' : 'es'}.`,
-          confirmLabel: 'Desactivar y guardar',
-          variant: 'destructive',
-        });
-        if (!ok) return;
-      }
-    }
-
     setSavingMeta(true);
     try {
       if (!editingPlaylistId) {
         await api.createScreenCastPlaylist({
           name: trimmed,
-          activo: playlistActivo,
+          activo: true,
         });
         toast.success('Playlist creada');
       } else {
         await api.updateScreenCastPlaylist(editingPlaylistId, {
           name: trimmed,
-          activo: playlistActivo,
         });
         toast.success('Playlist guardada');
       }
@@ -550,9 +705,6 @@ export function ScreenCastAdminPage() {
           : p,
       ),
     );
-    if (editingPlaylistId === playlist.id) {
-      setPlaylistActivo(next);
-    }
 
     try {
       await api.updateScreenCastPlaylist(playlist.id, { activo: next });
@@ -563,9 +715,6 @@ export function ScreenCastAdminPage() {
           p.id === playlist.id ? { ...p, activo: previous } : p,
         ),
       );
-      if (editingPlaylistId === playlist.id) {
-        setPlaylistActivo(previous);
-      }
       toast.error(
         e instanceof Error ? e.message : 'Error al cambiar el estado',
       );
@@ -665,14 +814,16 @@ export function ScreenCastAdminPage() {
     }
   }
 
-  async function moveItem(index: number, direction: -1 | 1) {
+  async function handleItemDragEnd(event: DragEndEvent) {
     if (!editingPlaylistId || reordering) return;
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= items.length) return;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const ordered = [...items];
-    const [moved] = ordered.splice(index, 1);
-    ordered.splice(nextIndex, 0, moved!);
+    const oldIndex = items.findIndex((item) => item.id === active.id);
+    const newIndex = items.findIndex((item) => item.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const ordered = arrayMove(items, oldIndex, newIndex);
     setItems(ordered);
     setReordering(true);
     try {
@@ -702,6 +853,7 @@ export function ScreenCastAdminPage() {
       location: m.location ?? '',
       orientation: m.orientation ?? 'LANDSCAPE',
       playlistId: m.playlistId ?? '',
+      photoUrl: m.photoUrl ?? '',
     });
     setMonitorDialogOpen(true);
   }
@@ -709,6 +861,25 @@ export function ScreenCastAdminPage() {
   function closeMonitorDialog() {
     setMonitorDialogOpen(false);
     setMonitorDraft(null);
+    setUploadingMonitorPhoto(false);
+  }
+
+  async function uploadMonitorPhoto(file: File) {
+    if (!monitorDraft) return;
+    if (!file.type.startsWith('image/') || file.type === 'image/gif') {
+      toast.error('Usa una foto JPG o PNG');
+      return;
+    }
+    setUploadingMonitorPhoto(true);
+    try {
+      const uploaded = await api.uploadScreenCastMedia(file);
+      setMonitorDraft({ ...monitorDraft, photoUrl: uploaded.url });
+      toast.success('Foto subida');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al subir la foto');
+    } finally {
+      setUploadingMonitorPhoto(false);
+    }
   }
 
   async function saveMonitorDraft() {
@@ -725,6 +896,7 @@ export function ScreenCastAdminPage() {
       location: monitorDraft.location.trim() || undefined,
       orientation: monitorDraft.orientation,
       playlistId: monitorDraft.playlistId || null,
+      photoUrl: monitorDraft.photoUrl.trim() || null,
     };
     setSavingMonitor(true);
     try {
@@ -876,6 +1048,7 @@ export function ScreenCastAdminPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nombre</TableHead>
+                    <TableHead>Vista previa</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Ítems</TableHead>
                     <TableHead>Monitores</TableHead>
@@ -900,6 +1073,9 @@ export function ScreenCastAdminPage() {
                               <LivePlaylistBadge monitors={assigned} />
                             ) : null}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <PlaylistPreviewStack items={p.previewItems ?? []} />
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -1038,7 +1214,15 @@ export function ScreenCastAdminPage() {
                             ) : null}
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium">{m.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <MonitorAvatar
+                              name={m.name}
+                              photoUrl={m.photoUrl}
+                            />
+                            <span>{m.name}</span>
+                          </div>
+                        </TableCell>
                         <TableCell className="font-mono text-sm">
                           {m.screenKey}
                         </TableCell>
@@ -1238,7 +1422,7 @@ export function ScreenCastAdminPage() {
         }}
       >
         <DialogContent
-          className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),42rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
           onPointerDownOutside={(e) => {
             if (itemDialogOpenRef.current) e.preventDefault();
           }}
@@ -1255,7 +1439,7 @@ export function ScreenCastAdminPage() {
             </DialogTitle>
             <DialogDescription>
               JPG, PNG, GIF, MP4 o MOV (iPhone → MP4). Pega una URL o elige desde
-              S3.
+              S3. Arrastra las celdas para reordenar.
             </DialogDescription>
           </DialogHeader>
 
@@ -1264,126 +1448,50 @@ export function ScreenCastAdminPage() {
               <p className="text-sm text-muted">Cargando playlist…</p>
             ) : (
               <>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="pl-detail-name">Nombre</Label>
-                    <Input
-                      id="pl-detail-name"
-                      autoFocus={!editingPlaylistId}
-                      value={playlistName}
-                      placeholder="Ej. Lobby principal"
-                      onChange={(e) => setPlaylistName(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <SettingSwitchInline
-                      label="Activa"
-                      checked={playlistActivo}
-                      onCheckedChange={setPlaylistActivo}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pl-detail-name">Nombre</Label>
+                  <Input
+                    id="pl-detail-name"
+                    autoFocus={!editingPlaylistId}
+                    value={playlistName}
+                    placeholder="Ej. Lobby principal"
+                    onChange={(e) => setPlaylistName(e.target.value)}
+                  />
                 </div>
 
-                <div className="flex items-center justify-between border-t pt-4">
-                  <h4 className="font-medium">Ítems ({items.length})</h4>
-                  <Button
-                    type="button"
-                    onClick={() => void openItemCreate()}
+                <div className="border-t pt-4">
+                  <h4 className="mb-3 font-medium">Ítems ({items.length})</h4>
+                  <DndContext
+                    sensors={itemSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(event) => void handleItemDragEnd(event)}
                   >
-                    <Plus size={16} />
-                    Añadir ítem
-                  </Button>
-                </div>
-
-                <div className="space-y-3">
-                  {items.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap items-center gap-3 rounded-md border p-3"
+                    <SortableContext
+                      items={items.map((item) => item.id)}
+                      strategy={rectSortingStrategy}
                     >
-                      <div className="h-16 w-24 shrink-0 overflow-hidden rounded bg-muted">
-                        <MediaThumb
-                          mediaUrl={item.mediaUrl}
-                          mediaType={item.mediaType}
-                          className="h-full w-full"
-                        />
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {items.map((item) => (
+                          <SortablePlaylistItemCard
+                            key={item.id}
+                            item={item}
+                            disabled={reordering}
+                            onEdit={() => openItemEdit(item)}
+                            onDuplicate={() => void duplicateItem(item)}
+                            onRemove={() => void removeItem(item)}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          className="flex aspect-video items-center justify-center rounded-md border border-dashed text-muted transition-colors hover:border-foreground/40 hover:text-foreground"
+                          onClick={() => void openItemCreate()}
+                        >
+                          <Plus size={28} />
+                          <span className="sr-only">Añadir ítem</span>
+                        </button>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {item.mediaUrl}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {item.mediaType === 'video'
-                            ? 'video · avanza al terminar'
-                            : `${item.mediaType} · ${Math.round(item.durationMs / 1000)}s`}
-                          {!item.activo ? ' · inactivo' : ''}
-                        </p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          title="Subir"
-                          disabled={reordering || index === 0}
-                          onClick={() => void moveItem(index, -1)}
-                        >
-                          <ArrowUp size={16} />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          title="Bajar"
-                          disabled={reordering || index === items.length - 1}
-                          onClick={() => void moveItem(index, 1)}
-                        >
-                          <ArrowDown size={16} />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          title="Duplicar"
-                          onClick={() => void duplicateItem(item)}
-                        >
-                          <CopyPlus size={16} />
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openItemEdit(item)}
-                        >
-                          Editar
-                        </Button>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          title="Eliminar"
-                          onClick={() => void removeItem(item)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {items.length === 0 ? (
-                    <div className="rounded-md border border-dashed px-4 py-8 text-center">
-                      <p className="text-sm text-muted">
-                        Esta playlist aún no tiene contenido.
-                      </p>
-                      <Button
-                        type="button"
-                        className="mt-3"
-                        onClick={() => void openItemCreate()}
-                      >
-                        <Plus size={16} />
-                        Añadir primer ítem
-                      </Button>
-                    </div>
-                  ) : null}
+                    </SortableContext>
+                  </DndContext>
                 </div>
               </>
             )}
@@ -1597,6 +1705,46 @@ export function ScreenCastAdminPage() {
 
           {monitorDraft ? (
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Foto (opcional)</Label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <MonitorAvatar
+                    name={monitorDraft.name || monitorDraft.screenKey || 'M'}
+                    photoUrl={monitorDraft.photoUrl || null}
+                    className="size-14 text-sm"
+                  />
+                  <input
+                    ref={monitorPhotoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (file) void uploadMonitorPhoto(file);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={uploadingMonitorPhoto}
+                    onClick={() => monitorPhotoInputRef.current?.click()}
+                  >
+                    {uploadingMonitorPhoto ? 'Subiendo…' : 'Subir foto'}
+                  </Button>
+                  {monitorDraft.photoUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() =>
+                        setMonitorDraft({ ...monitorDraft, photoUrl: '' })
+                      }
+                    >
+                      Quitar
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="sc-key">ID de pantalla</Label>
                 <Input

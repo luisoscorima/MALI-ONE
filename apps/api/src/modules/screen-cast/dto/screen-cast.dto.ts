@@ -102,6 +102,10 @@ export class CreateScreenCastMonitorDto {
   @IsOptional()
   @IsString()
   playlistId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string | null;
 }
 
 export class UpdateScreenCastMonitorDto {
@@ -129,4 +133,8 @@ export class UpdateScreenCastMonitorDto {
   @IsOptional()
   @IsString()
   playlistId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string | null;
 }

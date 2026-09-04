@@ -221,17 +221,26 @@ export class ScreenCastService {
 
   // --- Playlists ---
 
-  listPlaylists() {
-    return this.prisma.screenCastPlaylist.findMany({
+  async listPlaylists() {
+    const rows = await this.prisma.screenCastPlaylist.findMany({
       orderBy: { name: 'asc' },
       include: {
         _count: { select: { monitors: true, items: true } },
         monitors: {
-          select: { id: true, name: true, screenKey: true },
+          select: { id: true, name: true, screenKey: true, photoUrl: true },
           orderBy: { name: 'asc' },
+        },
+        items: {
+          orderBy: { sortOrder: 'asc' },
+          take: 4,
+          select: { mediaUrl: true, mediaType: true },
         },
       },
     });
+    return rows.map(({ items, ...playlist }) => ({
+      ...playlist,
+      previewItems: items,
+    }));
   }
 
   async getPlaylist(id: string) {
@@ -272,7 +281,7 @@ export class ScreenCastService {
       include: {
         items: { orderBy: { sortOrder: 'asc' } },
         monitors: {
-          select: { id: true, name: true, screenKey: true },
+          select: { id: true, name: true, screenKey: true, photoUrl: true },
           orderBy: { name: 'asc' },
         },
         _count: { select: { monitors: true, items: true } },
@@ -509,6 +518,7 @@ export class ScreenCastService {
         screenKey: dto.screenKey.trim().toLowerCase(),
         name: dto.name.trim(),
         location: dto.location?.trim() || null,
+        photoUrl: dto.photoUrl?.trim() || null,
         orientation: dto.orientation ?? 'LANDSCAPE',
         playlistId: dto.playlistId || null,
       },
@@ -533,6 +543,9 @@ export class ScreenCastService {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.location !== undefined
           ? { location: dto.location?.trim() || null }
+          : {}),
+        ...(dto.photoUrl !== undefined
+          ? { photoUrl: dto.photoUrl?.trim() || null }
           : {}),
         ...(dto.orientation !== undefined
           ? { orientation: dto.orientation }
@@ -635,6 +648,7 @@ export class ScreenCastService {
       screenKey: row.screenKey,
       name: row.name,
       location: row.location,
+      photoUrl: row.photoUrl,
       orientation: row.orientation,
       playlistId: row.playlistId,
       playlistName: row.playlist?.name ?? null,
