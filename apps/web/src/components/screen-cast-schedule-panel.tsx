@@ -327,10 +327,8 @@ export function ScreenCastSchedulePanel({
           Programación
         </h3>
         <p className="mt-1 max-w-3xl text-sm text-muted">
-          Overrides opcionales sobre la playlist por defecto del monitor
-          (horario America/Lima). Si solo programas un monitor de un par
-          sincronizado, dejarán de ir al unísono hasta que ambos compartan otra
-          vez la misma playlist.
+          Programa la reproducción de una playlist en un monitor específico (o
+          varios) en un lapso de tiempo que desees.
         </p>
       </div>
 

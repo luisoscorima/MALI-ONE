@@ -22,6 +22,8 @@ import {
   CopyPlus,
   Eye,
   Film,
+  ListMusic,
+  Monitor,
   Pencil,
   Plus,
   RefreshCw,
@@ -1030,7 +1032,10 @@ export function ScreenCastAdminPage() {
           <section className="space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-medium">Listas de reproducción</h3>
+                <h3 className="flex items-center gap-2 text-lg font-medium">
+                  <ListMusic size={18} />
+                  Listas de reproducción
+                </h3>
                 <p className="mt-1 text-sm text-muted">
                   Playlists reutilizables con imágenes, GIFs y videos.
                 </p>
@@ -1146,10 +1151,12 @@ export function ScreenCastAdminPage() {
           <section className="space-y-4 border-t pt-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h3 className="text-lg font-medium">Monitores</h3>
+              <h3 className="flex items-center gap-2 text-lg font-medium">
+                <Monitor size={18} />
+                Monitores
+              </h3>
               <p className="mt-1 text-sm text-muted">
-                Registra pantallas físicas y asigna una playlist. Online/Offline
-                refleja la conexión WebSocket en vivo.
+                Registra pantallas físicas y asigna una playlist.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

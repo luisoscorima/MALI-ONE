@@ -32,6 +32,7 @@ import {
   UpdateScreenCastScheduleOverrideDto,
 } from './dto/screen-cast.dto';
 import { ScreenCastGateway } from './screen-cast.gateway';
+import { ScreenCastScheduleScheduler } from './screen-cast-schedule.scheduler';
 import { ScreenCastService } from './screen-cast.service';
 
 type UploadedMediaFile = {
@@ -46,6 +47,7 @@ export class ScreenCastController {
   constructor(
     private readonly service: ScreenCastService,
     private readonly gateway: ScreenCastGateway,
+    private readonly scheduleScheduler: ScreenCastScheduleScheduler,
     private readonly s3Manager: S3ManagerService,
   ) {}
 
@@ -291,11 +293,14 @@ export class ScreenCastController {
     @Body() body: CreateScreenCastScheduleOverrideDto,
   ) {
     const created = await this.service.createScheduleOverride(body);
-    if (
-      this.service.scheduleOverrideTouchesNow(created.startsAt, created.endsAt)
-    ) {
-      await this.gateway.applyScheduleTransition(created.screenKey);
-    }
+    this.scheduleScheduler.armOverrideBoundaries(
+      created.startsAt,
+      created.endsAt,
+    );
+    await this.applyScheduleIfNeeded(created.screenKey, [
+      created.startsAt,
+      created.endsAt,
+    ]);
     return created;
   }
 
@@ -307,20 +312,17 @@ export class ScreenCastController {
   ) {
     const previous = await this.service.getScheduleOverride(id);
     const updated = await this.service.updateScheduleOverride(id, body);
+    this.scheduleScheduler.armOverrideBoundaries(
+      updated.startsAt,
+      updated.endsAt,
+    );
     const keys = new Set<string>([previous.screenKey, updated.screenKey]);
-    const touchesNow =
-      this.service.scheduleOverrideTouchesNow(
-        updated.startsAt,
-        updated.endsAt,
-      ) ||
-      this.service.scheduleOverrideTouchesNow(
-        previous.startsAt,
-        previous.endsAt,
-      );
-    if (touchesNow) {
-      for (const key of keys) {
-        await this.gateway.applyScheduleTransition(key);
-      }
+    const windows: Array<[string, string]> = [
+      [updated.startsAt, updated.endsAt],
+      [previous.startsAt, previous.endsAt],
+    ];
+    for (const key of keys) {
+      await this.applyScheduleIfNeeded(key, windows.flat());
     }
     return updated;
   }
@@ -329,12 +331,48 @@ export class ScreenCastController {
   @RequireModule(AppModule.screen_cast)
   async deleteScheduleOverride(@Param('id') id: string) {
     const result = await this.service.deleteScheduleOverride(id);
-    if (
-      this.service.scheduleOverrideTouchesNow(result.startsAt, result.endsAt)
-    ) {
-      await this.gateway.applyScheduleTransition(result.screenKey);
-    }
+    await this.applyScheduleIfNeeded(result.screenKey, [
+      result.startsAt,
+      result.endsAt,
+    ]);
     return { ok: true };
+  }
+
+  /**
+   * If any window touches now, push the same reload path as "Sincronizar"
+   * and update the scheduler snapshot so the poll stays consistent.
+   */
+  private async applyScheduleIfNeeded(
+    screenKey: string,
+    instants: string[],
+  ) {
+    const now = Date.now();
+    // Touching "now" if any [start,end) pair from consecutive pairs... 
+    // Callers pass [start,end] or flat list of starts/ends for previous+updated.
+    let touches = false;
+    for (let i = 0; i + 1 < instants.length; i += 2) {
+      const start = new Date(instants[i]!).getTime();
+      const end = new Date(instants[i + 1]!).getTime();
+      if (start <= now && end > now) {
+        touches = true;
+        break;
+      }
+    }
+    // Also transition when deleting/updating an active window (already covered)
+    // or when the effective playlist may have changed even if windows look past:
+    // always transition if any instant is within 2s of now (boundary).
+    if (!touches) {
+      touches = instants.some((iso) => {
+        const t = new Date(iso).getTime();
+        return Number.isFinite(t) && Math.abs(t - now) < 2_000;
+      });
+    }
+    if (!touches) return;
+
+    await this.gateway.applyScheduleTransition(screenKey);
+    const playlistId =
+      await this.service.getMonitorPlaylistId(screenKey);
+    this.scheduleScheduler.markEffective(screenKey, playlistId);
   }
 
   // --- S3 picker + upload (gated by screen_cast) ---

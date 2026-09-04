@@ -526,7 +526,8 @@ export class ScreenCastGateway
 
   /**
    * Schedule boundary / active override change for one screen.
-   * Prefer catch-up onto a live clock; never force-restart the wall.
+   * Must reload content like the admin "Sincronizar" button (fetchConfig).
+   * Prefer catch-up onto a live clock; never force-restart sibling walls.
    */
   async applyScheduleTransition(screenKey: string) {
     const key = screenKey.trim().toLowerCase();
@@ -544,14 +545,14 @@ export class ScreenCastGateway
       this.playlistByScreen.delete(key);
     }
 
-    if (!playlistId) {
+    // No destination playlist, or a live group clock exists → same path as
+    // POST monitors/:id/sync (catchUp → client fetchConfig).
+    if (!playlistId || this.clocks.has(playlistId)) {
       await this.catchUpScreen(key);
       return;
     }
-    if (this.clocks.has(playlistId)) {
-      await this.catchUpScreen(key);
-      return;
-    }
+
+    // First screen on this playlist: start a sync session (catchUp: false).
     await this.restartSync([key], { reason: 'schedule:boundary' });
   }
 
