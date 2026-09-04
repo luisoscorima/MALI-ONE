@@ -138,3 +138,39 @@ export class UpdateScreenCastMonitorDto {
   @IsString()
   photoUrl?: string | null;
 }
+
+export class CreateScreenCastScheduleOverrideDto {
+  @IsString()
+  @MinLength(1)
+  monitorId!: string;
+
+  @IsString()
+  @MinLength(1)
+  playlistId!: string;
+
+  @IsString()
+  startsAt!: string;
+
+  @IsString()
+  endsAt!: string;
+}
+
+export class UpdateScreenCastScheduleOverrideDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  monitorId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  playlistId?: string;
+
+  @IsOptional()
+  @IsString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsString()
+  endsAt?: string;
+}

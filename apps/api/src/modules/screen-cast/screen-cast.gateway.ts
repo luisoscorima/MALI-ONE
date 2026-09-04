@@ -524,6 +524,37 @@ export class ScreenCastGateway
     });
   }
 
+  /**
+   * Schedule boundary / active override change for one screen.
+   * Prefer catch-up onto a live clock; never force-restart the wall.
+   */
+  async applyScheduleTransition(screenKey: string) {
+    const key = screenKey.trim().toLowerCase();
+    const playlistId = await this.service.getMonitorPlaylistId(key);
+
+    const socketIds = this.connections.get(key);
+    if (socketIds) {
+      for (const socketId of socketIds) {
+        const client = this.server.sockets.sockets.get(socketId);
+        if (client) await this.bindPlaylistRoom(client, playlistId);
+      }
+    } else if (playlistId) {
+      this.playlistByScreen.set(key, playlistId);
+    } else {
+      this.playlistByScreen.delete(key);
+    }
+
+    if (!playlistId) {
+      await this.catchUpScreen(key);
+      return;
+    }
+    if (this.clocks.has(playlistId)) {
+      await this.catchUpScreen(key);
+      return;
+    }
+    await this.restartSync([key], { reason: 'schedule:boundary' });
+  }
+
   notifyPlaylistUpdated(screenKeys: string[]) {
     void this.restartSync(screenKeys, { reason: 'playlist:updated' });
   }

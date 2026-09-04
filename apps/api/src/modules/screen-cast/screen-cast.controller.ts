@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -24,9 +25,11 @@ import {
   CreateScreenCastMonitorDto,
   CreateScreenCastPlaylistDto,
   CreateScreenCastPlaylistItemDto,
+  CreateScreenCastScheduleOverrideDto,
   UpdateScreenCastMonitorDto,
   UpdateScreenCastPlaylistDto,
   UpdateScreenCastPlaylistItemDto,
+  UpdateScreenCastScheduleOverrideDto,
 } from './dto/screen-cast.dto';
 import { ScreenCastGateway } from './screen-cast.gateway';
 import { ScreenCastService } from './screen-cast.service';
@@ -266,6 +269,72 @@ export class ScreenCastController {
   @RequireModule(AppModule.screen_cast)
   deleteMonitor(@Param('id') id: string) {
     return this.service.deleteMonitor(id);
+  }
+
+  // --- Schedule overrides ---
+
+  @Get('schedule-overrides')
+  @RequireModule(AppModule.screen_cast)
+  listScheduleOverrides(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!from?.trim() || !to?.trim()) {
+      throw new BadRequestException('from y to son requeridos');
+    }
+    return this.service.listScheduleOverrides(from, to);
+  }
+
+  @Post('schedule-overrides')
+  @RequireModule(AppModule.screen_cast)
+  async createScheduleOverride(
+    @Body() body: CreateScreenCastScheduleOverrideDto,
+  ) {
+    const created = await this.service.createScheduleOverride(body);
+    if (
+      this.service.scheduleOverrideTouchesNow(created.startsAt, created.endsAt)
+    ) {
+      await this.gateway.applyScheduleTransition(created.screenKey);
+    }
+    return created;
+  }
+
+  @Patch('schedule-overrides/:id')
+  @RequireModule(AppModule.screen_cast)
+  async updateScheduleOverride(
+    @Param('id') id: string,
+    @Body() body: UpdateScreenCastScheduleOverrideDto,
+  ) {
+    const previous = await this.service.getScheduleOverride(id);
+    const updated = await this.service.updateScheduleOverride(id, body);
+    const keys = new Set<string>([previous.screenKey, updated.screenKey]);
+    const touchesNow =
+      this.service.scheduleOverrideTouchesNow(
+        updated.startsAt,
+        updated.endsAt,
+      ) ||
+      this.service.scheduleOverrideTouchesNow(
+        previous.startsAt,
+        previous.endsAt,
+      );
+    if (touchesNow) {
+      for (const key of keys) {
+        await this.gateway.applyScheduleTransition(key);
+      }
+    }
+    return updated;
+  }
+
+  @Delete('schedule-overrides/:id')
+  @RequireModule(AppModule.screen_cast)
+  async deleteScheduleOverride(@Param('id') id: string) {
+    const result = await this.service.deleteScheduleOverride(id);
+    if (
+      this.service.scheduleOverrideTouchesNow(result.startsAt, result.endsAt)
+    ) {
+      await this.gateway.applyScheduleTransition(result.screenKey);
+    }
+    return { ok: true };
   }
 
   // --- S3 picker + upload (gated by screen_cast) ---

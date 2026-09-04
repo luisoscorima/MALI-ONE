@@ -19,9 +19,11 @@ import {
   CreateScreenCastMonitorDto,
   CreateScreenCastPlaylistDto,
   CreateScreenCastPlaylistItemDto,
+  CreateScreenCastScheduleOverrideDto,
   UpdateScreenCastMonitorDto,
   UpdateScreenCastPlaylistDto,
   UpdateScreenCastPlaylistItemDto,
+  UpdateScreenCastScheduleOverrideDto,
 } from './dto/screen-cast.dto';
 import {
   convertMovBufferToMp4,
@@ -267,6 +269,14 @@ export class ScreenCastService {
   async updatePlaylist(id: string, dto: UpdateScreenCastPlaylistDto) {
     await this.findPlaylist(id);
     if (dto.activo === false) {
+      const blocking = await this.prisma.screenCastScheduleOverride.count({
+        where: { playlistId: id, endsAt: { gt: new Date() } },
+      });
+      if (blocking > 0) {
+        throw new BadRequestException(
+          'No se puede desactivar: hay programación futura o activa con esta playlist',
+        );
+      }
       await this.prisma.screenCastMonitor.updateMany({
         where: { playlistId: id },
         data: { playlistId: null },
@@ -421,11 +431,16 @@ export class ScreenCastService {
   }
 
   async getScreenKeysForPlaylist(playlistId: string): Promise<string[]> {
+    const at = new Date();
     const monitors = await this.prisma.screenCastMonitor.findMany({
-      where: { playlistId },
-      select: { screenKey: true },
+      select: { id: true, screenKey: true, playlistId: true },
     });
-    return monitors.map((m) => m.screenKey);
+    const overrideByMonitor = await this.activeOverridePlaylistByMonitorId(at);
+    return monitors
+      .filter(
+        (m) => (overrideByMonitor.get(m.id) ?? m.playlistId) === playlistId,
+      )
+      .map((m) => m.screenKey);
   }
 
   /**
@@ -464,12 +479,26 @@ export class ScreenCastService {
     return monitors.map((m) => m.screenKey);
   }
 
+  async listMonitorEffectivePlaylistIds(
+    at = new Date(),
+  ): Promise<Array<{ screenKey: string; playlistId: string | null }>> {
+    const monitors = await this.prisma.screenCastMonitor.findMany({
+      select: { id: true, screenKey: true, playlistId: true },
+    });
+    const overrideByMonitor = await this.activeOverridePlaylistByMonitorId(at);
+    return monitors.map((m) => ({
+      screenKey: m.screenKey,
+      playlistId: overrideByMonitor.get(m.id) ?? m.playlistId,
+    }));
+  }
+
   async getMonitorPlaylistId(screenKey: string): Promise<string | null> {
     const row = await this.prisma.screenCastMonitor.findUnique({
       where: { screenKey: screenKey.trim().toLowerCase() },
-      select: { playlistId: true },
+      select: { id: true, playlistId: true },
     });
-    return row?.playlistId ?? null;
+    if (!row) return null;
+    return this.resolveEffectivePlaylistIdForMonitor(row, new Date());
   }
 
   async getScreenPlaylistMap(
@@ -481,12 +510,17 @@ export class ScreenCastService {
       if (key) map.set(key, null);
     }
     if (map.size === 0) return map;
+    const at = new Date();
     const rows = await this.prisma.screenCastMonitor.findMany({
       where: { screenKey: { in: [...map.keys()] } },
-      select: { screenKey: true, playlistId: true },
+      select: { id: true, screenKey: true, playlistId: true },
     });
+    const overrideByMonitor = await this.activeOverridePlaylistByMonitorId(at);
     for (const row of rows) {
-      map.set(row.screenKey, row.playlistId);
+      map.set(
+        row.screenKey,
+        overrideByMonitor.get(row.id) ?? row.playlistId,
+      );
     }
     return map;
   }
@@ -494,11 +528,15 @@ export class ScreenCastService {
   // --- Monitors ---
 
   async listMonitors() {
+    const at = new Date();
     const rows = await this.prisma.screenCastMonitor.findMany({
       orderBy: { name: 'asc' },
       include: { playlist: this.monitorPlaylistInclude },
     });
-    return rows.map((row) => this.toMonitorDto(row));
+    const activeByMonitor = await this.activeOverrideDetailsByMonitorId(at);
+    return rows.map((row) =>
+      this.toMonitorDto(row, activeByMonitor.get(row.id) ?? null),
+    );
   }
 
   async getMonitor(id: string) {
@@ -507,7 +545,8 @@ export class ScreenCastService {
       include: { playlist: this.monitorPlaylistInclude },
     });
     if (!row) throw new NotFoundException('Monitor no encontrado');
-    return this.toMonitorDto(row);
+    const active = await this.activeOverrideDetailsByMonitorId(new Date());
+    return this.toMonitorDto(row, active.get(row.id) ?? null);
   }
 
   async createMonitor(dto: CreateScreenCastMonitorDto) {
@@ -524,7 +563,7 @@ export class ScreenCastService {
       },
       include: { playlist: this.monitorPlaylistInclude },
     });
-    return this.toMonitorDto(row);
+    return this.toMonitorDto(row, null);
   }
 
   async updateMonitor(id: string, dto: UpdateScreenCastMonitorDto) {
@@ -533,6 +572,9 @@ export class ScreenCastService {
       await this.ensureUniqueScreenKey(dto.screenKey);
     }
     if (dto.playlistId) await this.assertAssignablePlaylist(dto.playlistId);
+    if (dto.playlistId !== undefined && !dto.playlistId) {
+      await this.assertMonitorHasNoFutureOverrides(id);
+    }
 
     const row = await this.prisma.screenCastMonitor.update({
       where: { id },
@@ -556,7 +598,8 @@ export class ScreenCastService {
       },
       include: { playlist: this.monitorPlaylistInclude },
     });
-    return this.toMonitorDto(row);
+    const active = await this.activeOverrideDetailsByMonitorId(new Date());
+    return this.toMonitorDto(row, active.get(row.id) ?? null);
   }
 
   async deleteMonitor(id: string) {
@@ -565,25 +608,133 @@ export class ScreenCastService {
     return { ok: true };
   }
 
+  // --- Schedule overrides ---
+
+  async listScheduleOverrides(fromIso: string, toIso: string) {
+    const from = this.parseInstant(fromIso, 'from');
+    const to = this.parseInstant(toIso, 'to');
+    if (!(to > from)) {
+      throw new BadRequestException('to debe ser posterior a from');
+    }
+    const rows = await this.prisma.screenCastScheduleOverride.findMany({
+      where: {
+        startsAt: { lt: to },
+        endsAt: { gt: from },
+      },
+      include: {
+        monitor: { select: { id: true, name: true, screenKey: true } },
+        playlist: { select: { id: true, name: true } },
+      },
+      orderBy: { startsAt: 'asc' },
+    });
+    return rows.map((row) => this.toScheduleOverrideDto(row));
+  }
+
+  async createScheduleOverride(dto: CreateScreenCastScheduleOverrideDto) {
+    const startsAt = this.parseInstant(dto.startsAt, 'startsAt');
+    const endsAt = this.parseInstant(dto.endsAt, 'endsAt');
+    await this.assertValidOverrideWindow({
+      monitorId: dto.monitorId,
+      playlistId: dto.playlistId,
+      startsAt,
+      endsAt,
+    });
+    const row = await this.prisma.screenCastScheduleOverride.create({
+      data: {
+        monitorId: dto.monitorId,
+        playlistId: dto.playlistId,
+        startsAt,
+        endsAt,
+      },
+      include: {
+        monitor: { select: { id: true, name: true, screenKey: true } },
+        playlist: { select: { id: true, name: true } },
+      },
+    });
+    return this.toScheduleOverrideDto(row);
+  }
+
+  async updateScheduleOverride(
+    id: string,
+    dto: UpdateScreenCastScheduleOverrideDto,
+  ) {
+    const existing = await this.findScheduleOverride(id);
+    const monitorId = dto.monitorId ?? existing.monitorId;
+    const playlistId = dto.playlistId ?? existing.playlistId;
+    const startsAt = dto.startsAt
+      ? this.parseInstant(dto.startsAt, 'startsAt')
+      : existing.startsAt;
+    const endsAt = dto.endsAt
+      ? this.parseInstant(dto.endsAt, 'endsAt')
+      : existing.endsAt;
+    await this.assertValidOverrideWindow({
+      monitorId,
+      playlistId,
+      startsAt,
+      endsAt,
+      excludeId: id,
+    });
+    const row = await this.prisma.screenCastScheduleOverride.update({
+      where: { id },
+      data: { monitorId, playlistId, startsAt, endsAt },
+      include: {
+        monitor: { select: { id: true, name: true, screenKey: true } },
+        playlist: { select: { id: true, name: true } },
+      },
+    });
+    return this.toScheduleOverrideDto(row);
+  }
+
+  async deleteScheduleOverride(id: string) {
+    const existing = await this.findScheduleOverride(id);
+    await this.prisma.screenCastScheduleOverride.delete({ where: { id } });
+    return {
+      ok: true as const,
+      screenKey: existing.monitor.screenKey,
+      startsAt: existing.startsAt.toISOString(),
+      endsAt: existing.endsAt.toISOString(),
+    };
+  }
+
+  async getScheduleOverride(id: string) {
+    const row = await this.findScheduleOverride(id);
+    return this.toScheduleOverrideDto(row);
+  }
+
+  /** True if [startsAt, endsAt) intersects now. */
+  scheduleOverrideTouchesNow(
+    startsAt: Date | string,
+    endsAt: Date | string,
+    at = new Date(),
+  ): boolean {
+    const start = startsAt instanceof Date ? startsAt : new Date(startsAt);
+    const end = endsAt instanceof Date ? endsAt : new Date(endsAt);
+    return start <= at && end > at;
+  }
+
   // --- Public + heartbeat ---
 
   async getPublicConfig(screenKey: string) {
     const monitor = await this.prisma.screenCastMonitor.findUnique({
       where: { screenKey: screenKey.trim().toLowerCase() },
-      include: {
-        playlist: {
+    });
+    if (!monitor) throw new NotFoundException('Pantalla no encontrada');
+
+    const effectivePlaylistId =
+      await this.resolveEffectivePlaylistIdForMonitor(monitor, new Date());
+
+    const playlist = effectivePlaylistId
+      ? await this.prisma.screenCastPlaylist.findUnique({
+          where: { id: effectivePlaylistId },
           include: {
             items: {
               where: { activo: true },
               orderBy: { sortOrder: 'asc' },
             },
           },
-        },
-      },
-    });
-    if (!monitor) throw new NotFoundException('Pantalla no encontrada');
+        })
+      : null;
 
-    const playlist = monitor.playlist;
     const empty =
       !playlist ||
       !playlist.activo ||
@@ -641,6 +792,11 @@ export class ScreenCastService {
         }>;
       } | null;
     },
+    scheduleActive: {
+      endsAt: string;
+      playlistId: string;
+      playlistName: string;
+    } | null = null,
   ) {
     const preview = row.playlist?.items?.[0];
     return {
@@ -655,12 +811,161 @@ export class ScreenCastService {
       playlistPreview: preview
         ? { mediaUrl: preview.mediaUrl, mediaType: preview.mediaType }
         : null,
+      scheduleActive,
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
       // Live Online/Offline comes from WebSocket presence in the controller.
       online: false,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
+  }
+
+  private toScheduleOverrideDto(row: {
+    id: string;
+    monitorId: string;
+    playlistId: string;
+    startsAt: Date;
+    endsAt: Date;
+    createdAt: Date;
+    updatedAt: Date;
+    monitor: { id: string; name: string; screenKey: string };
+    playlist: { id: string; name: string };
+  }) {
+    return {
+      id: row.id,
+      monitorId: row.monitorId,
+      monitorName: row.monitor.name,
+      screenKey: row.monitor.screenKey,
+      playlistId: row.playlistId,
+      playlistName: row.playlist.name,
+      startsAt: row.startsAt.toISOString(),
+      endsAt: row.endsAt.toISOString(),
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  private async resolveEffectivePlaylistIdForMonitor(
+    monitor: { id: string; playlistId: string | null },
+    at: Date,
+  ): Promise<string | null> {
+    const override = await this.prisma.screenCastScheduleOverride.findFirst({
+      where: {
+        monitorId: monitor.id,
+        startsAt: { lte: at },
+        endsAt: { gt: at },
+        playlist: { activo: true },
+      },
+      select: { playlistId: true },
+    });
+    return override?.playlistId ?? monitor.playlistId;
+  }
+
+  private async activeOverridePlaylistByMonitorId(
+    at: Date,
+  ): Promise<Map<string, string>> {
+    const rows = await this.prisma.screenCastScheduleOverride.findMany({
+      where: {
+        startsAt: { lte: at },
+        endsAt: { gt: at },
+        playlist: { activo: true },
+      },
+      select: { monitorId: true, playlistId: true },
+    });
+    return new Map(rows.map((r) => [r.monitorId, r.playlistId]));
+  }
+
+  private async activeOverrideDetailsByMonitorId(at: Date) {
+    const rows = await this.prisma.screenCastScheduleOverride.findMany({
+      where: {
+        startsAt: { lte: at },
+        endsAt: { gt: at },
+        playlist: { activo: true },
+      },
+      select: {
+        monitorId: true,
+        endsAt: true,
+        playlistId: true,
+        playlist: { select: { name: true } },
+      },
+    });
+    const map = new Map<
+      string,
+      { endsAt: string; playlistId: string; playlistName: string }
+    >();
+    for (const r of rows) {
+      map.set(r.monitorId, {
+        endsAt: r.endsAt.toISOString(),
+        playlistId: r.playlistId,
+        playlistName: r.playlist.name,
+      });
+    }
+    return map;
+  }
+
+  private async assertValidOverrideWindow(input: {
+    monitorId: string;
+    playlistId: string;
+    startsAt: Date;
+    endsAt: Date;
+    excludeId?: string;
+  }) {
+    if (!(input.endsAt > input.startsAt)) {
+      throw new BadRequestException('La hora de fin debe ser posterior al inicio');
+    }
+    const monitor = await this.findMonitor(input.monitorId);
+    if (!monitor.playlistId) {
+      throw new BadRequestException(
+        'El monitor necesita una playlist por defecto antes de programar',
+      );
+    }
+    await this.assertAssignablePlaylist(input.playlistId);
+
+    const overlap = await this.prisma.screenCastScheduleOverride.findFirst({
+      where: {
+        monitorId: input.monitorId,
+        ...(input.excludeId ? { id: { not: input.excludeId } } : {}),
+        startsAt: { lt: input.endsAt },
+        endsAt: { gt: input.startsAt },
+      },
+      select: { id: true },
+    });
+    if (overlap) {
+      throw new ConflictException(
+        'Ya existe una programación que se solapa en este monitor',
+      );
+    }
+  }
+
+  private async assertMonitorHasNoFutureOverrides(monitorId: string) {
+    const count = await this.prisma.screenCastScheduleOverride.count({
+      where: { monitorId, endsAt: { gt: new Date() } },
+    });
+    if (count > 0) {
+      throw new BadRequestException(
+        'Quita primero la programación de este monitor',
+      );
+    }
+  }
+
+  private parseInstant(raw: string, field: string): Date {
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} no es una fecha válida`);
+    }
+    return date;
+  }
+
+  private async findScheduleOverride(id: string) {
+    const row = await this.prisma.screenCastScheduleOverride.findUnique({
+      where: { id },
+      include: {
+        monitor: { select: { id: true, name: true, screenKey: true } },
+        playlist: { select: { id: true, name: true } },
+      },
+    });
+    if (!row) throw new NotFoundException('Programación no encontrada');
+    return row;
   }
 
   private async assertAssignablePlaylist(playlistId: string) {

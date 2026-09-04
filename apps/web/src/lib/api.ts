@@ -704,6 +704,43 @@ export const api = {
       method: 'DELETE',
     }),
 
+  listScreenCastScheduleOverrides: (from: string, to: string) => {
+    const params = new URLSearchParams({ from, to });
+    return request<import('@mali-one/shared').ScreenCastScheduleOverrideDto[]>(
+      `/api/screen-cast/schedule-overrides?${params.toString()}`,
+    );
+  },
+
+  createScreenCastScheduleOverride: (body: {
+    monitorId: string;
+    playlistId: string;
+    startsAt: string;
+    endsAt: string;
+  }) =>
+    request<import('@mali-one/shared').ScreenCastScheduleOverrideDto>(
+      '/api/screen-cast/schedule-overrides',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateScreenCastScheduleOverride: (
+    id: string,
+    body: Partial<{
+      monitorId: string;
+      playlistId: string;
+      startsAt: string;
+      endsAt: string;
+    }>,
+  ) =>
+    request<import('@mali-one/shared').ScreenCastScheduleOverrideDto>(
+      `/api/screen-cast/schedule-overrides/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteScreenCastScheduleOverride: (id: string) =>
+    request<{ ok: boolean }>(`/api/screen-cast/schedule-overrides/${id}`, {
+      method: 'DELETE',
+    }),
+
   syncAllScreenCastMonitors: () =>
     request<{ ok: boolean; notified: number }>(
       '/api/screen-cast/monitors/sync',

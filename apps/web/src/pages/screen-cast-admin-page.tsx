@@ -38,6 +38,10 @@ import type {
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
+import {
+  ScheduleActiveBadge,
+  ScreenCastSchedulePanel,
+} from '@/components/screen-cast-schedule-panel';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -1204,6 +1208,9 @@ export function ScreenCastAdminPage() {
                               online={m.online}
                               lastSeenAt={m.lastSeenAt}
                             />
+                            <ScheduleActiveBadge
+                              scheduleActive={m.scheduleActive}
+                            />
                             {m.lastError ? (
                               <p
                                 className="max-w-40 truncate text-xs text-destructive"
@@ -1327,6 +1334,12 @@ export function ScreenCastAdminPage() {
             </div>
           )}
           </section>
+
+          <ScreenCastSchedulePanel
+            monitors={monitors}
+            playlists={playlists}
+            onChanged={() => void loadLists()}
+          />
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-4">

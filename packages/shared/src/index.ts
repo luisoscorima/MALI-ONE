@@ -209,12 +209,31 @@ export interface ScreenCastMonitorDto {
   playlistName?: string | null;
   /** First active item of the assigned playlist, if any. */
   playlistPreview?: ScreenCastPlaylistPreviewDto | null;
+  /** Active schedule override right now, if any. */
+  scheduleActive?: {
+    endsAt: string;
+    playlistId: string;
+    playlistName: string;
+  } | null;
   lastSeenAt: string | null;
   online: boolean;
   /** 0-based index of current slide when online, else null. */
   playbackIndex?: number | null;
   playbackTotal?: number | null;
   lastError?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScreenCastScheduleOverrideDto {
+  id: string;
+  monitorId: string;
+  monitorName: string;
+  screenKey: string;
+  playlistId: string;
+  playlistName: string;
+  startsAt: string;
+  endsAt: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -387,13 +387,14 @@ model EducacionLead {
 }
 
 model ScreenCastPlaylist {
-  id        String                   @id @default(cuid())
+  id        String                       @id @default(cuid())
   name      String
-  activo    Boolean                  @default(true)
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+  activo    Boolean                      @default(true)
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
   items     ScreenCastPlaylistItem[]
   monitors  ScreenCastMonitor[]
+  scheduleOverrides ScreenCastScheduleOverride[]
 }
 
 model ScreenCastPlaylistItem {
@@ -421,8 +422,24 @@ model ScreenCastMonitor {
   lastSeenAt  DateTime?
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
+  scheduleOverrides ScreenCastScheduleOverride[]
 
   @@index([playlistId])
+}
+
+model ScreenCastScheduleOverride {
+  id         String              @id @default(cuid())
+  monitorId  String
+  playlistId String
+  startsAt   DateTime
+  endsAt     DateTime
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  monitor    ScreenCastMonitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  playlist   ScreenCastPlaylist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, startsAt, endsAt])
+  @@index([startsAt, endsAt])
 }
 
 enum NewsletterStatus {
