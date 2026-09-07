@@ -7,6 +7,20 @@ import { MP_CONFIRMED } from './pam-widgets.service';
 
 const DIAS_ANTES_AVISO = 5;
 
+/** Off hasta integración MP de renovaciones. Reactivar el cron cambiando a true. */
+const EXPIRY_NOTICES_AUTO_ENABLED = false;
+
+export type PamExpiryNoticeCandidate = {
+  id: string;
+  nombres: string;
+  apellidos: string;
+  correo: string;
+  plan: string;
+  frecuencia: string;
+  mpStatus: PamMpStatus | null;
+  expiryDate: Date;
+};
+
 @Injectable()
 export class PamEmailService {
   private readonly logger = new Logger(PamEmailService.name);
@@ -27,6 +41,26 @@ export class PamEmailService {
       port: Number(this.config.get('PAM_SMTP_PORT') ?? 587),
       secure: this.config.get('PAM_SMTP_SECURE') === 'true',
       auth: { user, pass },
+    });
+  }
+
+  private expiryWindow() {
+    const now = new Date();
+    const limit = new Date(now);
+    limit.setDate(limit.getDate() + DIAS_ANTES_AVISO);
+    return { now, limit };
+  }
+
+  private async findExpiryCandidates(take?: number) {
+    const { now, limit } = this.expiryWindow();
+    return this.prisma.pamRegistration.findMany({
+      where: {
+        expiryNotice: PamEmailStatus.PENDIENTE,
+        mpStatus: { in: MP_CONFIRMED as PamMpStatus[] },
+        expiryDate: { lte: limit, gte: now },
+      },
+      orderBy: { expiryDate: 'asc' },
+      ...(take != null ? { take } : {}),
     });
   }
 
@@ -57,22 +91,59 @@ export class PamEmailService {
   }
 
   async sendPendingExpiryNotices() {
-    const now = new Date();
-    const limit = new Date(now);
-    limit.setDate(limit.getDate() + DIAS_ANTES_AVISO);
+    if (!EXPIRY_NOTICES_AUTO_ENABLED) {
+      this.logger.debug(
+        'Avisos de caducidad automáticos desactivados (EXPIRY_NOTICES_AUTO_ENABLED)',
+      );
+      return { skipped: true as const, reason: 'disabled' as const };
+    }
+    return this.sendExpiryNoticesBatch(50);
+  }
 
-    const rows = await this.prisma.pamRegistration.findMany({
-      where: {
-        expiryNotice: PamEmailStatus.PENDIENTE,
-        mpStatus: { in: MP_CONFIRMED as PamMpStatus[] },
-        expiryDate: { lte: limit, gte: now },
-      },
-      take: 50,
-    });
+  async previewExpiryNotices() {
+    const { now, limit } = this.expiryWindow();
+    const rows = await this.findExpiryCandidates();
+    const candidates: PamExpiryNoticeCandidate[] = rows
+      .filter((r): r is typeof r & { expiryDate: Date } => r.expiryDate != null)
+      .map((r) => ({
+        id: r.id,
+        nombres: r.nombres,
+        apellidos: r.apellidos,
+        correo: r.correo,
+        plan: r.plan,
+        frecuencia: r.frecuencia,
+        mpStatus: r.mpStatus,
+        expiryDate: r.expiryDate,
+      }));
+
+    return {
+      diasAntes: DIAS_ANTES_AVISO,
+      autoEnabled: EXPIRY_NOTICES_AUTO_ENABLED,
+      windowFrom: now.toISOString(),
+      windowTo: limit.toISOString(),
+      total: candidates.length,
+      candidates,
+    };
+  }
+
+  async sendExpiryNoticesManual() {
+    return this.sendExpiryNoticesBatch();
+  }
+
+  private async sendExpiryNoticesBatch(take?: number) {
+    const rows = await this.findExpiryCandidates(take);
+    let sent = 0;
+    let errors = 0;
+    let skipped = 0;
 
     for (const reg of rows) {
-      await this.sendExpiryNotice(reg);
+      const result = await this.sendExpiryNotice(reg);
+      if (result === 'sent') sent += 1;
+      else if (result === 'error') errors += 1;
+      else skipped += 1;
     }
+
+    return { total: rows.length, sent, errors, skipped };
   }
 
   private async sendWelcome(reg: PamRegistration) {
@@ -118,16 +189,18 @@ export class PamEmailService {
     }
   }
 
-  private async sendExpiryNotice(reg: PamRegistration) {
+  private async sendExpiryNotice(
+    reg: PamRegistration,
+  ): Promise<'sent' | 'error' | 'skipped'> {
     if (!reg.expiryDate || !this.isValidEmail(reg.correo)) {
       await this.setExpiryStatus(reg.id, PamEmailStatus.ERROR_DATOS);
-      return;
+      return 'error';
     }
 
     const transport = this.getTransport();
     if (!transport) {
       this.logger.warn('PAM SMTP no configurado; omitiendo aviso de caducidad');
-      return;
+      return 'skipped';
     }
 
     const from =
@@ -145,9 +218,11 @@ export class PamEmailService {
 <p>Equipo PAM — Museo de Arte de Lima</p>`,
       });
       await this.setExpiryStatus(reg.id, PamEmailStatus.ENVIADO);
+      return 'sent';
     } catch (err) {
       this.logger.error('Error enviando aviso caducidad PAM', err);
       await this.setExpiryStatus(reg.id, PamEmailStatus.ERROR_TEMP);
+      return 'error';
     }
   }
 

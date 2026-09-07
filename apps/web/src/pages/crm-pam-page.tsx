@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Columns3, Link2, Mail, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
+import { Columns3, Link2, Mail, MessageCircle, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type {
   EmailCampaignDto,
@@ -274,6 +274,26 @@ export function CrmPamPage() {
   );
   const [suggestLoading, setSuggestLoading] = useState(false);
   const suggestTimer = useRef<number | null>(null);
+  const [showExpiryNotices, setShowExpiryNotices] = useState(false);
+  const [expiryPreviewLoading, setExpiryPreviewLoading] = useState(false);
+  const [expirySending, setExpirySending] = useState(false);
+  const [expiryPreview, setExpiryPreview] = useState<{
+    diasAntes: number;
+    autoEnabled: boolean;
+    windowFrom: string;
+    windowTo: string;
+    total: number;
+    candidates: Array<{
+      id: string;
+      nombres: string;
+      apellidos: string;
+      correo: string;
+      plan: string;
+      frecuencia: string;
+      mpStatus: string | null;
+      expiryDate: string;
+    }>;
+  } | null>(null);
 
   const [newsletters, setNewsletters] = useState<PublishedNewsletter[]>([]);
   const [campaigns, setCampaigns] = useState<EmailCampaignDto[]>([]);
@@ -457,6 +477,48 @@ export function CrmPamPage() {
       setPamPlans([]);
     }
   }, []);
+
+  async function openExpiryNotices() {
+    setShowExpiryNotices(true);
+    setExpiryPreviewLoading(true);
+    setExpiryPreview(null);
+    try {
+      const data = await api.previewPamExpiryNotices();
+      setExpiryPreview(data);
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'No se pudo cargar el preview',
+      );
+      setShowExpiryNotices(false);
+    } finally {
+      setExpiryPreviewLoading(false);
+    }
+  }
+
+  async function sendExpiryNotices() {
+    if (!expiryPreview || expiryPreview.total === 0) return;
+    const ok = await confirm({
+      title: 'Enviar avisos de vencimiento',
+      description: `Se enviarán ${expiryPreview.total} correo(s) a miembros con caducidad en los próximos ${expiryPreview.diasAntes} días. Revisa que el estado MP siga vigente antes de continuar.`,
+      confirmLabel: 'Enviar ahora',
+    });
+    if (!ok) return;
+
+    setExpirySending(true);
+    try {
+      const result = await api.sendPamExpiryNotices();
+      toast.success(
+        `Avisos: ${result.sent} enviados, ${result.errors} errores, ${result.skipped} omitidos`,
+      );
+      setShowExpiryNotices(false);
+      setExpiryPreview(null);
+      await loadPayments();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al enviar avisos');
+    } finally {
+      setExpirySending(false);
+    }
+  }
 
   const activePaymentMethods = useMemo(
     () => paymentMethods.filter((m) => m.active),
@@ -773,6 +835,18 @@ export function CrmPamPage() {
       toast.success('Correo de bienvenida reenviado (SMTP)');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al reenviar correo');
+    }
+  }
+
+  async function resendWelcomeWhatsapp(id: string) {
+    try {
+      const updated = await api.resendPamWelcomeWhatsapp(id);
+      updatePaymentInState(updated);
+      toast.success('Bienvenida WhatsApp reenviada');
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Error al reenviar WhatsApp',
+      );
     }
   }
 
@@ -1620,6 +1694,14 @@ export function CrmPamPage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => void openExpiryNotices()}
+              >
+                <Mail className="mr-1 size-4" />
+                Avisos de vencimiento
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowMethodsManager(true)}
               >
                 Medios de pago
@@ -1646,6 +1728,104 @@ export function CrmPamPage() {
               </Button>
             </div>
           </div>
+
+          <Dialog
+            open={showExpiryNotices}
+            onOpenChange={(open) => {
+              setShowExpiryNotices(open);
+              if (!open) setExpiryPreview(null);
+            }}
+          >
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Avisos de vencimiento</DialogTitle>
+                <DialogDescription>
+                  Preview de miembros con pago confirmado, aviso pendiente y
+                  caducidad en los próximos{' '}
+                  {expiryPreview?.diasAntes ?? 5} días. El envío automático del
+                  cron está{' '}
+                  {expiryPreview?.autoEnabled ? 'activado' : 'desactivado'}{' '}
+                  por ahora (hasta integración MP).
+                </DialogDescription>
+              </DialogHeader>
+              {expiryPreviewLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando preview…</p>
+              ) : expiryPreview ? (
+                <div className="space-y-3">
+                  <p className="text-sm">
+                    <span className="font-medium">{expiryPreview.total}</span>{' '}
+                    destinatario{expiryPreview.total === 1 ? '' : 's'} elegible
+                    {expiryPreview.total === 1 ? '' : 's'}.
+                  </p>
+                  {expiryPreview.total === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay avisos pendientes en la ventana actual.
+                    </p>
+                  ) : (
+                    <div className="max-h-80 overflow-auto rounded-md border border-border/50">
+                      <table className="w-full text-left text-sm">
+                        <thead className="sticky top-0 bg-background text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Nombre</th>
+                            <th className="px-3 py-2 font-medium">Correo</th>
+                            <th className="px-3 py-2 font-medium">Plan</th>
+                            <th className="px-3 py-2 font-medium">Frec.</th>
+                            <th className="px-3 py-2 font-medium">MP</th>
+                            <th className="px-3 py-2 font-medium">Caduca</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/40">
+                          {expiryPreview.candidates.map((c) => (
+                            <tr key={c.id}>
+                              <td className="px-3 py-2">
+                                {c.nombres} {c.apellidos}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-xs">
+                                {c.correo}
+                              </td>
+                              <td className="px-3 py-2">{c.plan}</td>
+                              <td className="px-3 py-2">{c.frecuencia}</td>
+                              <td className="px-3 py-2">
+                                {c.mpStatus ?? '—'}
+                              </td>
+                              <td className="px-3 py-2">
+                                {formatDate(c.expiryDate)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={expiryPreviewLoading || expirySending}
+                      onClick={() => void openExpiryNotices()}
+                    >
+                      <RefreshCw className="mr-1 size-4" />
+                      Actualizar
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={
+                        expirySending ||
+                        expiryPreviewLoading ||
+                        expiryPreview.total === 0
+                      }
+                      onClick={() => void sendExpiryNotices()}
+                    >
+                      <Send className="mr-1 size-4" />
+                      {expirySending
+                        ? 'Enviando…'
+                        : `Enviar ${expiryPreview.total} aviso(s)`}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </DialogContent>
+          </Dialog>
 
           <Dialog
             open={showMethodsManager}
@@ -2150,6 +2330,16 @@ export function CrmPamPage() {
                           onClick={() => void resendWelcome(p.id)}
                         >
                           <Mail className="size-4" />
+                        </IconActionButton>
+                        <IconActionButton
+                          label="Reenviar bienvenida WhatsApp"
+                          disabled={
+                            !p.mpStatus ||
+                            !CONFIRMED_MP.includes(p.mpStatus)
+                          }
+                          onClick={() => void resendWelcomeWhatsapp(p.id)}
+                        >
+                          <MessageCircle className="size-4" />
                         </IconActionButton>
                         <IconActionButton
                           label="Vincular a este pago"

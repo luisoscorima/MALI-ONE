@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { EducacionLead, PamRegistration } from '@prisma/client';
 import { planToPamSegmentSlug } from '@mali-one/shared';
@@ -183,58 +183,110 @@ export class WhatsappCrmClientService {
   /**
    * Plantilla WhatsApp de bienvenida al confirmar pago (approved/authorized).
    * Requiere PAM_WA_WELCOME_TEMPLATE (= nombre exacto de plantilla APPROVED en área pam).
+   * Idempotente por id de registro salvo `force`.
    */
   async sendPamWelcomeIfNeeded(reg: PamRegistration): Promise<void> {
-    if (!this.configured) return;
+    await this.sendPamWelcomeTemplate(reg, { force: false, throwOnError: false });
+  }
+
+  /** Reenvío manual: ignora idempotencia y propaga errores al caller. */
+  async resendPamWelcomeWhatsapp(reg: PamRegistration): Promise<{
+    message_id?: string | null;
+  }> {
+    const result = await this.sendPamWelcomeTemplate(reg, {
+      force: true,
+      throwOnError: true,
+    });
+    return { message_id: result?.message_id ?? null };
+  }
+
+  private async sendPamWelcomeTemplate(
+    reg: PamRegistration,
+    opts: { force: boolean; throwOnError: boolean },
+  ): Promise<{ skipped?: boolean; reason?: string; message_id?: string } | null> {
+    if (!this.configured) {
+      if (opts.throwOnError) {
+        throw new BadRequestException(
+          'WhatsApp CRM no configurado (WHATSAPP_CRM_BASE_URL / TOKEN)',
+        );
+      }
+      return null;
+    }
 
     const templateName = String(
       this.config.get('PAM_WA_WELCOME_TEMPLATE') ?? '',
     ).trim();
     if (!templateName) {
+      if (opts.throwOnError) {
+        throw new BadRequestException(
+          'PAM_WA_WELCOME_TEMPLATE no configurado',
+        );
+      }
       this.logger.debug(
         'PAM_WA_WELCOME_TEMPLATE no configurado; omitiendo bienvenida WhatsApp',
       );
-      return;
+      return null;
     }
 
     if (
       !reg.mpStatus ||
       !(['approved', 'authorized'] as string[]).includes(reg.mpStatus)
     ) {
-      return;
+      if (opts.throwOnError) {
+        throw new BadRequestException(
+          'Solo se puede enviar bienvenida WA con pago confirmado (approved/authorized)',
+        );
+      }
+      return null;
     }
 
     const phone = this.toE164Pe(reg.celular);
     if (!phone) {
-      this.logger.warn(
-        `Bienvenida WA omitida: teléfono inválido en registro ${reg.id}`,
-      );
-      return;
+      const msg = `Teléfono inválido en registro ${reg.id}`;
+      if (opts.throwOnError) {
+        throw new BadRequestException(msg);
+      }
+      this.logger.warn(`Bienvenida WA omitida: ${msg}`);
+      return null;
     }
 
     try {
-      const result = (await this.request('POST', '/api/crm/send-template', {
+      const payload: Record<string, unknown> = {
         area: 'pam',
         phone,
         template_name: templateName,
-        idempotency_key: reg.id,
         body_params: [reg.nombres.trim()],
-      })) as { skipped?: boolean; reason?: string; message_id?: string };
+      };
+      if (!opts.force) {
+        payload.idempotency_key = reg.id;
+      }
+
+      const result = (await this.request(
+        'POST',
+        '/api/crm/send-template',
+        payload,
+      )) as { skipped?: boolean; reason?: string; message_id?: string };
 
       if (result?.skipped) {
         this.logger.debug(
           `Bienvenida WA ya enviada para ${reg.id} (${result.reason})`,
         );
-        return;
+        return result;
       }
 
       this.logger.log(`Bienvenida WA enviada para PamRegistration ${reg.id}`);
+      return result;
     } catch (err) {
-      this.logger.warn(
-        `Bienvenida WA fallida para ${reg.id}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
+      const message =
+        err instanceof Error ? err.message : String(err);
+      if (opts.throwOnError) {
+        if (err instanceof BadRequestException) throw err;
+        throw new BadRequestException(
+          `Bienvenida WA fallida: ${message}`,
+        );
+      }
+      this.logger.warn(`Bienvenida WA fallida para ${reg.id}: ${message}`);
+      return null;
     }
   }
 

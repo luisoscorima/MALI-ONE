@@ -560,6 +560,39 @@ export const api = {
       { method: 'POST' },
     ),
 
+  resendPamWelcomeWhatsapp: (id: string) =>
+    request<import('@mali-one/shared').PamRegistrationDto>(
+      `/api/pam/registrations/${id}/resend-welcome-whatsapp`,
+      { method: 'POST' },
+    ),
+
+  previewPamExpiryNotices: () =>
+    request<{
+      diasAntes: number;
+      autoEnabled: boolean;
+      windowFrom: string;
+      windowTo: string;
+      total: number;
+      candidates: Array<{
+        id: string;
+        nombres: string;
+        apellidos: string;
+        correo: string;
+        plan: string;
+        frecuencia: string;
+        mpStatus: string | null;
+        expiryDate: string;
+      }>;
+    }>('/api/pam/expiry-notices/preview'),
+
+  sendPamExpiryNotices: () =>
+    request<{
+      total: number;
+      sent: number;
+      errors: number;
+      skipped: number;
+    }>('/api/pam/expiry-notices/send', { method: 'POST' }),
+
   getMuseoPopup: () =>
     request<import('@mali-one/shared').MuseoPopupSettingsDto>(
       '/api/widgets/museo/popup',

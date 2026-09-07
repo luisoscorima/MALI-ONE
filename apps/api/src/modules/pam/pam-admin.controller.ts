@@ -77,4 +77,22 @@ export class PamAdminController {
   resendWelcome(@Param('id') id: string) {
     return this.service.resendWelcome(id);
   }
+
+  @Post('registrations/:id/resend-welcome-whatsapp')
+  @RequirePermission('pam.registros.manage')
+  resendWelcomeWhatsapp(@Param('id') id: string) {
+    return this.service.resendWelcomeWhatsapp(id);
+  }
+
+  @Get('expiry-notices/preview')
+  @RequirePermission('pam.registros.read')
+  previewExpiryNotices() {
+    return this.service.previewExpiryNotices();
+  }
+
+  @Post('expiry-notices/send')
+  @RequirePermission('pam.registros.manage')
+  sendExpiryNotices() {
+    return this.service.sendExpiryNoticesManual();
+  }
 }

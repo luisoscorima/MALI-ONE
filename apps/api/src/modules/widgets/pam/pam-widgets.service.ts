@@ -261,6 +261,22 @@ export class PamWidgetsService {
     return this.findRegistration(id);
   }
 
+  async resendWelcomeWhatsapp(id: string) {
+    const reg = await this.findRegistration(id);
+    if (!reg.mpStatus || !MP_CONFIRMED.includes(reg.mpStatus)) {
+      throw new BadRequestException(
+        'Solo se puede reenviar la bienvenida WA con pago confirmado (approved/authorized)',
+      );
+    }
+    try {
+      await this.crm.syncPamRegistrationAsync(reg);
+    } catch {
+      this.crm.syncPamRegistration(reg);
+    }
+    await this.crm.resendPamWelcomeWhatsapp(reg);
+    return this.findRegistration(id);
+  }
+
   async createRegistration(dto: CreatePamRegistrationDto, ip: string) {
     const key = `pam:reg:${ip}`;
     const count = await this.redis.client.incr(key);
@@ -388,6 +404,14 @@ export class PamWidgetsService {
   async processPendingEmails() {
     await this.email.sendPendingWelcomeEmails();
     await this.email.sendPendingExpiryNotices();
+  }
+
+  previewExpiryNotices() {
+    return this.email.previewExpiryNotices();
+  }
+
+  sendExpiryNoticesManual() {
+    return this.email.sendExpiryNoticesManual();
   }
 
   private calculateExpiryDate(
