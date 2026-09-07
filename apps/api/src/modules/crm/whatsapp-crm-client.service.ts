@@ -250,12 +250,16 @@ export class WhatsappCrmClientService {
       return null;
     }
 
+    // Mismos valores que el sync CRM: name + attr `plan`
+    const planAttr = String(reg.plan ?? '').trim();
+
     try {
       const payload: Record<string, unknown> = {
         area: 'pam',
         phone,
         template_name: templateName,
-        body_params: [reg.nombres.trim()],
+        // Plantilla: {{Nombre}}, {{Plan}} (= attr CRM slug `plan`)
+        body_params: [reg.nombres.trim(), planAttr || 'PAM'],
       };
       if (!opts.force) {
         payload.idempotency_key = reg.id;
