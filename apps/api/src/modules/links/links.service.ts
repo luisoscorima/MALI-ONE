@@ -19,6 +19,7 @@ import { QrExportFormat, QrService } from '../../core/qr/qr.service';
 import { RedisService } from '../../core/redis/redis.service';
 import { S3Service } from '../../core/s3/s3.service';
 import { UpdateQrStyleDto } from './dto/update-qr-style.dto';
+import { ensureWhatsappRef, stripWhatsappRef } from './whatsapp-ref.util';
 import archiver from 'archiver';
 import type { Writable } from 'node:stream';
 
@@ -192,8 +193,9 @@ export class LinksService {
     customSlug?: string,
     tags?: string[],
   ) {
-    const targetUrl = this.buildWhatsappUrl(phone, text);
     const slug = await this.resolveSlug(customSlug);
+    const textWithRef = ensureWhatsappRef(text, slug);
+    const targetUrl = this.buildWhatsappUrl(phone, textWithRef);
     const qrStyle = await this.initialQrStyle(user.id);
 
     const link = await this.prisma.shortLink.create({
@@ -309,7 +311,9 @@ export class LinksService {
       if (input.phone !== undefined || input.text !== undefined) {
         const current = this.parseWhatsappFromUrl(link.targetUrl);
         const phone = input.phone ?? current.phone;
-        const text = input.text !== undefined ? input.text : current.text;
+        const textRaw =
+          input.text !== undefined ? input.text : current.text;
+        const text = ensureWhatsappRef(textRaw, link.slug);
         data.targetUrl = this.buildWhatsappUrl(phone, text);
       }
     } else if (link.type === LinkType.URL) {
@@ -819,6 +823,84 @@ export class LinksService {
     }
 
     return `https://api.whatsapp.com/send?${params.toString()}`;
+  }
+
+  /** Catálogo WHATSAPP para mali-whatsapp (match por ref/texto). */
+  async listWhatsappCatalog(): Promise<
+    Array<{
+      slug: string;
+      text: string;
+      text_normalized: string;
+      tags: string[];
+      phone: string;
+    }>
+  > {
+    const links = await this.prisma.shortLink.findMany({
+      where: { type: LinkType.WHATSAPP },
+      orderBy: { slug: 'asc' },
+      select: { slug: true, targetUrl: true, tags: true },
+    });
+
+    return links.map((link) => {
+      const parsed = this.parseWhatsappFromUrl(link.targetUrl);
+      const text = String(parsed.text ?? '');
+      return {
+        slug: link.slug,
+        text,
+        text_normalized: this.normalizeWhatsappText(stripWhatsappRef(text)),
+        tags: link.tags,
+        phone: parsed.phone,
+      };
+    });
+  }
+
+  /**
+   * Añade/corrige ` · ref:{slug}` en todos los links WHATSAPP existentes.
+   * Idempotente: no cambia filas que ya tienen el ref correcto.
+   */
+  async backfillWhatsappRefs(): Promise<{
+    updated: number;
+    skipped: number;
+    total: number;
+  }> {
+    const links = await this.prisma.shortLink.findMany({
+      where: { type: LinkType.WHATSAPP },
+      select: { id: true, slug: true, targetUrl: true },
+    });
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const link of links) {
+      const current = this.parseWhatsappFromUrl(link.targetUrl);
+      if (!current.phone) {
+        skipped += 1;
+        continue;
+      }
+      const nextText = ensureWhatsappRef(current.text, link.slug);
+      const nextUrl = this.buildWhatsappUrl(current.phone, nextText);
+      if (nextUrl === link.targetUrl) {
+        skipped += 1;
+        continue;
+      }
+      await this.prisma.shortLink.update({
+        where: { id: link.id },
+        data: { targetUrl: nextUrl },
+      });
+      await this.refreshCache(link.slug, nextUrl);
+      updated += 1;
+    }
+
+    return { updated, skipped, total: links.length };
+  }
+
+  normalizeWhatsappText(text: string): string {
+    return String(text ?? '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async resolveSlug(customSlug?: string): Promise<string> {
