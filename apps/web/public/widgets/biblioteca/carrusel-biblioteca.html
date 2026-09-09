@@ -33,6 +33,23 @@
 			font-style: italic;
 		}
 
+		/* Permite interpolar el micro-movimiento de la imagen actual */
+		@property --drift-x {
+			syntax: '<percentage>';
+			inherits: false;
+			initial-value: 0%;
+		}
+		@property --drift-y {
+			syntax: '<percentage>';
+			inherits: false;
+			initial-value: 0%;
+		}
+		@property --drift-scale {
+			syntax: '<number>';
+			inherits: false;
+			initial-value: 1;
+		}
+
 		:root {
 			/* Base y escala del contenido (no afecta al fondo) */
 			--slide-width-base: min(30vw, 300px);
@@ -40,8 +57,13 @@
 			/* reduce solo el contenido ~70% */
 			--slide-width: calc(var(--slide-width-base) * var(--content-scale));
 			--slide-aspect: 9/16;
-			--slide-transition-duration: 800ms;
-			--slide-transition-easing: ease;
+			--slide-transition-duration: 900ms;
+			/* Easing cinematográfico (inspirado en coverflow/circular galleries) */
+			--slide-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
+			--slide-opacity-easing: linear;
+			--slide-opacity-duration: 320ms;
+			--side-opacity: 0.58;
+			--side-brightness: 0.74;
 
 			/* Separación para que header/footer no se superpongan al carrusel */
 			--header-gap: 40px;
@@ -248,6 +270,9 @@
 		.slide {
 			--slide-tx: 0px;
 			--slide-ty: 0vh;
+			--slide-tz: -180px;
+			--slide-rotY: 0deg;
+			--slide-scale: 0.88;
 			--padding: 0px;
 			--offset: 0;
 
@@ -256,60 +281,71 @@
 			aspect-ratio: var(--slide-aspect);
 			user-select: none;
 			perspective: 800px;
+			opacity: 0;
 
-			transform: perspective(1000px) translate3d(var(--slide-tx), var(--slide-ty), var(--slide-tz, 0)) rotateY(var(--slide-rotY)) scale(var(--slide-scale));
-			transition: transform var(--slide-transition-duration) var(--slide-transition-easing);
+			transform: perspective(1200px) translate3d(var(--slide-tx), var(--slide-ty), var(--slide-tz)) rotateY(var(--slide-rotY)) scale(var(--slide-scale));
+			transition:
+				transform var(--slide-transition-duration) var(--slide-transition-easing),
+				opacity var(--slide-opacity-duration) var(--slide-opacity-easing);
+			will-change: transform, opacity;
 		}
 
 		.slide[data-current] {
-			--slide-scale: 1.2;
-			--slide-tz: 0px;
+			--slide-scale: 1.22;
+			--slide-tz: 48px;
 			--slide-tx: 0px;
-			--slide-rotY: 0;
+			--slide-rotY: 0deg;
+			opacity: 1;
 			z-index: 30;
 
 			pointer-events: auto;
 		}
 
 		.slide[data-next] {
-			--slide-tx: calc(1 * var(--slide-width) * 1.3);
-			--slide-rotY: -45deg;
+			--slide-tx: calc(1 * var(--slide-width) * 1.28);
+			--slide-rotY: -38deg;
+			--slide-tz: -110px;
+			--slide-scale: 0.94;
+			opacity: var(--side-opacity);
 			z-index: 10;
-
 		}
 
 		.slide[data-previous] {
-			--slide-tx: calc(-1 * var(--slide-width) * 1.3);
-			--slide-rotY: 45deg;
+			--slide-tx: calc(-1 * var(--slide-width) * 1.28);
+			--slide-rotY: 38deg;
+			--slide-tz: -110px;
+			--slide-scale: 0.94;
+			opacity: var(--side-opacity);
 			z-index: 10;
-
 		}
 
 		.slide:not([data-current]) {
-			--slide-scale: 1;
-			--slide-tz: 0;
-			/* --slide-tx: calc(var(--offset) * var(--slide-width) * 1.05); */
-			/* --slide-rotY: calc(var(--dir) * -45deg); */
-
 			pointer-events: none;
 		}
 
 		.slide[data-current] {
 			& .slide--image {
-				filter: brightness(1);
+				filter: brightness(1) saturate(1.02);
 				overflow: visible;
+			}
+
+			& .slide__inner {
+				box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 			}
 		}
 
-		.slide:not([data-current]) {
+		.slide[data-previous],
+		.slide[data-next] {
 			& .slide--image {
-				filter: brightness(0.88);
+				filter: brightness(var(--side-brightness)) saturate(0.92);
 				overflow: hidden;
 			}
 		}
 
 		.slide:not([data-current]):not([data-next]):not([data-previous]) {
 			opacity: 0;
+			--slide-scale: 0.86;
+			--slide-tz: -200px;
 			pointer-events: none;
 		}
 
@@ -326,6 +362,8 @@
 			height: calc(100% - var(--padding));
 			transform-style: preserve-3d;
 			transform: rotateX(var(--rotX)) rotateY(var(--rotY));
+			border-radius: 2px;
+			transition: box-shadow var(--slide-transition-duration) var(--slide-transition-easing);
 		}
 
 		.slide--image__wrapper {
@@ -333,6 +371,7 @@
 			width: 100%;
 			height: 100%;
 			object-fit: contain;
+			overflow: hidden;
 		}
 
 		.slide--image {
@@ -343,8 +382,44 @@
 			position: absolute;
 			top: 50%;
 			left: 50%;
-			transform: translate(-50%, -50%) scale(1.25) translate3d(var(--bgPosX), var(--bgPosY), 0);
+			/* --drift*: micro-movimiento continuo (no pelea con el tilt del mouse) */
+			--drift-x: 0%;
+			--drift-y: 0%;
+			--drift-scale: 1;
+			transform:
+				translate(-50%, -50%)
+				scale(calc(1.25 * var(--drift-scale)))
+				translate3d(calc(var(--bgPosX) + var(--drift-x)), calc(var(--bgPosY) + var(--drift-y)), 0);
 			transition: filter var(--slide-transition-duration) var(--slide-transition-easing);
+			will-change: transform, filter;
+		}
+
+		.slide[data-current] .slide--image {
+			animation: slide-image-drift 9s ease-in-out infinite alternate;
+		}
+
+		@keyframes slide-image-drift {
+			from {
+				--drift-x: -0.6%;
+				--drift-y: 0.4%;
+				--drift-scale: 1;
+			}
+			to {
+				--drift-x: 0.8%;
+				--drift-y: -0.5%;
+				--drift-scale: 1.045;
+			}
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			:root {
+				--slide-transition-duration: 200ms;
+				--slide-opacity-duration: 120ms;
+			}
+
+			.slide[data-current] .slide--image {
+				animation: none;
+			}
 		}
 
 		.slide__bg {
@@ -358,8 +433,9 @@
 			z-index: -1;
 			pointer-events: none;
 
-			transition: opacity var(--slide-transition-duration) ease,
-				transform var(--slide-transition-duration) ease;
+			transition:
+				opacity var(--slide-transition-duration) var(--slide-transition-easing),
+				transform var(--slide-transition-duration) var(--slide-transition-easing);
 
 			&::before {
 				content: "";
@@ -377,11 +453,11 @@
 			}
 
 			&[data-previous] {
-				transform: translateX(-10%);
+				transform: translateX(-8%) scale(1.02);
 			}
 
 			&[data-next] {
-				transform: translateX(10%);
+				transform: translateX(8%) scale(1.02);
 			}
 		}
 
@@ -982,7 +1058,26 @@
 		let allSlideBgs = [];
 		let totalSlides = 0;
 		let isTransitioning = false;
-		let transitionMs = 800; // fallback
+		let transitionMs = 900; // fallback alineado con CSS
+		let autoplayTimer = null;
+		const AUTOPLAY_MS = 5500;
+		let autoplayPaused = false;
+
+		function stopAutoplay() {
+			if (autoplayTimer) {
+				clearInterval(autoplayTimer);
+				autoplayTimer = null;
+			}
+		}
+
+		function startAutoplay(autoNext) {
+			stopAutoplay();
+			if (totalSlides < 2) return;
+			autoplayTimer = setInterval(() => {
+				if (autoplayPaused || document.hidden) return;
+				autoNext();
+			}, AUTOPLAY_MS);
+		}
 
 		function init() {
 			// Capturamos todos los elementos de slide, info y fondo (sin atributos fijos en el HTML)
@@ -1016,6 +1111,7 @@
 				prev: document.querySelector(".slider--btn__prev"),
 				next: document.querySelector(".slider--btn__next")
 			};
+			const sliderEl = document.querySelector(".slider");
 
 			// Inicializamos tilt para cada slide e info
 			allSlides.forEach((slide, i) => {
@@ -1063,15 +1159,40 @@
 
 			loadSlideMediaForIndices(prevIndex, currentIndex, nextIndex);
 
-			// Asignamos los eventos a los botones
-			buttons.prev.addEventListener("click", change(-1));
-			buttons.next.addEventListener("click", change(1));
+			const goPrev = change(-1);
+			const goNext = change(1);
+			const onManualNav = (fn) => () => {
+				fn();
+				startAutoplay(goNext);
+			};
 
-			// --- AUTO-PLAY CADA 5 SEGUNDOS ---
-			const autoNext = change(1);
-			setInterval(() => {
-				autoNext();
-			}, 5000);
+			buttons.prev.addEventListener("click", onManualNav(goPrev));
+			buttons.next.addEventListener("click", onManualNav(goNext));
+
+			if (sliderEl) {
+				sliderEl.addEventListener("mouseenter", () => {
+					autoplayPaused = true;
+				});
+				sliderEl.addEventListener("mouseleave", () => {
+					autoplayPaused = false;
+				});
+				sliderEl.addEventListener("focusin", () => {
+					autoplayPaused = true;
+				});
+				sliderEl.addEventListener("focusout", () => {
+					if (!sliderEl.contains(document.activeElement)) {
+						autoplayPaused = false;
+					}
+				});
+			}
+
+			document.addEventListener("visibilitychange", () => {
+				if (!document.hidden) {
+					startAutoplay(goNext);
+				}
+			});
+
+			startAutoplay(goNext);
 		}
 
 		function setup() {
