@@ -26,7 +26,7 @@ enum AppModule {
   mailing
   newsletters
   crm_pam
-  todos
+  portfolio
   files
 }
 
@@ -43,6 +43,43 @@ enum TodoEffort {
   m
   l
   xl
+}
+
+enum PortfolioArea {
+  infraestructura
+  aplicaciones
+  datos
+  seguridad
+  contenidos
+  otros
+}
+
+enum PortfolioImpact {
+  low
+  medium
+  high
+}
+
+enum PortfolioProjectType {
+  estrategico
+  tactico
+  operativo
+  mejora
+  migracion
+  otro
+}
+
+enum TodoOrigin {
+  internal
+  request
+  incident
+}
+
+enum OperationalServiceStatus {
+  up
+  degraded
+  down
+  maintenance
 }
 
 enum ScreenCastMediaType {
@@ -93,9 +130,11 @@ model User {
   shortLinks     ShortLink[]
   auditLogs      AdminAuditLog[]    @relation("ActorAuditLogs")
   moduleAccess   UserModuleAccess[]
-  newsletters    Newsletter[]
-  emailCampaigns EmailCampaign[]
-  todoItems      TodoItem[]
+  newsletters         Newsletter[]
+  emailCampaigns      EmailCampaign[]
+  todoItems           TodoItem[]
+  portfolioProjects   PortfolioProject[]
+  operationalServices OperationalService[]
 }
 
 model UserModuleAccess {
@@ -578,34 +617,102 @@ model TodoStatus {
   updatedAt DateTime   @updatedAt
 }
 
+model PortfolioProjectStatus {
+  id        String             @id @default(cuid())
+  key       String             @unique
+  name      String
+  color     String?
+  isClosed  Boolean            @default(false)
+  sortOrder Int                @default(0)
+  projects  PortfolioProject[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+model PortfolioProject {
+  id          String                  @id @default(cuid())
+  name        String
+  detail      String?                 @db.Text
+  statusId    String
+  status      PortfolioProjectStatus  @relation(fields: [statusId], references: [id])
+  area        PortfolioArea           @default(otros)
+  projectType PortfolioProjectType    @default(otro)
+  stakeholder String?
+  impact      PortfolioImpact         @default(medium)
+  link        String?
+  targetAt    DateTime?
+  ownerId     String
+  owner       User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sortOrder   Int                     @default(0)
+  archivedAt  DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  tasks       TodoItem[]
+
+  @@index([ownerId])
+  @@index([statusId])
+  @@index([area])
+  @@index([projectType])
+  @@index([ownerId, statusId])
+  @@index([ownerId, archivedAt])
+  @@index([targetAt])
+}
+
 model TodoItem {
-  id               String       @id @default(cuid())
+  id               String           @id @default(cuid())
   title            String
-  detail           String?      @db.Text
+  detail           String?          @db.Text
   typeId           String?
-  type             TodoType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
-  priority         TodoPriority @default(medium)
+  type             TodoType?        @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  priority         TodoPriority     @default(medium)
   effort           TodoEffort?
   statusId         String
-  status           TodoStatus   @relation(fields: [statusId], references: [id])
+  status           TodoStatus       @relation(fields: [statusId], references: [id])
   ownerId          String
-  owner            User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  registeredAt     DateTime     @default(now())
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          PortfolioProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  area             PortfolioArea?
+  origin           TodoOrigin       @default(internal)
+  impact           PortfolioImpact  @default(medium)
+  link             String?
+  registeredAt     DateTime         @default(now())
   dueAt            DateTime?
-  statusChangedAt  DateTime     @default(now())
+  scheduledAt      DateTime?
+  statusChangedAt  DateTime         @default(now())
   completedAt      DateTime?
   archivedAt       DateTime?
-  sortOrder        Int          @default(0)
-  timeSpentMinutes Int          @default(0)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  sortOrder        Int              @default(0)
+  timeSpentMinutes Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   @@index([ownerId])
   @@index([statusId])
   @@index([dueAt])
+  @@index([scheduledAt])
   @@index([typeId])
+  @@index([projectId])
+  @@index([area])
+  @@index([origin])
   @@index([ownerId, statusId])
   @@index([ownerId, dueAt])
   @@index([ownerId, archivedAt])
+}
+
+model OperationalService {
+  id        String                    @id @default(cuid())
+  name      String
+  status    OperationalServiceStatus  @default(up)
+  notes     String?                   @db.Text
+  sortOrder Int                       @default(0)
+  ownerId   String
+  owner     User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([ownerId, sortOrder])
 }
 

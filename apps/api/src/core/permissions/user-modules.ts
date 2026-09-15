@@ -13,7 +13,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.bsale_reports,
   AppModule.newsletters,
   AppModule.crm_pam,
-  AppModule.todos,
+  AppModule.portfolio,
   AppModule.files,
 ];
 

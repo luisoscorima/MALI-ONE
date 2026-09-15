@@ -34,7 +34,7 @@ import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 import { NewslettersPage } from '@/pages/newsletters-page';
 import { CrmPamPage } from '@/pages/crm-pam-page';
 import { PresentacionPage } from '@/pages/presentacion-page';
-import { TodosPage } from '@/pages/todos-page';
+import { PortfolioPage } from '@/pages/portfolio-page';
 import { FilesPage } from '@/pages/files-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
@@ -50,8 +50,12 @@ function AuthenticatedApp() {
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
                   <Route index element={<DashboardPage />} />
-                  <Route element={<ModuleGuard module="todos" />}>
-                    <Route path="todos" element={<TodosPage />} />
+                  <Route element={<ModuleGuard module="portfolio" />}>
+                    <Route path="portfolio" element={<PortfolioPage />} />
+                    <Route
+                      path="todos"
+                      element={<Navigate to="/portfolio" replace />}
+                    />
                   </Route>
                   <Route element={<ModuleGuard module="links" />}>
                     <Route path="links" element={<LinksPage />} />

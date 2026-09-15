@@ -68,9 +68,10 @@ export const APP_MODULES: {
       'Contactos WhatsApp + ledger de pagos MP (manual) y envío de boletines.',
   },
   {
-    id: 'todos',
-    label: 'Pendientes',
-    description: 'Lista personal de tareas con vistas Kanban y calendario.',
+    id: 'portfolio',
+    label: 'Portafolio de área',
+    description:
+      'Proyectos, tareas, dashboard ejecutivo y estado operativo del área.',
   },
   {
     id: 'files',

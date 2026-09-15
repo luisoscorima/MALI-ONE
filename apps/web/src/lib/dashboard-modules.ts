@@ -27,8 +27,8 @@ export const moduleMeta: Record<
     accent: ModuleCardAccent;
   }
 > = {
-  todos: {
-    to: '/todos',
+  portfolio: {
+    to: '/portfolio',
     icon: ListTodo,
     group: 'general',
     accent: 'blue',

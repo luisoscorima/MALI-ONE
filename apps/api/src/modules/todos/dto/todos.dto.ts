@@ -12,7 +12,13 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { TodoEffort, TodoPriority } from '@prisma/client';
+import {
+  PortfolioArea,
+  PortfolioImpact,
+  TodoEffort,
+  TodoOrigin,
+  TodoPriority,
+} from '@prisma/client';
 
 function toOptionalBoolean(value: unknown): boolean | undefined {
   if (value === undefined || value === null || value === '') return undefined;
@@ -33,6 +39,18 @@ export class ListTodosQueryDto {
   @IsOptional()
   @IsString()
   typeId?: string;
+
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
+  @IsOptional()
+  @IsEnum(PortfolioArea)
+  area?: PortfolioArea;
+
+  @IsOptional()
+  @IsEnum(TodoOrigin)
+  origin?: TodoOrigin;
 
   @IsOptional()
   @IsEnum(TodoPriority)
@@ -84,8 +102,33 @@ export class CreateTodoItemDto {
   statusId?: string;
 
   @IsOptional()
+  @IsString()
+  projectId?: string | null;
+
+  @IsOptional()
+  @IsEnum(PortfolioArea)
+  area?: PortfolioArea | null;
+
+  @IsOptional()
+  @IsEnum(TodoOrigin)
+  origin?: TodoOrigin;
+
+  @IsOptional()
+  @IsEnum(PortfolioImpact)
+  impact?: PortfolioImpact;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  link?: string | null;
+
+  @IsOptional()
   @IsDateString()
   dueAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string | null;
 }
 
 export class UpdateTodoItemDto {
@@ -116,8 +159,33 @@ export class UpdateTodoItemDto {
   statusId?: string;
 
   @IsOptional()
+  @IsString()
+  projectId?: string | null;
+
+  @IsOptional()
+  @IsEnum(PortfolioArea)
+  area?: PortfolioArea | null;
+
+  @IsOptional()
+  @IsEnum(TodoOrigin)
+  origin?: TodoOrigin;
+
+  @IsOptional()
+  @IsEnum(PortfolioImpact)
+  impact?: PortfolioImpact;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  link?: string | null;
+
+  @IsOptional()
   @IsDateString()
   dueAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string | null;
 
   @IsOptional()
   @Type(() => Number)

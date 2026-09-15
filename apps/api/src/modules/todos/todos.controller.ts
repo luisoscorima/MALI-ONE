@@ -27,7 +27,7 @@ import {
 import { TodosService } from './todos.service';
 
 @Controller('todos')
-@RequireModule(AppModule.todos)
+@RequireModule(AppModule.portfolio)
 export class TodosController {
   constructor(private readonly todos: TodosService) {}
 

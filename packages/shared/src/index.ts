@@ -14,11 +14,32 @@ export type AppModule =
   | 'mailing'
   | 'newsletters'
   | 'crm_pam'
-  | 'todos'
+  | 'portfolio'
   | 'files';
 
 export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TodoEffort = 'xs' | 's' | 'm' | 'l' | 'xl';
+export type PortfolioArea =
+  | 'infraestructura'
+  | 'aplicaciones'
+  | 'datos'
+  | 'seguridad'
+  | 'contenidos'
+  | 'otros';
+export type PortfolioImpact = 'low' | 'medium' | 'high';
+export type PortfolioProjectType =
+  | 'estrategico'
+  | 'tactico'
+  | 'operativo'
+  | 'mejora'
+  | 'migracion'
+  | 'otro';
+export type TodoOrigin = 'internal' | 'request' | 'incident';
+export type OperationalServiceStatus =
+  | 'up'
+  | 'degraded'
+  | 'down'
+  | 'maintenance';
 
 export interface TodoTypeDto {
   id: string;
@@ -37,6 +58,44 @@ export interface TodoStatusDto {
   sortOrder: number;
 }
 
+export interface PortfolioProjectStatusDto {
+  id: string;
+  key: string;
+  name: string;
+  color: string | null;
+  isClosed: boolean;
+  sortOrder: number;
+}
+
+export interface PortfolioProjectSummaryDto {
+  id: string;
+  name: string;
+}
+
+export interface PortfolioProjectDto {
+  id: string;
+  name: string;
+  detail: string | null;
+  statusId: string;
+  status: PortfolioProjectStatusDto;
+  area: PortfolioArea;
+  projectType: PortfolioProjectType;
+  stakeholder: string | null;
+  impact: PortfolioImpact;
+  link: string | null;
+  targetAt: string | null;
+  ownerId: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  sortOrder: number;
+  archivedAt: string | null;
+  progress: number;
+  taskTotal: number;
+  taskDone: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface TodoItemDto {
   id: string;
   title: string;
@@ -50,8 +109,15 @@ export interface TodoItemDto {
   ownerId: string;
   ownerName?: string;
   ownerEmail?: string;
+  projectId: string | null;
+  project: PortfolioProjectSummaryDto | null;
+  area: PortfolioArea | null;
+  origin: TodoOrigin;
+  impact: PortfolioImpact;
+  link: string | null;
   registeredAt: string;
   dueAt: string | null;
+  scheduledAt: string | null;
   statusChangedAt: string;
   completedAt: string | null;
   archivedAt: string | null;
@@ -66,10 +132,49 @@ export interface TodoMetaDto {
   statuses: TodoStatusDto[];
 }
 
+export interface PortfolioMetaDto {
+  projectStatuses: PortfolioProjectStatusDto[];
+  areas: PortfolioArea[];
+}
+
+export interface PortfolioDashboardDto {
+  projectsActive: number;
+  projectsInProgress: number;
+  projectsPlanned: number;
+  projectsBlocked: number;
+  projectsClosed: number;
+  areaDistribution: { area: PortfolioArea; count: number; percent: number }[];
+  weekCompletedTasks: number;
+  weekTimeMinutes: number;
+  upcomingMilestones: {
+    kind: 'project' | 'task';
+    id: string;
+    title: string;
+    at: string;
+    projectName?: string | null;
+  }[];
+  weekCompletedTitles: string[];
+}
+
+export interface OperationalServiceDto {
+  id: string;
+  name: string;
+  status: OperationalServiceStatus;
+  notes: string | null;
+  sortOrder: number;
+  ownerId: string;
+  ownerName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ListTodosQuery {
   ownerId?: string;
   statusId?: string;
   typeId?: string;
+  projectId?: string;
+  area?: PortfolioArea;
+  origin?: TodoOrigin;
   priority?: TodoPriority;
   includeDone?: boolean;
   includeArchived?: boolean;
@@ -84,7 +189,13 @@ export interface CreateTodoItemDto {
   priority?: TodoPriority;
   effort?: TodoEffort | null;
   statusId?: string;
+  projectId?: string | null;
+  area?: PortfolioArea | null;
+  origin?: TodoOrigin;
+  impact?: PortfolioImpact;
+  link?: string | null;
   dueAt?: string | null;
+  scheduledAt?: string | null;
 }
 
 export interface UpdateTodoItemDto {
@@ -94,9 +205,68 @@ export interface UpdateTodoItemDto {
   priority?: TodoPriority;
   effort?: TodoEffort | null;
   statusId?: string;
+  projectId?: string | null;
+  area?: PortfolioArea | null;
+  origin?: TodoOrigin;
+  impact?: PortfolioImpact;
+  link?: string | null;
   dueAt?: string | null;
+  scheduledAt?: string | null;
   sortOrder?: number;
   archived?: boolean;
+}
+
+export interface ListProjectsQuery {
+  ownerId?: string;
+  statusId?: string;
+  area?: PortfolioArea;
+  includeArchived?: boolean;
+  includeClosed?: boolean;
+}
+
+export interface CreatePortfolioProjectDto {
+  name: string;
+  detail?: string;
+  statusId?: string;
+  area?: PortfolioArea;
+  projectType?: PortfolioProjectType;
+  stakeholder?: string | null;
+  impact?: PortfolioImpact;
+  link?: string | null;
+  targetAt?: string | null;
+}
+
+export interface UpdatePortfolioProjectDto {
+  name?: string;
+  detail?: string | null;
+  statusId?: string;
+  area?: PortfolioArea;
+  projectType?: PortfolioProjectType;
+  stakeholder?: string | null;
+  impact?: PortfolioImpact;
+  link?: string | null;
+  targetAt?: string | null;
+  sortOrder?: number;
+  archived?: boolean;
+}
+
+export interface ReorderProjectsDto {
+  statusId: string;
+  orderedIds: string[];
+}
+
+export interface CreateOperationalServiceDto {
+  name: string;
+  status?: OperationalServiceStatus;
+  notes?: string | null;
+  sortOrder?: number;
+}
+
+export interface UpdateOperationalServiceDto {
+  name?: string;
+  status?: OperationalServiceStatus;
+  notes?: string | null;
+  sortOrder?: number;
 }
 
 export interface ReorderTodosDto {

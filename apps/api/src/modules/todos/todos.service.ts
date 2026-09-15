@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -6,8 +7,11 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import {
+  PortfolioArea,
+  PortfolioImpact,
   Prisma,
   TodoEffort,
+  TodoOrigin,
   TodoPriority,
   User,
   UserRole,
@@ -25,11 +29,20 @@ import {
   UpdateTodoTypeDto,
 } from './dto/todos.dto';
 
+const LEGACY_TYPE_NAMES = new Set([
+  'general',
+  'operaciones',
+  'contenido',
+  'sistemas',
+]);
+
 const DEFAULT_TYPES = [
-  { name: 'General', color: '#64748b', sortOrder: 0 },
-  { name: 'Operaciones', color: '#2563eb', sortOrder: 1 },
-  { name: 'Contenido', color: '#7c3aed', sortOrder: 2 },
-  { name: 'Sistemas', color: '#059669', sortOrder: 3 },
+  { name: 'Proyecto', color: '#22c55e', sortOrder: 0 },
+  { name: 'Mejora', color: '#3b82f6', sortOrder: 1 },
+  { name: 'Soporte', color: '#eab308', sortOrder: 2 },
+  { name: 'Incidente', color: '#ef4444', sortOrder: 3 },
+  { name: 'Investigación', color: '#a855f7', sortOrder: 4 },
+  { name: 'Reunión', color: '#94a3b8', sortOrder: 5 },
 ];
 
 const DEFAULT_STATUSES = [
@@ -66,6 +79,7 @@ const DEFAULT_STATUSES = [
 const itemInclude = {
   type: true,
   status: true,
+  project: { select: { id: true, name: true } },
   owner: { select: { id: true, name: true, email: true } },
 } as const;
 
@@ -102,10 +116,21 @@ export class TodosService implements OnModuleInit {
         this.prisma.todoType.delete({ where: { id: row.id } }),
       ]);
     }
+
     for (const def of DEFAULT_TYPES) {
       if (!keepers.has(def.name.toLowerCase())) {
         const created = await this.prisma.todoType.create({ data: def });
         keepers.set(def.name.toLowerCase(), created.id);
+      }
+    }
+
+    // Deactivate legacy catalog types without deleting FKs
+    for (const row of await this.prisma.todoType.findMany()) {
+      if (LEGACY_TYPE_NAMES.has(row.name.trim().toLowerCase()) && row.active) {
+        await this.prisma.todoType.update({
+          where: { id: row.id },
+          data: { active: false },
+        });
       }
     }
   }
@@ -144,6 +169,9 @@ export class TodosService implements OnModuleInit {
 
     if (query.statusId) where.statusId = query.statusId;
     if (query.typeId) where.typeId = query.typeId;
+    if (query.projectId) where.projectId = query.projectId;
+    if (query.area) where.area = query.area;
+    if (query.origin) where.origin = query.origin;
     if (query.priority) where.priority = query.priority;
 
     const includeArchived = query.includeArchived === true;
@@ -187,6 +215,10 @@ export class TodosService implements OnModuleInit {
       throw new NotFoundException('No hay estados configurados');
     }
     if (dto.typeId) await this.assertType(dto.typeId);
+    const projectId = dto.projectId ?? null;
+    const origin = dto.origin ?? TodoOrigin.internal;
+    this.assertProjectRule(projectId, origin);
+    if (projectId) await this.assertProject(user, projectId);
 
     const sortOrder = await this.nextSortOrder(user.id, status.id);
     const now = new Date();
@@ -200,7 +232,13 @@ export class TodosService implements OnModuleInit {
         effort: dto.effort ?? null,
         statusId: status.id,
         ownerId: user.id,
+        projectId,
+        area: dto.area ?? null,
+        origin,
+        impact: dto.impact ?? PortfolioImpact.medium,
+        link: dto.link?.trim() || null,
         dueAt: dto.dueAt ? new Date(dto.dueAt) : null,
+        scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         sortOrder,
         completedAt: status.isDone ? now : null,
         statusChangedAt: now,
@@ -216,6 +254,12 @@ export class TodosService implements OnModuleInit {
       ? await this.assertStatus(dto.statusId)
       : existing.status;
     if (dto.typeId) await this.assertType(dto.typeId);
+
+    const nextProjectId =
+      dto.projectId !== undefined ? dto.projectId : existing.projectId;
+    const nextOrigin = dto.origin !== undefined ? dto.origin : existing.origin;
+    this.assertProjectRule(nextProjectId, nextOrigin);
+    if (nextProjectId) await this.assertProject(user, nextProjectId);
 
     const statusChanging =
       dto.statusId !== undefined && dto.statusId !== existing.statusId;
@@ -252,8 +296,16 @@ export class TodosService implements OnModuleInit {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
         ...(dto.effort !== undefined ? { effort: dto.effort } : {}),
         ...(dto.statusId !== undefined ? { statusId: dto.statusId } : {}),
+        ...(dto.projectId !== undefined ? { projectId: dto.projectId } : {}),
+        ...(dto.area !== undefined ? { area: dto.area } : {}),
+        ...(dto.origin !== undefined ? { origin: dto.origin } : {}),
+        ...(dto.impact !== undefined ? { impact: dto.impact } : {}),
+        ...(dto.link !== undefined ? { link: dto.link?.trim() || null } : {}),
         ...(dto.dueAt !== undefined
           ? { dueAt: dto.dueAt ? new Date(dto.dueAt) : null }
+          : {}),
+        ...(dto.scheduledAt !== undefined
+          ? { scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null }
           : {}),
         ...(sortOrder !== undefined ? { sortOrder } : {}),
         ...(completedAt !== undefined ? { completedAt } : {}),
@@ -445,6 +497,28 @@ export class TodosService implements OnModuleInit {
     return row;
   }
 
+  private assertProjectRule(
+    projectId: string | null | undefined,
+    origin: TodoOrigin,
+  ) {
+    if (!projectId && origin !== TodoOrigin.incident) {
+      throw new BadRequestException(
+        'Las tareas deben pertenecer a un proyecto, salvo incidentes de operación',
+      );
+    }
+  }
+
+  private async assertProject(user: User, id: string) {
+    const row = await this.prisma.portfolioProject.findUnique({
+      where: { id },
+    });
+    if (!row) throw new NotFoundException('Proyecto no encontrado');
+    if (user.role !== UserRole.admin && row.ownerId !== user.id) {
+      throw new ForbiddenException('No tienes acceso a este proyecto');
+    }
+    return row;
+  }
+
   private mapType(row: {
     id: string;
     name: string;
@@ -504,8 +578,15 @@ export class TodosService implements OnModuleInit {
     };
     ownerId: string;
     owner: { id: string; name: string; email: string };
+    projectId: string | null;
+    project: { id: string; name: string } | null;
+    area: PortfolioArea | null;
+    origin: TodoOrigin;
+    impact: PortfolioImpact;
+    link: string | null;
     registeredAt: Date;
     dueAt: Date | null;
+    scheduledAt: Date | null;
     statusChangedAt: Date;
     completedAt: Date | null;
     archivedAt: Date | null;
@@ -527,8 +608,17 @@ export class TodosService implements OnModuleInit {
       ownerId: item.ownerId,
       ownerName: item.owner.name,
       ownerEmail: item.owner.email,
+      projectId: item.projectId,
+      project: item.project
+        ? { id: item.project.id, name: item.project.name }
+        : null,
+      area: item.area,
+      origin: item.origin,
+      impact: item.impact,
+      link: item.link,
       registeredAt: item.registeredAt.toISOString(),
       dueAt: item.dueAt?.toISOString() ?? null,
+      scheduledAt: item.scheduledAt?.toISOString() ?? null,
       statusChangedAt: item.statusChangedAt.toISOString(),
       completedAt: item.completedAt?.toISOString() ?? null,
       archivedAt: item.archivedAt?.toISOString() ?? null,

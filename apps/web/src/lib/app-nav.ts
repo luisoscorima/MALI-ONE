@@ -40,7 +40,7 @@ export const appNavSections: AppNavSection[] = [
     label: 'General',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/todos', label: 'Pendientes', icon: ListTodo, module: 'todos' },
+      { to: '/portfolio', label: 'Portafolio de área', icon: ListTodo, module: 'portfolio' },
     ],
   },
   {

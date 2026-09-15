@@ -1,18 +1,21 @@
 /**
- * Seed de catálogos TODO (tipos y estados).
+ * Seed de catálogos Portafolio (tipos/estados de tarea + estados de proyecto).
  * Uso: pnpm --filter @mali-one/api prisma:seed:todos
- * También se auto-siembra al primer GET /api/todos/meta si faltan filas.
  */
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const DEFAULT_TYPES = [
-  { name: 'General', color: '#64748b', sortOrder: 0 },
-  { name: 'Operaciones', color: '#2563eb', sortOrder: 1 },
-  { name: 'Contenido', color: '#7c3aed', sortOrder: 2 },
-  { name: 'Sistemas', color: '#059669', sortOrder: 3 },
+  { name: 'Proyecto', color: '#22c55e', sortOrder: 0 },
+  { name: 'Mejora', color: '#3b82f6', sortOrder: 1 },
+  { name: 'Soporte', color: '#eab308', sortOrder: 2 },
+  { name: 'Incidente', color: '#ef4444', sortOrder: 3 },
+  { name: 'Investigación', color: '#a855f7', sortOrder: 4 },
+  { name: 'Reunión', color: '#94a3b8', sortOrder: 5 },
 ];
+
+const LEGACY_TYPES = ['General', 'Operaciones', 'Contenido', 'Sistemas'];
 
 const DEFAULT_STATUSES = [
   { key: 'pending', name: 'Pendiente', color: '#94a3b8', isDone: false, sortOrder: 0 },
@@ -21,12 +24,26 @@ const DEFAULT_STATUSES = [
   { key: 'done', name: 'Hecho', color: '#22c55e', isDone: true, sortOrder: 3 },
 ];
 
+const DEFAULT_PROJECT_STATUSES = [
+  { key: 'backlog', name: 'Backlog', color: '#94a3b8', isClosed: false, sortOrder: 0 },
+  { key: 'planned', name: 'Planificado', color: '#eab308', isClosed: false, sortOrder: 1 },
+  { key: 'active', name: 'En ejecución', color: '#22c55e', isClosed: false, sortOrder: 2 },
+  { key: 'blocked', name: 'Bloqueado', color: '#ef4444', isClosed: false, sortOrder: 3 },
+  { key: 'closed', name: 'Cerrado', color: '#64748b', isClosed: true, sortOrder: 4 },
+];
+
 async function main() {
   for (const type of DEFAULT_TYPES) {
     await prisma.todoType.upsert({
       where: { name: type.name },
       create: type,
-      update: {},
+      update: { color: type.color, sortOrder: type.sortOrder, active: true },
+    });
+  }
+  for (const name of LEGACY_TYPES) {
+    await prisma.todoType.updateMany({
+      where: { name },
+      data: { active: false },
     });
   }
   console.log(`Upserted ${DEFAULT_TYPES.length} todo types`);
@@ -39,6 +56,15 @@ async function main() {
     });
   }
   console.log(`Upserted ${DEFAULT_STATUSES.length} todo statuses`);
+
+  for (const status of DEFAULT_PROJECT_STATUSES) {
+    await prisma.portfolioProjectStatus.upsert({
+      where: { key: status.key },
+      create: status,
+      update: {},
+    });
+  }
+  console.log(`Upserted ${DEFAULT_PROJECT_STATUSES.length} project statuses`);
 }
 
 main()

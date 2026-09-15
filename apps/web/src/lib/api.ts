@@ -1127,11 +1127,96 @@ export const api = {
   getTodoMeta: () =>
     request<import('@mali-one/shared').TodoMetaDto>('/api/todos/meta'),
 
+  getPortfolioMeta: () =>
+    request<import('@mali-one/shared').PortfolioMetaDto>('/api/portfolio/meta'),
+
+  getPortfolioDashboard: (ownerId?: string) => {
+    const qs = ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : '';
+    return request<import('@mali-one/shared').PortfolioDashboardDto>(
+      `/api/portfolio/dashboard${qs}`,
+    );
+  },
+
+  listProjects: (params?: import('@mali-one/shared').ListProjectsQuery) => {
+    const qs = new URLSearchParams();
+    if (params?.ownerId) qs.set('ownerId', params.ownerId);
+    if (params?.statusId) qs.set('statusId', params.statusId);
+    if (params?.area) qs.set('area', params.area);
+    if (params?.includeArchived !== undefined) {
+      qs.set('includeArchived', String(params.includeArchived));
+    }
+    if (params?.includeClosed !== undefined) {
+      qs.set('includeClosed', String(params.includeClosed));
+    }
+    const query = qs.toString();
+    return request<import('@mali-one/shared').PortfolioProjectDto[]>(
+      `/api/portfolio/projects${query ? `?${query}` : ''}`,
+    );
+  },
+
+  createProject: (body: import('@mali-one/shared').CreatePortfolioProjectDto) =>
+    request<import('@mali-one/shared').PortfolioProjectDto>(
+      '/api/portfolio/projects',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateProject: (
+    id: string,
+    body: import('@mali-one/shared').UpdatePortfolioProjectDto,
+  ) =>
+    request<import('@mali-one/shared').PortfolioProjectDto>(
+      `/api/portfolio/projects/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  reorderProjects: (body: import('@mali-one/shared').ReorderProjectsDto) =>
+    request<{ ok: boolean }>('/api/portfolio/projects/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteProject: (id: string) =>
+    request<{ ok: boolean }>(`/api/portfolio/projects/${id}`, {
+      method: 'DELETE',
+    }),
+
+  listOperationalServices: (ownerId?: string) => {
+    const qs = ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : '';
+    return request<import('@mali-one/shared').OperationalServiceDto[]>(
+      `/api/portfolio/services${qs}`,
+    );
+  },
+
+  createOperationalService: (
+    body: import('@mali-one/shared').CreateOperationalServiceDto,
+  ) =>
+    request<import('@mali-one/shared').OperationalServiceDto>(
+      '/api/portfolio/services',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateOperationalService: (
+    id: string,
+    body: import('@mali-one/shared').UpdateOperationalServiceDto,
+  ) =>
+    request<import('@mali-one/shared').OperationalServiceDto>(
+      `/api/portfolio/services/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+
+  deleteOperationalService: (id: string) =>
+    request<{ ok: boolean }>(`/api/portfolio/services/${id}`, {
+      method: 'DELETE',
+    }),
+
   listTodos: (params?: import('@mali-one/shared').ListTodosQuery) => {
     const qs = new URLSearchParams();
     if (params?.ownerId) qs.set('ownerId', params.ownerId);
     if (params?.statusId) qs.set('statusId', params.statusId);
     if (params?.typeId) qs.set('typeId', params.typeId);
+    if (params?.projectId) qs.set('projectId', params.projectId);
+    if (params?.area) qs.set('area', params.area);
+    if (params?.origin) qs.set('origin', params.origin);
     if (params?.priority) qs.set('priority', params.priority);
     if (params?.includeDone !== undefined) {
       qs.set('includeDone', String(params.includeDone));
