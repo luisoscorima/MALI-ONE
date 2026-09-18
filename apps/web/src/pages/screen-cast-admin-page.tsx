@@ -230,16 +230,47 @@ function MonitorAvatar({
   photoUrl?: string | null;
   className?: string;
 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   if (photoUrl) {
     return (
-      <img
-        src={photoUrl}
-        alt=""
-        className={cn(
-          'size-7 rounded-full border border-background object-cover',
-          className,
-        )}
-      />
+      <>
+        <button
+          type="button"
+          title={`Ver foto de ${name}`}
+          aria-label={`Ver foto de ${name}`}
+          className={cn(
+            'size-7 shrink-0 overflow-hidden rounded-full border border-background transition-opacity hover:opacity-90',
+            className,
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            setPreviewOpen(true);
+          }}
+        >
+          <img
+            src={photoUrl}
+            alt=""
+            className="size-full object-cover"
+            draggable={false}
+          />
+        </button>
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-md gap-3 p-4 sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{name}</DialogTitle>
+              <DialogDescription className="sr-only">
+                Vista previa de la foto del monitor
+              </DialogDescription>
+            </DialogHeader>
+            <img
+              src={photoUrl}
+              alt={name}
+              className="max-h-[min(70vh,560px)] w-full rounded-md object-contain bg-muted"
+            />
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
   return (
@@ -1838,11 +1869,6 @@ export function ScreenCastAdminPage() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                {monitorDraft.orientation === 'PORTRAIT_FLIPPED' ? (
-                  <p className="text-xs text-muted-foreground">
-                    Para pantallas verticales instaladas al revés.
-                  </p>
-                ) : null}
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Playlist</Label>
