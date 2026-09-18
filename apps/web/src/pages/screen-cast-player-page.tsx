@@ -83,6 +83,9 @@ const VIDEO_COVER_MAX_MS = 2_500;
 /** How often a held slot re-checks whether its clip became playable. */
 const HOLD_RECHECK_MS = 3_000;
 
+/** Soft image→image blend; stays inside the new slide's clock slot. */
+const IMAGE_CROSSFADE_MS = 450;
+
 const MEDIA_FILL_STYLE: CSSProperties = {
   position: 'absolute',
   top: 0,
@@ -93,6 +96,12 @@ const MEDIA_FILL_STYLE: CSSProperties = {
   maxHeight: 'none',
   objectFit: 'fill',
   display: 'block',
+};
+
+type StillSlide = {
+  mediaUrl: string;
+  slideKey: string;
+  useCors: boolean;
 };
 
 function destroyVideo(video: HTMLVideoElement | null) {
@@ -247,6 +256,10 @@ export function ScreenCastPlayerPage() {
     vw: typeof window !== 'undefined' ? window.innerWidth : 1080,
     vh: typeof window !== 'undefined' ? window.innerHeight : 1920,
   }));
+  const [stillBack, setStillBack] = useState<StillSlide | null>(null);
+  const [stillFrontOpaque, setStillFrontOpaque] = useState(true);
+  const prevStillRef = useRef<StillSlide | null>(null);
+  const crossfadeClearRef = useRef<number | null>(null);
 
   const timerRef = useRef<number | null>(null);
   const heartbeatRef = useRef<number | null>(null);
@@ -1578,6 +1591,74 @@ export function ScreenCastPlayerPage() {
   const videoActive = videoVisible && !holdUi;
   const showHoldFrame =
     isVideoItem && videoHolding && !holdUi && !!holdFrameUrl;
+  const crossfadeOn = !!config?.crossfade;
+  const kenBurnsOn = !!config?.kenBurns;
+
+  useLayoutEffect(() => {
+    if (crossfadeClearRef.current != null) {
+      window.clearTimeout(crossfadeClearRef.current);
+      crossfadeClearRef.current = null;
+    }
+
+    if (!showImage || !current) {
+      prevStillRef.current = null;
+      setStillBack(null);
+      setStillFrontOpaque(true);
+      return;
+    }
+
+    const next: StillSlide = {
+      mediaUrl: current.mediaUrl,
+      slideKey: `${current.mediaUrl}-${index}`,
+      useCors: isCorsCacheableMediaUrl(current.mediaUrl),
+    };
+    const outgoing = prevStillRef.current;
+    const shouldFade =
+      crossfadeOn &&
+      !!outgoing &&
+      outgoing.slideKey !== next.slideKey;
+
+    if (shouldFade) {
+      setStillBack(outgoing);
+      setStillFrontOpaque(false);
+      let nestedRaf = 0;
+      const raf = window.requestAnimationFrame(() => {
+        nestedRaf = window.requestAnimationFrame(() =>
+          setStillFrontOpaque(true),
+        );
+      });
+      crossfadeClearRef.current = window.setTimeout(() => {
+        setStillBack(null);
+        crossfadeClearRef.current = null;
+      }, IMAGE_CROSSFADE_MS + 80);
+      prevStillRef.current = next;
+      return () => {
+        window.cancelAnimationFrame(raf);
+        if (nestedRaf) window.cancelAnimationFrame(nestedRaf);
+      };
+    }
+
+    setStillBack(null);
+    setStillFrontOpaque(true);
+    prevStillRef.current = next;
+  }, [showImage, current?.mediaUrl, index, crossfadeOn]);
+
+  const kenBurnsStyle: CSSProperties | undefined = (() => {
+    if (!kenBurnsOn || !showImage || !current) return undefined;
+    const durationMs = Math.max(current.durationMs || 10_000, 1_000);
+    let offsetMs = 0;
+    const epoch = epochMsRef.current;
+    if (epoch != null) {
+      const pos = positionAt(durationsRef.current, epoch, nowServer());
+      if (pos && pos.index === index) {
+        offsetMs = Math.min(Math.max(0, pos.offsetMs), durationMs);
+      }
+    }
+    return {
+      ['--sc-kb-duration' as string]: `${durationMs}ms`,
+      ['--sc-kb-delay' as string]: `${-offsetMs}ms`,
+    };
+  })();
 
   const orientation = parseOrientation(config?.orientation);
 
@@ -1594,7 +1675,7 @@ export function ScreenCastPlayerPage() {
   return (
     <div className="screen-cast-player fixed inset-0 z-100 overflow-hidden bg-black text-white">
       <div
-        className="screen-cast-stage"
+        className="screen-cast-stage overflow-hidden"
         style={stageStyle(
           orientation,
           viewportPortrait,
@@ -1651,12 +1732,39 @@ export function ScreenCastPlayerPage() {
           />
         )}
 
+        {showImage && stillBack && (
+          <img
+            key={`back-${stillBack.slideKey}`}
+            src={stillBack.mediaUrl}
+            alt=""
+            style={{ ...MEDIA_FILL_STYLE, zIndex: 0 }}
+            draggable={false}
+            {...(stillBack.useCors
+              ? { crossOrigin: 'anonymous' as const }
+              : {})}
+          />
+        )}
+
         {showImage && current && (
           <img
-            key={`${current.mediaUrl}-${index}`}
+            key={`front-${current.mediaUrl}-${index}${kenBurnsOn ? `-g${playbackGen}` : ''}`}
             src={current.mediaUrl}
             alt=""
-            style={MEDIA_FILL_STYLE}
+            className={
+              kenBurnsOn
+                ? `screen-cast-kenburns screen-cast-kenburns-${index % 4}`
+                : undefined
+            }
+            style={{
+              ...MEDIA_FILL_STYLE,
+              ...kenBurnsStyle,
+              zIndex: 1,
+              opacity: stillFrontOpaque ? 1 : 0,
+              transition:
+                crossfadeOn && stillBack
+                  ? `opacity ${IMAGE_CROSSFADE_MS}ms ease`
+                  : undefined,
+            }}
             draggable={false}
             {...(imageUsesCors ? { crossOrigin: 'anonymous' as const } : {})}
             onError={handleImageError}

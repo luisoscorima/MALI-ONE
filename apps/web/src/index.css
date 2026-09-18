@@ -455,3 +455,64 @@ html.screen-cast-kiosk .screen-cast-stage video {
   max-width: none !important;
   max-height: none !important;
 }
+
+/* Subtle Ken Burns variants for still slides (synced via animation-delay). */
+@keyframes sc-kenburns-0 {
+  from {
+    transform: scale(1) translate(0%, 0%);
+  }
+  to {
+    transform: scale(1.06) translate(-1.2%, -0.8%);
+  }
+}
+
+@keyframes sc-kenburns-1 {
+  from {
+    transform: scale(1.06) translate(-1%, 0.6%);
+  }
+  to {
+    transform: scale(1) translate(0%, 0%);
+  }
+}
+
+@keyframes sc-kenburns-2 {
+  from {
+    transform: scale(1) translate(0%, 0%);
+  }
+  to {
+    transform: scale(1.06) translate(1.2%, -0.6%);
+  }
+}
+
+@keyframes sc-kenburns-3 {
+  from {
+    transform: scale(1.06) translate(0.8%, 1%);
+  }
+  to {
+    transform: scale(1) translate(0%, 0%);
+  }
+}
+
+.screen-cast-kenburns {
+  animation-duration: var(--sc-kb-duration, 10s);
+  animation-delay: var(--sc-kb-delay, 0s);
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform;
+}
+
+.screen-cast-kenburns-0 {
+  animation-name: sc-kenburns-0;
+}
+
+.screen-cast-kenburns-1 {
+  animation-name: sc-kenburns-1;
+}
+
+.screen-cast-kenburns-2 {
+  animation-name: sc-kenburns-2;
+}
+
+.screen-cast-kenburns-3 {
+  animation-name: sc-kenburns-3;
+}

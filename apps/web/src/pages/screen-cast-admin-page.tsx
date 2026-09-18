@@ -481,6 +481,8 @@ export function ScreenCastAdminPage() {
     null,
   );
   const [playlistName, setPlaylistName] = useState('');
+  const [playlistCrossfade, setPlaylistCrossfade] = useState(false);
+  const [playlistKenBurns, setPlaylistKenBurns] = useState(false);
   const [items, setItems] = useState<ScreenCastPlaylistItemDto[]>([]);
   const [loadingPlaylist, setLoadingPlaylist] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
@@ -535,6 +537,8 @@ export function ScreenCastAdminPage() {
       try {
         const data = await api.getScreenCastPlaylist(id);
         setPlaylistName(data.name);
+        setPlaylistCrossfade(data.crossfade ?? false);
+        setPlaylistKenBurns(data.kenBurns ?? false);
         setItems(data.items ?? []);
       } catch (e) {
         toast.error(
@@ -611,6 +615,8 @@ export function ScreenCastAdminPage() {
   function openCreatePlaylist() {
     setEditingPlaylistId(null);
     setPlaylistName('');
+    setPlaylistCrossfade(false);
+    setPlaylistKenBurns(false);
     setItems([]);
     setLoadingPlaylist(false);
     itemDialogOpenRef.current = false;
@@ -628,6 +634,8 @@ export function ScreenCastAdminPage() {
     setItemDialogOpen(false);
     setItemDraft(null);
     setItems([]);
+    setPlaylistCrossfade(false);
+    setPlaylistKenBurns(false);
   }
 
   async function ensurePlaylistSaved(): Promise<string | null> {
@@ -643,6 +651,8 @@ export function ScreenCastAdminPage() {
       const created = await api.createScreenCastPlaylist({
         name: trimmed,
         activo: true,
+        crossfade: playlistCrossfade,
+        kenBurns: playlistKenBurns,
       });
       setEditingPlaylistId(created.id);
       await loadLists();
@@ -669,11 +679,15 @@ export function ScreenCastAdminPage() {
         await api.createScreenCastPlaylist({
           name: trimmed,
           activo: true,
+          crossfade: playlistCrossfade,
+          kenBurns: playlistKenBurns,
         });
         toast.success('Playlist creada');
       } else {
         await api.updateScreenCastPlaylist(editingPlaylistId, {
           name: trimmed,
+          crossfade: playlistCrossfade,
+          kenBurns: playlistKenBurns,
         });
         toast.success('Playlist guardada');
       }
@@ -1516,6 +1530,22 @@ export function ScreenCastAdminPage() {
                     onChange={(e) => setPlaylistName(e.target.value)}
                   />
                 </div>
+
+                <SettingSwitchInline
+                  label="Animación entre imágenes (crossfade)"
+                  checked={playlistCrossfade}
+                  onCheckedChange={setPlaylistCrossfade}
+                  activeLabel="Activa"
+                  inactiveLabel="Inactiva"
+                />
+
+                <SettingSwitchInline
+                  label="Movimiento suave en cada imagen (Ken Burns)"
+                  checked={playlistKenBurns}
+                  onCheckedChange={setPlaylistKenBurns}
+                  activeLabel="Activa"
+                  inactiveLabel="Inactiva"
+                />
 
                 <div className="border-t pt-4">
                   <h4 className="mb-3 font-medium">Ítems ({items.length})</h4>

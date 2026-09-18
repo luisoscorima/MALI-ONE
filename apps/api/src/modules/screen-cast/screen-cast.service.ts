@@ -262,6 +262,8 @@ export class ScreenCastService {
       data: {
         name: dto.name.trim(),
         activo: dto.activo ?? true,
+        crossfade: dto.crossfade ?? false,
+        kenBurns: dto.kenBurns ?? false,
       },
     });
   }
@@ -287,6 +289,8 @@ export class ScreenCastService {
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.activo !== undefined ? { activo: dto.activo } : {}),
+        ...(dto.crossfade !== undefined ? { crossfade: dto.crossfade } : {}),
+        ...(dto.kenBurns !== undefined ? { kenBurns: dto.kenBurns } : {}),
       },
       include: {
         items: { orderBy: { sortOrder: 'asc' } },
@@ -316,6 +320,8 @@ export class ScreenCastService {
       data: {
         name: `${source.name} (copia)`,
         activo: source.activo,
+        crossfade: source.crossfade,
+        kenBurns: source.kenBurns,
         items: {
           create: source.items.map((item) => ({
             mediaUrl: item.mediaUrl,
@@ -453,6 +459,8 @@ export class ScreenCastService {
       where: { id: playlistId },
       select: {
         activo: true,
+        crossfade: true,
+        kenBurns: true,
         items: {
           where: { activo: true },
           orderBy: { sortOrder: 'asc' },
@@ -468,7 +476,9 @@ export class ScreenCastService {
       )
       .join('|');
     return createHash('sha1')
-      .update(`${playlist.activo ? 'on' : 'off'}#${items}`)
+      .update(
+        `${playlist.activo ? 'on' : 'off'}#${playlist.crossfade ? 'xf' : 'cut'}#${playlist.kenBurns ? 'kb' : 'still'}#${items}`,
+      )
       .digest('hex');
   }
 
@@ -747,6 +757,8 @@ export class ScreenCastService {
       empty,
       playlistId: playlist?.id ?? null,
       playlistName: playlist?.name ?? null,
+      crossfade: playlist?.crossfade ?? false,
+      kenBurns: playlist?.kenBurns ?? false,
       items: empty
         ? []
         : playlist!.items.map((item) => ({

@@ -615,7 +615,12 @@ export const api = {
       }
     >(`/api/screen-cast/playlists/${id}`),
 
-  createScreenCastPlaylist: (body: { name: string; activo?: boolean }) =>
+  createScreenCastPlaylist: (body: {
+    name: string;
+    activo?: boolean;
+    crossfade?: boolean;
+    kenBurns?: boolean;
+  }) =>
     request<import('@mali-one/shared').ScreenCastPlaylistDto>(
       '/api/screen-cast/playlists',
       { method: 'POST', body: JSON.stringify(body) },
@@ -623,7 +628,12 @@ export const api = {
 
   updateScreenCastPlaylist: (
     id: string,
-    body: { name?: string; activo?: boolean },
+    body: {
+      name?: string;
+      activo?: boolean;
+      crossfade?: boolean;
+      kenBurns?: boolean;
+    },
   ) =>
     request<import('@mali-one/shared').ScreenCastPlaylistDto>(
       `/api/screen-cast/playlists/${id}`,

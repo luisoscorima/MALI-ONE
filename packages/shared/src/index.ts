@@ -362,6 +362,10 @@ export interface ScreenCastPlaylistDto {
   id: string;
   name: string;
   activo: boolean;
+  /** Soft crossfade between still images (image/gif). */
+  crossfade: boolean;
+  /** Subtle Ken Burns zoom/pan while a still image is on screen. */
+  kenBurns: boolean;
   createdAt: string;
   updatedAt: string;
   items?: ScreenCastPlaylistItemDto[];
@@ -442,6 +446,10 @@ export interface ScreenCastPublicConfigDto {
   empty: boolean;
   playlistId: string | null;
   playlistName: string | null;
+  /** Soft crossfade between still images when the playlist enables it. */
+  crossfade: boolean;
+  /** Subtle Ken Burns zoom/pan while a still image is on screen. */
+  kenBurns: boolean;
   items: ScreenCastPublicItemDto[];
 }
 

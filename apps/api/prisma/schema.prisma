@@ -430,6 +430,8 @@ model ScreenCastPlaylist {
   id        String                       @id @default(cuid())
   name      String
   activo    Boolean                      @default(true)
+  crossfade Boolean                      @default(false)
+  kenBurns  Boolean                      @default(false)
   createdAt DateTime                     @default(now())
   updatedAt DateTime                     @updatedAt
   items     ScreenCastPlaylistItem[]

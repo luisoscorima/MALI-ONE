@@ -18,6 +18,14 @@ export class CreateScreenCastPlaylistDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  crossfade?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  kenBurns?: boolean;
 }
 
 export class UpdateScreenCastPlaylistDto {
@@ -29,6 +37,14 @@ export class UpdateScreenCastPlaylistDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  crossfade?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  kenBurns?: boolean;
 }
 
 export class CreateScreenCastPlaylistItemDto {
