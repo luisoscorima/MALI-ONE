@@ -328,7 +328,16 @@ export interface FilesConfigDto {
 
 export type ScreenCastMediaType = 'image' | 'video' | 'gif';
 
-export type ScreenCastOrientation = 'LANDSCAPE' | 'PORTRAIT';
+export type ScreenCastOrientation =
+  | 'LANDSCAPE'
+  | 'PORTRAIT'
+  | 'PORTRAIT_FLIPPED';
+
+export function isScreenCastPortrait(
+  orientation: ScreenCastOrientation | string | undefined,
+): boolean {
+  return orientation === 'PORTRAIT' || orientation === 'PORTRAIT_FLIPPED';
+}
 
 export interface ScreenCastPlaylistItemDto {
   id: string;

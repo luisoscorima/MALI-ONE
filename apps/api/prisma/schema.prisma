@@ -91,6 +91,7 @@ enum ScreenCastMediaType {
 enum ScreenCastOrientation {
   LANDSCAPE
   PORTRAIT
+  PORTRAIT_FLIPPED
 }
 
 enum PamEmailStatus {

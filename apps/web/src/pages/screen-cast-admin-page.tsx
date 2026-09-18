@@ -29,14 +29,15 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react';
-import type {
-  ScreenCastMediaType,
-  ScreenCastMonitorDto,
-  ScreenCastOrientation,
-  ScreenCastPlaylistDto,
-  ScreenCastPlaylistItemDto,
-  ScreenCastPlaylistMonitorRefDto,
-  ScreenCastPlaylistPreviewDto,
+import {
+  isScreenCastPortrait,
+  type ScreenCastMediaType,
+  type ScreenCastMonitorDto,
+  type ScreenCastOrientation,
+  type ScreenCastPlaylistDto,
+  type ScreenCastPlaylistItemDto,
+  type ScreenCastPlaylistMonitorRefDto,
+  type ScreenCastPlaylistPreviewDto,
 } from '@mali-one/shared';
 import { PageLoading, EmptyState, AlertBanner } from '@/components/feedback';
 import { ScreenCastMediaUrlField } from '@/components/screen-cast-media-url-field';
@@ -131,6 +132,12 @@ function emptyMonitorDraft(): MonitorDraft {
 
 function playerUrl(screenKey: string): string {
   return `${window.location.origin}/screen-cast?id=${encodeURIComponent(screenKey)}`;
+}
+
+function orientationLabel(orientation: ScreenCastOrientation): string {
+  if (orientation === 'PORTRAIT') return 'Vertical';
+  if (orientation === 'PORTRAIT_FLIPPED') return 'Vertical invertido';
+  return 'Horizontal';
 }
 
 function formatLastSeen(iso: string | null | undefined): string {
@@ -553,7 +560,9 @@ export function ScreenCastAdminPage() {
     }
     const assigned = monitors.filter((m) => m.playlistId === editingPlaylistId);
     return {
-      hasPortraitMonitors: assigned.some((m) => m.orientation === 'PORTRAIT'),
+      hasPortraitMonitors: assigned.some((m) =>
+        isScreenCastPortrait(m.orientation),
+      ),
       hasLandscapeMonitors: assigned.some((m) => m.orientation === 'LANDSCAPE'),
     };
   }, [editingPlaylistId, monitors]);
@@ -1241,9 +1250,7 @@ export function ScreenCastAdminPage() {
                           {m.screenKey}
                         </TableCell>
                         <TableCell>
-                          {m.orientation === 'PORTRAIT'
-                            ? 'Vertical'
-                            : 'Horizontal'}
+                          {orientationLabel(m.orientation)}
                         </TableCell>
                         <TableCell className="tabular-nums">
                           {slideLabel}
@@ -1405,7 +1412,7 @@ export function ScreenCastAdminPage() {
                   key={`${previewKey}-${previewMonitor.id}`}
                   className={cn(
                     'overflow-hidden rounded-lg border border-border bg-black shadow-sm',
-                    previewMonitor.orientation === 'PORTRAIT'
+                    isScreenCastPortrait(previewMonitor.orientation)
                       ? 'aspect-9/16 w-[min(100%,360px)]'
                       : 'aspect-video w-full max-w-4xl',
                   )}
@@ -1826,8 +1833,16 @@ export function ScreenCastAdminPage() {
                     <SelectItem value="PORTRAIT">
                       Vertical (Portrait)
                     </SelectItem>
+                    <SelectItem value="PORTRAIT_FLIPPED">
+                      Vertical invertido (Portrait flipped)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                {monitorDraft.orientation === 'PORTRAIT_FLIPPED' ? (
+                  <p className="text-xs text-muted-foreground">
+                    Para pantallas verticales instaladas al revés.
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label>Playlist</Label>

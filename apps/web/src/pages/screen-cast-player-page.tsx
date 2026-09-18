@@ -9,10 +9,11 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
-import type {
-  ScreenCastOrientation,
-  ScreenCastPublicConfigDto,
-  ScreenCastPublicItemDto,
+import {
+  isScreenCastPortrait,
+  type ScreenCastOrientation,
+  type ScreenCastPublicConfigDto,
+  type ScreenCastPublicItemDto,
 } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import {
@@ -163,8 +164,17 @@ function connectScreenCastSocket(screenKey: string): Socket {
   });
 }
 
+function parseOrientation(
+  raw: ScreenCastOrientation | string | undefined,
+): ScreenCastOrientation {
+  if (raw === 'PORTRAIT' || raw === 'PORTRAIT_FLIPPED' || raw === 'LANDSCAPE') {
+    return raw;
+  }
+  return 'LANDSCAPE';
+}
+
 function stageStyle(
-  isPortraitConfig: boolean,
+  orientation: ScreenCastOrientation,
   viewportPortrait: boolean,
   vw: number,
   vh: number,
@@ -179,16 +189,29 @@ function stageStyle(
     height: '100%',
   };
 
-  if (!isPortraitConfig) return fill;
-  if (viewportPortrait) return fill;
+  const isPortrait = isScreenCastPortrait(orientation);
+  const flipped = orientation === 'PORTRAIT_FLIPPED';
 
+  if (!isPortrait) return fill;
+
+  // Native portrait viewport: only the inverted mount needs a spin.
+  if (viewportPortrait) {
+    if (!flipped) return fill;
+    return {
+      ...fill,
+      transform: 'rotate(180deg)',
+      transformOrigin: 'center center',
+    };
+  }
+
+  // Landscape viewport (typical TV): 90° for portrait, 270° if hung upside down.
   return {
     position: 'absolute',
     width: `${vh}px`,
     height: `${vw}px`,
     top: `${(vh - vw) / 2}px`,
     left: `${(vw - vh) / 2}px`,
-    transform: 'rotate(90deg)',
+    transform: flipped ? 'rotate(270deg)' : 'rotate(90deg)',
     transformOrigin: 'center center',
   };
 }
@@ -1556,9 +1579,7 @@ export function ScreenCastPlayerPage() {
   const showHoldFrame =
     isVideoItem && videoHolding && !holdUi && !!holdFrameUrl;
 
-  const orientation: ScreenCastOrientation =
-    config?.orientation === 'PORTRAIT' ? 'PORTRAIT' : 'LANDSCAPE';
-  const isPortrait = orientation === 'PORTRAIT';
+  const orientation = parseOrientation(config?.orientation);
 
   function handleImageError(_e: SyntheticEvent<HTMLImageElement>) {
     emitStatus({
@@ -1575,7 +1596,7 @@ export function ScreenCastPlayerPage() {
       <div
         className="screen-cast-stage"
         style={stageStyle(
-          isPortrait,
+          orientation,
           viewportPortrait,
           viewportSize.vw,
           viewportSize.vh,
