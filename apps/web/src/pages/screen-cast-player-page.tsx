@@ -102,6 +102,31 @@ type StillSlide = {
   mediaUrl: string;
   slideKey: string;
   useCors: boolean;
+  /** Ken Burns variant (0–3) while this slide was front. */
+  kenVariant: number;
+};
+
+/** Keep in sync with `@keyframes sc-kenburns-*` in index.css. */
+function kenBurnsTransform(variant: number, progress: number): string {
+  const t = Math.min(1, Math.max(0, progress));
+  const paths = [
+    { from: { s: 1, x: 0, y: 0 }, to: { s: 1.06, x: -1.2, y: -0.8 } },
+    { from: { s: 1.06, x: -1, y: 0.6 }, to: { s: 1, x: 0, y: 0 } },
+    { from: { s: 1, x: 0, y: 0 }, to: { s: 1.06, x: 1.2, y: -0.6 } },
+    { from: { s: 1.06, x: 0.8, y: 1 }, to: { s: 1, x: 0, y: 0 } },
+  ] as const;
+  const path = paths[((variant % 4) + 4) % 4]!;
+  const s = path.from.s + (path.to.s - path.from.s) * t;
+  const x = path.from.x + (path.to.x - path.from.x) * t;
+  const y = path.from.y + (path.to.y - path.from.y) * t;
+  return `scale(${s}) translate(${x}%, ${y}%)`;
+}
+
+type KenBurnsAnim = {
+  slideKey: string;
+  variant: number;
+  durationMs: number;
+  delayMs: number;
 };
 
 function destroyVideo(video: HTMLVideoElement | null) {
@@ -257,7 +282,11 @@ export function ScreenCastPlayerPage() {
     vh: typeof window !== 'undefined' ? window.innerHeight : 1920,
   }));
   const [stillBack, setStillBack] = useState<StillSlide | null>(null);
+  const [stillBackTransform, setStillBackTransform] = useState<string | null>(
+    null,
+  );
   const [stillFrontOpaque, setStillFrontOpaque] = useState(true);
+  const [kenBurnsAnim, setKenBurnsAnim] = useState<KenBurnsAnim | null>(null);
   const prevStillRef = useRef<StillSlide | null>(null);
   const crossfadeClearRef = useRef<number | null>(null);
 
@@ -1603,7 +1632,9 @@ export function ScreenCastPlayerPage() {
     if (!showImage || !current) {
       prevStillRef.current = null;
       setStillBack(null);
+      setStillBackTransform(null);
       setStillFrontOpaque(true);
+      setKenBurnsAnim(null);
       return;
     }
 
@@ -1611,6 +1642,7 @@ export function ScreenCastPlayerPage() {
       mediaUrl: current.mediaUrl,
       slideKey: `${current.mediaUrl}-${index}`,
       useCors: isCorsCacheableMediaUrl(current.mediaUrl),
+      kenVariant: index % 4,
     };
     const outgoing = prevStillRef.current;
     const shouldFade =
@@ -1618,8 +1650,48 @@ export function ScreenCastPlayerPage() {
       !!outgoing &&
       outgoing.slideKey !== next.slideKey;
 
+    // Freeze Ken Burns timing once per slide so crossfade re-renders don't
+    // rewrite animation-delay (that was the mid-fade jump).
+    const durationMs = Math.max(current.durationMs || 10_000, 1_000);
+    let offsetMs = 0;
+    const epoch = epochMsRef.current;
+    if (epoch != null) {
+      const pos = positionAt(durationsRef.current, epoch, nowServer());
+      if (pos && pos.index === index) {
+        offsetMs = Math.min(Math.max(0, pos.offsetMs), durationMs);
+      }
+    }
+    if (kenBurnsOn) {
+      setKenBurnsAnim((prev) => {
+        if (
+          prev &&
+          prev.slideKey === next.slideKey &&
+          prev.durationMs === durationMs &&
+          prev.delayMs === -offsetMs &&
+          prev.variant === next.kenVariant
+        ) {
+          return prev;
+        }
+        return {
+          slideKey: next.slideKey,
+          variant: next.kenVariant,
+          durationMs,
+          delayMs: -offsetMs,
+        };
+      });
+    } else {
+      setKenBurnsAnim(null);
+    }
+
     if (shouldFade) {
+      // Outgoing was at the end of its Ken Burns path; keep that transform
+      // while it fades out so it doesn't snap back to scale(1).
       setStillBack(outgoing);
+      setStillBackTransform(
+        kenBurnsOn
+          ? kenBurnsTransform(outgoing.kenVariant, 1)
+          : null,
+      );
       setStillFrontOpaque(false);
       let nestedRaf = 0;
       const raf = window.requestAnimationFrame(() => {
@@ -1629,6 +1701,7 @@ export function ScreenCastPlayerPage() {
       });
       crossfadeClearRef.current = window.setTimeout(() => {
         setStillBack(null);
+        setStillBackTransform(null);
         crossfadeClearRef.current = null;
       }, IMAGE_CROSSFADE_MS + 80);
       prevStillRef.current = next;
@@ -1639,26 +1712,19 @@ export function ScreenCastPlayerPage() {
     }
 
     setStillBack(null);
+    setStillBackTransform(null);
     setStillFrontOpaque(true);
     prevStillRef.current = next;
-  }, [showImage, current?.mediaUrl, index, crossfadeOn]);
-
-  const kenBurnsStyle: CSSProperties | undefined = (() => {
-    if (!kenBurnsOn || !showImage || !current) return undefined;
-    const durationMs = Math.max(current.durationMs || 10_000, 1_000);
-    let offsetMs = 0;
-    const epoch = epochMsRef.current;
-    if (epoch != null) {
-      const pos = positionAt(durationsRef.current, epoch, nowServer());
-      if (pos && pos.index === index) {
-        offsetMs = Math.min(Math.max(0, pos.offsetMs), durationMs);
-      }
-    }
-    return {
-      ['--sc-kb-duration' as string]: `${durationMs}ms`,
-      ['--sc-kb-delay' as string]: `${-offsetMs}ms`,
-    };
-  })();
+  }, [
+    showImage,
+    current?.mediaUrl,
+    current?.durationMs,
+    index,
+    crossfadeOn,
+    kenBurnsOn,
+    playbackGen,
+    nowServer,
+  ]);
 
   const orientation = parseOrientation(config?.orientation);
 
@@ -1737,7 +1803,13 @@ export function ScreenCastPlayerPage() {
             key={`back-${stillBack.slideKey}`}
             src={stillBack.mediaUrl}
             alt=""
-            style={{ ...MEDIA_FILL_STYLE, zIndex: 0 }}
+            style={{
+              ...MEDIA_FILL_STYLE,
+              zIndex: 0,
+              ...(stillBackTransform
+                ? { transform: stillBackTransform }
+                : null),
+            }}
             draggable={false}
             {...(stillBack.useCors
               ? { crossOrigin: 'anonymous' as const }
@@ -1747,17 +1819,22 @@ export function ScreenCastPlayerPage() {
 
         {showImage && current && (
           <img
-            key={`front-${current.mediaUrl}-${index}${kenBurnsOn ? `-g${playbackGen}` : ''}`}
+            key={`front-${current.mediaUrl}-${index}`}
             src={current.mediaUrl}
             alt=""
             className={
-              kenBurnsOn
-                ? `screen-cast-kenburns screen-cast-kenburns-${index % 4}`
+              kenBurnsAnim
+                ? `screen-cast-kenburns screen-cast-kenburns-${kenBurnsAnim.variant}`
                 : undefined
             }
             style={{
               ...MEDIA_FILL_STYLE,
-              ...kenBurnsStyle,
+              ...(kenBurnsAnim
+                ? {
+                    ['--sc-kb-duration' as string]: `${kenBurnsAnim.durationMs}ms`,
+                    ['--sc-kb-delay' as string]: `${kenBurnsAnim.delayMs}ms`,
+                  }
+                : null),
               zIndex: 1,
               opacity: stillFrontOpaque ? 1 : 0,
               transition:
