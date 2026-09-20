@@ -11,7 +11,7 @@ type IconActionButtonProps = {
   label: string;
   onClick?: () => void;
   href?: string;
-  variant?: 'default' | 'outline' | 'ghost' | 'danger' | 'destructive';
+  variant?: 'default' | 'outline' | 'ghost' | 'secondary' | 'danger' | 'destructive';
   disabled?: boolean;
   children: ReactNode;
   className?: string;
@@ -102,8 +102,9 @@ export function FilterChip({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+        'rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         active
           ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border bg-muted/30 text-muted hover:border-primary/40 hover:bg-muted/50 hover:text-foreground',

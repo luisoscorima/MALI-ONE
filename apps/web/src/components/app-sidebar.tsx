@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps } from 'react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { MaliMark } from '@/components/mali-logo';
 import { NavMain } from '@/components/nav-main';
@@ -17,7 +19,16 @@ import {
 
 export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
   const { user, logout } = useAuth();
-  const sections = getVisibleNavSections(user);
+  const [search, setSearch] = useState('');
+  const query = search.trim().toLocaleLowerCase();
+  const sections = getVisibleNavSections(user)
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) =>
+        item.label.toLocaleLowerCase().includes(query),
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -37,10 +48,30 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <label className="grid gap-1 px-1 text-xs text-muted-foreground">
+          Buscar módulo
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Nombre del módulo"
+            className="min-w-0"
+          />
+        </label>
+        {search && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSearch('')}>
+            Limpiar búsqueda
+          </Button>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
         <NavMain sections={sections} />
+        {sections.length === 0 && (
+          <p role="status" className="px-4 py-3 text-sm text-muted-foreground">
+            Sin módulos coincidentes.
+          </p>
+        )}
       </SidebarContent>
 
       {user && (

@@ -78,7 +78,7 @@ function TagsField({
   return (
     <label className="block" htmlFor={id}>
       <span className="mb-2 block text-sm text-muted">
-        Tags (opcional, separados por coma)
+        Etiquetas (opcional, separadas por coma)
       </span>
       <Input
         id={id}
@@ -87,7 +87,7 @@ function TagsField({
         onChange={(e) => onChange(e.target.value)}
       />
       <p className="mt-1 text-xs text-muted">
-        Minúsculas, números, guiones y guiones bajos. Máx. 10 tags.
+        Minúsculas, números, guiones y guiones bajos. Máx. 10 etiquetas.
       </p>
     </label>
   );
@@ -103,6 +103,8 @@ export function LinksPage() {
   const [customSlug, setCustomSlug] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [file, setFile] = useState<File | null>(null);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -411,14 +413,28 @@ export function LinksPage() {
   }
 
   const allTags = [...new Set(links.flatMap((link) => link.tags))].sort();
-  const filteredLinks = tagFilter
-    ? links.filter((link) => link.tags.includes(tagFilter))
-    : links;
+  const query = search.trim().toLocaleLowerCase();
+  const hasFilters = !!(query || tagFilter || typeFilter !== 'all');
+  const filteredLinks = links.filter((link) =>
+    (!tagFilter || link.tags.includes(tagFilter)) &&
+    (typeFilter === 'all' || link.type === typeFilter) &&
+    (!query || [link.slug, link.shortUrl, link.targetUrl, link.fileName, ...link.tags]
+      .some((value) => value?.toLocaleLowerCase().includes(query))),
+  );
+  const visibleSelectedCount = filteredLinks.filter((link) => selectedIds.includes(link.id)).length;
+  const hiddenSelectedCount = selectedIds.length - visibleSelectedCount;
+  function resetFilters() {
+    setSearch('');
+    setTagFilter('');
+    setTypeFilter('all');
+  }
   const exportTargets = getExportTargets(filteredLinks);
   const exportScopeLabel =
     selectedIds.length > 0
-      ? `${exportTargets.length} seleccionado${exportTargets.length === 1 ? '' : 's'}`
-      : `todos los visibles: ${exportTargets.length}`;
+      ? hiddenSelectedCount > 0
+        ? `${visibleSelectedCount} visibles · ${hiddenSelectedCount} ocultos (no se exportan)`
+        : `Exportar ${visibleSelectedCount} seleccionados`
+      : `Exportar visibles: ${exportTargets.length}`;
 
   return (
     <div>
@@ -451,17 +467,23 @@ export function LinksPage() {
         <TabsContent value="url">
           <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleShorten}>
-            <Input
-              placeholder="https://ejemplo.com/pagina"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              required
-            />
-            <Input
-              placeholder="Slug personalizado (opcional)"
-              value={customSlug}
-              onChange={(e) => setCustomSlug(e.target.value)}
-            />
+            <label className="grid gap-2 text-sm">
+              <span>URL de destino</span>
+              <Input
+                placeholder="https://ejemplo.com/pagina"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-2 text-sm">
+              <span>Identificador personalizado (opcional)</span>
+              <Input
+                placeholder="ej. mi-campana"
+                value={customSlug}
+                onChange={(e) => setCustomSlug(e.target.value)}
+              />
+            </label>
             <TagsField
               id="tags-url"
               value={tagsInput}
@@ -490,12 +512,15 @@ export function LinksPage() {
         <TabsContent value="whatsapp">
           <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleWhatsapp}>
-            <Input
-              placeholder="Número con código de país (ej. 51987654321 o +51 987 654 321)"
-              value={whatsappPhone}
-              onChange={(e) => setWhatsappPhone(e.target.value)}
-              required
-            />
+            <label className="grid gap-2 text-sm">
+              <span>Número de WhatsApp con código de país</span>
+              <Input
+                placeholder="Número con código de país (ej. 51987654321 o +51 987 654 321)"
+                value={whatsappPhone}
+                onChange={(e) => setWhatsappPhone(e.target.value)}
+                required
+              />
+            </label>
             <label className="block">
               <span className="mb-2 block text-sm text-muted">
                 Mensaje prellenado (opcional)
@@ -507,11 +532,14 @@ export function LinksPage() {
                 rows={4}
               />
             </label>
-            <Input
-              placeholder="Slug personalizado (opcional)"
-              value={customSlug}
-              onChange={(e) => setCustomSlug(e.target.value)}
-            />
+            <label className="grid gap-2 text-sm">
+              <span>Identificador personalizado (opcional)</span>
+              <Input
+                placeholder="ej. mi-campana"
+                value={customSlug}
+                onChange={(e) => setCustomSlug(e.target.value)}
+              />
+            </label>
             <TagsField
               id="tags-whatsapp"
               value={tagsInput}
@@ -551,11 +579,14 @@ export function LinksPage() {
                 required
               />
             </label>
-            <Input
-              placeholder="Slug personalizado (opcional)"
-              value={customSlug}
-              onChange={(e) => setCustomSlug(e.target.value)}
-            />
+            <label className="grid gap-2 text-sm">
+              <span>Identificador personalizado (opcional)</span>
+              <Input
+                placeholder="ej. mi-campana"
+                value={customSlug}
+                onChange={(e) => setCustomSlug(e.target.value)}
+              />
+            </label>
             <TagsField
               id="tags-file"
               value={tagsInput}
@@ -607,7 +638,29 @@ export function LinksPage() {
               </div>
             )}
           </div>
-          {filteredLinks.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="grid min-w-0 flex-1 basis-64 gap-1 text-sm">
+              Buscar enlaces
+              <Input type="search" placeholder="Enlace, destino, archivo o etiqueta" value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+            <div className="grid gap-1 text-sm">
+              <label htmlFor="link-type-filter">Tipo</label>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger id="link-type-filter" className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  <SelectItem value="URL">URL</SelectItem>
+                  <SelectItem value="FILE">Archivo</SelectItem>
+                  <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {hasFilters && <Button type="button" variant="ghost" onClick={resetFilters}>Restablecer filtros</Button>}
+          </div>
+          <p role="status" className="mt-2 text-sm text-muted-foreground">
+            {listLoading ? 'Cargando enlaces…' : filteredLinks.length + ' de ' + links.length + ' enlaces'}
+          </p>
+          {(filteredLinks.length > 0 || selectedIds.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
               <span className="text-sm text-muted">{exportScopeLabel}</span>
               <Button
@@ -636,7 +689,7 @@ export function LinksPage() {
                 }
                 disabled={bulkDownloading || excelExporting}
               >
-                <SelectTrigger className="h-8 w-28">
+                <SelectTrigger aria-label="Formato de descarga de QR" className="h-8 w-28">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -675,7 +728,7 @@ export function LinksPage() {
                   disabled={bulkDownloading || excelExporting}
                   onClick={() => setSelectedIds([])}
                 >
-                  Limpiar
+                  Limpiar selección
                 </Button>
               )}
               {exportTargets.length > 50 && (
@@ -711,11 +764,11 @@ export function LinksPage() {
                     disabled={listLoading || filteredLinks.length === 0}
                   />
                 </TableHead>
-                <TableHead className="p-4">Slug</TableHead>
+                <TableHead className="p-4">Identificador</TableHead>
                 <TableHead className="p-4">Tipo</TableHead>
-                <TableHead className="p-4">Tags</TableHead>
+                <TableHead className="p-4">Etiquetas</TableHead>
                 <TableHead className="p-4">Destino</TableHead>
-                <TableHead className="p-4">Clicks</TableHead>
+                <TableHead className="p-4">Clics</TableHead>
                 <TableHead className="p-4">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -728,10 +781,10 @@ export function LinksPage() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <EmptyState
-                      title={tagFilter ? 'Sin enlaces con ese tag' : 'Sin enlaces todavía'}
+                      title={links.length > 0 ? 'Sin coincidencias' : 'Sin enlaces todavía'}
                       description={
-                        tagFilter
-                          ? 'Prueba otro tag o quita el filtro.'
+                        links.length > 0
+                          ? 'Prueba otra búsqueda o restablece los filtros.'
                           : 'Acorta una URL, crea un enlace de WhatsApp o sube un archivo para empezar.'
                       }
                     />
@@ -771,7 +824,7 @@ export function LinksPage() {
                                 : 'rounded bg-border px-2 py-0.5 text-xs'
                           }
                         >
-                          {link.type}
+                          {link.type === 'FILE' ? 'Archivo' : link.type === 'WHATSAPP' ? 'WhatsApp' : 'URL'}
                         </span>
                       </TableCell>
                       <TableCell className="p-4">
@@ -782,6 +835,7 @@ export function LinksPage() {
                                 key={tag}
                                 type="button"
                                 className="rounded-full border border-border bg-muted/30 px-2 py-0.5 text-xs hover:border-primary/40 hover:bg-muted/50"
+                                aria-pressed={tagFilter === tag}
                                 onClick={() => setTagFilter(tag)}
                               >
                                 #{tag}
@@ -863,8 +917,8 @@ export function LinksPage() {
           <DialogHeader>
             <DialogTitle>Editar enlace</DialogTitle>
             <DialogDescription>
-              El slug, URL corta y QR no cambian. Solo se actualiza el destino y
-              los tags.
+              El identificador, URL corta y QR no cambian. Solo se actualiza el destino y
+              las etiquetas.
             </DialogDescription>
           </DialogHeader>
 
@@ -872,18 +926,21 @@ export function LinksPage() {
               <form className="grid gap-3" onSubmit={handleSaveEdit}>
                 {editLink.link.type === 'WHATSAPP' && (
                   <>
-                    <Input
-                      placeholder="Número con código de país"
-                      value={editLink.phone}
-                      onChange={(e) =>
-                        setEditLink((current) =>
-                          current
-                            ? { ...current, phone: e.target.value }
-                            : null,
-                        )
-                      }
-                      required
-                    />
+                    <label className="grid gap-2 text-sm">
+                      <span>Número de WhatsApp con código de país</span>
+                      <Input
+                        placeholder="Número con código de país"
+                        value={editLink.phone}
+                        onChange={(e) =>
+                          setEditLink((current) =>
+                            current
+                              ? { ...current, phone: e.target.value }
+                              : null,
+                          )
+                        }
+                        required
+                      />
+                    </label>
                     <label className="block">
                       <span className="mb-2 block text-sm text-muted">
                         Mensaje prellenado
@@ -904,22 +961,25 @@ export function LinksPage() {
                 )}
 
                 {editLink.link.type === 'URL' && (
-                  <Input
-                    placeholder="https://ejemplo.com/pagina"
-                    value={editLink.url}
-                    onChange={(e) =>
-                      setEditLink((current) =>
-                        current ? { ...current, url: e.target.value } : null,
-                      )
-                    }
-                    required
-                  />
+                  <label className="grid gap-2 text-sm">
+                    <span>URL de destino</span>
+                    <Input
+                      placeholder="https://ejemplo.com/pagina"
+                      value={editLink.url}
+                      onChange={(e) =>
+                        setEditLink((current) =>
+                          current ? { ...current, url: e.target.value } : null,
+                        )
+                      }
+                      required
+                    />
+                  </label>
                 )}
 
                 {editLink.link.type === 'FILE' && (
                   <p className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted">
                     Archivo: {editLink.link.fileName ?? editLink.link.slug}. Solo
-                    puedes editar los tags.
+                    puedes editar las etiquetas.
                   </p>
                 )}
 
@@ -1018,7 +1078,7 @@ export function LinksPage() {
           <DialogHeader className="shrink-0 px-4 pt-4">
             <DialogTitle>Estadísticas del enlace</DialogTitle>
             <DialogDescription>
-              Clicks y escaneos por día, dispositivos y navegadores
+              Clics y escaneos por día, dispositivos y navegadores
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">

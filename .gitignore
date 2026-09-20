@@ -6,6 +6,7 @@ dist
 .DS_Store
 coverage
 .turbo
+*.tsbuildinfo
 apps/api/prisma/*.db
 secrets/
 google-sa.json

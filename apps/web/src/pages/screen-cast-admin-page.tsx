@@ -1,3 +1,5 @@
+import { PageHeader } from '@/components/page-header';
+import { IconActionButton } from '@/components/icon-action-button';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DndContext,
@@ -174,7 +176,7 @@ function OnlineStatusBadge({
           variant={online ? 'default' : 'secondary'}
           className="cursor-default"
         >
-          {online ? 'Online' : 'Offline'}
+          {online ? 'Conectado' : 'Desconectado'}
         </Badge>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-xs text-center">
@@ -430,36 +432,30 @@ function SortablePlaylistItemCard({
         {!item.activo ? ' · inactivo' : ''}
       </div>
       <div className="absolute inset-x-0 top-0 z-10 flex justify-end gap-1 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        <Button
-          type="button"
-          size="icon"
+        <IconActionButton
           variant="secondary"
           className="size-7 shadow-sm"
-          title="Editar"
+          label="Editar"
           onClick={onEdit}
         >
           <Pencil size={14} />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
+        </IconActionButton>
+        <IconActionButton
           variant="secondary"
           className="size-7 shadow-sm"
-          title="Duplicar"
+          label="Duplicar"
           onClick={onDuplicate}
         >
           <CopyPlus size={14} />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
+        </IconActionButton>
+        <IconActionButton
           variant="secondary"
           className="size-7 shadow-sm"
-          title="Eliminar"
+          label="Eliminar"
           onClick={onRemove}
         >
           <Trash2 size={14} />
-        </Button>
+        </IconActionButton>
       </div>
     </div>
   );
@@ -473,6 +469,9 @@ export function ScreenCastAdminPage() {
   const [monitors, setMonitors] = useState<ScreenCastMonitorDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [monitorSearch, setMonitorSearch] = useState('');
+  const [connectionFilter, setConnectionFilter] = useState('all');
+  const [assignmentFilter, setAssignmentFilter] = useState('all');
 
   const [activeTab, setActiveTab] = useState<AdminTab>('config');
 
@@ -993,18 +992,28 @@ export function ScreenCastAdminPage() {
     }
   }
 
-  async function syncAllMonitors() {
-    if (monitors.length === 0) {
+  async function syncAllMonitors(targets: ScreenCastMonitorDto[]) {
+    if (targets.length === 0) {
       toast.error('No hay monitores para sincronizar');
       return;
     }
     setSyncingAll(true);
     try {
-      const result = await api.syncAllScreenCastMonitors();
+      let notified: number;
+      if (targets.length === monitors.length) {
+        const result = await api.syncAllScreenCastMonitors();
+        notified = result.notified;
+      } else {
+        notified = 0;
+        for (const monitor of targets) {
+          const result = await api.syncScreenCastMonitor(monitor.id);
+          notified += result.notified;
+        }
+      }
       toast.success(
-        result.notified === 1
+        notified === 1
           ? '1 pantalla notificada'
-          : `${result.notified} pantallas notificadas`,
+          : `${notified} pantallas notificadas`,
       );
       setPreviewKey((k) => k + 1);
     } catch (e) {
@@ -1050,6 +1059,22 @@ export function ScreenCastAdminPage() {
     openPlaylistEditor(playlistId);
   }
 
+  const monitorQuery = monitorSearch.trim().toLocaleLowerCase();
+  const hasMonitorFilters = !!(monitorQuery || connectionFilter !== 'all' || assignmentFilter !== 'all');
+  const filteredMonitors = monitors.filter((monitor) =>
+    (!monitorQuery || [monitor.name, monitor.screenKey, monitor.location, monitor.playlistName]
+      .some((value) => value?.toLocaleLowerCase().includes(monitorQuery))) &&
+    (connectionFilter === 'all' || (connectionFilter === 'online' ? monitor.online : !monitor.online)) &&
+    (assignmentFilter === 'all' || (assignmentFilter === 'assigned' ? !!monitor.playlistId : !monitor.playlistId)),
+  );
+  const connectedCount = monitors.filter((monitor) => monitor.online).length;
+  const unassignedCount = monitors.filter((monitor) => !monitor.playlistId).length;
+  function resetMonitorFilters() {
+    setMonitorSearch('');
+    setConnectionFilter('all');
+    setAssignmentFilter('all');
+  }
+
   if (loading) return <PageLoading />;
 
   const previewMonitor =
@@ -1061,15 +1086,10 @@ export function ScreenCastAdminPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Transmisión a pantallas
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          Configura listas de reproducción y monitores quiosco desde un solo
-          panel.
-        </p>
-      </div>
+      <PageHeader
+        title="Transmisión a pantallas"
+        description="Configura listas de reproducción y monitores quiosco desde un solo panel."
+      />
 
       {error ? <AlertBanner>{error}</AlertBanner> : null}
 
@@ -1164,33 +1184,27 @@ export function ScreenCastAdminPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
+                            <IconActionButton
                               variant="ghost"
-                              title="Editar"
+                              label="Editar"
                               onClick={() => openPlaylistEditor(p.id)}
                             >
                               <Pencil size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Duplicar"
+                              label="Duplicar"
                               onClick={() => void duplicatePlaylist(p)}
                             >
                               <CopyPlus size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Eliminar"
+                              label="Eliminar"
                               onClick={() => void removePlaylist(p)}
                             >
                               <Trash2 size={16} />
-                            </Button>
+                            </IconActionButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1217,14 +1231,16 @@ export function ScreenCastAdminPage() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={syncingAll || monitors.length === 0}
-                onClick={() => void syncAllMonitors()}
+                disabled={syncingAll || filteredMonitors.length === 0}
+                onClick={() => void syncAllMonitors(filteredMonitors)}
               >
                 <RefreshCw
                   size={16}
                   className={syncingAll ? 'animate-spin' : undefined}
                 />
-                Sincronizar todos
+                {hasMonitorFilters
+                  ? `Sincronizar visibles (${filteredMonitors.length})`
+                  : `Sincronizar todos (${monitors.length})`}
               </Button>
               <Button type="button" onClick={openMonitorCreate}>
                 <Plus size={16} />
@@ -1233,11 +1249,58 @@ export function ScreenCastAdminPage() {
             </div>
           </div>
 
+          <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              ['Total', monitors.length],
+              ['Conectados', connectedCount],
+              ['Desconectados', monitors.length - connectedCount],
+              ['Sin playlist', unassignedCount],
+            ].map(([label, count]) => (
+              <div key={label} className="rounded-lg border bg-card p-3">
+                <dt className="text-sm text-muted-foreground">{label}</dt>
+                <dd className="mt-1 text-xl font-semibold tabular-nums">{count}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="grid min-w-0 flex-1 basis-64 gap-1 text-sm">
+              Buscar monitores
+              <Input type="search" placeholder="Nombre, identificador, ubicación o playlist" value={monitorSearch} onChange={(event) => setMonitorSearch(event.target.value)} />
+            </label>
+            <div className="grid gap-1 text-sm">
+              <Label htmlFor="monitor-connection">Conexión</Label>
+              <Select value={connectionFilter} onValueChange={setConnectionFilter}>
+                <SelectTrigger id="monitor-connection" className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="online">Conectados</SelectItem>
+                  <SelectItem value="offline">Desconectados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1 text-sm">
+              <Label htmlFor="monitor-assignment">Asignación</Label>
+              <Select value={assignmentFilter} onValueChange={setAssignmentFilter}>
+                <SelectTrigger id="monitor-assignment" className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="assigned">Con playlist</SelectItem>
+                  <SelectItem value="unassigned">Sin playlist</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {hasMonitorFilters && <Button type="button" variant="ghost" onClick={resetMonitorFilters}>Restablecer filtros</Button>}
+          </div>
+          <p role="status" className="text-sm text-muted-foreground">
+            {filteredMonitors.length} de {monitors.length} monitores
+          </p>
           {monitors.length === 0 ? (
             <EmptyState
               title="Sin monitores"
               description="Crea el primero para obtener su URL de reproducción."
             />
+          ) : filteredMonitors.length === 0 ? (
+            <EmptyState title="Sin coincidencias" description="Prueba otra búsqueda o restablece los filtros." />
           ) : (
             <div className="rounded-md border">
               <Table>
@@ -1249,11 +1312,11 @@ export function ScreenCastAdminPage() {
                     <TableHead>Orientación</TableHead>
                     <TableHead>Reproducción</TableHead>
                     <TableHead>Playlist</TableHead>
-                    <TableHead className="w-52" />
+                    <TableHead className="w-52 text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {monitors.map((m) => {
+                  {filteredMonitors.map((m) => {
                     const slideLabel =
                       m.online &&
                       m.playbackTotal != null &&
@@ -1269,6 +1332,9 @@ export function ScreenCastAdminPage() {
                               online={m.online}
                               lastSeenAt={m.lastSeenAt}
                             />
+                            <p className="text-xs text-muted-foreground">
+                              Última conexión: {formatLastSeen(m.lastSeenAt)}
+                            </p>
                             <ScheduleActiveBadge
                               scheduleActive={m.scheduleActive}
                             />
@@ -1288,7 +1354,10 @@ export function ScreenCastAdminPage() {
                               name={m.name}
                               photoUrl={m.photoUrl}
                             />
-                            <span>{m.name}</span>
+                            <div>
+                              <p>{m.name}</p>
+                              {m.location && <p className="text-xs font-normal text-muted-foreground">{m.location}</p>}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-sm">
@@ -1330,20 +1399,16 @@ export function ScreenCastAdminPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex justify-end gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
+                            <IconActionButton
                               variant="ghost"
-                              title="Previsualizar"
+                              label="Previsualizar"
                               onClick={() => selectMonitorForPreview(m.id)}
                             >
                               <Eye size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Sincronizar"
+                              label="Sincronizar"
                               disabled={syncingMonitorId === m.id}
                               onClick={() => void syncOneMonitor(m)}
                             >
@@ -1355,34 +1420,28 @@ export function ScreenCastAdminPage() {
                                     : undefined
                                 }
                               />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Copiar URL"
+                              label="Copiar URL"
                               onClick={() => copyUrl(m.screenKey)}
                             >
                               <Copy size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Editar"
+                              label="Editar"
                               onClick={() => openMonitorEdit(m)}
                             >
                               <Pencil size={16} />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
+                            </IconActionButton>
+                            <IconActionButton
                               variant="ghost"
-                              title="Eliminar"
+                              label="Eliminar"
                               onClick={() => void removeMonitor(m)}
                             >
                               <Trash2 size={16} />
-                            </Button>
+                            </IconActionButton>
                           </div>
                         </TableCell>
                       </TableRow>
