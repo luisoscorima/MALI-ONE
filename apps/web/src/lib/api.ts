@@ -13,6 +13,11 @@ export type EducationContact = {
   opt_in_email: boolean;
   segment_slugs: string[];
   attributes: Record<string, string>;
+  assigned_user_id?: number | null;
+  assigned_user_label?: string | null;
+  requires_review?: boolean;
+  lead_status_id?: number | null;
+  lead_status_label?: string | null;
 };
 export type EducationLead = {
   id: number;
@@ -33,6 +38,28 @@ export type EducationLead = {
     email: string | null;
     lead_status: { label: string } | null;
   } | null;
+  classification: 'new' | 'duplicate' | 'conflict' | 'dismissed';
+  assignment_rule: 'new_number' | 'same_advisor' | 'reassignable' | 'conflict';
+  conflict_reason: string | null;
+  previous_assigned_user_id: number | null;
+  previous_advisor_label: string | null;
+  previous_status_label: string | null;
+  previous_interaction_at: string | null;
+  reviewed_at: string | null;
+  cycle_id: number | null;
+  is_current_cycle: boolean;
+  assigned_user_id: number | null;
+  assigned_user_label: string | null;
+  requires_review: boolean;
+  lead_status_id: number | null;
+};
+export type EducationLeadCounts = {
+  recent: number; new_number: number; duplicate: number; reassignable: number; conflict: number;
+  in_progress: number; unassigned: number; eligible: number;
+};
+export type EducationManagementCatalog = {
+  advisors: Array<{ id: number; label: string; areas: EducationArea[] }>;
+  statuses: Array<{ id: number; area: EducationArea; slug: string; label: string; is_default: boolean }>;
 };
 export type EducationCatalog = {
   attributes: Array<{
@@ -106,6 +133,7 @@ export const api = {
     id: number,
     body: { area: EducationArea; name?: string; last_name?: string;
       email?: string | null; dni?: string | null; opt_in_email?: boolean;
+      segment_slugs?: string[];
       attributes?: Record<string, string> },
   ) => request<EducationContact>(`/api/crm-educacion/contacts/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),
@@ -114,16 +142,34 @@ export const api = {
     request<EducationCatalog>('/api/crm-educacion/catalogs'),
   listCrmEducationLeads: (params: {
     area?: EducationArea | 'all'; channel?: string; q?: string;
+    view?: 'recent' | 'new_number' | 'duplicate' | 'reassignable' | 'conflict' | 'in_progress' | 'all';
+    unassigned?: boolean;
     page?: number; limit?: number;
   }) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') qs.set(key, String(value));
     }
-    return request<{ items: EducationLead[]; total: number; page: number; limit: number; pages: number }>(
+    return request<{ items: EducationLead[]; counts: EducationLeadCounts;
+      total: number; page: number; limit: number; pages: number }>(
       `/api/crm-educacion/leads?${qs}`,
     );
   },
+  getCrmEducationManagementCatalogs: () =>
+    request<EducationManagementCatalog>('/api/crm-educacion/management-catalogs'),
+  patchCrmEducationManagement: (id: number, body: {
+    area: EducationArea; assigned_user_id?: number | null; lead_status_id?: number | null;
+  }) => request(`/api/crm-educacion/contacts/${id}/management`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+  distributeCrmEducation: (params: { area: EducationArea | 'all'; channel?: string; q?: string }) =>
+    request<{ assigned: number; by_area: Array<{ area: EducationArea; assigned: number }> }>(
+      '/api/crm-educacion/distribute', { method: 'POST', body: JSON.stringify(params) }),
+  reviewCrmEducationLead: (id: number, body: { area: EducationArea;
+    action: 'open_new' | 'keep_existing' | 'dismiss' }) =>
+    request(`/api/crm-educacion/leads/${id}/review`, {
+      method: 'PATCH', body: JSON.stringify(body),
+    }),
   getMe: () => request<AuthUser>('/api/auth/me'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   googleLoginUrl: () => '/api/auth/google',

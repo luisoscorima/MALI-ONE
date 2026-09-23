@@ -244,6 +244,7 @@ export function CrmPamPage() {
     email: string;
     dni: string;
     opt_in_email: boolean;
+    segment_slugs: string[];
     attributes: Record<string, string>;
   } | null>(null);
   const [savingContactId, setSavingContactId] = useState<number | null>(null);
@@ -647,6 +648,7 @@ export function CrmPamPage() {
       email: c.email ?? '',
       dni: c.dni ?? c.attributes.dni ?? '',
       opt_in_email: c.opt_in_email,
+      segment_slugs: [...c.segment_slugs],
       attributes: { ...c.attributes },
     });
   }
@@ -661,6 +663,7 @@ export function CrmPamPage() {
         email: draftContact.email || null,
         dni: draftContact.dni || null,
         opt_in_email: draftContact.opt_in_email,
+        segment_slugs: draftContact.segment_slugs,
         attributes: draftContact.attributes,
       });
       toast.success('Contacto actualizado en WhatsApp CRM');
@@ -1578,6 +1581,38 @@ export function CrmPamPage() {
                           }
                         />
                       </div>
+                      <fieldset className="space-y-2 sm:col-span-2">
+                        <legend className="text-sm font-medium">Segmentos</legend>
+                        <div className="flex flex-wrap gap-x-4 gap-y-2">
+                          {[...new Set([
+                            ...segments.map((item) => item.slug),
+                            ...c.segment_slugs,
+                          ])].map((slug) => {
+                            const definition = segments.find((item) => item.slug === slug);
+                            return (
+                              <label key={slug} className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={draftContact.segment_slugs.includes(slug)}
+                                  onChange={(event) => setDraftContact((current) => {
+                                    if (!current) return current;
+                                    const next = new Set(current.segment_slugs);
+                                    if (event.target.checked) next.add(slug);
+                                    else next.delete(slug);
+                                    return { ...current, segment_slugs: [...next] };
+                                  })}
+                                />
+                                {definition?.label ?? `${slug} (inactivo)`}
+                              </label>
+                            );
+                          })}
+                          {segments.length === 0 && c.segment_slugs.length === 0 ? (
+                            <span className="text-sm text-muted-foreground">
+                              No hay segmentos configurados.
+                            </span>
+                          ) : null}
+                        </div>
+                      </fieldset>
                       {areaAttrDefs.map((d) => (
                         <div
                           key={d.id}

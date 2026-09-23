@@ -84,6 +84,10 @@ export type CrmContactRow = {
   attributes: Record<string, string>;
   created_at: string;
   updated_at: string;
+  assigned_user_id?: number | null;
+  assigned_user_label?: string | null;
+  lead_status_id?: number | null;
+  lead_status_label?: string | null;
 };
 
 @Injectable()
@@ -604,6 +608,8 @@ export class WhatsappCrmClientService {
     area?: string;
     channel?: string;
     q?: string;
+    view?: string;
+    unassigned?: boolean;
     page?: number;
     limit?: number;
   }): Promise<{
@@ -626,7 +632,24 @@ export class WhatsappCrmClientService {
         email: string | null;
         lead_status: { label: string } | null;
       } | null;
+      classification: string;
+      assignment_rule: string;
+      conflict_reason: string | null;
+      previous_assigned_user_id: number | null;
+      previous_advisor_label: string | null;
+      previous_status_label: string | null;
+      previous_interaction_at: string | null;
+      reviewed_at: string | null;
+      cycle_id: number | null;
+      is_current_cycle: boolean;
+      assigned_user_id: number | null;
+      assigned_user_label: string | null;
+      requires_review: boolean;
+      lead_status_id: number | null;
     }>;
+    counts: { recent: number; new_number: number; duplicate: number;
+      reassignable: number; conflict: number;
+      in_progress: number; unassigned: number; eligible: number };
     total: number;
     page: number;
     limit: number;
@@ -635,9 +658,37 @@ export class WhatsappCrmClientService {
     const qs = new URLSearchParams({ area: params.area ?? 'all' });
     if (params.channel) qs.set('channel', params.channel);
     if (params.q) qs.set('q', params.q);
+    if (params.view) qs.set('view', params.view);
+    if (params.unassigned) qs.set('unassigned', 'true');
     if (params.page) qs.set('page', String(params.page));
     if (params.limit) qs.set('limit', String(params.limit));
     return this.request('GET', `/api/crm/education/leads?${qs}`);
+  }
+
+  fetchEducationManagementCatalogs() {
+    return this.request<{
+      advisors: Array<{ id: number; label: string; areas: string[] }>;
+      statuses: Array<{ id: number; area: string; slug: string; label: string; is_default: boolean }>;
+    }>('GET', '/api/crm/education/management-catalogs');
+  }
+
+  patchEducationManagement(contactId: number, area: string, changes: {
+    assigned_user_id?: number | null; lead_status_id?: number | null; actor_email?: string;
+  }) {
+    return this.request('PATCH',
+      `/api/crm/education/contacts/${contactId}/management?${new URLSearchParams({ area })}`,
+      changes);
+  }
+
+  distributeEducation(params: { area: string; channel?: string; q?: string; actor_email?: string }) {
+    return this.request<{ assigned: number; by_area: Array<{ area: string; assigned: number }> }>(
+      'POST', '/api/crm/education/distribute', params);
+  }
+
+  reviewEducationEntry(id: number, area: string, action: string, actor_email?: string) {
+    return this.request('PATCH',
+      `/api/crm/education/entries/${id}/review?${new URLSearchParams({ area })}`,
+      { action, actor_email });
   }
 
   private async request<T = unknown>(

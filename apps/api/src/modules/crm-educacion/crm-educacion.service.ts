@@ -37,6 +37,7 @@ export class CrmEducacionService {
   patchContact(id: number, body: {
     area: string; name?: string; last_name?: string; email?: string | null;
     dni?: string | null; opt_in?: boolean; opt_in_email?: boolean;
+    segment_slugs?: string[];
     attributes?: Record<string, string>;
   }) {
     this.ensureConfigured();
@@ -62,12 +63,42 @@ export class CrmEducacionService {
     };
   }
 
-  leads(query: { area?: string; channel?: string; q?: string; page?: string; limit?: string }) {
+  leads(query: { area?: string; channel?: string; q?: string; view?: string;
+    unassigned?: string; page?: string; limit?: string }) {
     this.ensureConfigured();
     return this.crm.fetchEducationLeads({
       ...query,
+      unassigned: query.unassigned === 'true',
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 200),
     });
+  }
+
+  managementCatalogs() {
+    this.ensureConfigured();
+    return this.crm.fetchEducationManagementCatalogs();
+  }
+
+  management(id: number, body: {
+    area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
+  }, actorEmail: string) {
+    this.ensureConfigured();
+    if (!AREAS.includes(body.area as (typeof AREAS)[number])) {
+      throw new BadRequestException('Área de educación inválida');
+    }
+    const { area, ...changes } = body;
+    return this.crm.patchEducationManagement(id, area, { ...changes, actor_email: actorEmail });
+  }
+
+  distribute(params: { area: string; channel?: string; q?: string }, actorEmail: string) {
+    this.ensureConfigured();
+    return this.crm.distributeEducation({ ...params, actor_email: actorEmail });
+  }
+
+  review(id: number, body: {
+    area: string; action: 'open_new' | 'keep_existing' | 'dismiss';
+  }, actorEmail: string) {
+    this.ensureConfigured();
+    return this.crm.reviewEducationEntry(id, body.area, body.action, actorEmail);
   }
 }
