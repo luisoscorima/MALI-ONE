@@ -14,6 +14,7 @@ export type AppModule =
   | 'mailing'
   | 'newsletters'
   | 'crm_pam'
+  | 'crm_educacion'
   | 'portfolio'
   | 'files';
 

@@ -1,0 +1,457 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Columns3, Download, Save } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { PageHeader } from '@/components/page-header';
+import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { useToast } from '@/contexts/toast-context';
+import { api, type EducationArea, type EducationCatalog, type EducationContact, type EducationLead } from '@/lib/api';
+import {
+  Badge, Button, DataTable, DropdownMenu, DropdownMenuCheckboxItem,
+  DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Tabs, TabsContent, TabsList, TabsTrigger,
+} from '@/components/ui';
+
+const AREA_LABELS: Record<EducationArea, string> = {
+  educacion: 'Educación',
+  educacion_ca: 'Educación CA',
+  educacion_ep: 'Educación EP',
+};
+const AREAS = Object.keys(AREA_LABELS) as EducationArea[];
+const CHANNEL_LABELS: Record<string, string> = {
+  meta_lead_form: 'Formulario Meta', meta_ctwa: 'Anuncio a WhatsApp',
+  widget: 'Widget web', tiktok: 'TikTok', import: 'Importación',
+  manual: 'Manual', organic_wa: 'WhatsApp orgánico',
+  mali_one_link: 'Enlace / QR MALI ONE', other: 'Otro',
+};
+const FIXED_COLUMNS = [
+  ['name', 'Nombre'], ['area', 'Número'], ['last_name', 'Apellido'],
+  ['phone', 'Teléfono'], ['email', 'Email'], ['dni', 'DNI'],
+  ['segments', 'Segmentos'],
+] as const;
+const STORAGE_KEY = 'crm-educacion-contact-cols-v1';
+const PAGE_SIZE = 50;
+
+function storedColumns(): Set<string> {
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
+    if (Array.isArray(value)) return new Set(value.filter((v): v is string => typeof v === 'string'));
+  } catch { /* Prefer defaults when storage is invalid. */ }
+  return new Set(FIXED_COLUMNS.map(([id]) => id));
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString('es-PE', { timeZone: 'America/Lima' });
+}
+
+type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email' | 'attributes'> & {
+  email: string; dni: string;
+};
+
+export function CrmEducacionPage() {
+  const toast = useToast();
+  const [tab, setTab] = useState('contacts');
+  const [area, setArea] = useState<EducationArea | 'all'>('all');
+  const [catalog, setCatalog] = useState<EducationCatalog>({ attributes: [], segments: [] });
+  const [contacts, setContacts] = useState<EducationContact[]>([]);
+  const [contactTotal, setContactTotal] = useState(0);
+  const [contactPage, setContactPage] = useState(1);
+  const [contactLoading, setContactLoading] = useState(true);
+  const [contactError, setContactError] = useState('');
+  const contactRequestId = useRef(0);
+  const [contactQ, setContactQ] = useState('');
+  const [debouncedContactQ, setDebouncedContactQ] = useState('');
+  const [segment, setSegment] = useState('');
+  const [attrKey, setAttrKey] = useState('');
+  const [attrValue, setAttrValue] = useState('');
+  const [debouncedAttrValue, setDebouncedAttrValue] = useState('');
+  const [visible, setVisible] = useState(storedColumns);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [draft, setDraft] = useState<DraftContact | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [leads, setLeads] = useState<EducationLead[]>([]);
+  const [leadTotal, setLeadTotal] = useState(0);
+  const [leadPage, setLeadPage] = useState(1);
+  const [leadLoading, setLeadLoading] = useState(true);
+  const [leadError, setLeadError] = useState('');
+  const [leadQ, setLeadQ] = useState('');
+  const [debouncedLeadQ, setDebouncedLeadQ] = useState('');
+  const [channel, setChannel] = useState('');
+
+  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible])); }, [visible]);
+  useEffect(() => {
+    void api.getCrmEducationCatalogs().then(setCatalog).catch((error) => {
+      toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los catálogos');
+    });
+  }, [toast]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedContactQ(contactQ.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [contactQ]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedAttrValue(attrValue.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [attrValue]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedLeadQ(leadQ.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [leadQ]);
+
+  const contactParams = useMemo(() => ({
+    area, q: debouncedContactQ, segment, attr_key: attrKey,
+    attr_value: debouncedAttrValue, page: contactPage, limit: PAGE_SIZE,
+  }), [area, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage]);
+  const loadContacts = useCallback(async () => {
+    const requestId = ++contactRequestId.current;
+    setContactLoading(true);
+    setContactError('');
+    try {
+      const data = await api.listCrmEducationContacts(contactParams);
+      if (requestId === contactRequestId.current) {
+        setContacts(data.items);
+        setContactTotal(data.total);
+      }
+    } catch (error) {
+      if (requestId === contactRequestId.current) {
+        setContactError(error instanceof Error ? error.message : 'No se pudieron cargar los contactos');
+      }
+    } finally {
+      if (requestId === contactRequestId.current) setContactLoading(false);
+    }
+  }, [contactParams]);
+  useEffect(() => { void loadContacts(); }, [loadContacts]);
+  useEffect(() => {
+    let active = true;
+    setLeadLoading(true);
+    setLeadError('');
+    void api.listCrmEducationLeads({ area, channel, q: debouncedLeadQ, page: leadPage, limit: PAGE_SIZE })
+      .then((data) => { if (active) { setLeads(data.items); setLeadTotal(data.total); } })
+      .catch((error) => { if (active) setLeadError(error instanceof Error ? error.message : 'No se pudieron cargar los leads'); })
+      .finally(() => { if (active) setLeadLoading(false); });
+    return () => { active = false; };
+  }, [area, channel, debouncedLeadQ, leadPage]);
+
+  const areaAttributes = useMemo(() => catalog.attributes.filter((d) =>
+    d.active && !d.segment_slug && (area === 'all' || d.area === area) &&
+    !['dni', 'email', 'correo'].includes(d.slug),
+  ).sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)), [catalog, area]);
+  const segments = useMemo(() => catalog.segments.filter((s) => area === 'all' || s.area === area), [catalog, area]);
+  const segmentOptions = useMemo(() => [...new Set(segments.map((s) => s.slug))], [segments]);
+  const attrOptions = useMemo(() => [...new Set(areaAttributes.map((d) => d.slug))], [areaAttributes]);
+
+  const contactColumns = useMemo<ColumnDef<EducationContact>[]>(() => {
+    const cols: ColumnDef<EducationContact>[] = [];
+    if (visible.has('name')) cols.push({ id: 'name', header: 'Nombre', cell: ({ row }) => row.original.name || '—' });
+    cols.push({ id: 'area', header: 'Número', cell: ({ row }) => <Badge variant="secondary">{AREA_LABELS[row.original.area]}</Badge> });
+    if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
+    if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
+    if (visible.has('email')) cols.push({ id: 'email', header: 'Email', cell: ({ row }) => row.original.email || '—' });
+    if (visible.has('dni')) cols.push({ id: 'dni', header: 'DNI', cell: ({ row }) => row.original.dni || row.original.attributes.dni || '—' });
+    if (visible.has('segments')) cols.push({
+      id: 'segments', header: 'Segmentos', cell: ({ row }) => row.original.segment_slugs.length ?
+        <div className="flex flex-wrap gap-1">{row.original.segment_slugs.map((slug) => <Badge key={slug} variant="outline">
+          {catalog.segments.find((s) => s.area === row.original.area && s.slug === slug)?.label ?? slug}
+        </Badge>)}</div> : '—',
+    });
+    for (const definition of areaAttributes) {
+      const key = `attr:${definition.area}:${definition.slug}`;
+      if (!visible.has(key)) continue;
+      cols.push({
+        id: key, header: `${AREA_LABELS[definition.area]} · ${definition.label}`,
+        cell: ({ row }) => row.original.area === definition.area ? row.original.attributes[definition.slug] || '—' : '—'
+      });
+    }
+    return cols;
+  }, [visible, areaAttributes, catalog.segments]);
+
+  const leadColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
+    { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
+    {
+      id: 'person', header: 'Contacto', cell: ({ row }) => {
+        const lead = row.original;
+        const name = [lead.contacts?.name, lead.contacts?.last_name].filter(Boolean).join(' ');
+        return <div><div>{name || '—'}</div><div className="text-xs text-muted-foreground">{lead.contacts?.phone || lead.phone || lead.contacts?.email || lead.email || '—'}</div></div>;
+      }
+    },
+    { id: 'channel', header: 'Canal', cell: ({ row }) => CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
+    { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || row.original.source_key || '—' },
+    { id: 'status', header: 'Estado', cell: ({ row }) => row.original.contacts?.lead_status?.label || '—' },
+    { id: 'first', header: 'Primera captación', cell: ({ row }) => formatDate(row.original.first_seen_at) },
+    { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_seen_at) },
+  ], []);
+
+  function changeArea(value: string) {
+    setArea(value as EducationArea | 'all');
+    setContactPage(1); setLeadPage(1);
+    setSegment(''); setAttrKey(''); setAttrValue('');
+    setExpandedId(null);
+  }
+  function toggleColumn(key: string) {
+    if (key === 'name' || key === 'area') return;
+    setVisible((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+  function openContact(contact: EducationContact) {
+    if (expandedId === contact.contact_id) { setExpandedId(null); setDraft(null); return; }
+    setExpandedId(contact.contact_id);
+    setDraft({
+      name: contact.name, last_name: contact.last_name, email: contact.email ?? '',
+      dni: contact.dni ?? contact.attributes.dni ?? '', opt_in_email: contact.opt_in_email,
+      attributes: { ...contact.attributes }
+    });
+  }
+  async function saveContact(contact: EducationContact) {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      await api.patchCrmEducationContact(contact.contact_id, {
+        area: contact.area, name: draft.name, last_name: draft.last_name,
+        email: draft.email || null, dni: draft.dni || null,
+        opt_in_email: draft.opt_in_email, attributes: draft.attributes,
+      });
+      toast.success('Contacto actualizado');
+      setExpandedId(null); setDraft(null);
+      await loadContacts();
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo guardar'); }
+    finally { setSaving(false); }
+  }
+  async function exportContacts() {
+    setExporting(true);
+    try {
+      const rows: EducationContact[] = [];
+      let page = 1;
+      while (true) {
+        const data = await api.listCrmEducationContacts({ ...contactParams, page, limit: 2000 });
+        rows.push(...data.items);
+        if (page >= data.pages) break;
+        page += 1;
+      }
+      const sheet = XLSX.utils.json_to_sheet(rows.map((c) => ({
+        Número: AREA_LABELS[c.area], Nombre: c.name, Apellido: c.last_name,
+        Teléfono: c.phone ?? '', Email: c.email ?? '', DNI: c.dni ?? '',
+        Segmentos: c.segment_slugs.join(', '), ...c.attributes,
+      })));
+      const book = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(book, sheet, 'Contactos Educación');
+      XLSX.writeFile(book, `crm-educacion-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo exportar'); }
+    finally { setExporting(false); }
+  }
+
+  function renderContactEditor(contact: EducationContact) {
+    if (!draft) return null;
+    const definitions = catalog.attributes.filter((definition) =>
+      definition.area === contact.area && definition.active &&
+      !definition.segment_slug &&
+      !['dni', 'email', 'correo'].includes(definition.slug),
+    );
+    return (
+      <div className="max-w-3xl space-y-4 p-4" onClick={(event) => event.stopPropagation()}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            ['name', 'Nombre'], ['last_name', 'Apellido'],
+            ['email', 'Email'], ['dni', 'DNI'],
+          ] as const).map(([key, label]) => (
+            <div key={key} className="space-y-1">
+              <Label>{label}</Label>
+              <Input value={draft[key]} onChange={(event) =>
+                setDraft({ ...draft, [key]: event.target.value })} />
+            </div>
+          ))}
+          {definitions.map((definition) => (
+            <div key={definition.id} className="space-y-1">
+              <Label>{definition.label}</Label>
+              <Input
+                value={draft.attributes[definition.slug] ?? ''}
+                onChange={(event) => setDraft({
+                  ...draft,
+                  attributes: {
+                    ...draft.attributes,
+                    [definition.slug]: event.target.value,
+                  },
+                })}
+              />
+            </div>
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={draft.opt_in_email} onChange={(event) =>
+            setDraft({ ...draft, opt_in_email: event.target.checked })} />
+          Acepta correos
+        </label>
+        <Button disabled={saving} onClick={() => void saveContact(contact)}>
+          <Save className="mr-1 size-4" />Guardar en WhatsApp
+        </Button>
+      </div>
+    );
+  }
+
+  return <div className="space-y-6">
+    <PageHeader
+      title="CRM Educación"
+      description="Contactos y captaciones de los tres números de Educación."
+    />
+    <div className="w-56 space-y-1">
+      <Label>Número</Label>
+      <Select value={area} onValueChange={changeArea}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los números</SelectItem>
+          {AREAS.map((item) => <SelectItem key={item} value={item}>
+            {AREA_LABELS[item]}
+          </SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+    <Tabs value={tab} onValueChange={setTab}>
+      <TabsList>
+        <TabsTrigger value="contacts">Contactos</TabsTrigger>
+        <TabsTrigger value="leads">Leads</TabsTrigger>
+        <TabsTrigger value="payments">Pagos</TabsTrigger>
+        <TabsTrigger value="campaigns">Campañas</TabsTrigger>
+      </TabsList>
+      <TabsContent value="contacts" className="space-y-4">
+        {contactError && <AlertBanner variant="error">{contactError}</AlertBanner>}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label>Buscar</Label>
+            <Input value={contactQ} placeholder="Nombre, teléfono, email…" className="w-56"
+              onChange={(event) => { setContactQ(event.target.value); setContactPage(1); }} />
+          </div>
+          <div className="space-y-1">
+            <Label>Segmento</Label>
+            <Select value={segment || '__all__'} onValueChange={(value) => {
+              setSegment(value === '__all__' ? '' : value);
+              setContactPage(1);
+            }}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos</SelectItem>
+                {segmentOptions.map((slug) => <SelectItem key={slug} value={slug}>
+                  {segments.find((item) => item.slug === slug)?.label ?? slug}
+                </SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Atributo</Label>
+            <Select value={attrKey || '__none__'} onValueChange={(value) => {
+              setAttrKey(value === '__none__' ? '' : value);
+              setContactPage(1);
+            }}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Ninguno</SelectItem>
+                {attrOptions.map((slug) => <SelectItem key={slug} value={slug}>
+                  {areaAttributes.find((item) => item.slug === slug)?.label ?? slug}
+                </SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {attrKey && <div className="space-y-1">
+            <Label>Valor</Label>
+            <Input value={attrValue} className="w-40" onChange={(event) => {
+              setAttrValue(event.target.value);
+              setContactPage(1);
+            }} />
+          </div>}
+          <Button variant="secondary" disabled={exporting || !contactTotal}
+            onClick={() => void exportContacts()}>
+            <Download className="mr-1 size-4" />
+            {exporting ? 'Exportando…' : 'Exportar Excel'}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline"><Columns3 className="mr-1 size-4" />Columnas</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-80 overflow-y-auto">
+              <DropdownMenuLabel>Columnas fijas</DropdownMenuLabel>
+              {FIXED_COLUMNS.map(([key, label]) => <DropdownMenuCheckboxItem
+                key={key}
+                checked={key === 'area' || visible.has(key)}
+                disabled={key === 'area' || key === 'name'}
+                onCheckedChange={() => toggleColumn(key)}
+                onSelect={(event) => event.preventDefault()}
+              >{label}</DropdownMenuCheckboxItem>)}
+              <DropdownMenuLabel>Atributos WhatsApp</DropdownMenuLabel>
+              {areaAttributes.map((definition) => {
+                const key = `attr:${definition.area}:${definition.slug}`;
+                return <DropdownMenuCheckboxItem
+                  key={key}
+                  checked={visible.has(key)}
+                  onCheckedChange={() => toggleColumn(key)}
+                  onSelect={(event) => event.preventDefault()}
+                >{AREA_LABELS[definition.area]} · {definition.label}</DropdownMenuCheckboxItem>;
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span className="text-sm text-muted-foreground">{contactTotal} contactos</span>
+        </div>
+        {contactLoading ? <TableSkeleton rows={8} cols={7} /> : contacts.length === 0 ?
+          <EmptyState title="Sin contactos" description="No hay contactos para estos filtros." /> :
+          <DataTable
+            columns={contactColumns}
+            data={contacts}
+            getRowId={(contact) => String(contact.contact_id)}
+            onRowClick={openContact}
+            isRowExpanded={(contact) => expandedId === contact.contact_id}
+            renderExpandedRow={renderContactEditor}
+          />}
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <span>Página {contactPage} de {Math.max(1, Math.ceil(contactTotal / PAGE_SIZE))}</span>
+          <Button variant="outline" disabled={contactPage <= 1}
+            onClick={() => setContactPage((page) => page - 1)}>Anterior</Button>
+          <Button variant="outline" disabled={contactPage * PAGE_SIZE >= contactTotal}
+            onClick={() => setContactPage((page) => page + 1)}>Siguiente</Button>
+        </div>
+      </TabsContent>
+      <TabsContent value="leads" className="space-y-4">
+        {leadError && <AlertBanner variant="error">{leadError}</AlertBanner>}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label>Buscar</Label>
+            <Input value={leadQ} placeholder="Contacto, teléfono, fuente…" className="w-64"
+              onChange={(event) => { setLeadQ(event.target.value); setLeadPage(1); }} />
+          </div>
+          <div className="space-y-1">
+            <Label>Canal</Label>
+            <Select value={channel || '__all__'} onValueChange={(value) => {
+              setChannel(value === '__all__' ? '' : value);
+              setLeadPage(1);
+            }}>
+              <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos los canales</SelectItem>
+                {Object.entries(CHANNEL_LABELS).map(([value, label]) =>
+                  <SelectItem key={value} value={value}>{label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <span className="text-sm text-muted-foreground">{leadTotal} captaciones</span>
+        </div>
+        {leadLoading ? <TableSkeleton rows={8} cols={7} /> : leads.length === 0 ?
+          <EmptyState title="Sin leads" description="No hay captaciones para estos filtros." /> :
+          <DataTable columns={leadColumns} data={leads}
+            getRowId={(lead) => String(lead.id)} tableClassName="min-w-full" />}
+        <div className="flex items-center justify-end gap-3 text-sm">
+          <span>Página {leadPage} de {Math.max(1, Math.ceil(leadTotal / PAGE_SIZE))}</span>
+          <Button variant="outline" disabled={leadPage <= 1}
+            onClick={() => setLeadPage((page) => page - 1)}>Anterior</Button>
+          <Button variant="outline" disabled={leadPage * PAGE_SIZE >= leadTotal}
+            onClick={() => setLeadPage((page) => page + 1)}>Siguiente</Button>
+        </div>
+      </TabsContent>
+      <TabsContent value="payments">
+        <EmptyState title="Pagos próximamente" description="Esta sección estará disponible más adelante." />
+      </TabsContent>
+      <TabsContent value="campaigns">
+        <EmptyState title="Campañas próximamente" description="Esta sección estará disponible cuando termine su configuración." />
+      </TabsContent>
+    </Tabs>
+  </div>;
+}

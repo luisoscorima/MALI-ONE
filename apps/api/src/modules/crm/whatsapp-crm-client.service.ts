@@ -71,6 +71,7 @@ export type CrmAttributeDefinition = {
 
 export type CrmContactRow = {
   contact_id: number;
+  area: string;
   name: string;
   last_name: string;
   phone: string;
@@ -572,6 +573,71 @@ export class WhatsappCrmClientService {
     }
 
     return this.request('GET', `/api/crm/contacts?${qs.toString()}`);
+  }
+
+  async fetchEducationContacts(params: {
+    area?: string;
+    q?: string;
+    segment?: string;
+    attr_key?: string;
+    attr_value?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    items: CrmContactRow[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  }> {
+    const qs = new URLSearchParams({ area: params.area ?? 'all' });
+    if (params.q) qs.set('q', params.q);
+    if (params.segment) qs.set('segment', params.segment);
+    if (params.attr_key) qs.set('attr_key', params.attr_key);
+    if (params.attr_value) qs.set('attr_value', params.attr_value);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    return this.request('GET', `/api/crm/education/contacts?${qs}`);
+  }
+
+  async fetchEducationLeads(params: {
+    area?: string;
+    channel?: string;
+    q?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    items: Array<{
+      id: number;
+      area: string;
+      channel: string;
+      source_key: string | null;
+      source_label: string | null;
+      phone: string | null;
+      email: string | null;
+      contact_id: number | null;
+      first_seen_at: string;
+      last_seen_at: string;
+      contacts: {
+        id: number;
+        name: string;
+        last_name: string;
+        phone: string | null;
+        email: string | null;
+        lead_status: { label: string } | null;
+      } | null;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  }> {
+    const qs = new URLSearchParams({ area: params.area ?? 'all' });
+    if (params.channel) qs.set('channel', params.channel);
+    if (params.q) qs.set('q', params.q);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    return this.request('GET', `/api/crm/education/leads?${qs}`);
   }
 
   private async request<T = unknown>(

@@ -1,5 +1,49 @@
 import type { AppModule, AppUserDto, AuthUser } from '@mali-one/shared';
 
+export type EducationArea = 'educacion' | 'educacion_ca' | 'educacion_ep';
+export type EducationContact = {
+  contact_id: number;
+  area: EducationArea;
+  name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  dni: string | null;
+  opt_in: boolean;
+  opt_in_email: boolean;
+  segment_slugs: string[];
+  attributes: Record<string, string>;
+};
+export type EducationLead = {
+  id: number;
+  area: EducationArea;
+  channel: string;
+  source_key: string | null;
+  source_label: string | null;
+  phone: string | null;
+  email: string | null;
+  contact_id: number | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  contacts: {
+    id: number;
+    name: string;
+    last_name: string;
+    phone: string | null;
+    email: string | null;
+    lead_status: { label: string } | null;
+  } | null;
+};
+export type EducationCatalog = {
+  attributes: Array<{
+    id: number; area: EducationArea; segment_slug: string | null;
+    slug: string; label: string; sort_order: number; active: boolean;
+  }>;
+  segments: Array<{
+    area: EducationArea; slug: string; label: string; color_key?: string;
+  }>;
+};
+
 const API_BASE = '';
 
 async function request<T>(
@@ -46,6 +90,40 @@ async function request<T>(
 }
 
 export const api = {
+  listCrmEducationContacts: (params: {
+    area?: EducationArea | 'all'; q?: string; segment?: string;
+    attr_key?: string; attr_value?: string; page?: number; limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<{ items: EducationContact[]; total: number; page: number; limit: number; pages: number }>(
+      `/api/crm-educacion/contacts?${qs}`,
+    );
+  },
+  patchCrmEducationContact: (
+    id: number,
+    body: { area: EducationArea; name?: string; last_name?: string;
+      email?: string | null; dni?: string | null; opt_in_email?: boolean;
+      attributes?: Record<string, string> },
+  ) => request<EducationContact>(`/api/crm-educacion/contacts/${id}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+  getCrmEducationCatalogs: () =>
+    request<EducationCatalog>('/api/crm-educacion/catalogs'),
+  listCrmEducationLeads: (params: {
+    area?: EducationArea | 'all'; channel?: string; q?: string;
+    page?: number; limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<{ items: EducationLead[]; total: number; page: number; limit: number; pages: number }>(
+      `/api/crm-educacion/leads?${qs}`,
+    );
+  },
   getMe: () => request<AuthUser>('/api/auth/me'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   googleLoginUrl: () => '/api/auth/google',

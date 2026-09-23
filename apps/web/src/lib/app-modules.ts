@@ -68,6 +68,11 @@ export const APP_MODULES: {
       'Contactos WhatsApp + ledger de pagos MP (manual) y envío de boletines.',
   },
   {
+    id: 'crm_educacion',
+    label: 'CRM Educación',
+    description: 'Contactos y leads de los tres números de Educación.',
+  },
+  {
     id: 'portfolio',
     label: 'Portafolio de área',
     description:

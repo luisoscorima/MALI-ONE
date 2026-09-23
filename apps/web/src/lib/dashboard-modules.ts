@@ -106,6 +106,12 @@ export const moduleMeta: Record<
     group: 'crms',
     accent: 'violet',
   },
+  crm_educacion: {
+    to: '/admin/crm-educacion',
+    icon: GraduationCap,
+    group: 'crms',
+    accent: 'cyan',
+  },
   mailing: {
     to: '/admin/newsletters',
     icon: Mail,

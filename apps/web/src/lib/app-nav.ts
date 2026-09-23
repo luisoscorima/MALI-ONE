@@ -100,6 +100,12 @@ export const appNavSections: AppNavSection[] = [
         icon: Contact,
         module: 'crm_pam',
       },
+      {
+        to: '/admin/crm-educacion',
+        label: 'CRM Educación',
+        icon: GraduationCap,
+        module: 'crm_educacion',
+      },
     ],
   },
   {
