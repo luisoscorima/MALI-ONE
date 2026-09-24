@@ -280,9 +280,20 @@ export class LinksService {
       user.role === UserRole.admin ? {} : { createdById: user.id };
     const normalizedTag = options.tag?.trim().toLowerCase();
     const search = options.search?.trim();
+    const searchLower = search?.toLowerCase();
     const type = Object.values(LinkType).includes(options.type as LinkType)
       ? (options.type as LinkType)
       : undefined;
+
+    const tagRows = await this.prisma.shortLink.findMany({
+      where: ownershipWhere,
+      select: { tags: true },
+    });
+    const tags = [...new Set(tagRows.flatMap((row) => row.tags))].sort();
+    const matchingTags = searchLower
+      ? tags.filter((tag) => tag.toLowerCase().includes(searchLower))
+      : [];
+
     const where: Prisma.ShortLinkWhereInput = {
       ...ownershipWhere,
       ...(normalizedTag ? { tags: { has: normalizedTag } } : {}),
@@ -293,13 +304,15 @@ export class LinksService {
               { slug: { contains: search, mode: 'insensitive' } },
               { targetUrl: { contains: search, mode: 'insensitive' } },
               { fileName: { contains: search, mode: 'insensitive' } },
-              { tags: { has: search.toLowerCase() } },
+              ...(matchingTags.length
+                ? [{ tags: { hasSome: matchingTags } }]
+                : []),
             ],
           }
         : {}),
     };
 
-    const [links, total, tagRows] = await this.prisma.$transaction([
+    const [links, total] = await this.prisma.$transaction([
       this.prisma.shortLink.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -307,10 +320,6 @@ export class LinksService {
         take: options.pageSize,
       }),
       this.prisma.shortLink.count({ where }),
-      this.prisma.shortLink.findMany({
-        where: ownershipWhere,
-        select: { tags: true },
-      }),
     ]);
     const totalPages = Math.ceil(total / options.pageSize);
 
@@ -320,7 +329,7 @@ export class LinksService {
       page: options.page,
       pageSize: options.pageSize,
       totalPages,
-      tags: [...new Set(tagRows.flatMap((row) => row.tags))].sort(),
+      tags,
     };
   }
 

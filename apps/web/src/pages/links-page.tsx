@@ -103,7 +103,6 @@ export function LinksPage() {
   const [customSlug, setCustomSlug] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
-  const [tagSearch, setTagSearch] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -441,16 +440,11 @@ export function LinksPage() {
     void loadLinks();
   }
 
-  const normalizedTagSearch = tagSearch.trim().toLocaleLowerCase();
-  const visibleTags = allTags.filter((tag) =>
-    tag.toLocaleLowerCase().includes(normalizedTagSearch),
-  );
   const hasFilters = !!(debouncedSearch || tagFilter || typeFilter !== 'all');
   const visibleSelectedCount = links.filter((link) => selectedIds.includes(link.id)).length;
   const hiddenSelectedCount = selectedIds.length - visibleSelectedCount;
   function resetFilters() {
     setSearch('');
-    setTagSearch('');
     setTagFilter('');
     setTypeFilter('all');
   }
@@ -648,20 +642,11 @@ export function LinksPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold">Historial</h3>
             {allTags.length > 0 && (
-              <div className="min-w-0 flex-1">
-                <Input
-                  type="search"
-                  aria-label="Buscar etiquetas"
-                  placeholder="Buscar etiquetas"
-                  value={tagSearch}
-                  onChange={(event) => setTagSearch(event.target.value)}
-                  className="mb-2 ml-auto max-w-xs"
-                />
-                <div className="flex max-h-24 flex-wrap items-center gap-1.5 overflow-y-auto">
-                  <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
-                    Todos
-                  </FilterChip>
-                  {visibleTags.map((tag) => (
+              <div className="flex max-h-24 max-w-full flex-wrap items-center justify-end gap-1.5 overflow-y-auto">
+                <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
+                  Todos
+                </FilterChip>
+                {allTags.map((tag) => (
                   <FilterChip
                     key={tag}
                     active={tagFilter === tag}
@@ -669,8 +654,7 @@ export function LinksPage() {
                   >
                     #{tag}
                   </FilterChip>
-                  ))}
-                </div>
+                ))}
               </div>
             )}
           </div>
