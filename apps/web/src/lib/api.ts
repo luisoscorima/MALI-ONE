@@ -7,6 +7,8 @@ export type EducationContact = {
   name: string;
   last_name: string;
   phone: string | null;
+  whatsapp_user_id: string | null;
+  wa_username: string | null;
   email: string | null;
   dni: string | null;
   opt_in: boolean;
@@ -26,6 +28,8 @@ export type EducationLead = {
   source_key: string | null;
   source_label: string | null;
   phone: string | null;
+  whatsapp_user_id: string | null;
+  wa_username: string | null;
   email: string | null;
   contact_id: number | null;
   first_seen_at: string;
@@ -35,6 +39,8 @@ export type EducationLead = {
     name: string;
     last_name: string;
     phone: string | null;
+    whatsapp_user_id: string | null;
+    wa_username: string | null;
     email: string | null;
     lead_status: { label: string } | null;
   } | null;
@@ -1070,7 +1076,9 @@ export const api = {
         contact_id: number;
         name: string;
         last_name: string;
-        phone: string;
+        phone: string | null;
+        whatsapp_user_id: string | null;
+        wa_username: string | null;
         email: string | null;
         dni: string | null;
         opt_in: boolean;

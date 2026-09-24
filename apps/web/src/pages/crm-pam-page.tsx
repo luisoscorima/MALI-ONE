@@ -60,7 +60,9 @@ type CrmContact = {
   contact_id: number;
   name: string;
   last_name: string;
-  phone: string;
+  phone: string | null;
+  whatsapp_user_id: string | null;
+  wa_username: string | null;
   email: string | null;
   dni: string | null;
   opt_in: boolean;
@@ -101,12 +103,14 @@ const MP_STATUSES = [
 
 const CONFIRMED_MP = ['approved', 'authorized'];
 const HIDDEN_ATTR_SLUGS = new Set(['dni', 'email', 'correo']);
-const COLS_STORAGE_KEY = 'crm-pam-contact-cols-v1';
+const COLS_STORAGE_KEY = 'crm-pam-contact-cols-v2';
+const LEGACY_COLS_STORAGE_KEY = 'crm-pam-contact-cols-v1';
 
 type FixedColId =
   | 'name'
   | 'last_name'
   | 'phone'
+  | 'wa_identity'
   | 'email'
   | 'dni'
   | 'segments'
@@ -119,6 +123,7 @@ const FIXED_COLUMNS: Array<{ id: FixedColId; label: string; locked?: boolean }> 
     { id: 'name', label: 'Nombre', locked: true },
     { id: 'last_name', label: 'Apellido' },
     { id: 'phone', label: 'Teléfono' },
+    { id: 'wa_identity', label: 'Usuario WhatsApp' },
     { id: 'email', label: 'Email' },
     { id: 'dni', label: 'DNI' },
     { id: 'segments', label: 'Segmentos' },
@@ -131,6 +136,7 @@ const DEFAULT_VISIBLE_COLS: FixedColId[] = [
   'name',
   'last_name',
   'phone',
+  'wa_identity',
   'email',
   'dni',
   'segments',
@@ -145,11 +151,14 @@ function attrColId(slug: string) {
 
 function loadStoredVisibleCols(): Set<string> | null {
   try {
-    const raw = localStorage.getItem(COLS_STORAGE_KEY);
+    const saved = localStorage.getItem(COLS_STORAGE_KEY);
+    const raw = saved ?? localStorage.getItem(LEGACY_COLS_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return null;
-    return new Set(parsed.filter((x): x is string => typeof x === 'string'));
+    const visible = new Set(parsed.filter((x): x is string => typeof x === 'string'));
+    if (!saved) visible.add('wa_identity');
+    return visible;
   } catch {
     return null;
   }
@@ -209,6 +218,10 @@ function computeExpiryDateInput(
 function dash(v: string | null | undefined) {
   const s = String(v ?? '').trim();
   return s || '—';
+}
+
+function waUsername(value: string | null) {
+  return value ? `@${value.replace(/^@/, '')}` : null;
 }
 
 export function CrmPamPage() {
@@ -718,7 +731,7 @@ export function CrmPamPage() {
       nombres: c.name.trim() || prev.nombres,
       apellidos: c.last_name.trim() || prev.apellidos,
       dni: (c.dni ?? c.attributes.dni ?? '').trim() || prev.dni,
-      celular: c.phone.trim() || prev.celular,
+      celular: c.phone?.trim() || prev.celular,
       correo: (c.email ?? '').trim() || prev.correo,
       plan: plan || prev.plan,
       frecuencia:
@@ -1023,7 +1036,9 @@ export function CrmPamPage() {
           ID: c.contact_id,
           Nombre: c.name,
           Apellido: c.last_name,
-          Teléfono: c.phone,
+          Teléfono: c.phone ?? '',
+          'Usuario WhatsApp': waUsername(c.wa_username) ?? '',
+          BSUID: c.whatsapp_user_id ?? '',
           Email: c.email ?? '',
           DNI: c.dni ?? c.attributes.dni ?? '',
           Segmentos: c.segment_slugs.join('; '),
@@ -1099,8 +1114,18 @@ export function CrmPamPage() {
         id: 'phone',
         header: 'Teléfono',
         cell: ({ row }) => (
-          <span className="font-mono text-sm">{row.original.phone}</span>
+          <span className="font-mono text-sm">{dash(row.original.phone)}</span>
         ),
+      });
+    }
+    if (isColVisible('wa_identity')) {
+      cols.push({
+        id: 'wa_identity',
+        header: 'Usuario WhatsApp',
+        cell: ({ row }) => <div className="min-w-36">
+          <div>{waUsername(row.original.wa_username) || (row.original.whatsapp_user_id ? 'Número privado' : '—')}</div>
+          {row.original.whatsapp_user_id && <div className="font-mono text-xs text-muted-foreground">{row.original.whatsapp_user_id}</div>}
+        </div>,
       });
     }
     if (isColVisible('email')) {
@@ -1982,7 +2007,7 @@ export function CrmPamPage() {
                             {c.name} {c.last_name}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {c.phone}
+                            {c.phone || waUsername(c.wa_username) || c.whatsapp_user_id || 'Sin teléfono'}
                             {c.email ? ` · ${c.email}` : ''}
                           </span>
                         </button>
@@ -2052,7 +2077,7 @@ export function CrmPamPage() {
                             {c.name} {c.last_name}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {c.phone}
+                            {c.phone || waUsername(c.wa_username) || c.whatsapp_user_id || 'Sin teléfono'}
                             {c.email ? ` · ${c.email}` : ''}
                           </span>
                         </button>

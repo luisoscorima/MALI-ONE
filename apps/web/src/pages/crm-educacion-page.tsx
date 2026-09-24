@@ -28,22 +28,32 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 const FIXED_COLUMNS = [
   ['name', 'Nombre'], ['area', 'Número'], ['last_name', 'Apellido'],
-  ['phone', 'Teléfono'], ['email', 'Email'], ['dni', 'DNI'],
+  ['phone', 'Teléfono'], ['wa_identity', 'Usuario WhatsApp'], ['email', 'Email'], ['dni', 'DNI'],
   ['segments', 'Segmentos'], ['advisor', 'Asesor'], ['lead_status', 'Estado del lead'],
 ] as const;
-const STORAGE_KEY = 'crm-educacion-contact-cols-v2';
+const STORAGE_KEY = 'crm-educacion-contact-cols-v3';
+const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v2';
 const PAGE_SIZE = 50;
 
 function storedColumns(): Set<string> {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (Array.isArray(value)) return new Set(value.filter((v): v is string => typeof v === 'string'));
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const value = JSON.parse(saved ?? localStorage.getItem(LEGACY_STORAGE_KEY) ?? 'null');
+    if (Array.isArray(value)) {
+      const visible = new Set(value.filter((v): v is string => typeof v === 'string'));
+      if (!saved) visible.add('wa_identity');
+      return visible;
+    }
   } catch { /* Prefer defaults when storage is invalid. */ }
   return new Set(FIXED_COLUMNS.map(([id]) => id));
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString('es-PE', { timeZone: 'America/Lima' });
+}
+
+function waUsername(value: string | null) {
+  return value ? `@${value.replace(/^@/, '')}` : null;
 }
 
 type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email' | 'segment_slugs' | 'attributes'> & {
@@ -198,6 +208,11 @@ export function CrmEducacionPage() {
     cols.push({ id: 'area', header: 'Número', cell: ({ row }) => <Badge variant="secondary">{AREA_LABELS[row.original.area]}</Badge> });
     if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
     if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
+    if (visible.has('wa_identity')) cols.push({ id: 'wa_identity', header: 'Usuario WhatsApp', cell: ({ row }) =>
+      <div className="min-w-36">
+        <div>{waUsername(row.original.wa_username) || (row.original.whatsapp_user_id ? 'Número privado' : '—')}</div>
+        {row.original.whatsapp_user_id && <div className="font-mono text-xs text-muted-foreground">{row.original.whatsapp_user_id}</div>}
+      </div> });
     if (visible.has('email')) cols.push({ id: 'email', header: 'Email', cell: ({ row }) => row.original.email || '—' });
     if (visible.has('dni')) cols.push({ id: 'dni', header: 'DNI', cell: ({ row }) => row.original.dni || row.original.attributes.dni || '—' });
     if (visible.has('segments')) cols.push({
@@ -227,7 +242,13 @@ export function CrmEducacionPage() {
       id: 'person', header: 'Contacto', cell: ({ row }) => {
         const lead = row.original;
         const name = [lead.contacts?.name, lead.contacts?.last_name].filter(Boolean).join(' ');
-        return <div><div>{name || '—'}</div><div className="text-xs text-muted-foreground">{lead.contacts?.phone || lead.phone || lead.contacts?.email || lead.email || '—'}</div></div>;
+        const username = waUsername(lead.wa_username || lead.contacts?.wa_username || null);
+        const bsuid = lead.whatsapp_user_id || lead.contacts?.whatsapp_user_id;
+        return <div><div>{name || '—'}</div>
+          <div className="text-xs text-muted-foreground">{[lead.contacts?.phone || lead.phone,
+            username, !username && bsuid ? bsuid : null,
+            lead.contacts?.email || lead.email].filter(Boolean).join(' · ') || '—'}</div>
+        </div>;
       }
     },
     { id: 'channel', header: 'Canal', cell: ({ row }) => CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
@@ -352,7 +373,8 @@ export function CrmEducacionPage() {
       }
       const sheet = XLSX.utils.json_to_sheet(rows.map((c) => ({
         Número: AREA_LABELS[c.area], Nombre: c.name, Apellido: c.last_name,
-        Teléfono: c.phone ?? '', Email: c.email ?? '', DNI: c.dni ?? '',
+        Teléfono: c.phone ?? '', 'Usuario WhatsApp': waUsername(c.wa_username) ?? '',
+        BSUID: c.whatsapp_user_id ?? '', Email: c.email ?? '', DNI: c.dni ?? '',
         Asesor: c.assigned_user_label ?? '',
         'Estado del lead': c.lead_status_label ?? '',
         Segmentos: c.segment_slugs.join(', '), ...c.attributes,
@@ -505,7 +527,7 @@ export function CrmEducacionPage() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label>Buscar</Label>
-            <Input value={contactQ} placeholder="Nombre, teléfono, email…" className="w-56"
+            <Input value={contactQ} placeholder="Nombre, @usuario, BSUID, teléfono…" className="w-64"
               onChange={(event) => { setContactQ(event.target.value); setContactPage(1); }} />
           </div>
           <div className="space-y-1">
@@ -627,7 +649,7 @@ export function CrmEducacionPage() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label>Buscar</Label>
-            <Input value={leadQ} placeholder="Contacto, teléfono, fuente…" className="w-64"
+            <Input value={leadQ} placeholder="Contacto, @usuario, BSUID, fuente…" className="w-72"
               onChange={(event) => { setLeadQ(event.target.value); setLeadPage(1); }} />
           </div>
           <div className="space-y-1">
