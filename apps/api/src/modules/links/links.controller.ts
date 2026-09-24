@@ -156,8 +156,26 @@ export class LinksController {
   }
 
   @Get()
-  list(@Req() req: Request, @Query('tag') tag?: string) {
-    return this.links.listLinks(req.user as User, tag);
+  list(
+    @Req() req: Request,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('tag') tag?: string,
+    @Query('type') type?: string,
+  ) {
+    const parsedPage = Number(page ?? 1);
+    const parsedPageSize = Number(pageSize ?? 25);
+    return this.links.listLinks(req.user as User, {
+      page: Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+      pageSize:
+        Number.isInteger(parsedPageSize) && parsedPageSize > 0
+          ? Math.min(parsedPageSize, 100)
+          : 25,
+      search,
+      tag,
+      type,
+    });
   }
 
   @Post('qr/bulk')

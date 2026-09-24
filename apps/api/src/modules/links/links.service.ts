@@ -266,19 +266,62 @@ export class LinksService {
     return link;
   }
 
-  async listLinks(user: User, tag?: string) {
-    const where =
+  async listLinks(
+    user: User,
+    options: {
+      page: number;
+      pageSize: number;
+      search?: string;
+      tag?: string;
+      type?: string;
+    },
+  ) {
+    const ownershipWhere: Prisma.ShortLinkWhereInput =
       user.role === UserRole.admin ? {} : { createdById: user.id };
-    const normalizedTag = tag?.trim().toLowerCase();
+    const normalizedTag = options.tag?.trim().toLowerCase();
+    const search = options.search?.trim();
+    const type = Object.values(LinkType).includes(options.type as LinkType)
+      ? (options.type as LinkType)
+      : undefined;
+    const where: Prisma.ShortLinkWhereInput = {
+      ...ownershipWhere,
+      ...(normalizedTag ? { tags: { has: normalizedTag } } : {}),
+      ...(type ? { type } : {}),
+      ...(search
+        ? {
+            OR: [
+              { slug: { contains: search, mode: 'insensitive' } },
+              { targetUrl: { contains: search, mode: 'insensitive' } },
+              { fileName: { contains: search, mode: 'insensitive' } },
+              { tags: { has: search.toLowerCase() } },
+            ],
+          }
+        : {}),
+    };
 
-    const links = await this.prisma.shortLink.findMany({
-      where: normalizedTag
-        ? { ...where, tags: { has: normalizedTag } }
-        : where,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-    return Promise.all(links.map((l) => this.toDto(l, false)));
+    const [links, total, tagRows] = await this.prisma.$transaction([
+      this.prisma.shortLink.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (options.page - 1) * options.pageSize,
+        take: options.pageSize,
+      }),
+      this.prisma.shortLink.count({ where }),
+      this.prisma.shortLink.findMany({
+        where: ownershipWhere,
+        select: { tags: true },
+      }),
+    ]);
+    const totalPages = Math.ceil(total / options.pageSize);
+
+    return {
+      items: await Promise.all(links.map((link) => this.toDto(link, false))),
+      total,
+      page: options.page,
+      pageSize: options.pageSize,
+      totalPages,
+      tags: [...new Set(tagRows.flatMap((row) => row.tags))].sort(),
+    };
   }
 
   async updateLink(

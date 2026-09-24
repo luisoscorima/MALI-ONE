@@ -1,5 +1,5 @@
-import { FormEvent, lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { BarChart3, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { BarChart3, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE } from '@mali-one/shared';
 import { FilterChip, IconActionButton } from '@/components/icon-action-button';
@@ -103,10 +103,17 @@ export function LinksPage() {
   const [customSlug, setCustomSlug] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
+  const [tagSearch, setTagSearch] = useState('');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [file, setFile] = useState<File | null>(null);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const pageSize = 25;
   const [listLoading, setListLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -123,6 +130,7 @@ export function LinksPage() {
   const [bulkQrFormat, setBulkQrFormat] = useState<'png' | 'svg'>('png');
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [excelExporting, setExcelExporting] = useState(false);
+  const listRequestId = useRef(0);
 
   const loadDefaultQrStyle = useCallback(async () => {
     try {
@@ -137,6 +145,15 @@ export function LinksPage() {
     void loadDefaultQrStyle();
   }, [loadDefaultQrStyle]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, tagFilter, typeFilter]);
+
   function openQrDesigner(link: ShortLinkDto) {
     setQrModalSavedStyle(link.qrStyle ?? defaultQrStyle);
     setQrModalLink(link);
@@ -148,22 +165,34 @@ export function LinksPage() {
   }
 
   const loadLinks = useCallback(async () => {
+    const requestId = ++listRequestId.current;
     setListLoading(true);
     setError('');
     try {
-      const data = await api.listLinks();
-      setLinks(data);
-      setSelectedIds((prev) =>
-        prev.filter((id) => data.some((link) => link.id === id)),
-      );
+      const data = await api.listLinks({
+        page,
+        pageSize,
+        search: debouncedSearch || undefined,
+        tag: tagFilter || undefined,
+        type: typeFilter,
+      });
+      if (requestId !== listRequestId.current) return;
+      setLinks(data.items);
+      setAllTags(data.tags);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
+      if (data.totalPages > 0 && page > data.totalPages) {
+        setPage(data.totalPages);
+      }
     } catch (e) {
+      if (requestId !== listRequestId.current) return;
       const msg = e instanceof Error ? e.message : 'Error al cargar enlaces';
       setError(msg);
       toast.error(msg);
     } finally {
-      setListLoading(false);
+      if (requestId === listRequestId.current) setListLoading(false);
     }
-  }, [toast]);
+  }, [debouncedSearch, page, tagFilter, toast, typeFilter]);
 
   useEffect(() => {
     void loadLinks();
@@ -412,23 +441,20 @@ export function LinksPage() {
     void loadLinks();
   }
 
-  const allTags = [...new Set(links.flatMap((link) => link.tags))].sort();
-  const query = search.trim().toLocaleLowerCase();
-  const hasFilters = !!(query || tagFilter || typeFilter !== 'all');
-  const filteredLinks = links.filter((link) =>
-    (!tagFilter || link.tags.includes(tagFilter)) &&
-    (typeFilter === 'all' || link.type === typeFilter) &&
-    (!query || [link.slug, link.shortUrl, link.targetUrl, link.fileName, ...link.tags]
-      .some((value) => value?.toLocaleLowerCase().includes(query))),
+  const normalizedTagSearch = tagSearch.trim().toLocaleLowerCase();
+  const visibleTags = allTags.filter((tag) =>
+    tag.toLocaleLowerCase().includes(normalizedTagSearch),
   );
-  const visibleSelectedCount = filteredLinks.filter((link) => selectedIds.includes(link.id)).length;
+  const hasFilters = !!(debouncedSearch || tagFilter || typeFilter !== 'all');
+  const visibleSelectedCount = links.filter((link) => selectedIds.includes(link.id)).length;
   const hiddenSelectedCount = selectedIds.length - visibleSelectedCount;
   function resetFilters() {
     setSearch('');
+    setTagSearch('');
     setTagFilter('');
     setTypeFilter('all');
   }
-  const exportTargets = getExportTargets(filteredLinks);
+  const exportTargets = getExportTargets(links);
   const exportScopeLabel =
     selectedIds.length > 0
       ? hiddenSelectedCount > 0
@@ -622,11 +648,20 @@ export function LinksPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold">Historial</h3>
             {allTags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
-                  Todos
-                </FilterChip>
-                {allTags.map((tag) => (
+              <div className="min-w-0 flex-1">
+                <Input
+                  type="search"
+                  aria-label="Buscar etiquetas"
+                  placeholder="Buscar etiquetas"
+                  value={tagSearch}
+                  onChange={(event) => setTagSearch(event.target.value)}
+                  className="mb-2 ml-auto max-w-xs"
+                />
+                <div className="flex max-h-24 flex-wrap items-center gap-1.5 overflow-y-auto">
+                  <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
+                    Todos
+                  </FilterChip>
+                  {visibleTags.map((tag) => (
                   <FilterChip
                     key={tag}
                     active={tagFilter === tag}
@@ -634,7 +669,8 @@ export function LinksPage() {
                   >
                     #{tag}
                   </FilterChip>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -658,9 +694,9 @@ export function LinksPage() {
             {hasFilters && <Button type="button" variant="ghost" onClick={resetFilters}>Restablecer filtros</Button>}
           </div>
           <p role="status" className="mt-2 text-sm text-muted-foreground">
-            {listLoading ? 'Cargando enlaces…' : filteredLinks.length + ' de ' + links.length + ' enlaces'}
+            {listLoading ? 'Cargando enlaces…' : `${links.length} de ${total} enlaces`}
           </p>
-          {(filteredLinks.length > 0 || selectedIds.length > 0) && (
+          {(links.length > 0 || selectedIds.length > 0) && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
               <span className="text-sm text-muted">{exportScopeLabel}</span>
               <Button
@@ -668,7 +704,7 @@ export function LinksPage() {
                 size="sm"
                 variant="outline"
                 disabled={excelExporting || bulkDownloading || exportTargets.length === 0}
-                onClick={() => handleExcelExport(filteredLinks)}
+                onClick={() => handleExcelExport(links)}
               >
                 {excelExporting ? (
                   <>
@@ -706,7 +742,7 @@ export function LinksPage() {
                   exportTargets.length === 0 ||
                   exportTargets.length > 50
                 }
-                onClick={() => void handleBulkQrDownload(filteredLinks)}
+                onClick={() => void handleBulkQrDownload(links)}
               >
                 {bulkDownloading ? (
                   <>
@@ -746,22 +782,22 @@ export function LinksPage() {
                 <TableHead className="w-10 p-4">
                   <Checkbox
                     checked={
-                      filteredLinks.length > 0 &&
-                      filteredLinks.every((link) =>
+                      links.length > 0 &&
+                      links.every((link) =>
                         selectedIds.includes(link.id),
                       )
                         ? true
-                        : filteredLinks.some((link) =>
+                        : links.some((link) =>
                               selectedIds.includes(link.id),
                             )
                           ? 'indeterminate'
                           : false
                     }
                     onCheckedChange={() =>
-                      toggleAllVisibleLinks(filteredLinks.map((l) => l.id))
+                      toggleAllVisibleLinks(links.map((l) => l.id))
                     }
                     aria-label="Seleccionar todos los visibles"
-                    disabled={listLoading || filteredLinks.length === 0}
+                    disabled={listLoading || links.length === 0}
                   />
                 </TableHead>
                 <TableHead className="p-4">Identificador</TableHead>
@@ -776,14 +812,14 @@ export function LinksPage() {
               <TableBody>
                 <TableSkeleton rows={4} cols={7} />
               </TableBody>
-            ) : filteredLinks.length === 0 ? (
+            ) : links.length === 0 ? (
               <TableBody>
                 <TableRow>
                   <TableCell colSpan={7}>
                     <EmptyState
-                      title={links.length > 0 ? 'Sin coincidencias' : 'Sin enlaces todavía'}
+                      title={hasFilters ? 'Sin coincidencias' : 'Sin enlaces todavía'}
                       description={
-                        links.length > 0
+                        hasFilters
                           ? 'Prueba otra búsqueda o restablece los filtros.'
                           : 'Acorta una URL, crea un enlace de WhatsApp o sube un archivo para empezar.'
                       }
@@ -793,7 +829,7 @@ export function LinksPage() {
               </TableBody>
             ) : (
               <TableBody>
-                {filteredLinks.map((link) => {
+                {links.map((link) => {
                   const dest = formatLinkDestination(link);
                   return (
                     <TableRow key={link.id} className="border-border/60">
@@ -905,6 +941,33 @@ export function LinksPage() {
             )}
           </Table>
         </div>
+        {!listLoading && (totalPages > 1 || total > pageSize) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+            <span className="text-sm text-muted">
+              Página {totalPages === 0 ? 0 : page} de {Math.max(1, totalPages)} · {total} enlaces
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                <ChevronLeft className="size-4" /> Anterior
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Siguiente <ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog

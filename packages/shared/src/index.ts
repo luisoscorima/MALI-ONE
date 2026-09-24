@@ -588,6 +588,15 @@ export interface ShortLinkDto {
   qrBase64?: string;
 }
 
+export interface ShortLinksPageDto {
+  items: ShortLinkDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  tags: string[];
+}
+
 export interface UpdateShortLinkDto {
   url?: string;
   phone?: string;

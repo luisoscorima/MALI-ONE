@@ -323,11 +323,21 @@ export const api = {
     );
   },
 
-  listLinks: (tag?: string) => {
+  listLinks: (options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    tag?: string;
+    type?: string;
+  } = {}) => {
     const params = new URLSearchParams();
-    if (tag) params.set('tag', tag);
+    if (options.page) params.set('page', String(options.page));
+    if (options.pageSize) params.set('pageSize', String(options.pageSize));
+    if (options.search) params.set('search', options.search);
+    if (options.tag) params.set('tag', options.tag);
+    if (options.type && options.type !== 'all') params.set('type', options.type);
     const qs = params.toString();
-    return request<import('@mali-one/shared').ShortLinkDto[]>(
+    return request<import('@mali-one/shared').ShortLinksPageDto>(
       `/api/links${qs ? `?${qs}` : ''}`,
     );
   },
