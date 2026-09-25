@@ -43,7 +43,14 @@ export function buildQrStylingOptions(
     data,
     margin: style.margin ?? 8,
     qrOptions: {
-      errorCorrectionLevel: withLogo ? ('H' as const) : ('M' as const),
+      // El preset de puntos sin logo usa L para mantener una matriz más
+      // compacta (normalmente 25x25). Los logos conservan H y los demás
+      // estilos conservan M.
+      errorCorrectionLevel: withLogo
+        ? ('H' as const)
+        : style.bodyShape === 'dots'
+          ? ('L' as const)
+          : ('M' as const),
     },
     image: logoUrl,
     imageOptions: {

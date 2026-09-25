@@ -130,7 +130,13 @@ export class QrService {
         }
       : undefined;
 
-    const errorCorrectionLevel = withLogo ? 'H' : 'M';
+    // Solo el estilo de puntos sin logo reduce la redundancia para obtener
+    // una matriz más compacta. Con logo se mantiene H; el resto conserva M.
+    const errorCorrectionLevel = withLogo
+      ? 'H'
+      : safeStyle.bodyShape === 'dots'
+        ? 'L'
+        : 'M';
 
     return {
       width,

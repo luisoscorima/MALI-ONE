@@ -21,7 +21,13 @@ export function buildAdobeSafeQrSvg(input: AdobeSvgInput): string {
   const { data, width, style, logoDataUrl } = input;
   const marginPx = Math.max(0, style.margin ?? 8);
   const withLogo = Boolean(logoDataUrl);
-  const ecc: 'M' | 'H' = withLogo ? 'H' : 'M';
+  // Mantener el mismo nivel usado por la vista previa y el PNG: puntos sin
+  // logo en L; cualquier QR con logo en H; los demás estilos en M.
+  const ecc: 'L' | 'M' | 'H' = withLogo
+    ? 'H'
+    : style.bodyShape === 'dots'
+      ? 'L'
+      : 'M';
 
   const qr = qrcode(0, ecc);
   qr.addData(data);
