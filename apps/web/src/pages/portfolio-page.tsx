@@ -26,6 +26,7 @@ import {
   Clock,
   Download,
   CalendarRange,
+  ExternalLink,
   LayoutGrid,
   List,
   Plus,
@@ -84,6 +85,9 @@ import {
   TabsList,
   TabsTrigger,
   Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { isFloatingLayerBlockingDismiss } from '@/lib/floating-layer';
@@ -361,6 +365,86 @@ function calendarChipLabel(item: TodoItemDto) {
       })} `
     : '';
   return `${prefix}${item.title}`;
+}
+
+function externalHref(raw: string | null | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(value) ? value : `https://${value}`;
+  try {
+    const url = new URL(candidate);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function OpenLinkButton({
+  url,
+  compact = false,
+  className,
+}: {
+  url: string | null | undefined;
+  compact?: boolean;
+  className?: string;
+}) {
+  const href = externalHref(url);
+  if (!href) return null;
+
+  if (compact) {
+    return (
+      <span
+        role="link"
+        tabIndex={0}
+        title="Abrir enlace"
+        aria-label="Abrir enlace en pestaña nueva"
+        className={cn(
+          'inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded opacity-80 hover:bg-black/10 hover:opacity-100',
+          className,
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(href, '_blank', 'noopener,noreferrer');
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(href, '_blank', 'noopener,noreferrer');
+        }}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <ExternalLink className="size-2.5" />
+      </span>
+    );
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+          asChild
+        >
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Abrir enlace en pestaña nueva"
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <ExternalLink className="size-3" />
+          </a>
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">Abrir enlace</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function impactBadgeVariant(impact: PortfolioImpact) {
@@ -1076,10 +1160,11 @@ function ProjectsSection() {
                     onClick={() => openEdit(p)}
                   >
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className={cn(p.archivedAt && 'text-muted-foreground')}>
                           {p.name}
                         </span>
+                        <OpenLinkButton url={p.link} />
                         {p.archivedAt ? (
                           <Badge variant="outline">Archivado</Badge>
                         ) : null}
@@ -1133,12 +1218,10 @@ function ProjectsSection() {
                     <span className="text-[10px] text-muted-foreground">—</span>
                   ) : (
                     timelineByMonth[monthIdx].map((p) => (
-                      <button
+                      <div
                         key={p.id}
-                        type="button"
-                        onClick={() => openEdit(p)}
                         className={cn(
-                          'rounded border bg-background px-1.5 py-1 text-left text-[10px] hover:bg-muted/50',
+                          'flex items-start gap-0.5 rounded border bg-background px-1.5 py-1 text-[10px] hover:bg-muted/50',
                           p.archivedAt && 'border-dashed opacity-80',
                         )}
                         style={{
@@ -1146,12 +1229,23 @@ function ProjectsSection() {
                           borderLeftWidth: 3,
                         }}
                       >
-                        <div className="truncate font-medium">{p.name}</div>
-                        <div className="text-muted-foreground">
-                          {p.archivedAt ? 'Archivado · ' : ''}
-                          {p.progress}% · {IMPACT_LABEL[p.impact]}
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(p)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <div className="truncate font-medium">{p.name}</div>
+                          <div className="text-muted-foreground">
+                            {p.archivedAt ? 'Archivado · ' : ''}
+                            {p.progress}% · {IMPACT_LABEL[p.impact]}
+                          </div>
+                        </button>
+                        <OpenLinkButton
+                          url={p.link}
+                          compact
+                          className="text-muted-foreground"
+                        />
+                      </div>
                     ))
                   )}
                 </div>
@@ -1306,11 +1400,14 @@ function ProjectsSection() {
               </div>
               <div className="col-span-2 grid gap-1.5">
                 <Label htmlFor="proj-link">Enlace</Label>
-                <Input
-                  id="proj-link"
-                  value={form.link}
-                  onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-                />
+                <div className="flex items-center gap-1">
+                  <Input
+                    id="proj-link"
+                    value={form.link}
+                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+                  />
+                  <OpenLinkButton url={form.link} />
+                </div>
               </div>
             </div>
             {editing ? (
@@ -1994,14 +2091,17 @@ function TasksSection() {
                               }
                             }}
                             className={cn(
-                              'truncate rounded px-1 py-0.5 text-left text-[10px] text-white',
+                              'flex items-center gap-0.5 rounded px-1 py-0.5 text-left text-[10px] text-white',
                               isOverdue(item) && 'ring-1 ring-red-400',
                             )}
                             style={{
                               background: workflowStatusColor(item.status),
                             }}
                           >
-                            {calendarChipLabel(item)}
+                            <span className="min-w-0 flex-1 truncate">
+                              {calendarChipLabel(item)}
+                            </span>
+                            <OpenLinkButton url={item.link} compact />
                           </span>
                         ))}
                         {dayItems.length > 3 ? (
@@ -2096,7 +2196,10 @@ function TasksSection() {
                               isOverdue(item) && 'text-red-700 dark:text-red-300',
                             )}
                           >
-                            {item.title}
+                            <div className="flex items-center gap-1">
+                              <span className="min-w-0">{item.title}</span>
+                              <OpenLinkButton url={item.link} />
+                            </div>
                           </TableCell>
                           <TableCell>{item.project?.name ?? '—'}</TableCell>
                           <TableCell>{item.type?.name ?? '—'}</TableCell>
@@ -2386,11 +2489,14 @@ function TasksSection() {
               </div>
               <div className="col-span-2 grid gap-1.5">
                 <Label htmlFor="todo-link">Enlace</Label>
-                <Input
-                  id="todo-link"
-                  value={form.link}
-                  onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-                />
+                <div className="flex items-center gap-1">
+                  <Input
+                    id="todo-link"
+                    value={form.link}
+                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+                  />
+                  <OpenLinkButton url={form.link} />
+                </div>
               </div>
               {editing ? (
                 <div className="grid gap-1.5">
@@ -2815,47 +2921,50 @@ function ProjectKanbanCard({
         project.archivedAt && 'border-dashed opacity-80',
       )}
     >
-      <button
-        type="button"
-        className="w-full text-left"
-        {...attributes}
-        {...listeners}
-        onClick={() => onOpen(project)}
-      >
-        <div className="text-sm font-medium leading-snug">{project.name}</div>
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          <Badge variant="outline" className="text-[10px]">
-            {AREA_LABEL[project.area]}
-          </Badge>
-          <Badge variant="secondary" className="text-[10px]">
-            {PROJECT_TYPE_LABEL[project.projectType]}
-          </Badge>
-          <Badge variant={impactBadgeVariant(project.impact)} className="text-[10px]">
-            {IMPACT_LABEL[project.impact]}
-          </Badge>
-          {project.archivedAt ? (
+      <div className="flex items-start gap-1">
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left"
+          {...attributes}
+          {...listeners}
+          onClick={() => onOpen(project)}
+        >
+          <div className="text-sm font-medium leading-snug">{project.name}</div>
+          <div className="mt-1.5 flex flex-wrap gap-1">
             <Badge variant="outline" className="text-[10px]">
-              Archivado
+              {AREA_LABEL[project.area]}
             </Badge>
-          ) : null}
-          {project.stakeholder ? (
-            <span className="text-[10px] text-muted-foreground">
-              {project.stakeholder}
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-2 flex items-center gap-2">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${project.progress}%` }}
-            />
+            <Badge variant="secondary" className="text-[10px]">
+              {PROJECT_TYPE_LABEL[project.projectType]}
+            </Badge>
+            <Badge variant={impactBadgeVariant(project.impact)} className="text-[10px]">
+              {IMPACT_LABEL[project.impact]}
+            </Badge>
+            {project.archivedAt ? (
+              <Badge variant="outline" className="text-[10px]">
+                Archivado
+              </Badge>
+            ) : null}
+            {project.stakeholder ? (
+              <span className="text-[10px] text-muted-foreground">
+                {project.stakeholder}
+              </span>
+            ) : null}
           </div>
-          <span className="text-[10px] tabular-nums text-muted-foreground">
-            {project.progress}%
-          </span>
-        </div>
-      </button>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${project.progress}%` }}
+              />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground">
+              {project.progress}%
+            </span>
+          </div>
+        </button>
+        <OpenLinkButton url={project.link} />
+      </div>
     </div>
   );
 }
@@ -2973,51 +3082,54 @@ function KanbanCard({
         overdue && 'border-red-300',
       )}
     >
-      <button
-        type="button"
-        className="w-full text-left"
-        {...attributes}
-        {...listeners}
-        onClick={() => onOpen(item)}
-      >
-        <div
-          className={cn(
-            'text-sm font-medium leading-snug',
-            overdue && 'text-red-700 dark:text-red-300',
-          )}
+      <div className="flex items-start gap-1">
+        <button
+          type="button"
+          className="min-w-0 flex-1 text-left"
+          {...attributes}
+          {...listeners}
+          onClick={() => onOpen(item)}
         >
-          {item.title}
-        </div>
-        {item.project ? (
-          <div className="mt-1 text-[10px] text-muted-foreground">
-            {item.project.name}
-          </div>
-        ) : null}
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          <Badge
-            variant="outline"
-            className="text-[10px]"
-            style={colorBadgeStyle(PRIORITY_COLOR[item.priority])}
+          <div
+            className={cn(
+              'text-sm font-medium leading-snug',
+              overdue && 'text-red-700 dark:text-red-300',
+            )}
           >
-            {PRIORITY_LABEL[item.priority]}
-          </Badge>
-          {item.type ? (
-            <Badge variant="secondary" className="text-[10px]">
-              {item.type.name}
-            </Badge>
+            {item.title}
+          </div>
+          {item.project ? (
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              {item.project.name}
+            </div>
           ) : null}
-          {item.dueAt ? (
-            <span
-              className={cn(
-                'text-[10px] text-muted-foreground',
-                overdue && 'font-medium text-red-600',
-              )}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <Badge
+              variant="outline"
+              className="text-[10px]"
+              style={colorBadgeStyle(PRIORITY_COLOR[item.priority])}
             >
-              {formatShortDate(item.dueAt)}
-            </span>
-          ) : null}
-        </div>
-      </button>
+              {PRIORITY_LABEL[item.priority]}
+            </Badge>
+            {item.type ? (
+              <Badge variant="secondary" className="text-[10px]">
+                {item.type.name}
+              </Badge>
+            ) : null}
+            {item.dueAt ? (
+              <span
+                className={cn(
+                  'text-[10px] text-muted-foreground',
+                  overdue && 'font-medium text-red-600',
+                )}
+              >
+                {formatShortDate(item.dueAt)}
+              </span>
+            ) : null}
+          </div>
+        </button>
+        <OpenLinkButton url={item.link} />
+      </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {canMarkDone ? (
           <Button
