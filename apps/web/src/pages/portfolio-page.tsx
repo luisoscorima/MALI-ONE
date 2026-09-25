@@ -134,7 +134,7 @@ const SERVICE_STATUS_COLOR: Record<OperationalServiceStatus, string> = {
   up: '#16a34a',
   degraded: '#ca8a04',
   down: '#dc2626',
-  maintenance: '#2563eb',
+  maintenance: '#9333ea',
 };
 
 const PRIORITY_LABEL: Record<TodoPriority, string> = {
@@ -150,6 +150,49 @@ const PRIORITY_RANK: Record<TodoPriority, number> = {
   high: 2,
   urgent: 3,
 };
+
+const PRIORITY_COLOR: Record<TodoPriority, string> = {
+  low: '#16a34a',
+  medium: '#ca8a04',
+  high: '#dc2626',
+  urgent: '#dc2626',
+};
+
+const WORKFLOW_STATUS_COLOR = {
+  pending: '#dc2626',
+  doing: '#ca8a04',
+  blocked: '#9333ea',
+  done: '#16a34a',
+} as const;
+
+function workflowStatusColor(status: {
+  key: string;
+  name: string;
+  color: string | null;
+  isDone?: boolean;
+  isClosed?: boolean;
+}) {
+  const value = `${status.key} ${status.name}`.toLowerCase();
+  if (status.isDone || status.isClosed || /done|closed|hecho|cerrado/.test(value)) {
+    return WORKFLOW_STATUS_COLOR.done;
+  }
+  if (/blocked|bloqueado/.test(value)) return WORKFLOW_STATUS_COLOR.blocked;
+  if (/doing|active|curso|ejecuci[oó]n/.test(value)) {
+    return WORKFLOW_STATUS_COLOR.doing;
+  }
+  if (/pending|backlog|planned|pendiente|planificado/.test(value)) {
+    return WORKFLOW_STATUS_COLOR.pending;
+  }
+  return status.color || '#94a3b8';
+}
+
+function colorBadgeStyle(color: string) {
+  return {
+    backgroundColor: `${color}22`,
+    borderColor: `${color}66`,
+    color,
+  };
+}
 
 const EFFORT_LABEL: Record<TodoEffort, string> = {
   xs: 'XS',
@@ -208,7 +251,7 @@ type TodoFormState = {
   effort: string;
   statusId: string;
   dueAt: string;
-  addMinutes: string;
+  timeSpentMinutes: string;
   archived: boolean;
 };
 
@@ -341,7 +384,7 @@ function emptyTodoForm(statusId = ''): TodoFormState {
     effort: '',
     statusId,
     dueAt: '',
-    addMinutes: '',
+    timeSpentMinutes: '0',
     archived: false,
   };
 }
@@ -483,20 +526,24 @@ function DashboardSection() {
   if (!data) return null;
 
   const stats = [
-    { label: 'Activos', value: data.projectsActive },
-    { label: 'En ejecución', value: data.projectsInProgress },
-    { label: 'Planificados', value: data.projectsPlanned },
-    { label: 'Bloqueados', value: data.projectsBlocked },
-    { label: 'Cerrados', value: data.projectsClosed },
+    { label: 'Activos', value: data.projectsActive, color: WORKFLOW_STATUS_COLOR.doing },
+    { label: 'En ejecución', value: data.projectsInProgress, color: WORKFLOW_STATUS_COLOR.doing },
+    { label: 'Planificados', value: data.projectsPlanned, color: WORKFLOW_STATUS_COLOR.pending },
+    { label: 'Bloqueados', value: data.projectsBlocked, color: WORKFLOW_STATUS_COLOR.blocked },
+    { label: 'Cerrados', value: data.projectsClosed, color: WORKFLOW_STATUS_COLOR.done },
   ];
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
-          <Card key={s.label} className="p-4">
+          <Card
+            key={s.label}
+            className="border-l-4 p-4"
+            style={{ borderLeftColor: s.color }}
+          >
             <div className="text-2xl font-semibold tabular-nums">{s.value}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
+            <div className="text-xs" style={{ color: s.color }}>{s.label}</div>
           </Card>
         ))}
       </div>
@@ -1043,15 +1090,8 @@ function ProjectsSection() {
                     <TableCell>{p.stakeholder || '—'}</TableCell>
                     <TableCell>
                       <Badge
-                        variant="secondary"
-                        style={
-                          p.status.color
-                            ? {
-                                backgroundColor: `${p.status.color}22`,
-                                color: p.status.color,
-                              }
-                            : undefined
-                        }
+                        variant="outline"
+                        style={colorBadgeStyle(workflowStatusColor(p.status))}
                       >
                         {p.status.name}
                       </Badge>
@@ -1102,8 +1142,8 @@ function ProjectsSection() {
                           p.archivedAt && 'border-dashed opacity-80',
                         )}
                         style={{
-                          borderLeftColor: p.status.color ?? undefined,
-                          borderLeftWidth: p.status.color ? 3 : undefined,
+                          borderLeftColor: workflowStatusColor(p.status),
+                          borderLeftWidth: 3,
                         }}
                       >
                         <div className="truncate font-medium">{p.name}</div>
@@ -1165,7 +1205,13 @@ function ProjectsSection() {
                   <SelectContent position="popper">
                     {statuses.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ background: workflowStatusColor(s) }}
+                          />
+                          {s.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1493,7 +1539,7 @@ function TasksSection() {
       effort: item.effort ?? '',
       statusId: item.statusId,
       dueAt: toDateInput(item.dueAt),
-      addMinutes: '',
+      timeSpentMinutes: String(item.timeSpentMinutes),
       archived: Boolean(item.archivedAt),
     });
     setDialogOpen(true);
@@ -1555,11 +1601,8 @@ function TasksSection() {
         saved = await api.updateTodo(editing.id, {
           ...payload,
           archived: form.archived,
+          timeSpentMinutes: Number(form.timeSpentMinutes),
         });
-        const minutes = Number(form.addMinutes);
-        if (minutes > 0) {
-          saved = await api.addTodoTime(editing.id, minutes);
-        }
         upsertItem(saved);
         toast.success('Tarea actualizada');
       } else {
@@ -1955,8 +1998,7 @@ function TasksSection() {
                               isOverdue(item) && 'ring-1 ring-red-400',
                             )}
                             style={{
-                              background:
-                                item.status.color || 'var(--color-primary)',
+                              background: workflowStatusColor(item.status),
                             }}
                           >
                             {calendarChipLabel(item)}
@@ -2060,26 +2102,18 @@ function TasksSection() {
                           <TableCell>{item.type?.name ?? '—'}</TableCell>
                           <TableCell>
                             <Badge
-                              variant={
-                                item.priority === 'urgent' || item.priority === 'high'
-                                  ? 'destructive'
-                                  : 'outline'
-                              }
+                              variant="outline"
+                              style={colorBadgeStyle(PRIORITY_COLOR[item.priority])}
                             >
                               {PRIORITY_LABEL[item.priority]}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant="secondary"
-                              style={
-                                item.status.color
-                                  ? {
-                                      backgroundColor: `${item.status.color}22`,
-                                      color: item.status.color,
-                                    }
-                                  : undefined
-                              }
+                              variant="outline"
+                              style={colorBadgeStyle(
+                                workflowStatusColor(item.status),
+                              )}
                             >
                               {item.status.name}
                             </Badge>
@@ -2271,7 +2305,13 @@ function TasksSection() {
                   <SelectContent position="popper">
                     {statuses.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.name}
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ background: workflowStatusColor(s) }}
+                          />
+                          {s.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2291,7 +2331,13 @@ function TasksSection() {
                   <SelectContent position="popper">
                     {(Object.keys(PRIORITY_LABEL) as TodoPriority[]).map((p) => (
                       <SelectItem key={p} value={p}>
-                        {PRIORITY_LABEL[p]}
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ background: PRIORITY_COLOR[p] }}
+                          />
+                          {PRIORITY_LABEL[p]}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -2348,15 +2394,15 @@ function TasksSection() {
               </div>
               {editing ? (
                 <div className="grid gap-1.5">
-                  <Label htmlFor="todo-mins">Sumar minutos</Label>
+                  <Label htmlFor="todo-mins">Tiempo registrado (minutos)</Label>
                   <Input
                     id="todo-mins"
                     type="number"
-                    min={1}
-                    max={480}
-                    value={form.addMinutes}
+                    min={0}
+                    step={1}
+                    value={form.timeSpentMinutes}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, addMinutes: e.target.value }))
+                      setForm((f) => ({ ...f, timeSpentMinutes: e.target.value }))
                     }
                   />
                   <div className="flex flex-wrap gap-1">
@@ -2369,7 +2415,9 @@ function TasksSection() {
                         onClick={() =>
                           setForm((f) => ({
                             ...f,
-                            addMinutes: String(Number(f.addMinutes || 0) + m),
+                            timeSpentMinutes: String(
+                              Number(f.timeSpentMinutes || 0) + m,
+                            ),
                           }))
                         }
                       >
@@ -2613,9 +2661,7 @@ function OperationSection({ onGoTasks }: { onGoTasks: () => void }) {
               >
                 <SelectTrigger
                   className="h-8"
-                  style={{
-                    borderColor: SERVICE_STATUS_COLOR[service.status],
-                  }}
+                  style={colorBadgeStyle(SERVICE_STATUS_COLOR[service.status])}
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -2724,7 +2770,7 @@ function ProjectKanbanColumn({
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span
           className="size-2.5 rounded-full"
-          style={{ background: status.color || '#94a3b8' }}
+          style={{ background: workflowStatusColor(status) }}
         />
         <span className="text-sm font-medium">{status.name}</span>
         <Badge variant="secondary" className="ml-auto">
@@ -2847,7 +2893,7 @@ function KanbanColumn({
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <span
           className="size-2.5 rounded-full"
-          style={{ background: status.color || '#94a3b8' }}
+          style={{ background: workflowStatusColor(status) }}
         />
         <span className="text-sm font-medium">{status.name}</span>
         <Badge variant="secondary" className="ml-auto">
@@ -2948,7 +2994,11 @@ function KanbanCard({
           </div>
         ) : null}
         <div className="mt-1.5 flex flex-wrap gap-1">
-          <Badge variant="outline" className="text-[10px]">
+          <Badge
+            variant="outline"
+            className="text-[10px]"
+            style={colorBadgeStyle(PRIORITY_COLOR[item.priority])}
+          >
             {PRIORITY_LABEL[item.priority]}
           </Badge>
           {item.type ? (

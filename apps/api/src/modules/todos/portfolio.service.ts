@@ -28,35 +28,35 @@ const DEFAULT_PROJECT_STATUSES = [
   {
     key: 'backlog',
     name: 'Backlog',
-    color: '#94a3b8',
+    color: '#dc2626',
     isClosed: false,
     sortOrder: 0,
   },
   {
     key: 'planned',
     name: 'Planificado',
-    color: '#eab308',
+    color: '#dc2626',
     isClosed: false,
     sortOrder: 1,
   },
   {
     key: 'active',
     name: 'En ejecución',
-    color: '#22c55e',
+    color: '#ca8a04',
     isClosed: false,
     sortOrder: 2,
   },
   {
     key: 'blocked',
     name: 'Bloqueado',
-    color: '#ef4444',
+    color: '#9333ea',
     isClosed: false,
     sortOrder: 3,
   },
   {
     key: 'closed',
     name: 'Cerrado',
-    color: '#64748b',
+    color: '#16a34a',
     isClosed: true,
     sortOrder: 4,
   },
@@ -93,11 +93,16 @@ export class PortfolioService implements OnModuleInit {
 
   async ensureMeta() {
     const existing = await this.prisma.portfolioProjectStatus.findMany();
-    const byKey = new Set(existing.map((row) => row.key));
+    const byKey = new Map(existing.map((row) => [row.key, row]));
     for (const def of DEFAULT_PROJECT_STATUSES) {
-      if (!byKey.has(def.key)) {
+      const current = byKey.get(def.key);
+      if (!current) {
         await this.prisma.portfolioProjectStatus.create({ data: def });
-        byKey.add(def.key);
+      } else if (current.color !== def.color) {
+        await this.prisma.portfolioProjectStatus.update({
+          where: { id: current.id },
+          data: { color: def.color },
+        });
       }
     }
   }

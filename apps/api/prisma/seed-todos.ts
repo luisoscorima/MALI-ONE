@@ -18,18 +18,18 @@ const DEFAULT_TYPES = [
 const LEGACY_TYPES = ['General', 'Operaciones', 'Contenido', 'Sistemas'];
 
 const DEFAULT_STATUSES = [
-  { key: 'pending', name: 'Pendiente', color: '#94a3b8', isDone: false, sortOrder: 0 },
-  { key: 'doing', name: 'En curso', color: '#3b82f6', isDone: false, sortOrder: 1 },
-  { key: 'blocked', name: 'Bloqueado', color: '#f59e0b', isDone: false, sortOrder: 2 },
-  { key: 'done', name: 'Hecho', color: '#22c55e', isDone: true, sortOrder: 3 },
+  { key: 'pending', name: 'Pendiente', color: '#dc2626', isDone: false, sortOrder: 0 },
+  { key: 'doing', name: 'En curso', color: '#ca8a04', isDone: false, sortOrder: 1 },
+  { key: 'blocked', name: 'Bloqueado', color: '#9333ea', isDone: false, sortOrder: 2 },
+  { key: 'done', name: 'Hecho', color: '#16a34a', isDone: true, sortOrder: 3 },
 ];
 
 const DEFAULT_PROJECT_STATUSES = [
-  { key: 'backlog', name: 'Backlog', color: '#94a3b8', isClosed: false, sortOrder: 0 },
-  { key: 'planned', name: 'Planificado', color: '#eab308', isClosed: false, sortOrder: 1 },
-  { key: 'active', name: 'En ejecución', color: '#22c55e', isClosed: false, sortOrder: 2 },
-  { key: 'blocked', name: 'Bloqueado', color: '#ef4444', isClosed: false, sortOrder: 3 },
-  { key: 'closed', name: 'Cerrado', color: '#64748b', isClosed: true, sortOrder: 4 },
+  { key: 'backlog', name: 'Backlog', color: '#dc2626', isClosed: false, sortOrder: 0 },
+  { key: 'planned', name: 'Planificado', color: '#dc2626', isClosed: false, sortOrder: 1 },
+  { key: 'active', name: 'En ejecución', color: '#ca8a04', isClosed: false, sortOrder: 2 },
+  { key: 'blocked', name: 'Bloqueado', color: '#9333ea', isClosed: false, sortOrder: 3 },
+  { key: 'closed', name: 'Cerrado', color: '#16a34a', isClosed: true, sortOrder: 4 },
 ];
 
 async function main() {
@@ -52,7 +52,7 @@ async function main() {
     await prisma.todoStatus.upsert({
       where: { key: status.key },
       create: status,
-      update: {},
+      update: { color: status.color },
     });
   }
   console.log(`Upserted ${DEFAULT_STATUSES.length} todo statuses`);
@@ -61,7 +61,7 @@ async function main() {
     await prisma.portfolioProjectStatus.upsert({
       where: { key: status.key },
       create: status,
-      update: {},
+      update: { color: status.color },
     });
   }
   console.log(`Upserted ${DEFAULT_PROJECT_STATUSES.length} project statuses`);

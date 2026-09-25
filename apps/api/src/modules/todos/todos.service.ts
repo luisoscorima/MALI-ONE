@@ -49,28 +49,28 @@ const DEFAULT_STATUSES = [
   {
     key: 'pending',
     name: 'Pendiente',
-    color: '#94a3b8',
+    color: '#dc2626',
     isDone: false,
     sortOrder: 0,
   },
   {
     key: 'doing',
     name: 'En curso',
-    color: '#3b82f6',
+    color: '#ca8a04',
     isDone: false,
     sortOrder: 1,
   },
   {
     key: 'blocked',
     name: 'Bloqueado',
-    color: '#f59e0b',
+    color: '#9333ea',
     isDone: false,
     sortOrder: 2,
   },
   {
     key: 'done',
     name: 'Hecho',
-    color: '#22c55e',
+    color: '#16a34a',
     isDone: true,
     sortOrder: 3,
   },
@@ -137,11 +137,16 @@ export class TodosService implements OnModuleInit {
 
   private async ensureDefaultStatuses() {
     const existing = await this.prisma.todoStatus.findMany();
-    const byKey = new Set(existing.map((row) => row.key));
+    const byKey = new Map(existing.map((row) => [row.key, row]));
     for (const def of DEFAULT_STATUSES) {
-      if (!byKey.has(def.key)) {
+      const current = byKey.get(def.key);
+      if (!current) {
         await this.prisma.todoStatus.create({ data: def });
-        byKey.add(def.key);
+      } else if (current.color !== def.color) {
+        await this.prisma.todoStatus.update({
+          where: { id: current.id },
+          data: { color: def.color },
+        });
       }
     }
   }
@@ -308,6 +313,9 @@ export class TodosService implements OnModuleInit {
           ? { scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null }
           : {}),
         ...(sortOrder !== undefined ? { sortOrder } : {}),
+        ...(dto.timeSpentMinutes !== undefined
+          ? { timeSpentMinutes: dto.timeSpentMinutes }
+          : {}),
         ...(completedAt !== undefined ? { completedAt } : {}),
         ...(archivedAt !== undefined ? { archivedAt } : {}),
         ...(statusChanging ? { statusChangedAt: new Date() } : {}),

@@ -215,6 +215,7 @@ export interface UpdateTodoItemDto {
   scheduledAt?: string | null;
   sortOrder?: number;
   archived?: boolean;
+  timeSpentMinutes?: number;
 }
 
 export interface ListProjectsQuery {

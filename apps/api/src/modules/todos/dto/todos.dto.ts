@@ -196,6 +196,12 @@ export class UpdateTodoItemDto {
   @IsOptional()
   @IsBoolean()
   archived?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  timeSpentMinutes?: number;
 }
 
 export class ReorderTodosDto {
