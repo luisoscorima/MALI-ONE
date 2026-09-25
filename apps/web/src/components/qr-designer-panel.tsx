@@ -1,4 +1,5 @@
 import { memo, useEffect, useState } from 'react';
+import { XIcon } from 'lucide-react';
 import type { QrLogoPresetId, QrStyleDto } from '@mali-one/shared';
 import {
   DEFAULT_QR_STYLE,
@@ -255,6 +256,20 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
+      {onRequestClose && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="absolute right-2 top-2 z-10"
+          onClick={requestClose}
+          aria-label="Cerrar modal"
+          title="Cerrar"
+        >
+          <XIcon className="size-4" />
+        </Button>
+      )}
+
       <div
         className={cn(
           'grid min-h-0 flex-1 gap-4 overflow-hidden',

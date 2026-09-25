@@ -1,8 +1,8 @@
-import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE, formatLimaDateTime } from '@mali-one/shared';
-import { FilterChip, IconActionButton } from '@/components/icon-action-button';
+import { IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
 import { downloadLinksExcel } from '@/lib/links-export';
@@ -93,10 +93,52 @@ function TagsField({
   );
 }
 
+function ImportDisclosure({
+  id,
+  open,
+  onToggle,
+  children,
+}: {
+  id: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={id}
+        >
+          <FileSpreadsheet className="size-4" />
+          Importar
+          <ChevronDown
+            className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </Button>
+      </div>
+      {open && (
+        <div id={id} className="mt-4 space-y-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LinksPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>('url');
+  const [bulkImportOpen, setBulkImportOpen] = useState<Record<Tab, boolean>>({
+    url: false,
+    file: false,
+    whatsapp: false,
+  });
   const [url, setUrl] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappText, setWhatsappText] = useState('');
@@ -129,6 +171,7 @@ export function LinksPage() {
   const [bulkQrFormat, setBulkQrFormat] = useState<'png' | 'svg'>('png');
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [excelExporting, setExcelExporting] = useState(false);
+  const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const listRequestId = useRef(0);
 
   const loadDefaultQrStyle = useCallback(async () => {
@@ -161,6 +204,13 @@ export function LinksPage() {
   function closeQrDesigner() {
     setQrModalLink(null);
     setQrModalSavedStyle(null);
+  }
+
+  function toggleBulkImport(target: Tab) {
+    setBulkImportOpen((current) => ({
+      ...current,
+      [target]: !current[target],
+    }));
   }
 
   const loadLinks = useCallback(async () => {
@@ -509,7 +559,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" className="w-fit" disabled={submitting}>
+            <Button type="submit" className="w-fit justify-self-end" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Procesando...
@@ -519,13 +569,17 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-          <div className="mt-4">
+          <ImportDisclosure
+            id="bulk-import-url"
+            open={bulkImportOpen.url}
+            onToggle={() => toggleBulkImport('url')}
+          >
             <LinksBulkImport
               mode="url"
               disabled={submitting}
               onSuccess={() => void loadLinks()}
             />
-          </div>
+          </ImportDisclosure>
           </Card>
         </TabsContent>
 
@@ -565,7 +619,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" className="w-fit" disabled={submitting}>
+            <Button type="submit" className="w-fit justify-self-end" disabled={submitting}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Procesando...
@@ -575,13 +629,17 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-          <div className="mt-4">
+          <ImportDisclosure
+            id="bulk-import-whatsapp"
+            open={bulkImportOpen.whatsapp}
+            onToggle={() => toggleBulkImport('whatsapp')}
+          >
             <LinksBulkImport
               mode="whatsapp"
               disabled={submitting}
               onSuccess={() => void loadLinks()}
             />
-          </div>
+          </ImportDisclosure>
           </Card>
         </TabsContent>
 
@@ -612,7 +670,7 @@ export function LinksPage() {
               value={tagsInput}
               onChange={setTagsInput}
             />
-            <Button type="submit" className="w-fit" disabled={submitting || !file}>
+            <Button type="submit" className="w-fit justify-self-end" disabled={submitting || !file}>
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <Spinner className="h-4 w-4" /> Subiendo...
@@ -622,7 +680,11 @@ export function LinksPage() {
               )}
             </Button>
           </form>
-          <div className="mt-4 space-y-4">
+          <ImportDisclosure
+            id="bulk-import-file"
+            open={bulkImportOpen.file}
+            onToggle={() => toggleBulkImport('file')}
+          >
             <LinksBulkImport
               mode="file-urls"
               disabled={submitting}
@@ -632,7 +694,7 @@ export function LinksPage() {
               disabled={submitting}
               onSuccess={() => void loadLinks()}
             />
-          </div>
+          </ImportDisclosure>
           </Card>
         </TabsContent>
       </Tabs>
@@ -641,22 +703,6 @@ export function LinksPage() {
         <div className="border-b border-border px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold">Historial</h3>
-            {allTags.length > 0 && (
-              <div className="flex max-h-24 max-w-full flex-wrap items-center justify-end gap-1.5 overflow-y-auto">
-                <FilterChip active={!tagFilter} onClick={() => setTagFilter('')}>
-                  Todos
-                </FilterChip>
-                {allTags.map((tag) => (
-                  <FilterChip
-                    key={tag}
-                    active={tagFilter === tag}
-                    onClick={() => setTagFilter(tag)}
-                  >
-                    #{tag}
-                  </FilterChip>
-                ))}
-              </div>
-            )}
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <label className="grid min-w-0 flex-1 basis-64 gap-1 text-sm">
@@ -675,86 +721,161 @@ export function LinksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-1 text-sm">
+              <label htmlFor="link-tag-filter">Etiquetas</label>
+              <Select
+                value={tagFilter || '__all_tags__'}
+                onValueChange={(value) =>
+                  setTagFilter(value === '__all_tags__' ? '' : value)
+                }
+              >
+                <SelectTrigger id="link-tag-filter" className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  <SelectItem value="__all_tags__">Todos</SelectItem>
+                  {allTags.map((tag) => (
+                    <SelectItem key={tag} value={tag}>
+                      #{tag}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {hasFilters && <Button type="button" variant="ghost" onClick={resetFilters}>Restablecer filtros</Button>}
           </div>
           <p role="status" className="mt-2 text-sm text-muted-foreground">
             {listLoading ? 'Cargando enlaces…' : `${links.length} de ${total} enlaces`}
           </p>
           {(links.length > 0 || selectedIds.length > 0) && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-              <span className="text-sm text-muted">{exportScopeLabel}</span>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={excelExporting || bulkDownloading || exportTargets.length === 0}
-                onClick={() => handleExcelExport(links)}
-              >
-                {excelExporting ? (
-                  <>
-                    <Spinner className="size-3.5" />
-                    Exportando…
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="size-3.5" />
-                    Excel
-                  </>
-                )}
-              </Button>
-              <Select
-                value={bulkQrFormat}
-                onValueChange={(value) =>
-                  setBulkQrFormat(value as 'png' | 'svg')
-                }
-                disabled={bulkDownloading || excelExporting}
-              >
-                <SelectTrigger aria-label="Formato de descarga de QR" className="h-8 w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="png">PNG</SelectItem>
-                  <SelectItem value="svg">SVG</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                size="sm"
-                disabled={
-                  bulkDownloading ||
-                  excelExporting ||
-                  exportTargets.length === 0 ||
-                  exportTargets.length > 50
-                }
-                onClick={() => void handleBulkQrDownload(links)}
-              >
-                {bulkDownloading ? (
-                  <>
-                    <Spinner className="size-3.5" />
-                    Generando ZIP…
-                  </>
-                ) : (
-                  <>
-                    <Download className="size-3.5" />
-                    Descargar QR
-                  </>
-                )}
-              </Button>
-              {selectedIds.length > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-end">
                 <Button
                   type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={bulkDownloading || excelExporting}
-                  onClick={() => setSelectedIds([])}
+                  variant="outline"
+                  onClick={() => setExportPanelOpen((open) => !open)}
+                  aria-expanded={exportPanelOpen}
+                  aria-controls="links-export-panel"
                 >
-                  Limpiar selección
+                  <Download className="size-4" />
+                  Exportar ({exportTargets.length})
+                  <ChevronDown
+                    className={`size-4 transition-transform ${exportPanelOpen ? 'rotate-180' : ''}`}
+                  />
                 </Button>
-              )}
-              {exportTargets.length > 50 && (
-                <span className="text-xs text-destructive">
-                  Máximo 50 QR por descarga
-                </span>
+              </div>
+
+              {exportPanelOpen && (
+                <div
+                  id="links-export-panel"
+                  className="mt-3 grid gap-3 rounded-lg border border-border bg-muted/20 p-3 md:grid-cols-2"
+                >
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-start gap-2">
+                      <FileSpreadsheet className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <div>
+                        <p className="font-medium">Exportar enlaces</p>
+                        <p className="text-xs text-muted">
+                          {exportTargets.length}{' '}
+                          {exportTargets.length === 1 ? 'enlace' : 'enlaces'} en el archivo Excel
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="mt-auto w-full"
+                      disabled={excelExporting || bulkDownloading || exportTargets.length === 0}
+                      onClick={() => handleExcelExport(links)}
+                    >
+                      {excelExporting ? (
+                        <>
+                          <Spinner className="size-3.5" />
+                          Exportando…
+                        </>
+                      ) : (
+                        <>
+                          <FileSpreadsheet className="size-3.5" />
+                          Descargar Excel
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3">
+                    <div className="flex items-start gap-2">
+                      <QrCode className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <div>
+                        <p className="font-medium">Exportar QRs</p>
+                        <p className="text-xs text-muted">
+                          {exportTargets.length} {exportTargets.length === 1 ? 'QR' : 'QRs'} en el archivo ZIP
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-auto flex gap-2">
+                      <Select
+                        value={bulkQrFormat}
+                        onValueChange={(value) =>
+                          setBulkQrFormat(value as 'png' | 'svg')
+                        }
+                        disabled={bulkDownloading || excelExporting}
+                      >
+                        <SelectTrigger aria-label="Formato de descarga de QR" className="h-8 w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="png">PNG</SelectItem>
+                          <SelectItem value="svg">SVG</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="min-w-0 flex-1"
+                        disabled={
+                          bulkDownloading ||
+                          excelExporting ||
+                          exportTargets.length === 0 ||
+                          exportTargets.length > 50
+                        }
+                        onClick={() => void handleBulkQrDownload(links)}
+                      >
+                        {bulkDownloading ? (
+                          <>
+                            <Spinner className="size-3.5" />
+                            Generando ZIP…
+                          </>
+                        ) : (
+                          <>
+                            <Download className="size-3.5" />
+                            Descargar QRs
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    {exportTargets.length > 50 && (
+                      <span className="text-xs text-destructive">
+                        Máximo 50 QR por descarga
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+                    <span className="text-xs text-muted">{exportScopeLabel}</span>
+                    {selectedIds.length > 0 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={bulkDownloading || excelExporting}
+                        onClick={() => setSelectedIds([])}
+                      >
+                        Limpiar selección
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -786,11 +907,11 @@ export function LinksPage() {
                 </TableHead>
                 <TableHead className="p-4">Identificador</TableHead>
                 <TableHead className="p-4">Tipo</TableHead>
-                <TableHead className="p-4">Creación</TableHead>
                 <TableHead className="p-4">Etiquetas</TableHead>
                 <TableHead className="p-4">Destino</TableHead>
                 <TableHead className="p-4">Clics</TableHead>
                 <TableHead className="p-4">Acciones</TableHead>
+                <TableHead className="p-4">Creación</TableHead>
               </TableRow>
             </TableHeader>
             {listLoading ? (
@@ -847,18 +968,6 @@ export function LinksPage() {
                         >
                           {link.type === 'FILE' ? 'Archivo' : link.type === 'WHATSAPP' ? 'WhatsApp' : 'URL'}
                         </span>
-                      </TableCell>
-                      <TableCell
-                        className="max-w-[15rem] p-4 text-xs text-muted"
-                        title={link.createdBy?.email}
-                      >
-                        <p className="truncate">
-                          {link.createdBy?.name ?? 'Sin identificar'}
-                          <span aria-hidden="true"> · </span>
-                          <span className="whitespace-nowrap">
-                            {formatLimaDateTime(link.createdAt)}
-                          </span>
-                        </p>
                       </TableCell>
                       <TableCell className="p-4">
                         {link.tags.length > 0 ? (
@@ -930,6 +1039,18 @@ export function LinksPage() {
                             <Trash2 className="size-4" />
                           </IconActionButton>
                         </div>
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[15rem] p-4 text-xs text-muted"
+                        title={link.createdBy?.email}
+                      >
+                        <p className="truncate">
+                          {link.createdBy?.name ?? 'Sin identificar'}
+                          <span aria-hidden="true"> · </span>
+                          <span className="whitespace-nowrap">
+                            {formatLimaDateTime(link.createdAt)}
+                          </span>
+                        </p>
                       </TableCell>
                     </TableRow>
                   );
