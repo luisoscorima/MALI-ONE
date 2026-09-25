@@ -1,7 +1,7 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { BarChart3, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
-import { DEFAULT_QR_STYLE } from '@mali-one/shared';
+import { DEFAULT_QR_STYLE, formatLimaDateTime } from '@mali-one/shared';
 import { FilterChip, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
 import { formatLinkDestination } from '@/lib/format-link';
@@ -760,7 +760,7 @@ export function LinksPage() {
           )}
         </div>
         <div className="overflow-x-auto">
-          <Table className="min-w-[640px]">
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow className="text-muted">
                 <TableHead className="w-10 p-4">
@@ -786,6 +786,7 @@ export function LinksPage() {
                 </TableHead>
                 <TableHead className="p-4">Identificador</TableHead>
                 <TableHead className="p-4">Tipo</TableHead>
+                <TableHead className="p-4">Creación</TableHead>
                 <TableHead className="p-4">Etiquetas</TableHead>
                 <TableHead className="p-4">Destino</TableHead>
                 <TableHead className="p-4">Clics</TableHead>
@@ -794,12 +795,12 @@ export function LinksPage() {
             </TableHeader>
             {listLoading ? (
               <TableBody>
-                <TableSkeleton rows={4} cols={7} />
+                <TableSkeleton rows={4} cols={8} />
               </TableBody>
             ) : links.length === 0 ? (
               <TableBody>
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <EmptyState
                       title={hasFilters ? 'Sin coincidencias' : 'Sin enlaces todavía'}
                       description={
@@ -846,6 +847,18 @@ export function LinksPage() {
                         >
                           {link.type === 'FILE' ? 'Archivo' : link.type === 'WHATSAPP' ? 'WhatsApp' : 'URL'}
                         </span>
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[15rem] p-4 text-xs text-muted"
+                        title={link.createdBy?.email}
+                      >
+                        <p className="truncate">
+                          {link.createdBy?.name ?? 'Sin identificar'}
+                          <span aria-hidden="true"> · </span>
+                          <span className="whitespace-nowrap">
+                            {formatLimaDateTime(link.createdAt)}
+                          </span>
+                        </p>
                       </TableCell>
                       <TableCell className="p-4">
                         {link.tags.length > 0 ? (
@@ -1070,11 +1083,13 @@ export function LinksPage() {
 
       <Dialog
         open={!!qrModalLink}
-        onOpenChange={(open) => {
-          if (!open) closeQrDesigner();
-        }}
       >
-        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col overflow-hidden p-0 sm:max-w-none">
+        <DialogContent
+          className="flex h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col overflow-hidden p-0 sm:max-w-none"
+          showCloseButton={false}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+        >
           <DialogHeader className="shrink-0 px-4 pt-4">
             <DialogTitle>Código QR personalizable</DialogTitle>
             {qrModalLink && (
@@ -1086,7 +1101,7 @@ export function LinksPage() {
             )}
           </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4">
             {qrModalLink && (
               <Suspense
                 fallback={
@@ -1108,6 +1123,7 @@ export function LinksPage() {
                   }
                   linkId={qrModalLink.id}
                   onSaved={handleQrSaved}
+                  onRequestClose={closeQrDesigner}
                 />
               </Suspense>
             )}

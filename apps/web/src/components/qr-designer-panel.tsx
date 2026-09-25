@@ -13,7 +13,17 @@ import {
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { Spinner } from '@/components/feedback';
-import { Button, Input } from '@/components/ui';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  Input,
+} from '@/components/ui';
 
 interface QrDesignerPanelProps {
   shortUrl: string;
@@ -26,6 +36,7 @@ interface QrDesignerPanelProps {
   onDraftLogoFileChange?: (file: File | null) => void;
   savedStyle?: QrStyleDto;
   initialPreview?: string | null;
+  onRequestClose?: () => void;
 }
 
 function qrStylesEqual(a: QrStyleDto, b: QrStyleDto) {
@@ -47,16 +58,19 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
   onDraftLogoFileChange,
   savedStyle,
   initialPreview,
+  onRequestClose,
 }: QrDesignerPanelProps) {
   const toast = useToast();
   const previewSize = compact ? 200 : 260;
   const [internalLogoFile, setInternalLogoFile] = useState<File | null>(null);
   const customLogoFile = draftLogoFile !== undefined ? draftLogoFile : internalLogoFile;
   const setCustomLogoFile = onDraftLogoFileChange ?? setInternalLogoFile;
+  const [dropSavedLogo, setDropSavedLogo] = useState(false);
   const usesSavedStyle =
     Boolean(linkId) &&
     Boolean(savedStyle) &&
     !customLogoFile &&
+    !dropSavedLogo &&
     qrStylesEqual(style, savedStyle!);
   const [previewUrl, setPreviewUrl] = useState<string | null>(() =>
     usesSavedStyle && initialPreview ? initialPreview : null,
@@ -66,8 +80,8 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
   );
   const [previewError, setPreviewError] = useState('');
   const [useGradient, setUseGradient] = useState(Boolean(style.foregroundGradient));
-  const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (usesSavedStyle && initialPreview) {
@@ -95,6 +109,7 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
           : api.fetchQrPreview(shortUrl, style, {
               linkId,
               logoFile: customLogoFile ?? undefined,
+              clearCustomLogo: dropSavedLogo && !customLogoFile && !style.logoPreset,
               signal: ctrl.signal,
               width: previewSize,
             });
@@ -132,6 +147,7 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
     savedStyle,
     initialPreview,
     usesSavedStyle,
+    dropSavedLogo,
   ]);
 
   useEffect(() => {
@@ -146,16 +162,19 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
 
   function selectPreset(preset: QrLogoPresetId) {
     setCustomLogoFile(null);
+    setDropSavedLogo(false);
     patchStyle({ logoPreset: preset });
   }
 
   function clearLogo() {
     setCustomLogoFile(null);
+    setDropSavedLogo(true);
     patchStyle({ logoPreset: null });
   }
 
   function handleCustomLogo(file: File | undefined) {
     if (!file) return;
+    setDropSavedLogo(false);
     setCustomLogoFile(file);
     patchStyle({ logoPreset: null });
   }
@@ -182,92 +201,104 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
     }
   }
 
-  async function handleSave() {
+  async function handleSave(): Promise<boolean> {
     setSaving(true);
     try {
       if (linkId) {
         const updated = await api.updateLinkQrStyle(
           linkId,
-          style,
+          dropSavedLogo && !customLogoFile
+            ? { ...style, clearCustomLogo: true }
+            : style,
           customLogoFile ?? undefined,
-          saveAsDefault,
+          false,
         );
-        toast.success(
-          saveAsDefault
-            ? 'Diseño guardado en el enlace y como predeterminado'
-            : 'Diseño QR guardado',
-        );
+        setCustomLogoFile(null);
+        setDropSavedLogo(false);
+        toast.success('Diseño QR guardado');
         onSaved?.(updated);
-      } else if (saveAsDefault) {
-        await api.saveQrDefaultStyle(style);
-        toast.success('Estilo predeterminado guardado');
       } else {
-        toast.success('Guarda el enlace primero o marca "Guardar como predeterminado"');
+        toast.error('Guarda el enlace antes de personalizar su QR');
+        return false;
       }
+      return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar diseño');
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
+  const hasUnsavedChanges =
+    Boolean(customLogoFile) ||
+    dropSavedLogo ||
+    (savedStyle ? !qrStylesEqual(style, savedStyle) : true);
+
+  function requestClose() {
+    if (!onRequestClose) return;
+    if (hasUnsavedChanges) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    onRequestClose();
+  }
+
+  async function saveAndClose() {
+    const saved = await handleSave();
+    if (!saved) return;
+    setCloseConfirmOpen(false);
+    onRequestClose?.();
+  }
+
   const transparentBg = (style.backgroundColor ?? '#ffffff') === 'transparent';
 
   return (
-    <div
-      className={cn(
-        'grid min-w-0 gap-4',
-        compact
-          ? 'grid-cols-1'
-          : 'grid-cols-1 xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]',
-      )}
-    >
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className={cn(
-            'relative flex min-h-[calc(var(--qr-preview-size)+16px)] min-w-[calc(var(--qr-preview-size)+16px)] items-center justify-center rounded-xl border border-border p-2',
-            transparentBg &&
-              'bg-[length:16px_16px] bg-[position:0_0,8px_8px] bg-[image:linear-gradient(45deg,#d1d5db_25%,transparent_25%),linear-gradient(-45deg,#d1d5db_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#d1d5db_75%),linear-gradient(-45deg,transparent_75%,#d1d5db_75%)]',
-            !transparentBg && 'bg-white',
-          )}
-          style={{ '--qr-preview-size': `${previewSize}px` } as React.CSSProperties}
-        >
-          {previewLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/60">
-              <Spinner className="size-6" />
-            </div>
-          )}
-          {previewUrl && !previewError && (
-            <img
-              src={previewUrl}
-              alt="Vista previa del código QR"
-              width={previewSize}
-              height={previewSize}
-              className="block max-w-full"
-            />
-          )}
-          {previewError && (
-            <p className="px-3 text-center text-xs text-destructive">{previewError}</p>
-          )}
-        </div>
-        {linkId && (
-          <div className="flex flex-wrap justify-center gap-2">
-            {(['png', 'svg', 'eps'] as const).map((fmt) => (
-              <a
-                key={fmt}
-                href={api.qrUrl(linkId, fmt)}
-                className="inline-flex h-7 items-center rounded-lg border border-border px-2.5 text-xs font-medium uppercase hover:bg-muted"
-                download
-              >
-                {fmt}
-              </a>
-            ))}
-          </div>
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
+      <div
+        className={cn(
+          'grid min-h-0 flex-1 gap-4 overflow-hidden',
+          compact
+            ? 'grid-rows-[auto_minmax(0,1fr)]'
+            : 'grid-rows-[auto_minmax(0,1fr)] xl:grid-cols-[minmax(220px,280px)_minmax(0,1fr)] xl:grid-rows-1',
         )}
-      </div>
+      >
+        <div className="flex shrink-0 flex-col items-center gap-3">
+          <div
+            className={cn(
+              'relative flex min-h-[calc(var(--qr-preview-size)+16px)] min-w-[calc(var(--qr-preview-size)+16px)] items-center justify-center rounded-xl border border-border p-2',
+              transparentBg &&
+                'bg-[length:16px_16px] bg-[position:0_0,8px_8px] bg-[image:linear-gradient(45deg,#d1d5db_25%,transparent_25%),linear-gradient(-45deg,#d1d5db_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#d1d5db_75%),linear-gradient(-45deg,transparent_75%,#d1d5db_75%)]',
+              !transparentBg && 'bg-white',
+            )}
+            style={
+              { '--qr-preview-size': `${previewSize}px` } as React.CSSProperties
+            }
+          >
+            {previewLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/60">
+                <Spinner className="size-6" />
+              </div>
+            )}
+            {previewUrl && !previewError && (
+              <img
+                src={previewUrl}
+                alt="Vista previa del código QR"
+                width={previewSize}
+                height={previewSize}
+                className="block max-w-full"
+              />
+            )}
+            {previewError && (
+              <p className="px-3 text-center text-xs text-destructive">
+                {previewError}
+              </p>
+            )}
+          </div>
+        </div>
 
-      <div className="min-w-0 space-y-4 text-sm">
-        <Section title="Color del QR">
+        <div className="min-h-0 min-w-0 space-y-4 overflow-x-hidden overflow-y-auto pr-1 text-sm">
+          <Section title="Color del QR">
           <div className="mb-2 flex flex-wrap gap-2">
             <Button
               type="button"
@@ -338,9 +369,9 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
               />
             </div>
           )}
-        </Section>
+          </Section>
 
-        <Section title="Fondo">
+          <Section title="Fondo">
           <div className="flex flex-wrap gap-2">
             {[
               { id: '#ffffff', label: 'Blanco' },
@@ -370,28 +401,28 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
             }
             onChange={(v) => patchStyle({ backgroundColor: v })}
           />
-        </Section>
+          </Section>
 
-        <ShapeGrid
+          <ShapeGrid
           title="Forma del cuerpo"
           options={BODY_SHAPES}
           value={style.bodyShape}
           onChange={(v) => patchStyle({ bodyShape: v })}
-        />
-        <ShapeGrid
+          />
+          <ShapeGrid
           title="Marco del ojo"
           options={EYE_FRAME_SHAPES}
           value={style.eyeFrameShape}
           onChange={(v) => patchStyle({ eyeFrameShape: v })}
-        />
-        <ShapeGrid
+          />
+          <ShapeGrid
           title="Forma del ojo"
           options={EYE_SHAPES}
           value={style.eyeShape}
           onChange={(v) => patchStyle({ eyeShape: v })}
-        />
+          />
 
-        <Section title="Logo central">
+          <Section title="Logo central">
           <div className="mb-2 flex flex-wrap gap-2">
             {(Object.keys(QR_LOGO_PRESETS) as QrLogoPresetId[]).map((id) => (
               <button
@@ -444,20 +475,13 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
               className="w-full"
             />
           </label>
-        </Section>
+          </Section>
+        </div>
+      </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={saveAsDefault}
-            onChange={(e) => setSaveAsDefault(e.target.checked)}
-          />
-          Guardar también como predeterminado para nuevos enlaces
-        </label>
-
+      <div className="mt-4 flex shrink-0 flex-wrap items-center gap-2 border-t border-border pt-3">
         <Button
           type="button"
-          className="w-fit"
           disabled={saving}
           onClick={() => void handleSave()}
         >
@@ -465,13 +489,73 @@ export const QrDesignerPanel = memo(function QrDesignerPanel({
             <span className="flex items-center gap-2">
               <Spinner className="size-4" /> Guardando...
             </span>
-          ) : linkId ? (
-            'Guardar diseño'
           ) : (
-            'Guardar predeterminado'
+            'Guardar diseño'
           )}
         </Button>
+
+        {linkId &&
+          (['png', 'svg', 'eps'] as const).map((fmt) =>
+            hasUnsavedChanges ? (
+              <Button key={fmt} type="button" variant="outline" disabled>
+                {fmt.toUpperCase()}
+              </Button>
+            ) : (
+              <a
+                key={fmt}
+                href={api.qrUrl(linkId, fmt)}
+                className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs font-medium uppercase hover:bg-muted"
+                download
+              >
+                {fmt}
+              </a>
+            ),
+          )}
+
+        {onRequestClose && (
+          <Button type="button" variant="outline" onClick={requestClose}>
+            Cerrar
+          </Button>
+        )}
+
+        {hasUnsavedChanges && (
+          <p className="w-full text-sm text-muted">
+            Guarda el diseño para descargar estos cambios.
+          </p>
+        )}
       </div>
+
+      <AlertDialog open={closeConfirmOpen} onOpenChange={setCloseConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Quieres cerrar sin guardar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tienes cambios pendientes en el diseño del QR.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:flex-wrap">
+            <AlertDialogCancel disabled={saving}>Seguir editando</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() => {
+                setCloseConfirmOpen(false);
+                onRequestClose?.();
+              }}
+            >
+              Cerrar sin guardar
+            </Button>
+            <Button
+              type="button"
+              disabled={saving}
+              onClick={() => void saveAndClose()}
+            >
+              {saving ? 'Guardando...' : 'Guardar y cerrar'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

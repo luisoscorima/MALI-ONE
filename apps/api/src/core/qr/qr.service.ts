@@ -178,6 +178,9 @@ export class QrService {
     style: QrStyleDto,
     qrLogoKey?: string | null,
   ): Promise<string | undefined> {
+    const presetUrl = getLogoUrl(style, null);
+    if (presetUrl) return this.toEmbeddedImageUrl(presetUrl);
+
     if (qrLogoKey) {
       try {
         const { buffer, contentType } = await this.s3.getFileBuffer(qrLogoKey);
@@ -194,9 +197,7 @@ export class QrService {
       }
     }
 
-    const presetUrl = getLogoUrl(style, null);
-    if (!presetUrl) return undefined;
-    return this.toEmbeddedImageUrl(presetUrl);
+    return undefined;
   }
 
   private async generatePngFromStyled(

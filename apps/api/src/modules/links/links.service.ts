@@ -315,6 +315,16 @@ export class LinksService {
     const [links, total] = await this.prisma.$transaction([
       this.prisma.shortLink.findMany({
         where,
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              qrDefaultStyle: true,
+            },
+          },
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (options.page - 1) * options.pageSize,
         take: options.pageSize,
@@ -541,22 +551,14 @@ export class LinksService {
     width = 260,
   ): Promise<Buffer> {
     const style = this.mergeQrStyle({ ...DEFAULT_QR_STYLE }, input);
-    let qrLogoKey: string | null = null;
-    let logoOverride: { buffer: Buffer; mimeType: string } | undefined;
-
-    if (logoFile) {
-      logoOverride = { buffer: logoFile.buffer, mimeType: logoFile.mimetype };
-    } else if (linkId) {
-      const link = await this.findOwnedLink(user, linkId);
-      qrLogoKey = link.qrLogoKey;
-    }
+    const logo = await this.resolveDraftLogo(user, linkId, logoFile, input);
 
     return this.qr.generatePngBuffer(
       data,
       style,
-      qrLogoKey,
+      logo.qrLogoKey,
       width,
-      logoOverride,
+      logo.logoOverride,
       { minRenderWidth: 280 },
     );
   }
@@ -598,7 +600,9 @@ export class LinksService {
     const merged = this.mergeQrStyle(current, input);
 
     let qrLogoKey = link.qrLogoKey;
-    if (input.clearCustomLogo && qrLogoKey) {
+    const dropSavedLogo =
+      !logoFile && (input.clearCustomLogo || Boolean(input.logoPreset));
+    if (dropSavedLogo && qrLogoKey) {
       await this.s3.deleteFile(qrLogoKey);
       qrLogoKey = null;
     }
@@ -770,6 +774,28 @@ export class LinksService {
         },
       }),
     ]);
+  }
+
+  private async resolveDraftLogo(
+    user: User,
+    linkId: string | undefined,
+    logoFile?: UploadedFile,
+    input?: UpdateQrStyleDto,
+  ): Promise<{
+    qrLogoKey: string | null;
+    logoOverride?: { buffer: Buffer; mimeType: string };
+  }> {
+    const logoOverride = logoFile
+      ? { buffer: logoFile.buffer, mimeType: logoFile.mimetype }
+      : undefined;
+    const keepSavedLogo =
+      !logoFile && !input?.logoPreset && !input?.clearCustomLogo;
+    if (!linkId || !keepSavedLogo) {
+      return { qrLogoKey: null, logoOverride };
+    }
+
+    const link = await this.findOwnedLink(user, linkId);
+    return { qrLogoKey: link.qrLogoKey, logoOverride };
   }
 
   private async initialQrStyle(userId: string): Promise<QrStyleDto> {
@@ -985,12 +1011,20 @@ export class LinksService {
       createdAt: Date;
       tags: string[];
       createdById?: string;
+      createdBy?: {
+        id: string;
+        name: string;
+        email: string;
+        qrDefaultStyle?: unknown;
+      };
     },
     includeQr = true,
     userDefaultStyle?: unknown,
   ) {
     let defaultStyle = userDefaultStyle;
-    if (defaultStyle === undefined && link.createdById) {
+    if (defaultStyle === undefined && link.createdBy?.qrDefaultStyle !== undefined) {
+      defaultStyle = link.createdBy.qrDefaultStyle;
+    } else if (defaultStyle === undefined && link.createdById) {
       const creator = await this.prisma.user.findUnique({
         where: { id: link.createdById },
         select: { qrDefaultStyle: true },
@@ -1019,6 +1053,13 @@ export class LinksService {
       s3Key: link.s3Key,
       clickCount: link.clickCount,
       createdAt: link.createdAt.toISOString(),
+      createdBy: link.createdBy
+        ? {
+            id: link.createdBy.id,
+            name: link.createdBy.name,
+            email: link.createdBy.email,
+          }
+        : undefined,
       tags: link.tags,
       qrStyle: effectiveStyle,
       qrLogoKey: link.qrLogoKey,

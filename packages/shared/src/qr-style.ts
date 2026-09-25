@@ -31,9 +31,9 @@ export const DEFAULT_QR_STYLE: QrStyleDto = {
   foregroundColor: '#000000',
   backgroundColor: '#ffffff',
   bodyShape: 'dots',
-  eyeFrameShape: 'extra-rounded',
+  eyeFrameShape: 'dot',
   eyeShape: 'dot',
-  logoPreset: 'cuadrado',
+  logoPreset: null,
   logoSize: 0.25,
   margin: 8,
 };

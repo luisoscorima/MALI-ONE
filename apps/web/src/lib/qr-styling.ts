@@ -95,8 +95,8 @@ export const BODY_SHAPES: Array<{
   id: QrStyleDto['bodyShape'];
   label: string;
 }> = [
-  { id: 'square', label: 'Cuadrados' },
   { id: 'dots', label: 'Círculos' },
+  { id: 'square', label: 'Cuadrados' },
   { id: 'rounded', label: 'Redondeado' },
   { id: 'extra-rounded', label: 'Extra redondeado' },
   { id: 'classy', label: 'Classy' },
@@ -107,13 +107,13 @@ export const EYE_FRAME_SHAPES: Array<{
   id: QrStyleDto['eyeFrameShape'];
   label: string;
 }> = [
-  { id: 'square', label: 'Cuadrado' },
   { id: 'dot', label: 'Círculo' },
+  { id: 'square', label: 'Cuadrado' },
   { id: 'extra-rounded', label: 'Redondeado' },
 ];
 
 export const EYE_SHAPES: Array<{ id: QrStyleDto['eyeShape']; label: string }> =
   [
-    { id: 'square', label: 'Cuadrado' },
     { id: 'dot', label: 'Círculo' },
+    { id: 'square', label: 'Cuadrado' },
   ];

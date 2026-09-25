@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
@@ -97,6 +98,7 @@ export class UpdateQrStyleDto {
   logoPreset?: QrLogoPresetId | null;
 
   @IsOptional()
+  @IsBoolean()
   clearCustomLogo?: boolean;
 }
 

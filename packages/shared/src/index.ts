@@ -582,6 +582,11 @@ export interface ShortLinkDto {
   s3Key: string | null;
   clickCount: number;
   createdAt: string;
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   tags: string[];
   qrStyle?: QrStyleDto | null;
   qrLogoKey?: string | null;

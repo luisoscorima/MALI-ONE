@@ -364,7 +364,9 @@ export const api = {
 
   updateLinkQrStyle: (
     id: string,
-    style: import('@mali-one/shared').QrStyleDto,
+    style: import('@mali-one/shared').QrStyleDto & {
+      clearCustomLogo?: boolean;
+    },
     logoFile?: File,
     saveAsDefault = false,
   ) => {
@@ -445,6 +447,7 @@ export const api = {
     options?: {
       linkId?: string;
       logoFile?: File;
+      clearCustomLogo?: boolean;
       signal?: AbortSignal;
       width?: number;
     },
@@ -454,7 +457,10 @@ export const api = {
       'payload',
       JSON.stringify({
         data,
-        style,
+        style: {
+          ...style,
+          ...(options?.clearCustomLogo ? { clearCustomLogo: true } : {}),
+        },
         linkId: options?.linkId,
       }),
     );
