@@ -35,6 +35,25 @@ const generateSlug = customAlphabet(
   8,
 );
 
+function parseLimaDate(value: string | undefined, endExclusive = false) {
+  if (!value) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) throw new BadRequestException('Rango de fechas inválido');
+
+  const [, year, month, day] = match;
+  const date = new Date(`${year}-${month}-${day}T05:00:00.000Z`);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() + 1 !== Number(month) ||
+    date.getUTCDate() !== Number(day)
+  ) {
+    throw new BadRequestException('Rango de fechas inválido');
+  }
+  if (endExclusive) date.setUTCDate(date.getUTCDate() + 1);
+  return date;
+}
+
 @Injectable()
 export class LinksService {
   constructor(
@@ -274,6 +293,8 @@ export class LinksService {
       search?: string;
       tag?: string;
       type?: string;
+      createdFrom?: string;
+      createdTo?: string;
     },
   ) {
     const ownershipWhere: Prisma.ShortLinkWhereInput =
@@ -284,6 +305,11 @@ export class LinksService {
     const type = Object.values(LinkType).includes(options.type as LinkType)
       ? (options.type as LinkType)
       : undefined;
+    const createdFrom = parseLimaDate(options.createdFrom);
+    const createdTo = parseLimaDate(options.createdTo, true);
+    if (createdFrom && createdTo && createdFrom >= createdTo) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
 
     const tagRows = await this.prisma.shortLink.findMany({
       where: ownershipWhere,
@@ -298,6 +324,14 @@ export class LinksService {
       ...ownershipWhere,
       ...(normalizedTag ? { tags: { has: normalizedTag } } : {}),
       ...(type ? { type } : {}),
+      ...(createdFrom || createdTo
+        ? {
+            createdAt: {
+              ...(createdFrom ? { gte: createdFrom } : {}),
+              ...(createdTo ? { lt: createdTo } : {}),
+            },
+          }
+        : {}),
       ...(search
         ? {
             OR: [

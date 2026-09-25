@@ -163,6 +163,8 @@ export class LinksController {
     @Query('search') search?: string,
     @Query('tag') tag?: string,
     @Query('type') type?: string,
+    @Query('createdFrom') createdFrom?: string,
+    @Query('createdTo') createdTo?: string,
   ) {
     const parsedPage = Number(page ?? 1);
     const parsedPageSize = Number(pageSize ?? 25);
@@ -175,6 +177,8 @@ export class LinksController {
       search,
       tag,
       type,
+      createdFrom,
+      createdTo,
     });
   }
 

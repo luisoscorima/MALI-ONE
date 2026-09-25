@@ -329,6 +329,8 @@ export const api = {
     search?: string;
     tag?: string;
     type?: string;
+    createdFrom?: string;
+    createdTo?: string;
   } = {}) => {
     const params = new URLSearchParams();
     if (options.page) params.set('page', String(options.page));
@@ -336,6 +338,8 @@ export const api = {
     if (options.search) params.set('search', options.search);
     if (options.tag) params.set('tag', options.tag);
     if (options.type && options.type !== 'all') params.set('type', options.type);
+    if (options.createdFrom) params.set('createdFrom', options.createdFrom);
+    if (options.createdTo) params.set('createdTo', options.createdTo);
     const qs = params.toString();
     return request<import('@mali-one/shared').ShortLinksPageDto>(
       `/api/links${qs ? `?${qs}` : ''}`,

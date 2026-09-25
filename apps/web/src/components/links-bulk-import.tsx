@@ -219,16 +219,20 @@ export function LinksBulkFileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BulkLinksResultDto | null>(null);
-  const [selectedCount, setSelectedCount] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [dropActive, setDropActive] = useState(false);
 
-  async function handleUpload() {
-    const files = inputRef.current?.files;
-    if (!files?.length) {
-      toast.error('Selecciona al menos un archivo.');
-      return;
-    }
+  function selectFiles(files: File[]) {
     if (files.length > 50) {
       toast.error('Máximo 50 archivos por lote.');
+      return;
+    }
+    setSelectedFiles(files);
+  }
+
+  async function handleUpload() {
+    if (selectedFiles.length === 0) {
+      toast.error('Selecciona al menos un archivo.');
       return;
     }
 
@@ -236,7 +240,7 @@ export function LinksBulkFileUpload({
     setResult(null);
 
     try {
-      const data = await api.bulkUpload(Array.from(files));
+      const data = await api.bulkUpload(selectedFiles);
       setResult(data);
       toast.success(
         `${data.created.length} archivo(s) subido(s)${data.errors.length ? `, ${data.errors.length} error(es)` : ''}`,
@@ -247,7 +251,7 @@ export function LinksBulkFileUpload({
     } finally {
       setLoading(false);
       if (inputRef.current) inputRef.current.value = '';
-      setSelectedCount(0);
+      setSelectedFiles([]);
     }
   }
 
@@ -264,20 +268,52 @@ export function LinksBulkFileUpload({
             uno. Los binarios no pueden importarse desde Excel.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+      </div>
+
+      <div
+        className={`mt-4 flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center transition-colors ${
+          dropActive ? 'border-primary bg-primary/5' : 'border-border bg-muted/20'
+        }`}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          if (!disabled && !loading) setDropActive(true);
+        }}
+        onDragOver={(event) => event.preventDefault()}
+        onDragLeave={() => setDropActive(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDropActive(false);
+          if (disabled || loading) return;
+          selectFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        <Upload className="size-5 text-primary" />
+        <p className="text-sm font-medium">
+          Arrastra tus archivos aquí o selecciónalos
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <input
             ref={inputRef}
             type="file"
             multiple
-            className="max-w-[14rem] text-sm file:mr-2 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-sm file:text-primary-foreground"
+            className="hidden"
             disabled={disabled || loading}
-            onChange={(e) => setSelectedCount(e.target.files?.length ?? 0)}
+            onChange={(e) => selectFiles(Array.from(e.target.files ?? []))}
           />
           <Button
             type="button"
             size="sm"
+            variant="outline"
+            disabled={disabled || loading}
+            onClick={() => inputRef.current?.click()}
+          >
+            Elegir archivos
+          </Button>
+          <Button
+            type="button"
+            size="sm"
             className="w-fit"
-            disabled={disabled || loading || selectedCount === 0}
+            disabled={disabled || loading || selectedFiles.length === 0}
             onClick={() => void handleUpload()}
           >
             {loading ? (
@@ -285,10 +321,16 @@ export function LinksBulkFileUpload({
                 <Spinner className="size-4" /> Subiendo...
               </span>
             ) : (
-              `Subir ${selectedCount > 0 ? `(${selectedCount})` : ''}`
+              `Subir ${selectedFiles.length > 0 ? `(${selectedFiles.length})` : ''}`
             )}
           </Button>
         </div>
+        {selectedFiles.length > 0 && (
+          <p className="text-xs text-muted">
+            {selectedFiles.length}{' '}
+            {selectedFiles.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}
+          </p>
+        )}
       </div>
 
       {result && (result.created.length > 0 || result.errors.length > 0) && (

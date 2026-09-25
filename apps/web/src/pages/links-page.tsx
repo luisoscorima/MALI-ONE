@@ -1,5 +1,5 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2 } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2, Upload } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE, formatLimaDateTime } from '@mali-one/shared';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -56,6 +56,44 @@ const LinkStatsPanel = lazy(() =>
 );
 
 type Tab = 'url' | 'file' | 'whatsapp';
+type DatePeriod = '7d' | '30d' | '90d' | 'current-month' | 'previous-month' | 'all';
+
+function formatUtcDate(date: Date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLimaToday() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day)));
+}
+
+function getDatePeriodRange(period: DatePeriod) {
+  if (period === 'all') return {};
+  const today = getLimaToday();
+  let from = new Date(today);
+  let to = new Date(today);
+
+  if (period === 'current-month') {
+    from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  } else if (period === 'previous-month') {
+    from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
+    to = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 0));
+  } else {
+    const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+  }
+
+  return { createdFrom: formatUtcDate(from), createdTo: formatUtcDate(to) };
+}
 
 interface EditLinkState {
   link: ShortLinkDto;
@@ -148,7 +186,9 @@ export function LinksPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [datePeriod, setDatePeriod] = useState<DatePeriod>('30d');
   const [file, setFile] = useState<File | null>(null);
+  const [fileDropActive, setFileDropActive] = useState(false);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -173,6 +213,7 @@ export function LinksPage() {
   const [excelExporting, setExcelExporting] = useState(false);
   const [exportPanelOpen, setExportPanelOpen] = useState(false);
   const listRequestId = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDefaultQrStyle = useCallback(async () => {
     try {
@@ -194,7 +235,7 @@ export function LinksPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, tagFilter, typeFilter]);
+  }, [datePeriod, debouncedSearch, tagFilter, typeFilter]);
 
   function openQrDesigner(link: ShortLinkDto) {
     setQrModalSavedStyle(link.qrStyle ?? defaultQrStyle);
@@ -224,6 +265,7 @@ export function LinksPage() {
         search: debouncedSearch || undefined,
         tag: tagFilter || undefined,
         type: typeFilter,
+        ...getDatePeriodRange(datePeriod),
       });
       if (requestId !== listRequestId.current) return;
       setLinks(data.items);
@@ -241,7 +283,7 @@ export function LinksPage() {
     } finally {
       if (requestId === listRequestId.current) setListLoading(false);
     }
-  }, [debouncedSearch, page, tagFilter, toast, typeFilter]);
+  }, [datePeriod, debouncedSearch, page, tagFilter, toast, typeFilter]);
 
   useEffect(() => {
     void loadLinks();
@@ -316,6 +358,7 @@ export function LinksPage() {
         getTagsFromInput(),
       );
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setCustomSlug('');
       setTagsInput('');
       await loadLinks();
@@ -490,13 +533,19 @@ export function LinksPage() {
     void loadLinks();
   }
 
-  const hasFilters = !!(debouncedSearch || tagFilter || typeFilter !== 'all');
+  const hasFilters = !!(
+    debouncedSearch ||
+    tagFilter ||
+    typeFilter !== 'all' ||
+    datePeriod !== '30d'
+  );
   const visibleSelectedCount = links.filter((link) => selectedIds.includes(link.id)).length;
   const hiddenSelectedCount = selectedIds.length - visibleSelectedCount;
   function resetFilters() {
     setSearch('');
     setTagFilter('');
     setTypeFilter('all');
+    setDatePeriod('30d');
   }
   const exportTargets = getExportTargets(links);
   const exportScopeLabel =
@@ -646,17 +695,54 @@ export function LinksPage() {
         <TabsContent value="file">
           <Card className="mb-6">
           <form className="grid gap-3" onSubmit={handleUpload}>
-            <label className="block">
-              <span className="mb-2 block text-sm text-muted">
-                Seleccionar archivo
-              </span>
+            <div>
+              <span className="mb-2 block text-sm text-muted">Seleccionar archivo</span>
+              <div
+                className={`flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center transition-colors ${
+                  fileDropActive
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-muted/20'
+                }`}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  if (!submitting) setFileDropActive(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setFileDropActive(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setFileDropActive(false);
+                  if (submitting) return;
+                  setFile(event.dataTransfer.files[0] ?? null);
+                }}
+              >
+                <Upload className="size-5 text-primary" />
+                <p className="text-sm font-medium">
+                  Arrastra un archivo aquí o selecciónalo
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={submitting}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Elegir archivo
+                </Button>
+                {file && (
+                  <p className="max-w-full truncate text-xs text-muted" title={file.name}>
+                    {file.name}
+                  </p>
+                )}
+              </div>
               <input
+                ref={fileInputRef}
                 type="file"
-                className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:text-primary-foreground"
+                className="hidden"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                required
+                disabled={submitting}
               />
-            </label>
+            </div>
             <label className="grid gap-2 text-sm">
               <span>Identificador personalizado (opcional)</span>
               <Input
@@ -742,6 +828,25 @@ export function LinksPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-1 text-sm">
+              <label htmlFor="link-date-filter">Periodo</label>
+              <Select
+                value={datePeriod}
+                onValueChange={(value) => setDatePeriod(value as DatePeriod)}
+              >
+                <SelectTrigger id="link-date-filter" className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">Últimos 7 días</SelectItem>
+                  <SelectItem value="30d">Últimos 30 días</SelectItem>
+                  <SelectItem value="90d">Últimos 90 días</SelectItem>
+                  <SelectItem value="current-month">Mes actual</SelectItem>
+                  <SelectItem value="previous-month">Mes anterior</SelectItem>
+                  <SelectItem value="all">Todo el historial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             {hasFilters && <Button type="button" variant="ghost" onClick={resetFilters}>Restablecer filtros</Button>}
           </div>
           <p role="status" className="mt-2 text-sm text-muted-foreground">
@@ -768,7 +873,7 @@ export function LinksPage() {
               {exportPanelOpen && (
                 <div
                   id="links-export-panel"
-                  className="mt-3 grid gap-3 rounded-lg border border-border bg-muted/20 p-3 md:grid-cols-2"
+                  className="mt-3 grid gap-3 md:grid-cols-2"
                 >
                   <div className="flex flex-col gap-3 rounded-lg border border-border bg-background p-3">
                     <div className="flex items-start gap-2">
@@ -832,6 +937,7 @@ export function LinksPage() {
                       <Button
                         type="button"
                         size="sm"
+                        variant="outline"
                         className="min-w-0 flex-1"
                         disabled={
                           bulkDownloading ||
