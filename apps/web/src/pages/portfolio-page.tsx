@@ -90,6 +90,7 @@ import { isFloatingLayerBlockingDismiss } from '@/lib/floating-layer';
 
 const SECTION_STORAGE_KEY = 'mali.portfolio.section';
 const PROJECTS_VIEW_KEY = 'mali.portfolio.projectsView';
+const SHOW_ARCHIVED_PROJECTS_KEY = 'mali.portfolio.showArchivedProjects';
 const TASKS_VIEW_KEY = 'mali.portfolio.tasksView';
 
 const AREA_LABEL: Record<PortfolioArea, string> = {
@@ -613,6 +614,13 @@ function ProjectsSection() {
     key: ProjectListSortKey;
     dir: 'asc' | 'desc';
   }>({ key: 'name', dir: 'asc' });
+  const [showArchived, setShowArchived] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_ARCHIVED_PROJECTS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
 
   const statuses = meta?.projectStatuses ?? [];
   const timelineYear = new Date().getFullYear();
@@ -623,7 +631,7 @@ function ProjectsSection() {
     try {
       const [m, list] = await Promise.all([
         api.getPortfolioMeta(),
-        api.listProjects({ includeClosed: true }),
+        api.listProjects({ includeClosed: true, includeArchived: true }),
       ]);
       setMeta(m);
       setProjects(list);
@@ -648,8 +656,26 @@ function ProjectsSection() {
     }
   }, [view]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHOW_ARCHIVED_PROJECTS_KEY, showArchived ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [showArchived]);
+
+  const archivedCount = useMemo(
+    () => projects.filter((p) => p.archivedAt).length,
+    [projects],
+  );
+
+  const visibleProjects = useMemo(
+    () => (showArchived ? projects : projects.filter((p) => !p.archivedAt)),
+    [projects, showArchived],
+  );
+
   const sortedList = useMemo(() => {
-    const list = [...projects];
+    const list = [...visibleProjects];
     const dir = listSort.dir === 'asc' ? 1 : -1;
     list.sort((a, b) => {
       switch (listSort.key) {
@@ -679,7 +705,7 @@ function ProjectsSection() {
       }
     });
     return list;
-  }, [projects, listSort]);
+  }, [visibleProjects, listSort]);
 
   function toggleListSort(key: ProjectListSortKey) {
     setListSort((prev) =>
@@ -720,9 +746,6 @@ function ProjectsSection() {
 
   function upsertProject(saved: PortfolioProjectDto) {
     setProjects((prev) => {
-      if (saved.archivedAt) {
-        return prev.filter((p) => p.id !== saved.id);
-      }
       const exists = prev.some((p) => p.id === saved.id);
       if (exists) {
         return prev.map((p) => (p.id === saved.id ? saved : p));
@@ -757,7 +780,13 @@ function ProjectsSection() {
           ...payload,
           archived: form.archived,
         });
-        toast.success('Proyecto actualizado');
+        if (editing.archivedAt && !form.archived) {
+          toast.success('Proyecto desarchivado');
+        } else if (!editing.archivedAt && form.archived) {
+          toast.success('Proyecto archivado');
+        } else {
+          toast.success('Proyecto actualizado');
+        }
       } else {
         saved = await api.createProject(payload);
         toast.success('Proyecto creado');
@@ -789,14 +818,16 @@ function ProjectsSection() {
   }
 
   async function moveToStatus(projectId: string, statusId: string) {
-    const current = projects.find((p) => p.id === projectId);
+    const current = visibleProjects.find((p) => p.id === projectId);
     if (!current || current.statusId === statusId) return;
     const status = statuses.find((s) => s.id === statusId);
     if (!status) return;
 
     const maxOrder = Math.max(
       -1,
-      ...projects.filter((p) => p.statusId === statusId).map((p) => p.sortOrder),
+      ...visibleProjects
+        .filter((p) => p.statusId === statusId)
+        .map((p) => p.sortOrder),
     );
 
     setProjects((prev) =>
@@ -836,16 +867,16 @@ function ProjectsSection() {
     if (!over) return;
     const projectId = String(active.id);
     const overId = String(over.id);
-    const activeProject = projects.find((p) => p.id === projectId);
+    const activeProject = visibleProjects.find((p) => p.id === projectId);
     if (!activeProject) return;
 
     const overStatus =
       statuses.find((s) => s.id === overId) ??
-      projects.find((p) => p.id === overId)?.status;
+      visibleProjects.find((p) => p.id === overId)?.status;
     if (!overStatus) return;
 
     if (activeProject.statusId === overStatus.id) {
-      const columnItems = projects
+      const columnItems = visibleProjects
         .filter((p) => p.statusId === overStatus.id)
         .sort((a, b) => a.sortOrder - b.sortOrder);
       const oldIndex = columnItems.findIndex((p) => p.id === projectId);
@@ -864,34 +895,47 @@ function ProjectsSection() {
 
   const timelineByMonth = useMemo(() => {
     const buckets: PortfolioProjectDto[][] = Array.from({ length: 12 }, () => []);
-    for (const p of projects) {
+    for (const p of visibleProjects) {
       if (!p.targetAt) continue;
       const d = new Date(p.targetAt);
       if (d.getFullYear() !== timelineYear) continue;
       buckets[d.getMonth()].push(p);
     }
     return buckets;
-  }, [projects, timelineYear]);
+  }, [visibleProjects, timelineYear]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={view} onValueChange={(v) => setView(v as ProjectViewMode)}>
-          <TabsList>
-            <TabsTrigger value="kanban">
-              <LayoutGrid className="size-3.5" />
-              Kanban
-            </TabsTrigger>
-            <TabsTrigger value="list">
-              <List className="size-3.5" />
-              Lista
-            </TabsTrigger>
-            <TabsTrigger value="timeline">
-              <CalendarRange className="size-3.5" />
-              Timeline
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap items-center gap-3">
+          <Tabs value={view} onValueChange={(v) => setView(v as ProjectViewMode)}>
+            <TabsList>
+              <TabsTrigger value="kanban">
+                <LayoutGrid className="size-3.5" />
+                Kanban
+              </TabsTrigger>
+              <TabsTrigger value="list">
+                <List className="size-3.5" />
+                Lista
+              </TabsTrigger>
+              <TabsTrigger value="timeline">
+                <CalendarRange className="size-3.5" />
+                Timeline
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <label className="inline-flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={showArchived}
+              onCheckedChange={(v) => setShowArchived(v === true)}
+            />
+            <Archive className="size-3.5" />
+            Ver archivados
+            {archivedCount > 0 ? (
+              <Badge variant="secondary">{archivedCount}</Badge>
+            ) : null}
+          </label>
+        </div>
         <Button onClick={openCreate} disabled={!meta}>
           <Plus className="size-4" />
           Nuevo proyecto
@@ -919,7 +963,7 @@ function ProjectsSection() {
                 <ProjectKanbanColumn
                   key={status.id}
                   status={status}
-                  projects={projects
+                  projects={visibleProjects
                     .filter((p) => p.statusId === status.id)
                     .sort((a, b) => a.sortOrder - b.sortOrder)}
                   onOpen={openEdit}
@@ -932,7 +976,11 @@ function ProjectsSection() {
         sortedList.length === 0 ? (
           <EmptyState
             title="Sin proyectos"
-            description="Crea tu primer proyecto para empezar."
+            description={
+              archivedCount > 0 && !showArchived
+                ? 'Activa «Ver archivados» para editarlos o devolverlos al tablero.'
+                : 'Crea tu primer proyecto para empezar.'
+            }
           />
         ) : (
           <div className="overflow-x-auto rounded-lg border">
@@ -980,7 +1028,16 @@ function ProjectsSection() {
                     className="cursor-pointer"
                     onClick={() => openEdit(p)}
                   >
-                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(p.archivedAt && 'text-muted-foreground')}>
+                          {p.name}
+                        </span>
+                        {p.archivedAt ? (
+                          <Badge variant="outline">Archivado</Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>{AREA_LABEL[p.area]}</TableCell>
                     <TableCell>{PROJECT_TYPE_LABEL[p.projectType]}</TableCell>
                     <TableCell>{p.stakeholder || '—'}</TableCell>
@@ -1040,7 +1097,10 @@ function ProjectsSection() {
                         key={p.id}
                         type="button"
                         onClick={() => openEdit(p)}
-                        className="rounded border bg-background px-1.5 py-1 text-left text-[10px] hover:bg-muted/50"
+                        className={cn(
+                          'rounded border bg-background px-1.5 py-1 text-left text-[10px] hover:bg-muted/50',
+                          p.archivedAt && 'border-dashed opacity-80',
+                        )}
                         style={{
                           borderLeftColor: p.status.color ?? undefined,
                           borderLeftWidth: p.status.color ? 3 : undefined,
@@ -1048,6 +1108,7 @@ function ProjectsSection() {
                       >
                         <div className="truncate font-medium">{p.name}</div>
                         <div className="text-muted-foreground">
+                          {p.archivedAt ? 'Archivado · ' : ''}
                           {p.progress}% · {IMPACT_LABEL[p.impact]}
                         </div>
                       </button>
@@ -1207,15 +1268,23 @@ function ProjectsSection() {
               </div>
             </div>
             {editing ? (
-              <label className="inline-flex items-center gap-2 text-sm">
-                <Checkbox
-                  checked={form.archived}
-                  onCheckedChange={(v) =>
-                    setForm((f) => ({ ...f, archived: v === true }))
-                  }
-                />
-                Archivar proyecto
-              </label>
+              <div className="grid gap-1">
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={form.archived}
+                    onCheckedChange={(v) =>
+                      setForm((f) => ({ ...f, archived: v === true }))
+                    }
+                  />
+                  Archivar proyecto
+                </label>
+                {form.archived ? (
+                  <p className="text-xs text-muted-foreground">
+                    Desmarca esta opción y guarda para devolver el proyecto al
+                    tablero.
+                  </p>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <DialogFooter className="gap-2 sm:justify-between">
@@ -2697,6 +2766,7 @@ function ProjectKanbanCard({
       className={cn(
         'rounded-md border bg-background p-2.5 shadow-sm',
         isDragging && 'opacity-60',
+        project.archivedAt && 'border-dashed opacity-80',
       )}
     >
       <button
@@ -2717,6 +2787,11 @@ function ProjectKanbanCard({
           <Badge variant={impactBadgeVariant(project.impact)} className="text-[10px]">
             {IMPACT_LABEL[project.impact]}
           </Badge>
+          {project.archivedAt ? (
+            <Badge variant="outline" className="text-[10px]">
+              Archivado
+            </Badge>
+          ) : null}
           {project.stakeholder ? (
             <span className="text-[10px] text-muted-foreground">
               {project.stakeholder}
