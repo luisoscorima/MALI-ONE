@@ -1,7 +1,8 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { AppModule, type User } from '@prisma/client';
 import type { Request } from 'express';
-import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { CrmEducacionService } from './crm-educacion.service';
 
@@ -56,8 +57,16 @@ class PatchContactBody {
   @IsOptional() @IsBoolean() opt_in?: boolean;
 }
 
+class ProspectiaSubjectBody {
+  @IsString() @MaxLength(160) key!: string;
+  @IsOptional() @IsString() @MaxLength(32) phone?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) username?: string | null;
+  @IsOptional() @IsString() @MaxLength(128) whatsapp_user_id?: string | null;
+}
+
 class ProspectiaCheckBody {
-  @IsArray() @IsString({ each: true }) phones!: string[];
+  @IsArray() @ValidateNested({ each: true }) @Type(() => ProspectiaSubjectBody)
+  subjects!: ProspectiaSubjectBody[];
 }
 
 @Controller('crm-educacion')
@@ -72,10 +81,12 @@ export class CrmEducacionController {
 
   @Post('prospectia/check')
   prospectiaCheck(@Body() body: ProspectiaCheckBody) {
-    if (body.phones.length > 50 || body.phones.some((phone) => phone.length > 32)) {
-      throw new BadRequestException('Máximo 50 teléfonos de hasta 32 caracteres');
+    if (body.subjects.length > 50 || body.subjects.some((subject) =>
+      subject.key.length > 160 || (subject.phone?.length ?? 0) > 32 ||
+      (subject.username?.length ?? 0) > 64 || (subject.whatsapp_user_id?.length ?? 0) > 128)) {
+      throw new BadRequestException('Máximo 50 contactos');
     }
-    return this.crm.checkProspectia(body.phones);
+    return this.crm.checkProspectia(body.subjects);
   }
 
   @Patch('contacts/:id')

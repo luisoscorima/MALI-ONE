@@ -58,14 +58,25 @@ function waUsername(value: string | null) {
   return value ? `@${value.replace(/^@/, '')}` : null;
 }
 
+function prospectiaKey(phone?: string | null, username?: string | null, userId?: string | null) {
+  const normalizedPhone = phone?.trim() ?? '';
+  const normalizedUser = username?.trim().replace(/^@+/, '').toLowerCase() ?? '';
+  const normalizedId = userId?.trim().toLowerCase() ?? '';
+  return normalizedPhone || normalizedUser || normalizedId
+    ? `${normalizedPhone}|${normalizedUser}|${normalizedId}` : '';
+}
+
 function prospectiaLabel(
   phone: string | null | undefined,
+  username: string | null | undefined,
+  userId: string | null | undefined,
   status: 'idle' | 'loading' | 'ready',
   matches: Record<string, ProspectiaMatch>,
   enabled: boolean,
 ) {
-  if (!phone) return <span className="text-xs text-muted-foreground">—</span>;
-  const match = matches[phone];
+  const key = prospectiaKey(phone, username, userId);
+  if (!key) return <span className="text-xs text-muted-foreground">—</span>;
+  const match = matches[key];
   if (status !== 'ready' || !match) return <span className="text-xs text-muted-foreground">…</span>;
   if (match === 'exists') return <Badge>Prospectia</Badge>;
   if (match === 'missing') return <span className="text-xs text-muted-foreground">No existe</span>;
@@ -170,20 +181,34 @@ export function CrmEducacionPage() {
   useEffect(() => { void loadContacts(); }, [loadContacts]);
   useEffect(() => {
     let active = true;
-    const phones = tab === 'contacts'
-      ? contacts.map((contact) => contact.phone)
+    const rows = tab === 'contacts'
+      ? contacts.map((contact) => ({
+        phone: contact.phone, username: contact.wa_username, userId: contact.whatsapp_user_id,
+      }))
       : tab === 'leads'
-        ? leads.map((lead) => lead.contacts?.phone || lead.phone)
+        ? leads.map((lead) => ({
+          phone: lead.contacts?.phone || lead.phone,
+          username: lead.wa_username || lead.contacts?.wa_username,
+          userId: lead.whatsapp_user_id || lead.contacts?.whatsapp_user_id,
+        }))
         : [];
-    const uniquePhones = [...new Set(phones.filter((phone): phone is string => Boolean(phone)))];
-    if (!uniquePhones.length) {
+    const subjects = [...new Map(rows.map((row) => {
+      const key = prospectiaKey(row.phone, row.username, row.userId);
+      return [key, {
+        key,
+        ...(row.phone ? { phone: row.phone } : {}),
+        ...(row.username ? { username: row.username } : {}),
+        ...(row.userId ? { whatsapp_user_id: row.userId } : {}),
+      }] as const;
+    })).values()].filter((subject) => subject.key);
+    if (!subjects.length) {
       setProspectiaMatches({});
       setProspectiaEnabled(false);
       setProspectiaStatus('ready');
       return () => { active = false; };
     }
     setProspectiaStatus('loading');
-    void api.checkCrmEducationProspectia(uniquePhones).then((result) => {
+    void api.checkCrmEducationProspectia(subjects).then((result) => {
       if (!active) return;
       setProspectiaEnabled(result.enabled);
       setProspectiaMatches(result.matches);
@@ -191,7 +216,7 @@ export function CrmEducacionPage() {
     }).catch(() => {
       if (!active) return;
       setProspectiaEnabled(false);
-      setProspectiaMatches(Object.fromEntries(uniquePhones.map((phone) => [phone, 'unverified' as const])));
+      setProspectiaMatches(Object.fromEntries(subjects.map((subject) => [subject.key, 'unverified' as const])));
       setProspectiaStatus('ready');
     });
     return () => { active = false; };
@@ -258,7 +283,7 @@ export function CrmEducacionPage() {
     if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
     if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
     if (visible.has('prospectia')) cols.push({ id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.phone, prospectiaStatus, prospectiaMatches, prospectiaEnabled) });
+      prospectiaLabel(row.original.phone, row.original.wa_username, row.original.whatsapp_user_id, prospectiaStatus, prospectiaMatches, prospectiaEnabled) });
     if (visible.has('wa_identity')) cols.push({ id: 'wa_identity', header: 'Usuario WhatsApp', cell: ({ row }) =>
       <div className="min-w-36">
         <div>{waUsername(row.original.wa_username) || (row.original.whatsapp_user_id ? 'Número privado' : '—')}</div>
@@ -303,7 +328,7 @@ export function CrmEducacionPage() {
       }
     },
     { id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.contacts?.phone || row.original.phone, prospectiaStatus, prospectiaMatches, prospectiaEnabled) },
+      prospectiaLabel(row.original.contacts?.phone || row.original.phone, row.original.wa_username || row.original.contacts?.wa_username, row.original.whatsapp_user_id || row.original.contacts?.whatsapp_user_id, prospectiaStatus, prospectiaMatches, prospectiaEnabled) },
     { id: 'channel', header: 'Canal', cell: ({ row }) => CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
     { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || row.original.source_key || '—' },
     { id: 'kind', header: 'Regla', cell: ({ row }) => {

@@ -124,10 +124,10 @@ async function request<T>(
 }
 
 export const api = {
-  checkCrmEducationProspectia: (phones: string[]) =>
+  checkCrmEducationProspectia: (subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) =>
     request<{ enabled: boolean; matches: Record<string, ProspectiaMatch> }>(
       '/api/crm-educacion/prospectia/check',
-      { method: 'POST', body: JSON.stringify({ phones }) },
+      { method: 'POST', body: JSON.stringify({ subjects }) },
     ),
   listCrmEducationContacts: (params: {
     area?: EducationArea | 'all'; q?: string; segment?: string;

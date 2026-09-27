@@ -671,9 +671,9 @@ export class WhatsappCrmClientService {
     return this.request('GET', `/api/crm/education/leads?${qs}`);
   }
 
-  checkEducationProspectia(phones: string[]) {
+  checkEducationProspectia(subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) {
     return this.request<{ enabled: boolean; matches: Record<string, 'exists' | 'missing' | 'unverified'> }>(
-      'POST', '/api/crm/education/prospectia/check', { phones },
+      'POST', '/api/crm/education/prospectia/check', { subjects },
     );
   }
 

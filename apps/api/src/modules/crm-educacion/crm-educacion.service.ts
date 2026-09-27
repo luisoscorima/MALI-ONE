@@ -79,14 +79,14 @@ export class CrmEducacionService {
     return this.crm.fetchEducationManagementCatalogs();
   }
 
-  async checkProspectia(phones: string[]) {
+  async checkProspectia(subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) {
     const unverified = () => ({
       enabled: false,
-      matches: Object.fromEntries(phones.map((phone) => [phone, 'unverified' as const])),
+      matches: Object.fromEntries(subjects.map((subject) => [subject.key, 'unverified' as const])),
     });
     if (!this.crm.configured) return unverified();
     try {
-      return await this.crm.checkEducationProspectia(phones);
+      return await this.crm.checkEducationProspectia(subjects);
     } catch {
       return unverified();
     }
