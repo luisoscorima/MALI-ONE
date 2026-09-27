@@ -134,7 +134,9 @@ export const api = {
   syncCrmEducationProspectia: () =>
     request<{ started: boolean }>('/api/crm-educacion/prospectia/sync', { method: 'POST', body: '{}' }),
   getCrmEducationProspectiaSync: () =>
-    request<{ running: boolean }>('/api/crm-educacion/prospectia/sync'),
+    request<{ running: boolean; processed: number; total: number; finished_at: string | null }>(
+      '/api/crm-educacion/prospectia/sync',
+    ),
   listCrmEducationContacts: (params: {
     area?: EducationArea | 'all'; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;

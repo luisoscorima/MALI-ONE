@@ -108,6 +108,11 @@ export function CrmEducacionPage() {
   const [managementSaving, setManagementSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
   const [syncingProspectia, setSyncingProspectia] = useState(false);
+  const [prospectiaWatch, setProspectiaWatch] = useState(0);
+  const [prospectiaSync, setProspectiaSync] = useState({
+    running: false, processed: 0, total: 0, finished_at: null as string | null,
+  });
+  const prospectiaWasRunning = useRef(false);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible])); }, [visible]);
   useEffect(() => {
@@ -193,24 +198,48 @@ export function CrmEducacionPage() {
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo revisar el conflicto'); }
   }, [loadContacts, loadLeads, toast]);
 
+  const reloadAfterProspectia = useRef({ loadContacts, loadLeads });
+  reloadAfterProspectia.current = { loadContacts, loadLeads };
+  useEffect(() => {
+    let cancel = false;
+    let timer = 0;
+    async function poll() {
+      try {
+        const status = await api.getCrmEducationProspectiaSync();
+        if (cancel) return;
+        setProspectiaSync(status);
+        if (status.running) {
+          prospectiaWasRunning.current = true;
+          timer = window.setTimeout(() => void poll(), 2000);
+          return;
+        }
+        if (prospectiaWasRunning.current) {
+          prospectiaWasRunning.current = false;
+          toast.success('Prospectia sincronizado');
+          const reload = reloadAfterProspectia.current;
+          await Promise.all([reload.loadContacts(), reload.loadLeads()]);
+        }
+        setSyncingProspectia(false);
+      } catch (error) {
+        if (!cancel) {
+          setSyncingProspectia(false);
+          toast.error(error instanceof Error ? error.message : 'No se pudo consultar el avance de Prospectia');
+        }
+      }
+    }
+    void poll();
+    return () => { cancel = true; window.clearTimeout(timer); };
+  }, [prospectiaWatch, toast]);
+
   async function syncProspectia() {
     setSyncingProspectia(true);
     try {
-      const started = await api.syncCrmEducationProspectia();
-      if (!started.started) {
-        toast.error('Ya hay una sincronización de Prospectia en curso');
-        return;
-      }
-      for (;;) {
-        await new Promise((resolve) => window.setTimeout(resolve, 2000));
-        const status = await api.getCrmEducationProspectiaSync();
-        if (!status.running) break;
-      }
-      toast.success('Prospectia sincronizado');
-      await Promise.all([loadContacts(), loadLeads()]);
+      await api.syncCrmEducationProspectia();
+      setProspectiaWatch((value) => value + 1);
     } catch (error) {
+      setSyncingProspectia(false);
       toast.error(error instanceof Error ? error.message : 'No se pudo sincronizar Prospectia');
-    } finally { setSyncingProspectia(false); }
+    }
   }
 
   async function distributeLeads() {
@@ -704,9 +733,19 @@ export function CrmEducacionPage() {
             <UsersRound className="mr-1 size-4" />
             {distributing ? 'Asignando…' : `Asignar automáticamente (${leadCounts.eligible})`}
           </Button>}
-          <Button variant="outline" disabled={syncingProspectia} onClick={() => void syncProspectia()}>
-            {syncingProspectia ? 'Sincronizando…' : 'Sincronizar Prospectia'}
+          <Button variant="outline" disabled={syncingProspectia || prospectiaSync.running}
+            onClick={() => void syncProspectia()}>
+            {prospectiaSync.running && prospectiaSync.total > 0
+              ? `Sincronizando ${prospectiaSync.processed.toLocaleString('es-PE')} de ${prospectiaSync.total.toLocaleString('es-PE')}`
+              : syncingProspectia || prospectiaSync.running
+                ? 'Sincronizando…'
+                : 'Sincronizar Prospectia'}
           </Button>
+          {prospectiaSync.finished_at && !prospectiaSync.running && (
+            <span className="text-sm text-muted-foreground">
+              Última sincronización: {formatDate(prospectiaSync.finished_at)}
+            </span>
+          )}
           <span className="text-sm text-muted-foreground">{leadTotal} captaciones</span>
         </div>
         {leadLoading ? <TableSkeleton rows={8} cols={7} /> : leads.length === 0 ?

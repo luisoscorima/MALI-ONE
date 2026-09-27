@@ -683,7 +683,9 @@ export class WhatsappCrmClientService {
   }
 
   educationProspectiaSyncStatus() {
-    return this.request<{ running: boolean }>('GET', '/api/crm/education/prospectia/sync');
+    return this.request<{
+      running: boolean; processed: number; total: number; finished_at: string | null;
+    }>('GET', '/api/crm/education/prospectia/sync');
   }
 
   fetchEducationManagementCatalogs() {
