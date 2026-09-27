@@ -79,6 +79,16 @@ export class CrmEducacionController {
     return this.crm.contacts(query);
   }
 
+  @Post('prospectia/sync')
+  prospectiaSync() {
+    return this.crm.startProspectiaSync();
+  }
+
+  @Get('prospectia/sync')
+  prospectiaSyncStatus() {
+    return this.crm.prospectiaSyncStatus();
+  }
+
   @Post('prospectia/check')
   prospectiaCheck(@Body() body: ProspectiaCheckBody) {
     if (body.subjects.length > 50 || body.subjects.some((subject) =>

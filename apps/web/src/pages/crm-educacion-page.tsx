@@ -6,8 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api, type EducationArea, type EducationCatalog, type EducationContact,
-  type EducationLead, type EducationLeadCounts, type EducationManagementCatalog,
-  type ProspectiaMatch } from '@/lib/api';
+  type EducationLead, type EducationLeadCounts, type EducationManagementCatalog } from '@/lib/api';
 import {
   Badge, Button, DataTable, DropdownMenu, DropdownMenuCheckboxItem,
   DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
@@ -58,31 +57,11 @@ function waUsername(value: string | null) {
   return value ? `@${value.replace(/^@/, '')}` : null;
 }
 
-function prospectiaKey(phone?: string | null, username?: string | null, userId?: string | null) {
-  const normalizedPhone = phone?.trim() ?? '';
-  const normalizedUser = username?.trim().replace(/^@+/, '').toLowerCase() ?? '';
-  const normalizedId = userId?.trim().toLowerCase() ?? '';
-  return normalizedPhone || normalizedUser || normalizedId
-    ? `${normalizedPhone}|${normalizedUser}|${normalizedId}` : '';
-}
-
-function prospectiaLabel(
-  phone: string | null | undefined,
-  username: string | null | undefined,
-  userId: string | null | undefined,
-  status: 'idle' | 'loading' | 'ready',
-  matches: Record<string, ProspectiaMatch>,
-  enabled: boolean,
-) {
-  const key = prospectiaKey(phone, username, userId);
-  if (!key) return <span className="text-xs text-muted-foreground">—</span>;
-  const match = matches[key];
-  if (status !== 'ready' || !match) return <span className="text-xs text-muted-foreground">…</span>;
+function prospectiaLabel(match: string | null | undefined) {
+  if (!match) return <span className="text-xs text-muted-foreground">Sin consultar</span>;
   if (match === 'exists') return <Badge>Prospectia</Badge>;
   if (match === 'missing') return <span className="text-xs text-muted-foreground">No existe</span>;
-  return <span className="text-xs text-muted-foreground" title={!enabled ? 'Consulta no configurada o no disponible' : undefined}>
-    No verificado
-  </span>;
+  return <span className="text-xs text-muted-foreground">No verificado</span>;
 }
 
 type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email' | 'segment_slugs' | 'attributes'> & {
@@ -95,9 +74,6 @@ export function CrmEducacionPage() {
   const [area, setArea] = useState<EducationArea | 'all'>('all');
   const [catalog, setCatalog] = useState<EducationCatalog>({ attributes: [], segments: [] });
   const [contacts, setContacts] = useState<EducationContact[]>([]);
-  const [prospectiaMatches, setProspectiaMatches] = useState<Record<string, ProspectiaMatch>>({});
-  const [prospectiaEnabled, setProspectiaEnabled] = useState(false);
-  const [prospectiaStatus, setProspectiaStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
   const [contactTotal, setContactTotal] = useState(0);
   const [contactPage, setContactPage] = useState(1);
   const [contactLoading, setContactLoading] = useState(true);
@@ -131,6 +107,7 @@ export function CrmEducacionPage() {
   const [managementCatalog, setManagementCatalog] = useState<EducationManagementCatalog>({ advisors: [], statuses: [] });
   const [managementSaving, setManagementSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
+  const [syncingProspectia, setSyncingProspectia] = useState(false);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible])); }, [visible]);
   useEffect(() => {
@@ -179,48 +156,6 @@ export function CrmEducacionPage() {
     }
   }, [contactParams]);
   useEffect(() => { void loadContacts(); }, [loadContacts]);
-  useEffect(() => {
-    let active = true;
-    const rows = tab === 'contacts'
-      ? contacts.map((contact) => ({
-        phone: contact.phone, username: contact.wa_username, userId: contact.whatsapp_user_id,
-      }))
-      : tab === 'leads'
-        ? leads.map((lead) => ({
-          phone: lead.contacts?.phone || lead.phone,
-          username: lead.wa_username || lead.contacts?.wa_username,
-          userId: lead.whatsapp_user_id || lead.contacts?.whatsapp_user_id,
-        }))
-        : [];
-    const subjects = [...new Map(rows.map((row) => {
-      const key = prospectiaKey(row.phone, row.username, row.userId);
-      return [key, {
-        key,
-        ...(row.phone ? { phone: row.phone } : {}),
-        ...(row.username ? { username: row.username } : {}),
-        ...(row.userId ? { whatsapp_user_id: row.userId } : {}),
-      }] as const;
-    })).values()].filter((subject) => subject.key);
-    if (!subjects.length) {
-      setProspectiaMatches({});
-      setProspectiaEnabled(false);
-      setProspectiaStatus('ready');
-      return () => { active = false; };
-    }
-    setProspectiaStatus('loading');
-    void api.checkCrmEducationProspectia(subjects).then((result) => {
-      if (!active) return;
-      setProspectiaEnabled(result.enabled);
-      setProspectiaMatches(result.matches);
-      setProspectiaStatus('ready');
-    }).catch(() => {
-      if (!active) return;
-      setProspectiaEnabled(false);
-      setProspectiaMatches(Object.fromEntries(subjects.map((subject) => [subject.key, 'unverified' as const])));
-      setProspectiaStatus('ready');
-    });
-    return () => { active = false; };
-  }, [contacts, leads, tab]);
   const leadParams = useMemo(() => ({
     area, channel, q: debouncedLeadQ, view: leadView, unassigned,
     page: leadPage, limit: PAGE_SIZE,
@@ -258,6 +193,26 @@ export function CrmEducacionPage() {
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo revisar el conflicto'); }
   }, [loadContacts, loadLeads, toast]);
 
+  async function syncProspectia() {
+    setSyncingProspectia(true);
+    try {
+      const started = await api.syncCrmEducationProspectia();
+      if (!started.started) {
+        toast.error('Ya hay una sincronización de Prospectia en curso');
+        return;
+      }
+      for (;;) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const status = await api.getCrmEducationProspectiaSync();
+        if (!status.running) break;
+      }
+      toast.success('Prospectia sincronizado');
+      await Promise.all([loadContacts(), loadLeads()]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo sincronizar Prospectia');
+    } finally { setSyncingProspectia(false); }
+  }
+
   async function distributeLeads() {
     setDistributing(true);
     try {
@@ -283,7 +238,7 @@ export function CrmEducacionPage() {
     if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
     if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
     if (visible.has('prospectia')) cols.push({ id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.phone, row.original.wa_username, row.original.whatsapp_user_id, prospectiaStatus, prospectiaMatches, prospectiaEnabled) });
+      prospectiaLabel(row.original.prospectia_match) });
     if (visible.has('wa_identity')) cols.push({ id: 'wa_identity', header: 'Usuario WhatsApp', cell: ({ row }) =>
       <div className="min-w-36">
         <div>{waUsername(row.original.wa_username) || (row.original.whatsapp_user_id ? 'Número privado' : '—')}</div>
@@ -310,7 +265,7 @@ export function CrmEducacionPage() {
       });
     }
     return cols;
-  }, [visible, areaAttributes, catalog.segments, prospectiaMatches, prospectiaEnabled, prospectiaStatus]);
+  }, [visible, areaAttributes, catalog.segments]);
 
   const leadColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
     { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
@@ -328,7 +283,7 @@ export function CrmEducacionPage() {
       }
     },
     { id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.contacts?.phone || row.original.phone, row.original.wa_username || row.original.contacts?.wa_username, row.original.whatsapp_user_id || row.original.contacts?.whatsapp_user_id, prospectiaStatus, prospectiaMatches, prospectiaEnabled) },
+      prospectiaLabel(row.original.prospectia_match) },
     { id: 'channel', header: 'Canal', cell: ({ row }) => CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
     { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || row.original.source_key || '—' },
     { id: 'kind', header: 'Regla', cell: ({ row }) => {
@@ -395,7 +350,7 @@ export function CrmEducacionPage() {
             { assigned_user_id: lead.assigned_user_id! })}>Confirmar asesor</Button>
         : '—';
     } },
-  ], [managementCatalog, managementSaving, updateManagement, reviewLead, prospectiaMatches, prospectiaEnabled, prospectiaStatus]);
+  ], [managementCatalog, managementSaving, updateManagement, reviewLead]);
 
   function changeArea(value: string) {
     setArea(value as EducationArea | 'all');
@@ -749,6 +704,9 @@ export function CrmEducacionPage() {
             <UsersRound className="mr-1 size-4" />
             {distributing ? 'Asignando…' : `Asignar automáticamente (${leadCounts.eligible})`}
           </Button>}
+          <Button variant="outline" disabled={syncingProspectia} onClick={() => void syncProspectia()}>
+            {syncingProspectia ? 'Sincronizando…' : 'Sincronizar Prospectia'}
+          </Button>
           <span className="text-sm text-muted-foreground">{leadTotal} captaciones</span>
         </div>
         {leadLoading ? <TableSkeleton rows={8} cols={7} /> : leads.length === 0 ?

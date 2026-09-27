@@ -92,6 +92,16 @@ export class CrmEducacionService {
     }
   }
 
+  startProspectiaSync() {
+    this.ensureConfigured();
+    return this.crm.startEducationProspectiaSync();
+  }
+
+  prospectiaSyncStatus() {
+    this.ensureConfigured();
+    return this.crm.educationProspectiaSyncStatus();
+  }
+
   management(id: number, body: {
     area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
   }, actorEmail: string) {

@@ -652,6 +652,7 @@ export class WhatsappCrmClientService {
       assigned_user_label: string | null;
       requires_review: boolean;
       lead_status_id: number | null;
+      prospectia_match: 'exists' | 'missing' | 'unverified' | null;
     }>;
     counts: { recent: number; new_number: number; duplicate: number;
       reassignable: number; conflict: number;
@@ -675,6 +676,14 @@ export class WhatsappCrmClientService {
     return this.request<{ enabled: boolean; matches: Record<string, 'exists' | 'missing' | 'unverified'> }>(
       'POST', '/api/crm/education/prospectia/check', { subjects },
     );
+  }
+
+  startEducationProspectiaSync() {
+    return this.request<{ started: boolean }>('POST', '/api/crm/education/prospectia/sync', {});
+  }
+
+  educationProspectiaSyncStatus() {
+    return this.request<{ running: boolean }>('GET', '/api/crm/education/prospectia/sync');
   }
 
   fetchEducationManagementCatalogs() {

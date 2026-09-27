@@ -21,6 +21,7 @@ export type EducationContact = {
   requires_review?: boolean;
   lead_status_id?: number | null;
   lead_status_label?: string | null;
+  prospectia_match?: ProspectiaMatch | null;
 };
 export type EducationLead = {
   id: number;
@@ -59,6 +60,7 @@ export type EducationLead = {
   assigned_user_label: string | null;
   requires_review: boolean;
   lead_status_id: number | null;
+  prospectia_match: ProspectiaMatch | null;
 };
 export type EducationLeadCounts = {
   recent: number; new_number: number; duplicate: number; reassignable: number; conflict: number;
@@ -129,6 +131,10 @@ export const api = {
       '/api/crm-educacion/prospectia/check',
       { method: 'POST', body: JSON.stringify({ subjects }) },
     ),
+  syncCrmEducationProspectia: () =>
+    request<{ started: boolean }>('/api/crm-educacion/prospectia/sync', { method: 'POST', body: '{}' }),
+  getCrmEducationProspectiaSync: () =>
+    request<{ running: boolean }>('/api/crm-educacion/prospectia/sync'),
   listCrmEducationContacts: (params: {
     area?: EducationArea | 'all'; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;
