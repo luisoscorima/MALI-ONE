@@ -95,6 +95,7 @@ import { isFloatingLayerBlockingDismiss } from '@/lib/floating-layer';
 const SECTION_STORAGE_KEY = 'mali.portfolio.section';
 const PROJECTS_VIEW_KEY = 'mali.portfolio.projectsView';
 const SHOW_ARCHIVED_PROJECTS_KEY = 'mali.portfolio.showArchivedProjects';
+const SHOW_ARCHIVED_TASKS_KEY = 'mali.portfolio.showArchivedTasks';
 const TASKS_VIEW_KEY = 'mali.portfolio.tasksView';
 
 const AREA_LABEL: Record<PortfolioArea, string> = {
@@ -1474,6 +1475,13 @@ function TasksSection() {
   );
   const [chip, setChip] = useState<ChipFilter>('all');
   const [hideDone, setHideDone] = useState(false);
+  const [showArchived, setShowArchived] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_ARCHIVED_TASKS_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [ownerFilter, setOwnerFilter] = useState('');
   const [projectFilter, setProjectFilter] = useState('');
   const [appUsers, setAppUsers] = useState<AppUserDto[]>([]);
@@ -1502,10 +1510,9 @@ function TasksSection() {
         api.getTodoMeta(),
         api.listTodos({
           ...(ownerFilter ? { ownerId: ownerFilter } : {}),
-          includeDone: !hideDone,
-          includeArchived: false,
+          includeArchived: true,
         }),
-        api.listProjects({ includeClosed: true }),
+        api.listProjects({ includeClosed: true, includeArchived: true }),
       ]);
       setMeta(m);
       setItems(list);
@@ -1517,7 +1524,7 @@ function TasksSection() {
     } finally {
       setLoading(false);
     }
-  }, [toast, ownerFilter, hideDone]);
+  }, [toast, ownerFilter]);
 
   useEffect(() => {
     void load();
@@ -1536,6 +1543,14 @@ function TasksSection() {
     }
   }, [view]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(SHOW_ARCHIVED_TASKS_KEY, showArchived ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [showArchived]);
+
   const activeTypes = useMemo(
     () => (meta?.types ?? []).filter((t) => t.active),
     [meta],
@@ -1546,17 +1561,27 @@ function TasksSection() {
     [statuses],
   );
 
+  const archivedProjectIds = useMemo(
+    () => new Set(projects.filter((p) => p.archivedAt).map((p) => p.id)),
+    [projects],
+  );
+  const isArchived = (item: TodoItemDto) =>
+    Boolean(item.archivedAt || (item.projectId && archivedProjectIds.has(item.projectId)));
+  const archivedCount = items.filter(isArchived).length;
+
   const counters = useMemo(() => {
-    const open = items.filter((i) => !i.status.isDone);
+    const open = items.filter((i) => !i.status.isDone && !isArchived(i));
     return {
       open: open.length,
       today: open.filter((i) => isDueToday(i.dueAt)).length,
       overdue: open.filter((i) => isOverdue(i)).length,
     };
-  }, [items]);
+  }, [items, archivedProjectIds]);
 
   const visibleItems = useMemo(() => {
     return items.filter((item) => {
+      if (!showArchived && isArchived(item)) return false;
+      if (hideDone && item.status.isDone) return false;
       if (projectFilter && item.projectId !== projectFilter) return false;
       if (chip === 'today') return isDueToday(item.dueAt) && !item.status.isDone;
       if (chip === 'overdue') return isOverdue(item);
@@ -1568,7 +1593,7 @@ function TasksSection() {
       }
       return true;
     });
-  }, [items, chip, projectFilter]);
+  }, [items, chip, projectFilter, hideDone, showArchived, archivedProjectIds]);
 
   const sortedListItems = useMemo(() => {
     const list = [...visibleItems];
@@ -1909,6 +1934,20 @@ function TasksSection() {
           />
           Ocultar hechas
         </label>
+        <label className="ml-1 inline-flex items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox
+            checked={showArchived}
+            onCheckedChange={(v) => {
+              const show = v === true;
+              setShowArchived(show);
+              if (!show && projects.some((p) => p.id === projectFilter && p.archivedAt)) {
+                setProjectFilter('');
+              }
+            }}
+          />
+          <Archive className="size-3.5" />
+          Ver archivados {archivedCount}
+        </label>
         <div className="min-w-48">
           <Select
             value={projectFilter || '__all__'}
@@ -1919,7 +1958,7 @@ function TasksSection() {
             </SelectTrigger>
             <SelectContent position="popper">
               <SelectItem value="__all__">Todos los proyectos</SelectItem>
-              {projects.map((p) => (
+              {projects.filter((p) => showArchived || !p.archivedAt).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
                 </SelectItem>

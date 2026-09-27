@@ -226,6 +226,16 @@ export class PortfolioService implements OnModuleInit {
           : {}),
         ...(sortOrder !== undefined ? { sortOrder } : {}),
         ...(archivedAt !== undefined ? { archivedAt } : {}),
+        ...(dto.archived === true && existing.archivedAt === null
+          ? {
+              tasks: {
+                updateMany: {
+                  where: { archivedAt: null },
+                  data: { archivedAt },
+                },
+              },
+            }
+          : {}),
       },
       include: projectInclude,
     });
