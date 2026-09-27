@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { AppModule, type User } from '@prisma/client';
 import type { Request } from 'express';
 import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from 'class-validator';
@@ -56,6 +56,10 @@ class PatchContactBody {
   @IsOptional() @IsBoolean() opt_in?: boolean;
 }
 
+class ProspectiaCheckBody {
+  @IsArray() @IsString({ each: true }) phones!: string[];
+}
+
 @Controller('crm-educacion')
 @RequireModule(AppModule.crm_educacion)
 export class CrmEducacionController {
@@ -64,6 +68,14 @@ export class CrmEducacionController {
   @Get('contacts')
   contacts(@Query() query: ListContactsQuery) {
     return this.crm.contacts(query);
+  }
+
+  @Post('prospectia/check')
+  prospectiaCheck(@Body() body: ProspectiaCheckBody) {
+    if (body.phones.length > 50 || body.phones.some((phone) => phone.length > 32)) {
+      throw new BadRequestException('Máximo 50 teléfonos de hasta 32 caracteres');
+    }
+    return this.crm.checkProspectia(body.phones);
   }
 
   @Patch('contacts/:id')

@@ -671,6 +671,12 @@ export class WhatsappCrmClientService {
     return this.request('GET', `/api/crm/education/leads?${qs}`);
   }
 
+  checkEducationProspectia(phones: string[]) {
+    return this.request<{ enabled: boolean; matches: Record<string, 'exists' | 'missing' | 'unverified'> }>(
+      'POST', '/api/crm/education/prospectia/check', { phones },
+    );
+  }
+
   fetchEducationManagementCatalogs() {
     return this.request<{
       advisors: Array<{ id: number; label: string; areas: string[] }>;

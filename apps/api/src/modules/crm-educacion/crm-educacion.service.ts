@@ -79,6 +79,19 @@ export class CrmEducacionService {
     return this.crm.fetchEducationManagementCatalogs();
   }
 
+  async checkProspectia(phones: string[]) {
+    const unverified = () => ({
+      enabled: false,
+      matches: Object.fromEntries(phones.map((phone) => [phone, 'unverified' as const])),
+    });
+    if (!this.crm.configured) return unverified();
+    try {
+      return await this.crm.checkEducationProspectia(phones);
+    } catch {
+      return unverified();
+    }
+  }
+
   management(id: number, body: {
     area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
   }, actorEmail: string) {

@@ -1,6 +1,7 @@
 import type { AppModule, AppUserDto, AuthUser } from '@mali-one/shared';
 
 export type EducationArea = 'educacion' | 'educacion_ca' | 'educacion_ep';
+export type ProspectiaMatch = 'exists' | 'missing' | 'unverified';
 export type EducationContact = {
   contact_id: number;
   area: EducationArea;
@@ -123,6 +124,11 @@ async function request<T>(
 }
 
 export const api = {
+  checkCrmEducationProspectia: (phones: string[]) =>
+    request<{ enabled: boolean; matches: Record<string, ProspectiaMatch> }>(
+      '/api/crm-educacion/prospectia/check',
+      { method: 'POST', body: JSON.stringify({ phones }) },
+    ),
   listCrmEducationContacts: (params: {
     area?: EducationArea | 'all'; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;
