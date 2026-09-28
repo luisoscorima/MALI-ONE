@@ -9,6 +9,7 @@
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { stripWhatsappRef } from '../src/modules/links/whatsapp-ref.util';
 
 const prisma = new PrismaClient();
 
@@ -26,6 +27,35 @@ type ProgramaSeed = {
   reemplazaCurso?: string;
   cursos: string[];
 };
+
+type MatchTarget = {
+  kind: 'curso' | 'programa';
+  id: string;
+  phrase: string;
+  normalized: string;
+};
+
+function normalizeName(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function prefillText(targetUrl: string) {
+  try {
+    return stripWhatsappRef(new URL(targetUrl).searchParams.get('text'));
+  } catch {
+    return '';
+  }
+}
+
+function containsPhrase(text: string, phrase: string) {
+  if (!phrase) return false;
+  return ` ${text} `.includes(` ${phrase} `);
+}
 
 async function main() {
   const { areas, programas } = JSON.parse(
@@ -141,9 +171,83 @@ async function main() {
     }
   }
 
+  const whatsapp = await linkWhatsappCatalog(programas ?? []);
+
   console.log(
     `Catálogo educación: ${areas.length} áreas/líneas, ${created} cursos nuevos, ${linked} cursos actualizados, ${programasNuevos} programas nuevos.`,
   );
+  console.log(
+    `Enlaces WhatsApp: ${whatsapp.matched} vinculados, ${whatsapp.skipped} ya tenían curso o programa, ${whatsapp.ambiguous} ambiguos.`,
+  );
+  for (const line of whatsapp.ambiguousLines) {
+    console.log(`  ambiguo ${line}`);
+  }
+}
+
+async function linkWhatsappCatalog(programas: ProgramaSeed[]) {
+  const [cursos, programasDb, links] = await Promise.all([
+    prisma.educacionCatalogCurso.findMany({ select: { id: true, nombre: true } }),
+    prisma.educacionCatalogPrograma.findMany({ select: { id: true, nombre: true } }),
+    prisma.shortLink.findMany({
+      where: { type: 'WHATSAPP' },
+      select: { id: true, slug: true, targetUrl: true, catalogCursoId: true, catalogProgramaId: true },
+    }),
+  ]);
+
+  const targets: MatchTarget[] = [];
+  for (const curso of cursos) {
+    const normalized = normalizeName(curso.nombre);
+    if (normalized) targets.push({ kind: 'curso', id: curso.id, phrase: curso.nombre, normalized });
+  }
+  for (const programa of programasDb) {
+    const normalized = normalizeName(programa.nombre);
+    if (normalized) targets.push({ kind: 'programa', id: programa.id, phrase: programa.nombre, normalized });
+  }
+  for (const programa of programas) {
+    if (!programa.reemplazaCurso) continue;
+    const row = programasDb.find((item) => item.nombre === programa.nombre);
+    const normalized = normalizeName(programa.reemplazaCurso);
+    if (!row || !normalized) continue;
+    targets.push({ kind: 'programa', id: row.id, phrase: programa.reemplazaCurso, normalized });
+  }
+  targets.sort((a, b) => b.normalized.length - a.normalized.length);
+
+  let matched = 0;
+  let skipped = 0;
+  const ambiguousLines: string[] = [];
+
+  for (const link of links) {
+    if (link.catalogCursoId || link.catalogProgramaId) {
+      skipped += 1;
+      continue;
+    }
+    const text = normalizeName(prefillText(link.targetUrl));
+    if (!text) continue;
+    const hits = targets.filter((target) => containsPhrase(text, target.normalized));
+    if (hits.length === 0) continue;
+    const bestLength = hits[0].normalized.length;
+    const winners = new Map<string, MatchTarget>();
+    for (const hit of hits) {
+      if (hit.normalized.length !== bestLength) continue;
+      winners.set(`${hit.kind}:${hit.id}`, hit);
+    }
+    if (winners.size !== 1) {
+      ambiguousLines.push(
+        `${link.slug}: ${[...winners.values()].map((item) => item.phrase).join(' | ')}`,
+      );
+      continue;
+    }
+    const winner = [...winners.values()][0];
+    await prisma.shortLink.update({
+      where: { id: link.id },
+      data: winner.kind === 'curso'
+        ? { catalogCursoId: winner.id }
+        : { catalogProgramaId: winner.id },
+    });
+    matched += 1;
+  }
+
+  return { matched, skipped, ambiguous: ambiguousLines.length, ambiguousLines };
 }
 
 main()
