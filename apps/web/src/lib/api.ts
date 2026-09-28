@@ -135,6 +135,7 @@ type EducacionOfertaDto = {
   sortOrder: number;
   areaId: string | null;
   area: { id: string; nombre: string; parentNombre: string | null } | null;
+  cursos?: { id: string; nombre: string }[];
 };
 
 type EducacionOfertaInput = {
@@ -145,6 +146,7 @@ type EducacionOfertaInput = {
   activo?: boolean;
   sortOrder?: number;
   areaId?: string | null;
+  cursoIds?: string[];
 };
 
 type EducacionAreaDto = {

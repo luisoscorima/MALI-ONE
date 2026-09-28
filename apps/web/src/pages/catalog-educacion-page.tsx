@@ -10,6 +10,7 @@ import { EmptyState, Spinner } from '@/components/feedback';
 import {
   Button,
   Card,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,6 +46,7 @@ type Oferta = {
   sortOrder: number;
   areaId: string | null;
   area: { id: string; nombre: string; parentNombre: string | null } | null;
+  cursos?: { id: string; nombre: string }[];
 };
 
 type Area = {
@@ -254,6 +256,7 @@ export function CatalogEducacionPage() {
             kind="programas"
             rows={programas}
             loading={loading}
+            showCursos
             onCreate={() => setOfertaEdit({ kind: 'programas', item: null })}
             onEdit={(item) => setOfertaEdit({ kind: 'programas', item })}
             onDelete={(item) => void removeOferta('programas', item)}
@@ -364,6 +367,7 @@ export function CatalogEducacionPage() {
       <OfertaDialog
         state={ofertaEdit}
         areas={areas}
+        cursos={cursos}
         onClose={() => setOfertaEdit(null)}
         onSaved={() => void load()}
       />
@@ -393,6 +397,7 @@ function OfertaPanel({
   rows,
   loading,
   showArea = false,
+  showCursos = false,
   onCreate,
   onEdit,
   onDelete,
@@ -401,6 +406,7 @@ function OfertaPanel({
   rows: Oferta[];
   loading: boolean;
   showArea?: boolean;
+  showCursos?: boolean;
   onCreate: () => void;
   onEdit: (item: Oferta) => void;
   onDelete: (item: Oferta) => void;
@@ -423,6 +429,7 @@ function OfertaPanel({
             <TableRow>
               <TableHead className="p-4">Nombre</TableHead>
               {showArea ? <TableHead className="p-4">Área</TableHead> : null}
+              {showCursos ? <TableHead className="p-4">Cursos</TableHead> : null}
               <TableHead className="p-4">Precio</TableHead>
               <TableHead className="p-4">Descuento</TableHead>
               <TableHead className="p-4">Horario</TableHead>
@@ -441,6 +448,11 @@ function OfertaPanel({
                         ? `${row.area.parentNombre} · ${row.area.nombre}`
                         : row.area.nombre
                       : '—'}
+                  </TableCell>
+                ) : null}
+                {showCursos ? (
+                  <TableCell className="max-w-xs p-4 text-sm text-muted">
+                    {row.cursos?.length ? row.cursos.map((curso) => curso.nombre).join(', ') : '—'}
                   </TableCell>
                 ) : null}
                 <TableCell className="p-4">{money(row.precio)}</TableCell>
@@ -469,11 +481,13 @@ function OfertaPanel({
 function OfertaDialog({
   state,
   areas,
+  cursos,
   onClose,
   onSaved,
 }: {
   state: { kind: OfertaKind; item: Oferta | null } | null;
   areas: Area[];
+  cursos: Oferta[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -484,6 +498,8 @@ function OfertaDialog({
   const [descuento, setDescuento] = useState('');
   const [horario, setHorario] = useState('');
   const [areaId, setAreaId] = useState('');
+  const [cursoIds, setCursoIds] = useState<string[]>([]);
+  const [cursoQuery, setCursoQuery] = useState('');
   const [activo, setActivo] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -493,6 +509,8 @@ function OfertaDialog({
     setDescuento(item?.descuento ?? '');
     setHorario(item?.horario ?? '');
     setAreaId(item?.areaId ?? '');
+    setCursoIds(item?.cursos?.map((curso) => curso.id) ?? []);
+    setCursoQuery('');
     setActivo(item?.activo ?? true);
   }, [item, state?.kind]);
 
@@ -507,7 +525,7 @@ function OfertaDialog({
       horario,
       activo,
       sortOrder: item?.sortOrder ?? 0,
-      ...(state.kind === 'cursos' ? { areaId: areaId || null } : {}),
+      ...(state.kind === 'cursos' ? { areaId: areaId || null } : { cursoIds }),
     };
     try {
       if (state.kind === 'cursos') {
@@ -532,12 +550,21 @@ function OfertaDialog({
     ? item ? 'Editar programa' : 'Nuevo programa'
     : item ? 'Editar curso' : 'Nuevo curso';
 
+  const cursoQueryNorm = cursoQuery.trim().toLocaleLowerCase('es');
+  const cursosVisibles = [...cursos]
+    .filter((curso) => curso.nombre.toLocaleLowerCase('es').includes(cursoQueryNorm))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
   return (
     <Dialog open={!!state} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent>
+      <DialogContent className={state?.kind === 'programas' ? 'max-h-[85vh] overflow-y-auto' : undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>El precio, el descuento y el horario describen la oferta. El pago de una persona no se registra aquí.</DialogDescription>
+          <DialogDescription>
+            {state?.kind === 'programas'
+              ? 'El programa puede quedar sin cursos. Si marcas alguno, agrupa esas ofertas.'
+              : 'El precio, el descuento y el horario describen la oferta. El pago de una persona no se registra aquí.'}
+          </DialogDescription>
         </DialogHeader>
         <form className="grid gap-3" onSubmit={(event) => void save(event)}>
           <label className="grid gap-2 text-sm">
@@ -559,7 +586,36 @@ function OfertaDialog({
                 </SelectContent>
               </Select>
             </label>
-          ) : null}
+          ) : (
+            <div className="grid gap-2 text-sm">
+              <span>Cursos (opcional)</span>
+              <Input
+                value={cursoQuery}
+                onChange={(event) => setCursoQuery(event.target.value)}
+                placeholder="Buscar curso"
+              />
+              <p className="text-muted">{cursoIds.length === 1 ? '1 seleccionado' : `${cursoIds.length} seleccionados`}</p>
+              <div className="grid max-h-48 gap-2 overflow-y-auto rounded-md border border-border p-3">
+                {cursosVisibles.length === 0 ? (
+                  <p className="text-muted">Ningún curso coincide.</p>
+                ) : cursosVisibles.map((curso) => (
+                  <label key={curso.id} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={cursoIds.includes(curso.id)}
+                      onCheckedChange={(value) => {
+                        setCursoIds((current) => (
+                          value === true
+                            ? current.includes(curso.id) ? current : [...current, curso.id]
+                            : current.filter((id) => id !== curso.id)
+                        ));
+                      }}
+                    />
+                    <span>{curso.nombre}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <label className="grid gap-2 text-sm">
             Precio (S/, opcional)
             <Input type="number" min="0" step="0.01" value={precio} onChange={(event) => setPrecio(event.target.value)} />

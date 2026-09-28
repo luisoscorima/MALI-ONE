@@ -21,10 +21,16 @@ type AreaSeed = {
   cursos: string[];
 };
 
+type ProgramaSeed = {
+  nombre: string;
+  reemplazaCurso?: string;
+  cursos: string[];
+};
+
 async function main() {
-  const { areas } = JSON.parse(
+  const { areas, programas } = JSON.parse(
     readFileSync(join(__dirname, 'seed-data', 'educacion-catalog-areas.json'), 'utf8'),
-  ) as { areas: AreaSeed[] };
+  ) as { areas: AreaSeed[]; programas?: ProgramaSeed[] };
 
   const ids = new Map<string, string>();
 
@@ -84,8 +90,59 @@ async function main() {
     }
   }
 
+  let programasNuevos = 0;
+  for (const programa of programas ?? []) {
+    const existing = await prisma.educacionCatalogPrograma.findFirst({
+      where: { nombre: programa.nombre },
+      select: { id: true },
+    });
+    const row = existing
+      ? await prisma.educacionCatalogPrograma.update({
+          where: { id: existing.id },
+          data: { activo: true },
+        })
+      : await prisma.educacionCatalogPrograma.create({
+          data: { nombre: programa.nombre, sortOrder: programasNuevos, activo: true },
+        });
+    if (!existing) programasNuevos += 1;
+
+    if (programa.reemplazaCurso) {
+      const curso = await prisma.educacionCatalogCurso.findFirst({
+        where: { nombre: programa.reemplazaCurso },
+        select: { id: true },
+      });
+      if (curso) {
+        await prisma.shortLink.updateMany({
+          where: { catalogCursoId: curso.id, catalogProgramaId: null },
+          data: { catalogProgramaId: row.id },
+        });
+        await prisma.shortLink.updateMany({
+          where: { catalogCursoId: curso.id },
+          data: { catalogCursoId: null },
+        });
+        await prisma.educacionCatalogCurso.delete({ where: { id: curso.id } });
+      }
+    }
+
+    if (programa.cursos.length > 0) {
+      const cursoIds: string[] = [];
+      for (const nombre of programa.cursos) {
+        const curso = await prisma.educacionCatalogCurso.findFirst({
+          where: { nombre },
+          select: { id: true },
+        });
+        if (!curso) throw new Error(`Curso no encontrado para el programa «${programa.nombre}»: ${nombre}`);
+        cursoIds.push(curso.id);
+      }
+      await prisma.educacionCatalogProgramaCurso.deleteMany({ where: { programaId: row.id } });
+      await prisma.educacionCatalogProgramaCurso.createMany({
+        data: cursoIds.map((cursoId, sortOrder) => ({ programaId: row.id, cursoId, sortOrder })),
+      });
+    }
+  }
+
   console.log(
-    `Catálogo educación: ${areas.length} áreas/líneas, ${created} cursos nuevos, ${linked} cursos actualizados.`,
+    `Catálogo educación: ${areas.length} áreas/líneas, ${created} cursos nuevos, ${linked} cursos actualizados, ${programasNuevos} programas nuevos.`,
   );
 }
 

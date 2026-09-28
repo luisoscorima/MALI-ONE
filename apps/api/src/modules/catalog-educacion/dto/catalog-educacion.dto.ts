@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsNumber,
@@ -44,6 +45,11 @@ export class UpsertEducacionOfertaDto {
   @IsOptional()
   @IsString()
   areaId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  cursoIds?: string[];
 }
 
 export class UpsertEducacionAreaDto {

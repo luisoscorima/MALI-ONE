@@ -28,6 +28,13 @@ function money(value: Prisma.Decimal | null): number | null {
   return value == null ? null : Number(value);
 }
 
+const programaInclude = {
+  cursos: {
+    orderBy: { sortOrder: 'asc' as const },
+    include: { curso: { select: { id: true, nombre: true } } },
+  },
+} satisfies Prisma.EducacionCatalogProgramaInclude;
+
 @Injectable()
 export class CatalogEducacionService {
   constructor(private readonly prisma: PrismaService) {}
@@ -49,7 +56,8 @@ export class CatalogEducacionService {
   listProgramas() {
     return this.prisma.educacionCatalogPrograma.findMany({
       orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
-    }).then((rows) => rows.map((row) => this.ofertaDto(row)));
+      include: programaInclude,
+    }).then((rows) => rows.map((row) => this.programaDto(row)));
   }
 
   listSedes() {
@@ -116,19 +124,35 @@ export class CatalogEducacionService {
   }
 
   async createPrograma(dto: UpsertEducacionOfertaDto) {
-    const row = await this.prisma.educacionCatalogPrograma.create({
-      data: this.ofertaData(dto),
+    const cursoIds = await this.cursoIdsOrThrow(dto.cursoIds ?? []);
+    const row = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.educacionCatalogPrograma.create({
+        data: this.ofertaData(dto),
+      });
+      await this.writeProgramaCursos(tx, created.id, cursoIds);
+      return tx.educacionCatalogPrograma.findUniqueOrThrow({
+        where: { id: created.id },
+        include: programaInclude,
+      });
     });
-    return this.ofertaDto(row);
+    return this.programaDto(row);
   }
 
   async updatePrograma(id: string, dto: UpsertEducacionOfertaDto) {
     await this.ensurePrograma(id);
-    const row = await this.prisma.educacionCatalogPrograma.update({
-      where: { id },
-      data: this.ofertaData(dto),
+    const cursoIds = dto.cursoIds === undefined ? undefined : await this.cursoIdsOrThrow(dto.cursoIds);
+    const row = await this.prisma.$transaction(async (tx) => {
+      await tx.educacionCatalogPrograma.update({
+        where: { id },
+        data: this.ofertaData(dto),
+      });
+      if (cursoIds !== undefined) await this.writeProgramaCursos(tx, id, cursoIds);
+      return tx.educacionCatalogPrograma.findUniqueOrThrow({
+        where: { id },
+        include: programaInclude,
+      });
     });
-    return this.ofertaDto(row);
+    return this.programaDto(row);
   }
 
   async deletePrograma(id: string) {
@@ -334,6 +358,22 @@ export class CatalogEducacionService {
     };
   }
 
+  private programaDto(row: {
+    id: string;
+    nombre: string;
+    precio: Prisma.Decimal | null;
+    descuento: string | null;
+    horario: string | null;
+    activo: boolean;
+    sortOrder: number;
+    cursos: { curso: { id: string; nombre: string } }[];
+  }) {
+    return {
+      ...this.ofertaDto(row),
+      cursos: row.cursos.map((item) => item.curso),
+    };
+  }
+
   private areaDto(row: {
     id: string;
     slug: string;
@@ -408,6 +448,35 @@ export class CatalogEducacionService {
       sortOrder: row.sortOrder,
       sedes: row._count.catalogSedes,
     };
+  }
+
+  private async cursoIdsOrThrow(ids: string[]) {
+    const unique: string[] = [];
+    for (const id of ids) {
+      const trimmed = id.trim();
+      if (trimmed && !unique.includes(trimmed)) unique.push(trimmed);
+    }
+    if (unique.length === 0) return unique;
+    const found = await this.prisma.educacionCatalogCurso.findMany({
+      where: { id: { in: unique } },
+      select: { id: true },
+    });
+    if (found.length !== unique.length) {
+      throw new BadRequestException('Alguno de los cursos no está en el catálogo');
+    }
+    return unique;
+  }
+
+  private async writeProgramaCursos(
+    tx: Prisma.TransactionClient,
+    programaId: string,
+    cursoIds: string[],
+  ) {
+    await tx.educacionCatalogProgramaCurso.deleteMany({ where: { programaId } });
+    if (cursoIds.length === 0) return;
+    await tx.educacionCatalogProgramaCurso.createMany({
+      data: cursoIds.map((cursoId, sortOrder) => ({ programaId, cursoId, sortOrder })),
+    });
   }
 
   private async resolveAreaId(value: string | null | undefined) {

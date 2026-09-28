@@ -64,7 +64,6 @@
         "Diseño Estratégico de Proyectos Culturales",
         "Economía, cultura e industrias creativas",
         "Financiamiento de la cultura",
-        "Gestión cultural",
         "Gestión Cultural y Políticas Públicas",
         "Gestión del patrimonio cultural",
         "Gestión estratégicas de las organizaciones culturales",
@@ -83,6 +82,13 @@
       "nombre": "Diseño y Comunicaciones",
       "parentSlug": "extension-profesional",
       "sortOrder": 1,
+      "cursos": []
+    }
+  ],
+  "programas": [
+    {
+      "nombre": "Programa de Especialización de Gestión Cultural",
+      "reemplazaCurso": "Gestión cultural",
       "cursos": []
     }
   ]

@@ -225,21 +225,34 @@ model EducacionCatalogCurso {
   createdAt DateTime              @default(now())
   updatedAt DateTime              @updatedAt
   links     ShortLink[]
+  programas EducacionCatalogProgramaCurso[]
 
   @@index([areaId])
 }
 
 model EducacionCatalogPrograma {
-  id        String      @id @default(cuid())
+  id        String                          @id @default(cuid())
   nombre    String
-  precio    Decimal?    @db.Decimal(10, 2)
+  precio    Decimal?                        @db.Decimal(10, 2)
   descuento String?
   horario   String?
-  activo    Boolean     @default(true)
-  sortOrder Int         @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  activo    Boolean                         @default(true)
+  sortOrder Int                             @default(0)
+  createdAt DateTime                        @default(now())
+  updatedAt DateTime                        @updatedAt
   links     ShortLink[]
+  cursos    EducacionCatalogProgramaCurso[]
+}
+
+model EducacionCatalogProgramaCurso {
+  programaId String
+  cursoId    String
+  sortOrder  Int                      @default(0)
+  programa   EducacionCatalogPrograma @relation(fields: [programaId], references: [id], onDelete: Cascade)
+  curso      EducacionCatalogCurso    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@id([programaId, cursoId])
+  @@index([cursoId])
 }
 
 model EducacionCatalogSede {
