@@ -9,7 +9,23 @@
 import { PrismaClient } from '@prisma/client';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { stripWhatsappRef } from '../src/modules/links/whatsapp-ref.util';
+
+const REF_TOKEN = String.raw`ref:[a-zA-Z0-9_-]+`;
+const WHATSAPP_REF_PREFIX_RE = new RegExp(
+  String.raw`^\s*${REF_TOKEN}(?:\s*[·•\-–—]\s*|\s+)?`,
+  'i',
+);
+const WHATSAPP_REF_SUFFIX_RE = new RegExp(
+  String.raw`\s*[·•\-–—]?\s*${REF_TOKEN}\s*$`,
+  'i',
+);
+
+function stripWhatsappRef(text: string | undefined | null): string {
+  return String(text ?? '')
+    .replace(WHATSAPP_REF_PREFIX_RE, '')
+    .replace(WHATSAPP_REF_SUFFIX_RE, '')
+    .trim();
+}
 
 const prisma = new PrismaClient();
 
