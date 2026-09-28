@@ -554,13 +554,31 @@ function SedeDialog({
         <DialogHeader>
           <DialogTitle>{sede?.id ? 'Editar sede' : 'Nueva sede'}</DialogTitle>
           <DialogDescription>
-            Dirección, brochure, horario, ícono y distrito se editan aquí. El mapa y el selector solo eligen el nombre visible y si la sede se muestra.
+            Dirección, brochure, horario y distrito se editan aquí. El ícono también se puede cambiar en el selector de sedes: es el mismo dato.
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-3" onSubmit={(event) => void save(event)}>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={activo} onCheckedChange={(value) => setActivo(value === true)} />
+            Activa en los enlaces de WhatsApp
+          </label>
           <label className="grid gap-2 text-sm">
             Nombre
             <Input value={nombre} onChange={(event) => setNombre(event.target.value)} required />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Distrito
+            <Select value={districtId || '__none__'} onValueChange={(value) => setDistrictId(value === '__none__' ? '' : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin distrito" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Sin distrito</SelectItem>
+                {distritos.map((distrito) => (
+                  <SelectItem key={distrito.id} value={distrito.id}>{distrito.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           <label className="grid gap-2 text-sm">
             Dirección (opcional)
@@ -581,24 +599,6 @@ function SedeDialog({
           <label className="grid gap-2 text-sm">
             Ícono
             <MaterialIconPicker value={icon} onChange={setIcon} />
-          </label>
-          <label className="grid gap-2 text-sm">
-            Distrito
-            <Select value={districtId || '__none__'} onValueChange={(value) => setDistrictId(value === '__none__' ? '' : value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sin distrito" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin distrito</SelectItem>
-                {distritos.map((distrito) => (
-                  <SelectItem key={distrito.id} value={distrito.id}>{distrito.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <Switch checked={activo} onCheckedChange={(value) => setActivo(value === true)} />
-            Activa en los enlaces de WhatsApp
           </label>
           <Button type="submit" className="justify-self-end" disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar'}

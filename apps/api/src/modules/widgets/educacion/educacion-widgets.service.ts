@@ -271,6 +271,7 @@ export class EducacionWidgetsService {
       data: {
         showOnSelector: dto.showOnSelector ?? false,
         nombreSelector: blankToNull(dto.nombreSelector),
+        icon: blankToNull(dto.icon) || 'location_on',
       },
     });
   }

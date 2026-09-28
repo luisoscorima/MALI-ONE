@@ -11,6 +11,7 @@ import {
   WidgetConfigItemMaterialIconThumb,
 } from '@/components/widget-config-item-card';
 import { Card, Input, SettingSwitchInline } from '@/components/ui';
+import { MaterialIconPicker } from '@/components/material-icon-picker';
 import { WidgetItemCardActions } from '@/components/widget-item-card-actions';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
@@ -38,6 +39,7 @@ export function WidgetEducacionSelectorPage() {
       await api.updateEducacionSelectorSede(sede.id, {
         showOnSelector: sede.showOnSelector,
         nombreSelector: sede.nombreSelector,
+        icon: sede.icon,
       });
       toast.success(`Sede ${sede.nombre} guardada`);
       await reload();
@@ -58,9 +60,9 @@ export function WidgetEducacionSelectorPage() {
           Sedes del selector ({state.selectorSedes.filter((sede) => sede.showOnSelector).length})
         </h2>
         <p className="text-sm text-muted">
-          El nombre oficial, el ícono y el brochure se editan en{' '}
+          El nombre oficial y el brochure se editan en{' '}
           <Link className="underline" to="/admin/catalogo-educacion">Catálogo Educación</Link>.
-          Aquí eliges si la sede se muestra y su nombre visible.
+          Aquí eliges si la sede se muestra, su nombre visible y su ícono. El ícono es el mismo del catálogo.
         </p>
       </div>
       <WidgetConfigItemList>
@@ -125,6 +127,10 @@ function SelectorEditor({
         placeholder={`Nombre visible (si se deja vacío: ${sede.nombre})`}
         value={sede.nombreSelector ?? ''}
         onChange={(e) => onChange({ ...sede, nombreSelector: e.target.value })}
+      />
+      <MaterialIconPicker
+        value={sede.icon}
+        onChange={(icon) => onChange({ ...sede, icon })}
       />
       <SettingSwitchInline
         label="Mostrar en el selector"
