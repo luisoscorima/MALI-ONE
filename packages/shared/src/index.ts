@@ -695,9 +695,11 @@ export interface EducacionSelectorSedeDto {
   id: string;
   slug: string;
   nombre: string;
+  nombreSelector: string | null;
   brochureUrl: string;
   icon: string;
   sortOrder: number;
+  showOnSelector: boolean;
   activo: boolean;
 }
 
@@ -754,11 +756,13 @@ export interface EducacionSedeDto {
   id: string;
   slug: string;
   nombre: string;
+  nombreMapa: string | null;
   direccion: string | null;
   lat: number | null;
   lng: number | null;
   horarioHtml: string | null;
   brochureUrl: string;
+  icon: string;
   districtId: string | null;
   showOnMap: boolean;
   sortOrder: number;

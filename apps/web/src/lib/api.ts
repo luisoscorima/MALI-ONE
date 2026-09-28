@@ -150,6 +150,10 @@ type EducacionCatalogSedeDto = {
   nombre: string;
   direccion: string | null;
   brochureUrl: string | null;
+  icon: string;
+  horarioHtml: string | null;
+  lat: number | null;
+  lng: number | null;
   districtId: string | null;
   distrito: { id: string; nombre: string } | null;
   showOnSelector: boolean;
@@ -162,6 +166,10 @@ type EducacionSedeInput = {
   nombre: string;
   direccion?: string | null;
   brochureUrl?: string | null;
+  icon?: string | null;
+  horarioHtml?: string | null;
+  lat?: number | null;
+  lng?: number | null;
   districtId?: string | null;
   showOnSelector?: boolean;
   showOnMap?: boolean;

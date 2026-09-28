@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -32,6 +33,11 @@ import {
 
 const DEFAULT_CALENDAR_ID = 'talleresmali@mali.pe';
 
+function blankToNull(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? '').trim();
+  return trimmed ? trimmed : null;
+}
+
 const DEFAULT_POPUP = {
   activo: false,
   imagenUrl: '',
@@ -63,9 +69,9 @@ export class EducacionWidgetsService {
     const [settings, districts, sedes] = await Promise.all([
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({ orderBy: { sortOrder: 'asc' } }),
-      this.prisma.educacionSede.findMany({
-        where: { activo: true, showOnMap: true },
-        orderBy: { sortOrder: 'asc' },
+      this.prisma.educacionCatalogSede.findMany({
+        where: { showOnMap: true },
+        orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
         include: { district: true },
       }),
     ]);
@@ -105,16 +111,16 @@ export class EducacionWidgetsService {
   }
 
   async getSelectorPublicConfig() {
-    const sedes = await this.prisma.educacionSelectorSede.findMany({
-      where: { activo: true },
-      orderBy: { sortOrder: 'asc' },
+    const sedes = await this.prisma.educacionCatalogSede.findMany({
+      where: { showOnSelector: true },
+      orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
     });
     return {
       sedes: sedes.map((s) => ({
         id: s.id,
         slug: s.slug,
-        nombre: s.nombre,
-        brochureUrl: s.brochureUrl,
+        nombre: s.nombreSelector?.trim() || s.nombre,
+        brochureUrl: s.brochureUrl ?? '',
         icon: s.icon,
         sortOrder: s.sortOrder,
       })),
@@ -187,25 +193,23 @@ export class EducacionWidgetsService {
   }
 
   async getAdminState() {
-    const [settings, districts, sedes, selectorSedes, popup, aliados] =
+    const [settings, districts, catalogSedes, popup, aliados] =
       await Promise.all([
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({
         orderBy: { sortOrder: 'asc' },
-        include: { sedes: { orderBy: { sortOrder: 'asc' } } },
       }),
-      this.prisma.educacionSede.findMany({
-        orderBy: { sortOrder: 'asc' },
+      this.prisma.educacionCatalogSede.findMany({
+        orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
         include: { district: true },
-      }),
-      this.prisma.educacionSelectorSede.findMany({
-        orderBy: { sortOrder: 'asc' },
       }),
       this.ensurePopup(),
       this.prisma.educacionAliado.findMany({
         orderBy: { sortOrder: 'asc' },
       }),
     ]);
+    const sedes = catalogSedes.map((sede) => this.mapSedeAdmin(sede));
+    const selectorSedes = catalogSedes.map((sede) => this.mapSelectorAdmin(sede));
     return { settings, districts, sedes, selectorSedes, popup, aliados };
   }
 
@@ -235,32 +239,44 @@ export class EducacionWidgetsService {
     return this.prisma.educacionDistrict.delete({ where: { id } });
   }
 
-  createSede(dto: CreateEducacionSedeDto) {
-    return this.prisma.educacionSede.create({ data: dto });
+  createSede(_dto: CreateEducacionSedeDto) {
+    throw new BadRequestException('Las sedes se crean en Catálogo Educación');
   }
 
   async updateSede(id: string, dto: UpdateEducacionSedeDto) {
-    await this.findSede(id);
-    return this.prisma.educacionSede.update({ where: { id }, data: dto });
+    await this.findCatalogSede(id);
+    return this.prisma.educacionCatalogSede.update({
+      where: { id },
+      data: {
+        showOnMap: dto.showOnMap ?? false,
+        nombreMapa: blankToNull(dto.nombreMapa),
+        lat: dto.lat ?? null,
+        lng: dto.lng ?? null,
+      },
+    });
   }
 
-  async deleteSede(id: string) {
-    await this.findSede(id);
-    return this.prisma.educacionSede.delete({ where: { id } });
+  deleteSede(_id: string) {
+    throw new BadRequestException('Las sedes se eliminan en Catálogo Educación');
   }
 
-  createSelectorSede(dto: CreateEducacionSelectorSedeDto) {
-    return this.prisma.educacionSelectorSede.create({ data: dto });
+  createSelectorSede(_dto: CreateEducacionSelectorSedeDto) {
+    throw new BadRequestException('Las sedes se crean en Catálogo Educación');
   }
 
   async updateSelectorSede(id: string, dto: UpdateEducacionSelectorSedeDto) {
-    await this.findSelectorSede(id);
-    return this.prisma.educacionSelectorSede.update({ where: { id }, data: dto });
+    await this.findCatalogSede(id);
+    return this.prisma.educacionCatalogSede.update({
+      where: { id },
+      data: {
+        showOnSelector: dto.showOnSelector ?? false,
+        nombreSelector: blankToNull(dto.nombreSelector),
+      },
+    });
   }
 
-  async deleteSelectorSede(id: string) {
-    await this.findSelectorSede(id);
-    return this.prisma.educacionSelectorSede.delete({ where: { id } });
+  deleteSelectorSede(_id: string) {
+    throw new BadRequestException('Las sedes se eliminan en Catálogo Educación');
   }
 
   async updatePopup(dto: UpdateEducacionPopupDto) {
@@ -340,35 +356,99 @@ export class EducacionWidgetsService {
     return { upserted, total: importedNames.size };
   }
 
-  private mapSedePublic(
-    s: {
-      id: string;
-      slug: string;
-      nombre: string;
-      direccion: string | null;
-      lat: number | null;
-      lng: number | null;
-      horarioHtml: string | null;
-      brochureUrl: string;
-      districtId: string | null;
-      showOnMap: boolean;
-      sortOrder: number;
-      district?: { slug: string } | null;
-    },
-  ) {
+  private mapSedePublic(s: {
+    id: string;
+    slug: string;
+    nombre: string;
+    nombreMapa: string | null;
+    direccion: string | null;
+    lat: number | null;
+    lng: number | null;
+    horarioHtml: string | null;
+    brochureUrl: string | null;
+    districtId: string | null;
+    showOnMap: boolean;
+    sortOrder: number;
+    district?: { slug: string } | null;
+  }) {
     return {
       id: s.id,
       slug: s.slug,
-      nombre: s.nombre,
+      nombre: s.nombreMapa?.trim() || s.nombre,
       direccion: s.direccion,
       lat: s.lat,
       lng: s.lng,
       horarioHtml: s.horarioHtml,
-      brochureUrl: s.brochureUrl,
+      brochureUrl: s.brochureUrl ?? '',
       districtId: s.districtId,
       districtSlug: s.district?.slug ?? null,
       showOnMap: s.showOnMap,
       sortOrder: s.sortOrder,
+    };
+  }
+
+  private mapSedeAdmin(s: {
+    id: string;
+    slug: string;
+    nombre: string;
+    nombreMapa: string | null;
+    direccion: string | null;
+    lat: number | null;
+    lng: number | null;
+    horarioHtml: string | null;
+    brochureUrl: string | null;
+    icon: string;
+    districtId: string | null;
+    showOnMap: boolean;
+    sortOrder: number;
+    activo: boolean;
+    district: {
+      id: string;
+      name: string;
+      slug: string;
+      sortOrder: number;
+    } | null;
+  }) {
+    return {
+      id: s.id,
+      slug: s.slug,
+      nombre: s.nombre,
+      nombreMapa: s.nombreMapa,
+      direccion: s.direccion,
+      lat: s.lat,
+      lng: s.lng,
+      horarioHtml: s.horarioHtml,
+      brochureUrl: s.brochureUrl ?? '',
+      icon: s.icon,
+      districtId: s.districtId,
+      showOnMap: s.showOnMap,
+      sortOrder: s.sortOrder,
+      activo: s.activo,
+      district: s.district,
+    };
+  }
+
+  private mapSelectorAdmin(s: {
+    id: string;
+    slug: string;
+    nombre: string;
+    nombreSelector: string | null;
+    brochureUrl: string | null;
+    icon: string;
+    sortOrder: number;
+    showOnSelector: boolean;
+    activo: boolean;
+  }) {
+    return {
+      id: s.id,
+      slug: s.slug,
+      nombre: s.nombre,
+      nombreSelector: s.nombreSelector,
+      brochureUrl: s.brochureUrl ?? '',
+      icon: s.icon,
+      sortOrder: s.sortOrder,
+      showOnSelector: s.showOnSelector,
+      activo: s.activo,
     };
   }
 
@@ -407,17 +487,9 @@ export class EducacionWidgetsService {
     return row;
   }
 
-  private async findSede(id: string) {
-    const row = await this.prisma.educacionSede.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException('Sede no encontrada');
-    return row;
-  }
-
-  private async findSelectorSede(id: string) {
-    const row = await this.prisma.educacionSelectorSede.findUnique({
-      where: { id },
-    });
-    if (!row) throw new NotFoundException('Sede del selector no encontrada');
+  private async findCatalogSede(id: string) {
+    const row = await this.prisma.educacionCatalogSede.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Sede no encontrada en el catálogo');
     return row;
   }
 

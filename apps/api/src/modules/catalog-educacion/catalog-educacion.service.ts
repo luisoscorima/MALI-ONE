@@ -210,6 +210,10 @@ export class CatalogEducacionService {
       nombre: dto.nombre.trim(),
       direccion: emptyToNull(dto.direccion),
       brochureUrl: emptyToNull(dto.brochureUrl),
+      icon: emptyToNull(dto.icon) || 'location_on',
+      horarioHtml: emptyToNull(dto.horarioHtml),
+      lat: dto.lat ?? null,
+      lng: dto.lng ?? null,
       showOnSelector: dto.showOnSelector ?? true,
       showOnMap: dto.showOnMap ?? false,
       activo: dto.activo ?? true,
@@ -259,6 +263,10 @@ export class CatalogEducacionService {
     nombre: string;
     direccion: string | null;
     brochureUrl: string | null;
+    icon: string;
+    horarioHtml: string | null;
+    lat: number | null;
+    lng: number | null;
     showOnSelector: boolean;
     showOnMap: boolean;
     activo: boolean;
@@ -271,6 +279,10 @@ export class CatalogEducacionService {
       nombre: row.nombre,
       direccion: row.direccion,
       brochureUrl: row.brochureUrl,
+      icon: row.icon,
+      horarioHtml: row.horarioHtml,
+      lat: row.lat,
+      lng: row.lng,
       districtId: row.district?.id ?? null,
       distrito: row.district ? { id: row.district.id, nombre: row.district.name } : null,
       showOnSelector: row.showOnSelector,

@@ -1,5 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { MaterialIconPicker } from '@/components/material-icon-picker';
+import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
 import { api } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -27,6 +29,7 @@ import {
   TableHeader,
   TableRow,
   Tabs,
+  Textarea,
   TabsContent,
   TabsList,
   TabsTrigger,
@@ -48,6 +51,10 @@ type Sede = {
   nombre: string;
   direccion: string | null;
   brochureUrl: string | null;
+  icon: string;
+  horarioHtml: string | null;
+  lat: number | null;
+  lng: number | null;
   districtId: string | null;
   distrito: { id: string; nombre: string } | null;
   showOnSelector: boolean;
@@ -169,7 +176,7 @@ export function CatalogEducacionPage() {
     <div>
       <PageHeader
         title="Catálogo Educación"
-        description="Cursos, programas, sedes y distritos. El mapa usa estos mismos distritos."
+        description="Cursos, programas, sedes y distritos. El mapa y el selector muestran estas sedes."
       />
       <Tabs defaultValue="cursos">
         <TabsList>
@@ -488,6 +495,9 @@ function SedeDialog({
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
   const [brochureUrl, setBrochureUrl] = useState('');
+  const [icon, setIcon] = useState('location_on');
+  const [horarioHtml, setHorarioHtml] = useState('');
+  const [coords, setCoords] = useState('');
   const [districtId, setDistrictId] = useState('');
   const [showOnSelector, setShowOnSelector] = useState(true);
   const [showOnMap, setShowOnMap] = useState(false);
@@ -498,6 +508,9 @@ function SedeDialog({
     setNombre(sede?.nombre ?? '');
     setDireccion(sede?.direccion ?? '');
     setBrochureUrl(sede?.brochureUrl ?? '');
+    setIcon(sede?.icon || 'location_on');
+    setHorarioHtml(sede?.horarioHtml ?? '');
+    setCoords(formatCoordinates(sede?.lat, sede?.lng));
     setDistrictId(sede?.districtId ?? '');
     setShowOnSelector(sede?.showOnSelector ?? true);
     setShowOnMap(sede?.showOnMap ?? false);
@@ -507,10 +520,15 @@ function SedeDialog({
   async function save(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
+    const parsed = parseCoordinates(coords);
     const body = {
       nombre,
       direccion,
       brochureUrl,
+      icon,
+      horarioHtml,
+      lat: parsed.lat,
+      lng: parsed.lng,
       districtId: districtId || null,
       showOnSelector,
       showOnMap,
@@ -532,10 +550,12 @@ function SedeDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{sede?.id ? 'Editar sede' : 'Nueva sede'}</DialogTitle>
-          <DialogDescription>Esta lista es la que eligen los enlaces de WhatsApp.</DialogDescription>
+          <DialogDescription>
+            Dirección, brochure, horario, ícono y distrito se editan aquí. El mapa y el selector solo eligen el nombre visible y si la sede se muestra.
+          </DialogDescription>
         </DialogHeader>
         <form className="grid gap-3" onSubmit={(event) => void save(event)}>
           <label className="grid gap-2 text-sm">
@@ -549,6 +569,18 @@ function SedeDialog({
           <label className="grid gap-2 text-sm">
             Brochure (opcional)
             <Input value={brochureUrl} onChange={(event) => setBrochureUrl(event.target.value)} />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Horario (opcional)
+            <Textarea rows={3} value={horarioHtml} onChange={(event) => setHorarioHtml(event.target.value)} />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Coordenadas (lat, lng)
+            <Input value={coords} onChange={(event) => setCoords(event.target.value)} placeholder="-12.08, -77.03" />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Ícono
+            <MaterialIconPicker value={icon} onChange={setIcon} />
           </label>
           <label className="grid gap-2 text-sm">
             Distrito

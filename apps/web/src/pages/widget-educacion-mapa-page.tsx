@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
-import type { EducacionDistrictDto, EducacionSedeDto } from '@mali-one/shared';
+import type { EducacionSedeDto } from '@mali-one/shared';
 import { PageLoading } from '@/components/feedback';
 import { WidgetBackLink } from '@/components/widget-area-hub';
 import { WidgetPreviewFrame } from '@/components/widget-preview-frame';
@@ -10,13 +11,12 @@ import {
   WidgetConfigItemList,
   WidgetConfigItemMapThumb,
 } from '@/components/widget-config-item-card';
-import { Button, Card, Input, SettingSwitchInline, Textarea } from '@/components/ui';
+import { Card, Input, SettingSwitchInline } from '@/components/ui';
 import { WidgetItemCardActions, WidgetSaveButton } from '@/components/widget-item-card-actions';
 import { useEducacionAdmin } from '@/hooks/use-educacion-admin';
-import { formatCoordinates, parseCoordinates, slugify } from '@/lib/coordinates';
+import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
 import { WIDGET_AREAS } from '@/lib/widget-catalog';
 import { useToast } from '@/contexts/toast-context';
-import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 
 const MAPA_PREVIEW = [
@@ -34,96 +34,27 @@ function withCoords(sede: EducacionSedeDto): SedeDraft {
   return { ...sede, coords: formatCoordinates(sede.lat, sede.lng) };
 }
 
-function emptySede(districts: EducacionDistrictDto[]): SedeDraft {
-  return {
-    id: '',
-    slug: '',
-    nombre: '',
-    direccion: '',
-    lat: null,
-    lng: null,
-    coords: '',
-    horarioHtml: '',
-    brochureUrl: '',
-    districtId: districts[0]?.id ?? null,
-    showOnMap: true,
-    sortOrder: 0,
-    activo: true,
-  };
-}
-
 export function WidgetEducacionMapaPage() {
   const toast = useToast();
-  const confirm = useConfirm();
   const { state, setState, loading, saving, saveSettings, reload } = useEducacionAdmin();
   const area = WIDGET_AREAS.educacion;
-  const [draft, setDraft] = useState<SedeDraft | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
 
   async function persistSede(sede: SedeDraft) {
     const { lat, lng } = parseCoordinates(sede.coords);
-    const payload = {
-      slug: sede.slug.trim(),
-      nombre: sede.nombre.trim(),
-      direccion: sede.direccion?.trim() || null,
-      lat,
-      lng,
-      horarioHtml: sede.horarioHtml?.trim() || null,
-      brochureUrl: sede.brochureUrl.trim(),
-      districtId: sede.districtId,
-      showOnMap: true,
-      activo: sede.activo,
-      sortOrder: sede.sortOrder,
-    };
-
-    if (!payload.slug || !payload.nombre || !payload.brochureUrl) {
-      toast.error('Slug, nombre y brochure son obligatorios');
-      return;
-    }
-
     try {
-      if (sede.id) {
-        await api.updateEducacionSede(sede.id, payload);
-        toast.success(`Sede ${payload.nombre} guardada`);
-      } else {
-        await api.createEducacionSede(payload);
-        toast.success(`Sede ${payload.nombre} creada`);
-        setDraft(null);
-      }
+      await api.updateEducacionSede(sede.id, {
+        showOnMap: sede.showOnMap,
+        nombreMapa: sede.nombreMapa,
+        lat,
+        lng,
+      });
+      toast.success(`Sede ${sede.nombre} guardada`);
       await reload();
       setPreviewKey((k) => k + 1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al guardar sede');
     }
-  }
-
-  async function removeSede(sede: EducacionSedeDto) {
-    const ok = await confirm({
-      title: `¿Eliminar la sede "${sede.nombre}"?`,
-      confirmLabel: 'Eliminar',
-      variant: 'destructive',
-    });
-    if (!ok) return;
-    try {
-      await api.deleteEducacionSede(sede.id);
-      toast.success('Sede eliminada');
-      await reload();
-      setPreviewKey((k) => k + 1);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al eliminar');
-    }
-  }
-
-  function duplicateSede(sede: EducacionSedeDto) {
-    const base = slugify(`${sede.slug}-copia`);
-    setDraft(
-      withCoords({
-        ...sede,
-        id: '',
-        slug: base,
-        nombre: `${sede.nombre} (copia)`,
-      }),
-    );
   }
 
   if (loading || !state) {
@@ -171,56 +102,37 @@ export function WidgetEducacionMapaPage() {
       </Card>
 
       <Card className="space-y-4 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="font-semibold">Sedes del mapa ({state.sedes.length})</h2>
-            <p className="text-sm text-muted">
-              Ubicaciones con coordenadas y horarios. Datos independientes del selector.
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => setDraft(emptySede(state.districts))}
-          >
-            Nueva sede
-          </Button>
+        <div>
+          <h2 className="font-semibold">Sedes del mapa ({state.sedes.filter((sede) => sede.showOnMap).length})</h2>
+          <p className="text-sm text-muted">
+            El nombre oficial, la dirección, el horario, el brochure y el distrito se editan en{' '}
+            <Link className="underline" to="/admin/catalogo-educacion">Catálogo Educación</Link>.
+            Aquí eliges si la sede se muestra, su nombre visible y las coordenadas.
+          </p>
         </div>
-
-        {draft && !draft.id && (
-          <SedeEditor
-            sede={draft}
-            districts={state.districts}
-            onChange={setDraft}
-            onSave={() => void persistSede(draft)}
-            onCancel={() => setDraft(null)}
-            title="Nuevo ítem"
-          />
-        )}
-
         <WidgetConfigItemList>
-          {state.sedes.map((sede, index) => (
-            <SedeEditor
-              key={sede.id}
-              sede={withCoords(sede)}
-              districts={state.districts}
-              title={`Ítem ${index + 1}`}
-              onChange={(next) => {
-                const { lat, lng } = parseCoordinates(next.coords);
-                setState({
-                  ...state,
-                  sedes: state.sedes.map((s) =>
-                    s.id === sede.id ? { ...s, ...next, lat, lng } : s,
-                  ),
-                });
-              }}
-              onSave={() => {
-                const current = state.sedes.find((s) => s.id === sede.id);
-                if (current) void persistSede(withCoords(current));
-              }}
-              onDelete={() => void removeSede(sede)}
-              onDuplicate={() => duplicateSede(sede)}
-            />
-          ))}
+          {state.sedes.map((sede) => {
+            const draft = withCoords(sede);
+            return (
+              <SedeEditor
+                key={sede.id}
+                sede={draft}
+                onChange={(next) => {
+                  const { lat, lng } = parseCoordinates(next.coords);
+                  setState({
+                    ...state,
+                    sedes: state.sedes.map((item) =>
+                      item.id === sede.id ? { ...item, ...next, lat, lng } : item,
+                    ),
+                  });
+                }}
+                onSave={() => {
+                  const current = state.sedes.find((item) => item.id === sede.id);
+                  if (current) void persistSede(withCoords(current));
+                }}
+              />
+            );
+          })}
         </WidgetConfigItemList>
       </Card>
     </div>
@@ -230,7 +142,7 @@ export function WidgetEducacionMapaPage() {
     <WidgetToolLayout
       backLink={<WidgetBackLink area={area} />}
       title="Mapa de sedes"
-      description="Widget para educacion.mali.pe — contactos y ubicaciones"
+      description="Qué sedes del catálogo aparecen en educacion.mali.pe"
       config={config}
       preview={<WidgetPreviewFrame key={previewKey} tabs={MAPA_PREVIEW} />}
     />
@@ -239,96 +151,49 @@ export function WidgetEducacionMapaPage() {
 
 function SedeEditor({
   sede,
-  districts,
   onChange,
   onSave,
-  onCancel,
-  onDelete,
-  onDuplicate,
-  title,
 }: {
   sede: SedeDraft;
-  districts: EducacionDistrictDto[];
   onChange: (sede: SedeDraft) => void;
   onSave: () => void;
-  onCancel?: () => void;
-  onDelete?: () => void;
-  onDuplicate?: () => void;
-  title?: string;
 }) {
   const { lat, lng } = parseCoordinates(sede.coords);
+  const visible = sede.nombreMapa?.trim() || sede.nombre;
 
   return (
     <WidgetConfigItemCard
-      badge={title}
-      inactive={!sede.activo}
+      badge={sede.district?.name || 'Sin distrito'}
+      inactive={!sede.showOnMap}
       aside={
         <WidgetConfigItemMapThumb
           lat={lat}
           lng={lng}
-          label={sede.nombre.trim() || 'Sede'}
+          label={visible}
           placeholderIcon={MapPin}
         />
       }
-      actions={
-        <WidgetItemCardActions
-          onSave={onSave}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
-          onCancel={onCancel}
-        />
-      }
+      actions={<WidgetItemCardActions onSave={onSave} />}
     >
+      <p className="text-sm font-medium">{sede.nombre}</p>
+      <p className="text-sm text-muted">{sede.direccion || 'Sin dirección en el catálogo'}</p>
       <Input
-        placeholder="Slug (único)"
-        value={sede.slug}
-        disabled={Boolean(sede.id)}
-        onChange={(e) => onChange({ ...sede, slug: slugify(e.target.value) })}
-      />
-      <Input
-        placeholder="Nombre"
-        value={sede.nombre}
-        onChange={(e) => onChange({ ...sede, nombre: e.target.value })}
-      />
-      <Input
-        placeholder="Dirección"
-        value={sede.direccion ?? ''}
-        onChange={(e) => onChange({ ...sede, direccion: e.target.value })}
+        placeholder={`Nombre visible (si se deja vacío: ${sede.nombre})`}
+        value={sede.nombreMapa ?? ''}
+        onChange={(e) => onChange({ ...sede, nombreMapa: e.target.value })}
       />
       <Input
         placeholder="Coordenadas (lat, lng)"
         value={sede.coords}
         onChange={(e) => onChange({ ...sede, coords: e.target.value })}
       />
-      <select
-        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-        value={sede.districtId ?? ''}
-        onChange={(e) =>
-          onChange({ ...sede, districtId: e.target.value || null })
-        }
-      >
-        <option value="">Sin distrito</option>
-        {districts.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-      <Textarea
-        rows={3}
-        placeholder="Horario HTML"
-        value={sede.horarioHtml ?? ''}
-        onChange={(e) => onChange({ ...sede, horarioHtml: e.target.value })}
-      />
-      <Input
-        placeholder="Brochure URL"
-        value={sede.brochureUrl}
-        onChange={(e) => onChange({ ...sede, brochureUrl: e.target.value })}
-      />
+      {!sede.districtId && (
+        <p className="text-sm text-muted">Sin distrito no aparece en el listado del mapa.</p>
+      )}
       <SettingSwitchInline
-        label="Sede activa"
-        checked={sede.activo}
-        onCheckedChange={(activo) => onChange({ ...sede, activo })}
+        label="Mostrar en el mapa"
+        checked={sede.showOnMap}
+        onCheckedChange={(checked) => onChange({ ...sede, showOnMap: checked })}
       />
     </WidgetConfigItemCard>
   );

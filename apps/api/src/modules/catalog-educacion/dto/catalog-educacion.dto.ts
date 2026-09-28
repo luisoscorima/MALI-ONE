@@ -75,6 +75,25 @@ export class UpsertEducacionSedeDto {
   districtId?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  icon?: string | null;
+
+  @IsOptional()
+  @IsString()
+  horarioHtml?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lat?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  lng?: number | null;
+
+  @IsOptional()
   @IsBoolean()
   showOnSelector?: boolean;
 

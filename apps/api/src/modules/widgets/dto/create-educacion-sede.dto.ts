@@ -89,6 +89,10 @@ export class UpdateEducacionSedeDto {
   showOnMap?: boolean;
 
   @IsOptional()
+  @IsString()
+  nombreMapa?: string | null;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   sortOrder?: number;

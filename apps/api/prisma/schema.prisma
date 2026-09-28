@@ -222,9 +222,11 @@ model EducacionCatalogPrograma {
 model EducacionCatalogSede {
   id             String      @id @default(cuid())
   slug           String      @unique
-  nombre         String
-  direccion      String?
-  brochureUrl    String?
+  nombre          String
+  nombreMapa      String?
+  nombreSelector  String?
+  direccion       String?
+  brochureUrl     String?
   icon           String      @default("location_on")
   lat            Float?
   lng            Float?

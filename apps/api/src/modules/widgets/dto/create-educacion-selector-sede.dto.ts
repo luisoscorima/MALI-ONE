@@ -64,4 +64,12 @@ export class UpdateEducacionSelectorSedeDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnSelector?: boolean;
+
+  @IsOptional()
+  @IsString()
+  nombreSelector?: string | null;
 }
