@@ -1,0 +1,93 @@
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+
+export class UpsertEducacionOfertaDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(180)
+  nombre!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  precio?: number | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  descuento?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  horario?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sortOrder?: number;
+}
+
+export class UpsertEducacionDistrictDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  nombre!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  sortOrder?: number;
+}
+
+export class UpsertEducacionSedeDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(180)
+  nombre!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  direccion?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brochureUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  districtId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnSelector?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showOnMap?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  sortOrder?: number;
+}

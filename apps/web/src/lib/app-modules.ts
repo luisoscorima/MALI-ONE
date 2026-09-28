@@ -73,6 +73,11 @@ export const APP_MODULES: {
     description: 'Contactos y leads de los tres números de Educación.',
   },
   {
+    id: 'catalog_educacion',
+    label: 'Catálogo Educación',
+    description: 'Cursos, programas y sedes para los enlaces de WhatsApp.',
+  },
+  {
     id: 'portfolio',
     label: 'Portafolio de área',
     description:

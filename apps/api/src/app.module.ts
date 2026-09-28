@@ -25,6 +25,7 @@ import { BsaleModule } from './modules/bsale/bsale.module';
 import { CrmClientModule } from './modules/crm/crm-client.module';
 import { NewslettersModule } from './modules/newsletters/newsletters.module';
 import { CrmPamModule } from './modules/crm-pam/crm-pam.module';
+import { CatalogEducacionModule } from './modules/catalog-educacion/catalog-educacion.module';
 import { CrmEducacionModule } from './modules/crm-educacion/crm-educacion.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
@@ -51,6 +52,7 @@ import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
     NewslettersModule,
     CrmPamModule,
     CrmEducacionModule,
+    CatalogEducacionModule,
     TodosModule,
     SftpgoFilesModule,
   ],

@@ -27,6 +27,7 @@ enum AppModule {
   newsletters
   crm_pam
   crm_educacion
+  catalog_educacion
   portfolio
   files
 }
@@ -177,10 +178,68 @@ model ShortLink {
   clickCount  Int         @default(0)
   tags        String[]    @default([])
   clicks      LinkClick[]
+  catalogCursoId    String?
+  catalogCurso      EducacionCatalogCurso?    @relation(fields: [catalogCursoId], references: [id], onDelete: SetNull)
+  catalogProgramaId String?
+  catalogPrograma   EducacionCatalogPrograma? @relation(fields: [catalogProgramaId], references: [id], onDelete: SetNull)
+  catalogSedeId     String?
+  catalogSede       EducacionCatalogSede?     @relation(fields: [catalogSedeId], references: [id], onDelete: SetNull)
 
   @@index([createdById])
   @@index([createdById, archivedAt])
+  @@index([catalogCursoId])
+  @@index([catalogProgramaId])
+  @@index([catalogSedeId])
   @@index([tags], type: Gin)
+}
+
+model EducacionCatalogCurso {
+  id        String      @id @default(cuid())
+  nombre    String
+  precio    Decimal?    @db.Decimal(10, 2)
+  descuento String?
+  horario   String?
+  activo    Boolean     @default(true)
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  links     ShortLink[]
+}
+
+model EducacionCatalogPrograma {
+  id        String      @id @default(cuid())
+  nombre    String
+  precio    Decimal?    @db.Decimal(10, 2)
+  descuento String?
+  horario   String?
+  activo    Boolean     @default(true)
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  links     ShortLink[]
+}
+
+model EducacionCatalogSede {
+  id             String      @id @default(cuid())
+  slug           String      @unique
+  nombre         String
+  direccion      String?
+  brochureUrl    String?
+  icon           String      @default("location_on")
+  lat            Float?
+  lng            Float?
+  horarioHtml    String?     @db.Text
+  districtId     String?
+  district       EducacionDistrict? @relation(fields: [districtId], references: [id], onDelete: SetNull)
+  showOnSelector Boolean     @default(true)
+  showOnMap      Boolean     @default(false)
+  activo         Boolean     @default(true)
+  sortOrder      Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  links          ShortLink[]
+
+  @@index([districtId])
 }
 
 model LinkClick {
@@ -215,11 +274,12 @@ model EducacionWidgetSettings {
 }
 
 model EducacionDistrict {
-  id        String          @id @default(cuid())
-  name      String
-  slug      String          @unique
-  sortOrder Int             @default(0)
-  sedes     EducacionSede[]
+  id           String                 @id @default(cuid())
+  name         String
+  slug         String                 @unique
+  sortOrder    Int                    @default(0)
+  sedes        EducacionSede[]
+  catalogSedes EducacionCatalogSede[]
 }
 
 model EducacionSede {

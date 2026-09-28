@@ -6,6 +6,7 @@ import {
   Heart,
   KeyRound,
   Landmark,
+  Library,
   Link2,
   ListTodo,
   Mail,
@@ -111,6 +112,12 @@ export const moduleMeta: Record<
     icon: GraduationCap,
     group: 'crms',
     accent: 'cyan',
+  },
+  catalog_educacion: {
+    to: '/admin/catalogo-educacion',
+    icon: Library,
+    group: 'crms',
+    accent: 'emerald',
   },
   mailing: {
     to: '/admin/newsletters',

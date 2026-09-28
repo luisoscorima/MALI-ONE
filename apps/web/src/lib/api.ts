@@ -125,6 +125,58 @@ async function request<T>(
   return res as unknown as T;
 }
 
+type EducacionOfertaDto = {
+  id: string;
+  nombre: string;
+  precio: number | null;
+  descuento: string | null;
+  horario: string | null;
+  activo: boolean;
+  sortOrder: number;
+};
+
+type EducacionOfertaInput = {
+  nombre: string;
+  precio?: number | null;
+  descuento?: string | null;
+  horario?: string | null;
+  activo?: boolean;
+  sortOrder?: number;
+};
+
+type EducacionCatalogSedeDto = {
+  id: string;
+  slug: string;
+  nombre: string;
+  direccion: string | null;
+  brochureUrl: string | null;
+  districtId: string | null;
+  distrito: { id: string; nombre: string } | null;
+  showOnSelector: boolean;
+  showOnMap: boolean;
+  activo: boolean;
+  sortOrder: number;
+};
+
+type EducacionSedeInput = {
+  nombre: string;
+  direccion?: string | null;
+  brochureUrl?: string | null;
+  districtId?: string | null;
+  showOnSelector?: boolean;
+  showOnMap?: boolean;
+  activo?: boolean;
+  sortOrder?: number;
+};
+
+type EducacionDistritoDto = {
+  id: string;
+  nombre: string;
+  slug: string;
+  sortOrder: number;
+  sedes: number;
+};
+
 export const api = {
   checkCrmEducationProspectia: (subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) =>
     request<{ enabled: boolean; matches: Record<string, ProspectiaMatch> }>(
@@ -279,11 +331,53 @@ export const api = {
     text?: string,
     customSlug?: string,
     tags?: string[],
+    catalog?: {
+      catalogCursoId?: string | null;
+      catalogProgramaId?: string | null;
+      catalogSedeId?: string | null;
+    },
   ) =>
     request<import('@mali-one/shared').ShortLinkDto>('/api/links/whatsapp', {
       method: 'POST',
-      body: JSON.stringify({ phone, text, customSlug, tags }),
+      body: JSON.stringify({ phone, text, customSlug, tags, ...catalog }),
     }),
+
+  whatsappCatalogOptions: () =>
+    request<{
+      cursos: Array<{ id: string; nombre: string }>;
+      programas: Array<{ id: string; nombre: string }>;
+      sedes: Array<{ id: string; nombre: string }>;
+    }>('/api/links/whatsapp-catalog-options'),
+
+  listEducacionCatalogCursos: () => request<EducacionOfertaDto[]>('/api/educacion-catalog/cursos'),
+  createEducacionCatalogCurso: (body: EducacionOfertaInput) =>
+    request<EducacionOfertaDto>('/api/educacion-catalog/cursos', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducacionCatalogCurso: (id: string, body: EducacionOfertaInput) =>
+    request<EducacionOfertaDto>(`/api/educacion-catalog/cursos/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEducacionCatalogCurso: (id: string) =>
+    request(`/api/educacion-catalog/cursos/${id}`, { method: 'DELETE' }),
+  listEducacionCatalogProgramas: () => request<EducacionOfertaDto[]>('/api/educacion-catalog/programas'),
+  createEducacionCatalogPrograma: (body: EducacionOfertaInput) =>
+    request<EducacionOfertaDto>('/api/educacion-catalog/programas', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducacionCatalogPrograma: (id: string, body: EducacionOfertaInput) =>
+    request<EducacionOfertaDto>(`/api/educacion-catalog/programas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEducacionCatalogPrograma: (id: string) =>
+    request(`/api/educacion-catalog/programas/${id}`, { method: 'DELETE' }),
+  listEducacionCatalogDistritos: () =>
+    request<EducacionDistritoDto[]>('/api/educacion-catalog/distritos'),
+  createEducacionCatalogDistrito: (body: { nombre: string; sortOrder?: number }) =>
+    request<EducacionDistritoDto>('/api/educacion-catalog/distritos', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducacionCatalogDistrito: (id: string, body: { nombre: string; sortOrder?: number }) =>
+    request<EducacionDistritoDto>(`/api/educacion-catalog/distritos/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEducacionCatalogDistrito: (id: string) =>
+    request(`/api/educacion-catalog/distritos/${id}`, { method: 'DELETE' }),
+  listEducacionCatalogSedes: () => request<EducacionCatalogSedeDto[]>('/api/educacion-catalog/sedes'),
+  createEducacionCatalogSede: (body: EducacionSedeInput) =>
+    request<EducacionCatalogSedeDto>('/api/educacion-catalog/sedes', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducacionCatalogSede: (id: string, body: EducacionSedeInput) =>
+    request<EducacionCatalogSedeDto>(`/api/educacion-catalog/sedes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEducacionCatalogSede: (id: string) =>
+    request(`/api/educacion-catalog/sedes/${id}`, { method: 'DELETE' }),
 
   uploadFile: (file: File, customSlug?: string, tags?: string[]) => {
     const form = new FormData();

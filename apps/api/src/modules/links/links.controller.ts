@@ -73,6 +73,11 @@ export class LinksController {
       body.text,
       body.customSlug,
       body.tags,
+      {
+        catalogCursoId: body.catalogCursoId,
+        catalogProgramaId: body.catalogProgramaId,
+        catalogSedeId: body.catalogSedeId,
+      },
     );
   }
 
@@ -184,6 +189,11 @@ export class LinksController {
       includeArchived:
         includeArchived === '1' || includeArchived === 'true',
     });
+  }
+
+  @Get('whatsapp-catalog-options')
+  whatsappCatalogOptions() {
+    return this.links.whatsappCatalogOptions();
   }
 
   @Post('qr/bulk')

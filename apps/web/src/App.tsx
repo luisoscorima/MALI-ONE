@@ -33,6 +33,7 @@ import { WidgetPamPage } from '@/pages/widget-pam-page';
 import { BsaleKardexPage } from '@/pages/bsale-kardex-page';
 import { NewslettersPage } from '@/pages/newsletters-page';
 import { CrmPamPage } from '@/pages/crm-pam-page';
+import { CatalogEducacionPage } from '@/pages/catalog-educacion-page';
 import { CrmEducacionPage } from '@/pages/crm-educacion-page';
 import { PresentacionPage } from '@/pages/presentacion-page';
 import { PortfolioPage } from '@/pages/portfolio-page';
@@ -157,6 +158,9 @@ function AuthenticatedApp() {
                   </Route>
                   <Route element={<ModuleGuard module="crm_educacion" />}>
                     <Route path="admin/crm-educacion" element={<CrmEducacionPage />} />
+                  </Route>
+                  <Route element={<ModuleGuard module="catalog_educacion" />}>
+                    <Route path="admin/catalogo-educacion" element={<CatalogEducacionPage />} />
                   </Route>
                   <Route
                     path="admin/mailing"

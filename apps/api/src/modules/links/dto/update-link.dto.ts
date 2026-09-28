@@ -18,4 +18,16 @@ export class UpdateLinkDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  catalogCursoId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  catalogProgramaId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  catalogSedeId?: string | null;
 }

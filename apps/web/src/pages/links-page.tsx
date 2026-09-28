@@ -101,7 +101,71 @@ interface EditLinkState {
   phone: string;
   text: string;
   tags: string;
+  catalogCursoId: string;
+  catalogProgramaId: string;
+  catalogSedeId: string;
   saving: boolean;
+}
+
+function CatalogFields({
+  options,
+  cursoId,
+  programaId,
+  sedeId,
+  onCurso,
+  onPrograma,
+  onSede,
+}: {
+  options: {
+    cursos: Array<{ id: string; nombre: string }>;
+    programas: Array<{ id: string; nombre: string }>;
+    sedes: Array<{ id: string; nombre: string }>;
+  };
+  cursoId: string;
+  programaId: string;
+  sedeId: string;
+  onCurso: (value: string) => void;
+  onPrograma: (value: string) => void;
+  onSede: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <CatalogSelect label="Curso" value={cursoId} options={options.cursos} onChange={onCurso} />
+      <CatalogSelect label="Programa" value={programaId} options={options.programas} onChange={onPrograma} />
+      <CatalogSelect label="Sede" value={sedeId} options={options.sedes} onChange={onSede} />
+    </div>
+  );
+}
+
+function CatalogSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ id: string; nombre: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="grid gap-2 text-sm">
+      <span>{label}</span>
+      <Select value={value || '__none__'} onValueChange={(next) => onChange(next === '__none__' ? '' : next)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Ninguno" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">Ninguno</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option.id} value={option.id}>
+              {option.nombre}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
 }
 
 function TagsField({
@@ -180,6 +244,14 @@ export function LinksPage() {
   const [url, setUrl] = useState('');
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappText, setWhatsappText] = useState('');
+  const [catalogCursoId, setCatalogCursoId] = useState('');
+  const [catalogProgramaId, setCatalogProgramaId] = useState('');
+  const [catalogSedeId, setCatalogSedeId] = useState('');
+  const [catalogOptions, setCatalogOptions] = useState<{
+    cursos: Array<{ id: string; nombre: string }>;
+    programas: Array<{ id: string; nombre: string }>;
+    sedes: Array<{ id: string; nombre: string }>;
+  }>({ cursos: [], programas: [], sedes: [] });
   const [customSlug, setCustomSlug] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [tagFilter, setTagFilter] = useState('');
@@ -227,6 +299,9 @@ export function LinksPage() {
 
   useEffect(() => {
     void loadDefaultQrStyle();
+    void api.whatsappCatalogOptions()
+      .then(setCatalogOptions)
+      .catch(() => setCatalogOptions({ cursos: [], programas: [], sedes: [] }));
   }, [loadDefaultQrStyle]);
 
   useEffect(() => {
@@ -331,9 +406,17 @@ export function LinksPage() {
         whatsappText || undefined,
         customSlug || undefined,
         getTagsFromInput(),
+        {
+          catalogCursoId: catalogCursoId || null,
+          catalogProgramaId: catalogProgramaId || null,
+          catalogSedeId: catalogSedeId || null,
+        },
       );
       setWhatsappPhone('');
       setWhatsappText('');
+      setCatalogCursoId('');
+      setCatalogProgramaId('');
+      setCatalogSedeId('');
       setCustomSlug('');
       setTagsInput('');
       await loadLinks();
@@ -384,6 +467,9 @@ export function LinksPage() {
         phone,
         text,
         tags: formatTagsInput(link.tags),
+        catalogCursoId: link.catalogCurso?.id ?? '',
+        catalogProgramaId: link.catalogPrograma?.id ?? '',
+        catalogSedeId: link.catalogSede?.id ?? '',
         saving: false,
       });
       return;
@@ -395,6 +481,9 @@ export function LinksPage() {
       phone: '',
       text: '',
       tags: formatTagsInput(link.tags),
+      catalogCursoId: '',
+      catalogProgramaId: '',
+      catalogSedeId: '',
       saving: false,
     });
   }
@@ -413,6 +502,9 @@ export function LinksPage() {
     if (editLink.link.type === 'WHATSAPP') {
       body.phone = editLink.phone;
       body.text = editLink.text;
+      body.catalogCursoId = editLink.catalogCursoId || null;
+      body.catalogProgramaId = editLink.catalogProgramaId || null;
+      body.catalogSedeId = editLink.catalogSedeId || null;
     } else if (editLink.link.type === 'URL') {
       body.url = editLink.url;
     }
@@ -697,6 +789,15 @@ export function LinksPage() {
                 rows={4}
               />
             </label>
+            <CatalogFields
+              options={catalogOptions}
+              cursoId={catalogCursoId}
+              programaId={catalogProgramaId}
+              sedeId={catalogSedeId}
+              onCurso={setCatalogCursoId}
+              onPrograma={setCatalogProgramaId}
+              onSede={setCatalogSedeId}
+            />
             <label className="grid gap-2 text-sm">
               <span>Identificador personalizado (opcional)</span>
               <Input
@@ -1320,6 +1421,27 @@ export function LinksPage() {
                         Al guardar se añade ref:{editLink.link.slug} al inicio. El lead lo envía con el mensaje.
                       </p>
                     </label>
+                    <CatalogFields
+                      options={catalogOptions}
+                      cursoId={editLink.catalogCursoId}
+                      programaId={editLink.catalogProgramaId}
+                      sedeId={editLink.catalogSedeId}
+                      onCurso={(value) =>
+                        setEditLink((current) =>
+                          current ? { ...current, catalogCursoId: value } : null,
+                        )
+                      }
+                      onPrograma={(value) =>
+                        setEditLink((current) =>
+                          current ? { ...current, catalogProgramaId: value } : null,
+                        )
+                      }
+                      onSede={(value) =>
+                        setEditLink((current) =>
+                          current ? { ...current, catalogSedeId: value } : null,
+                        )
+                      }
+                    />
                   </>
                 )}
 

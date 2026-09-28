@@ -15,6 +15,7 @@ export type AppModule =
   | 'newsletters'
   | 'crm_pam'
   | 'crm_educacion'
+  | 'catalog_educacion'
   | 'portfolio'
   | 'files';
 
@@ -590,6 +591,9 @@ export interface ShortLinkDto {
     email: string;
   };
   tags: string[];
+  catalogCurso?: { id: string; nombre: string } | null;
+  catalogPrograma?: { id: string; nombre: string } | null;
+  catalogSede?: { id: string; nombre: string } | null;
   qrStyle?: QrStyleDto | null;
   qrLogoKey?: string | null;
   qrBase64?: string;
@@ -609,6 +613,9 @@ export interface UpdateShortLinkDto {
   phone?: string;
   text?: string;
   tags?: string[];
+  catalogCursoId?: string | null;
+  catalogProgramaId?: string | null;
+  catalogSedeId?: string | null;
 }
 
 export interface BulkLinkRowError {

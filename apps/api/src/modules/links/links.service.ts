@@ -194,6 +194,11 @@ export class LinksService {
     text?: string,
     customSlug?: string,
     tags?: string[],
+    catalog?: {
+      catalogCursoId?: string | null;
+      catalogProgramaId?: string | null;
+      catalogSedeId?: string | null;
+    },
   ) {
     const link = await this.createWhatsappLinkRecord(
       user,
@@ -201,6 +206,7 @@ export class LinksService {
       text,
       customSlug,
       tags,
+      catalog,
     );
     return this.toDto(link);
   }
@@ -211,11 +217,21 @@ export class LinksService {
     text?: string,
     customSlug?: string,
     tags?: string[],
+    catalog?: {
+      catalogCursoId?: string | null;
+      catalogProgramaId?: string | null;
+      catalogSedeId?: string | null;
+    },
   ) {
     const slug = await this.resolveSlug(customSlug);
     const textWithRef = ensureWhatsappRef(text, slug);
     const targetUrl = this.buildWhatsappUrl(phone, textWithRef);
     const qrStyle = await this.initialQrStyle(user.id);
+    const refs = await this.resolveCatalogIds({
+      catalogCursoId: catalog?.catalogCursoId ?? null,
+      catalogProgramaId: catalog?.catalogProgramaId ?? null,
+      catalogSedeId: catalog?.catalogSedeId ?? null,
+    });
 
     const link = await this.prisma.shortLink.create({
       data: {
@@ -225,6 +241,9 @@ export class LinksService {
         tags: this.normalizeTags(tags),
         qrStyle: qrStyle as unknown as Prisma.InputJsonValue,
         createdById: user.id,
+        catalogCursoId: refs.catalogCursoId,
+        catalogProgramaId: refs.catalogProgramaId,
+        catalogSedeId: refs.catalogSedeId,
       },
     });
 
@@ -283,6 +302,27 @@ export class LinksService {
 
     await this.cacheSlug(slug, targetUrl);
     return link;
+  }
+
+  async whatsappCatalogOptions() {
+    const [cursos, programas, sedes] = await Promise.all([
+      this.prisma.educacionCatalogCurso.findMany({
+        where: { activo: true },
+        orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
+        select: { id: true, nombre: true },
+      }),
+      this.prisma.educacionCatalogPrograma.findMany({
+        where: { activo: true },
+        orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
+        select: { id: true, nombre: true },
+      }),
+      this.prisma.educacionCatalogSede.findMany({
+        where: { activo: true },
+        orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
+        select: { id: true, nombre: true },
+      }),
+    ]);
+    return { cursos, programas, sedes };
   }
 
   async listLinks(
@@ -364,6 +404,9 @@ export class LinksService {
               qrDefaultStyle: true,
             },
           },
+          catalogCurso: { select: { id: true, nombre: true } },
+          catalogPrograma: { select: { id: true, nombre: true } },
+          catalogSede: { select: { id: true, nombre: true } },
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: (options.page - 1) * options.pageSize,
@@ -391,12 +434,18 @@ export class LinksService {
       phone?: string;
       text?: string;
       tags?: string[];
+      catalogCursoId?: string | null;
+      catalogProgramaId?: string | null;
+      catalogSedeId?: string | null;
     },
   ) {
     const link = await this.findOwnedLink(user, id);
     const data: {
       targetUrl?: string;
       tags?: string[];
+      catalogCursoId?: string | null;
+      catalogProgramaId?: string | null;
+      catalogSedeId?: string | null;
     } = {};
 
     if (input.tags !== undefined) {
@@ -417,6 +466,30 @@ export class LinksService {
           input.text !== undefined ? input.text : current.text;
         const text = ensureWhatsappRef(textRaw, link.slug);
         data.targetUrl = this.buildWhatsappUrl(phone, text);
+      }
+
+      if (
+        input.catalogCursoId !== undefined ||
+        input.catalogProgramaId !== undefined ||
+        input.catalogSedeId !== undefined
+      ) {
+        const refs = await this.resolveCatalogIds({
+          catalogCursoId:
+            input.catalogCursoId === undefined
+              ? link.catalogCursoId
+              : input.catalogCursoId,
+          catalogProgramaId:
+            input.catalogProgramaId === undefined
+              ? link.catalogProgramaId
+              : input.catalogProgramaId,
+          catalogSedeId:
+            input.catalogSedeId === undefined
+              ? link.catalogSedeId
+              : input.catalogSedeId,
+        });
+        data.catalogCursoId = refs.catalogCursoId;
+        data.catalogProgramaId = refs.catalogProgramaId;
+        data.catalogSedeId = refs.catalogSedeId;
       }
     } else if (link.type === LinkType.URL) {
       if (input.phone !== undefined || input.text !== undefined) {
@@ -907,6 +980,47 @@ export class LinksService {
     return link;
   }
 
+  private async resolveCatalogIds(input: {
+    catalogCursoId?: string | null;
+    catalogProgramaId?: string | null;
+    catalogSedeId?: string | null;
+  }) {
+    const catalogCursoId = this.emptyCatalogId(input.catalogCursoId);
+    const catalogProgramaId = this.emptyCatalogId(input.catalogProgramaId);
+    const catalogSedeId = this.emptyCatalogId(input.catalogSedeId);
+
+    if (catalogCursoId) {
+      const row = await this.prisma.educacionCatalogCurso.findUnique({
+        where: { id: catalogCursoId },
+        select: { id: true },
+      });
+      if (!row) throw new BadRequestException('El curso no está en el catálogo');
+    }
+    if (catalogProgramaId) {
+      const row = await this.prisma.educacionCatalogPrograma.findUnique({
+        where: { id: catalogProgramaId },
+        select: { id: true },
+      });
+      if (!row) {
+        throw new BadRequestException('El programa no está en el catálogo');
+      }
+    }
+    if (catalogSedeId) {
+      const row = await this.prisma.educacionCatalogSede.findUnique({
+        where: { id: catalogSedeId },
+        select: { id: true },
+      });
+      if (!row) throw new BadRequestException('La sede no está en el catálogo');
+    }
+
+    return { catalogCursoId, catalogProgramaId, catalogSedeId };
+  }
+
+  private emptyCatalogId(value: string | null | undefined) {
+    const id = String(value ?? '').trim();
+    return id || null;
+  }
+
   private normalizeTags(tags?: string[]): string[] {
     if (!tags?.length) return [];
 
@@ -975,12 +1089,22 @@ export class LinksService {
       text_normalized: string;
       tags: string[];
       phone: string;
+      curso: string | null;
+      programa: string | null;
+      sede: string | null;
     }>
   > {
     const links = await this.prisma.shortLink.findMany({
       where: { type: LinkType.WHATSAPP },
       orderBy: { slug: 'asc' },
-      select: { slug: true, targetUrl: true, tags: true },
+      select: {
+        slug: true,
+        targetUrl: true,
+        tags: true,
+        catalogCurso: { select: { nombre: true } },
+        catalogPrograma: { select: { nombre: true } },
+        catalogSede: { select: { nombre: true } },
+      },
     });
 
     return links.map((link) => {
@@ -992,6 +1116,9 @@ export class LinksService {
         text_normalized: this.normalizeWhatsappText(stripWhatsappRef(text)),
         tags: link.tags,
         phone: parsed.phone,
+        curso: link.catalogCurso?.nombre ?? null,
+        programa: link.catalogPrograma?.nombre ?? null,
+        sede: link.catalogSede?.nombre ?? null,
       };
     });
   }
@@ -1076,6 +1203,9 @@ export class LinksService {
       createdAt: Date;
       archivedAt: Date | null;
       tags: string[];
+      catalogCurso?: { id: string; nombre: string } | null;
+      catalogPrograma?: { id: string; nombre: string } | null;
+      catalogSede?: { id: string; nombre: string } | null;
       createdById?: string;
       createdBy?: {
         id: string;
@@ -1128,6 +1258,9 @@ export class LinksService {
           }
         : undefined,
       tags: link.tags,
+      catalogCurso: link.catalogCurso ?? null,
+      catalogPrograma: link.catalogPrograma ?? null,
+      catalogSede: link.catalogSede ?? null,
       qrStyle: effectiveStyle,
       qrLogoKey: link.qrLogoKey,
       qrBase64,
