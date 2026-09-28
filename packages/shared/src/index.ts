@@ -749,6 +749,7 @@ export interface EducacionDistrictDto {
   id: string;
   name: string;
   slug: string;
+  brochureUrl: string | null;
   sortOrder: number;
 }
 

@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -39,6 +40,35 @@ export class UpsertEducacionOfertaDto {
   @Type(() => Number)
   @IsNumber()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsString()
+  areaId?: string | null;
+}
+
+export class UpsertEducacionAreaDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(180)
+  nombre!: string;
+
+  @IsOptional()
+  @IsString()
+  parentId?: string | null;
+
+  @IsOptional()
+  @IsIn(['educacion_ca', 'educacion_ep'])
+  whatsappArea?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  sortOrder?: number;
 }
 
 export class UpsertEducacionDistrictDto {
@@ -46,6 +76,11 @@ export class UpsertEducacionDistrictDto {
   @MinLength(1)
   @MaxLength(120)
   nombre!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  brochureUrl?: string | null;
 
   @IsOptional()
   @Type(() => Number)

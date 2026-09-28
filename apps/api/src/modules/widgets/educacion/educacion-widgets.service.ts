@@ -104,6 +104,7 @@ export class EducacionWidgetsService {
         id: d.id,
         name: d.name,
         slug: d.slug,
+        brochureUrl: d.brochureUrl,
         sortOrder: d.sortOrder,
       })),
       sedes: sedes.map((s) => this.mapSedePublic(s)),
@@ -231,12 +232,8 @@ export class EducacionWidgetsService {
   }
 
   async deleteDistrict(id: string) {
-    await this.findDistrict(id);
-    await this.prisma.educacionSede.updateMany({
-      where: { districtId: id },
-      data: { districtId: null },
-    });
-    return this.prisma.educacionDistrict.delete({ where: { id } });
+  await this.findDistrict(id);
+  return this.prisma.educacionDistrict.delete({ where: { id } });
   }
 
   createSede(_dto: CreateEducacionSedeDto) {

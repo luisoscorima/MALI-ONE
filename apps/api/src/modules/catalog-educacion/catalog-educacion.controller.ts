@@ -11,6 +11,7 @@ import { AppModule } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { CatalogEducacionService } from './catalog-educacion.service';
 import {
+  UpsertEducacionAreaDto,
   UpsertEducacionDistrictDto,
   UpsertEducacionOfertaDto,
   UpsertEducacionSedeDto,
@@ -67,6 +68,26 @@ export class CatalogEducacionController {
   @Delete('programas/:id')
   deletePrograma(@Param('id') id: string) {
     return this.catalog.deletePrograma(id);
+  }
+
+  @Get('areas')
+  areas() {
+    return this.catalog.listAreas();
+  }
+
+  @Post('areas')
+  createArea(@Body() body: UpsertEducacionAreaDto) {
+    return this.catalog.createArea(body);
+  }
+
+  @Patch('areas/:id')
+  updateArea(@Param('id') id: string, @Body() body: UpsertEducacionAreaDto) {
+    return this.catalog.updateArea(id, body);
+  }
+
+  @Delete('areas/:id')
+  deleteArea(@Param('id') id: string) {
+    return this.catalog.deleteArea(id);
   }
 
   @Get('distritos')

@@ -43,7 +43,32 @@ type Oferta = {
   horario: string | null;
   activo: boolean;
   sortOrder: number;
+  areaId: string | null;
+  area: { id: string; nombre: string; parentNombre: string | null } | null;
 };
+
+type Area = {
+  id: string;
+  slug: string;
+  nombre: string;
+  parentId: string | null;
+  whatsappArea: string | null;
+  activo: boolean;
+  sortOrder: number;
+  lineas: number;
+  cursos: number;
+};
+
+const WHATSAPP_AREA_LABEL: Record<string, string> = {
+  educacion_ca: 'Educación CA',
+  educacion_ep: 'Educación EP',
+};
+
+function areaPath(area: Area, areas: Area[]) {
+  if (!area.parentId) return area.nombre;
+  const parent = areas.find((item) => item.id === area.parentId);
+  return parent ? `${parent.nombre} · ${area.nombre}` : area.nombre;
+}
 
 type Sede = {
   id: string;
@@ -67,6 +92,7 @@ type Distrito = {
   id: string;
   nombre: string;
   slug: string;
+  brochureUrl: string | null;
   sortOrder: number;
   sedes: number;
 };
@@ -81,6 +107,7 @@ function money(value: number | null) {
 export function CatalogEducacionPage() {
   const toast = useToast();
   const confirm = useConfirm();
+  const [areas, setAreas] = useState<Area[]>([]);
   const [cursos, setCursos] = useState<Oferta[]>([]);
   const [programas, setProgramas] = useState<Oferta[]>([]);
   const [sedes, setSedes] = useState<Sede[]>([]);
@@ -92,16 +119,19 @@ export function CatalogEducacionPage() {
   } | null>(null);
   const [sedeEdit, setSedeEdit] = useState<Sede | null | undefined>(undefined);
   const [distritoEdit, setDistritoEdit] = useState<Distrito | null | undefined>(undefined);
+  const [areaEdit, setAreaEdit] = useState<{ item: Area | null; parentId: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextCursos, nextProgramas, nextSedes, nextDistritos] = await Promise.all([
+      const [nextAreas, nextCursos, nextProgramas, nextSedes, nextDistritos] = await Promise.all([
+        api.listEducacionCatalogAreas(),
         api.listEducacionCatalogCursos(),
         api.listEducacionCatalogProgramas(),
         api.listEducacionCatalogSedes(),
         api.listEducacionCatalogDistritos(),
       ]);
+      setAreas(nextAreas);
       setCursos(nextCursos);
       setProgramas(nextProgramas);
       setSedes(nextSedes);
@@ -130,6 +160,28 @@ export function CatalogEducacionPage() {
       if (kind === 'cursos') await api.deleteEducacionCatalogCurso(item.id);
       else await api.deleteEducacionCatalogPrograma(item.id);
       toast.success(`${label[0].toUpperCase()}${label.slice(1)} eliminado`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
+    }
+  }
+
+  async function removeArea(item: Area) {
+    const label = item.parentId ? 'línea' : 'área';
+    const ok = await confirm({
+      title: `¿Eliminar esta ${label}?`,
+      description: item.lineas > 0
+        ? 'Tiene líneas. Elimínalas antes.'
+        : item.cursos > 0
+          ? 'Tiene cursos asignados. Cámbialos de área antes de eliminarla.'
+          : 'Los cursos dejan de ofrecer esta opción al asignarse.',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await api.deleteEducacionCatalogArea(item.id);
+      toast.success(`${label[0].toUpperCase()}${label.slice(1)} eliminada`);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo eliminar');
@@ -176,12 +228,13 @@ export function CatalogEducacionPage() {
     <div>
       <PageHeader
         title="Catálogo Educación"
-        description="Cursos, programas, sedes y distritos. El mapa y el selector muestran estas sedes."
+        description="Áreas, líneas, cursos, programas, sedes y distritos. El mapa y el selector muestran estas sedes."
       />
       <Tabs defaultValue="cursos">
         <TabsList>
           <TabsTrigger value="cursos">Cursos</TabsTrigger>
           <TabsTrigger value="programas">Programas</TabsTrigger>
+          <TabsTrigger value="areas">Áreas</TabsTrigger>
           <TabsTrigger value="sedes">Sedes</TabsTrigger>
           <TabsTrigger value="distritos">Distritos</TabsTrigger>
         </TabsList>
@@ -190,6 +243,7 @@ export function CatalogEducacionPage() {
             kind="cursos"
             rows={cursos}
             loading={loading}
+            showArea
             onCreate={() => setOfertaEdit({ kind: 'cursos', item: null })}
             onEdit={(item) => setOfertaEdit({ kind: 'cursos', item })}
             onDelete={(item) => void removeOferta('cursos', item)}
@@ -203,6 +257,16 @@ export function CatalogEducacionPage() {
             onCreate={() => setOfertaEdit({ kind: 'programas', item: null })}
             onEdit={(item) => setOfertaEdit({ kind: 'programas', item })}
             onDelete={(item) => void removeOferta('programas', item)}
+          />
+        </TabsContent>
+        <TabsContent value="areas">
+          <AreasPanel
+            areas={areas}
+            loading={loading}
+            onCreate={() => setAreaEdit({ item: null, parentId: '' })}
+            onCreateLinea={(parentId) => setAreaEdit({ item: null, parentId })}
+            onEdit={(item) => setAreaEdit({ item, parentId: item.parentId ?? '' })}
+            onDelete={(item) => void removeArea(item)}
           />
         </TabsContent>
         <TabsContent value="sedes">
@@ -267,6 +331,7 @@ export function CatalogEducacionPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="p-4">Nombre</TableHead>
+                    <TableHead className="p-4">Brochure</TableHead>
                     <TableHead className="p-4">Sedes</TableHead>
                     <TableHead className="p-4">Acciones</TableHead>
                   </TableRow>
@@ -275,6 +340,7 @@ export function CatalogEducacionPage() {
                   {distritos.map((distrito) => (
                     <TableRow key={distrito.id}>
                       <TableCell className="p-4 font-medium">{distrito.nombre}</TableCell>
+                      <TableCell className="max-w-xs truncate p-4 text-sm text-muted">{distrito.brochureUrl || '—'}</TableCell>
                       <TableCell className="p-4 text-sm">{distrito.sedes}</TableCell>
                       <TableCell className="p-4">
                         <div className="flex gap-2">
@@ -297,7 +363,14 @@ export function CatalogEducacionPage() {
 
       <OfertaDialog
         state={ofertaEdit}
+        areas={areas}
         onClose={() => setOfertaEdit(null)}
+        onSaved={() => void load()}
+      />
+      <AreaDialog
+        state={areaEdit}
+        areas={areas}
+        onClose={() => setAreaEdit(null)}
         onSaved={() => void load()}
       />
       <SedeDialog
@@ -319,6 +392,7 @@ function OfertaPanel({
   kind,
   rows,
   loading,
+  showArea = false,
   onCreate,
   onEdit,
   onDelete,
@@ -326,6 +400,7 @@ function OfertaPanel({
   kind: OfertaKind;
   rows: Oferta[];
   loading: boolean;
+  showArea?: boolean;
   onCreate: () => void;
   onEdit: (item: Oferta) => void;
   onDelete: (item: Oferta) => void;
@@ -347,6 +422,7 @@ function OfertaPanel({
           <TableHeader>
             <TableRow>
               <TableHead className="p-4">Nombre</TableHead>
+              {showArea ? <TableHead className="p-4">Área</TableHead> : null}
               <TableHead className="p-4">Precio</TableHead>
               <TableHead className="p-4">Descuento</TableHead>
               <TableHead className="p-4">Horario</TableHead>
@@ -358,6 +434,15 @@ function OfertaPanel({
             {rows.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="p-4 font-medium">{row.nombre}</TableCell>
+                {showArea ? (
+                  <TableCell className="p-4 text-sm text-muted">
+                    {row.area
+                      ? row.area.parentNombre
+                        ? `${row.area.parentNombre} · ${row.area.nombre}`
+                        : row.area.nombre
+                      : '—'}
+                  </TableCell>
+                ) : null}
                 <TableCell className="p-4">{money(row.precio)}</TableCell>
                 <TableCell className="p-4">{row.descuento || '—'}</TableCell>
                 <TableCell className="p-4">{row.horario || '—'}</TableCell>
@@ -383,10 +468,12 @@ function OfertaPanel({
 
 function OfertaDialog({
   state,
+  areas,
   onClose,
   onSaved,
 }: {
   state: { kind: OfertaKind; item: Oferta | null } | null;
+  areas: Area[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -396,6 +483,7 @@ function OfertaDialog({
   const [precio, setPrecio] = useState('');
   const [descuento, setDescuento] = useState('');
   const [horario, setHorario] = useState('');
+  const [areaId, setAreaId] = useState('');
   const [activo, setActivo] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -404,6 +492,7 @@ function OfertaDialog({
     setPrecio(item?.precio == null ? '' : String(item.precio));
     setDescuento(item?.descuento ?? '');
     setHorario(item?.horario ?? '');
+    setAreaId(item?.areaId ?? '');
     setActivo(item?.activo ?? true);
   }, [item, state?.kind]);
 
@@ -418,6 +507,7 @@ function OfertaDialog({
       horario,
       activo,
       sortOrder: item?.sortOrder ?? 0,
+      ...(state.kind === 'cursos' ? { areaId: areaId || null } : {}),
     };
     try {
       if (state.kind === 'cursos') {
@@ -454,6 +544,22 @@ function OfertaDialog({
             Nombre
             <Input value={nombre} onChange={(event) => setNombre(event.target.value)} required />
           </label>
+          {state?.kind === 'cursos' ? (
+            <label className="grid gap-2 text-sm">
+              Área o línea
+              <Select value={areaId || '__none__'} onValueChange={(value) => setAreaId(value === '__none__' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin área" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin área</SelectItem>
+                  {areas.map((area) => (
+                    <SelectItem key={area.id} value={area.id}>{areaPath(area, areas)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          ) : null}
           <label className="grid gap-2 text-sm">
             Precio (S/, opcional)
             <Input type="number" min="0" step="0.01" value={precio} onChange={(event) => setPrecio(event.target.value)} />
@@ -621,10 +727,12 @@ function DistritoDialog({
   const toast = useToast();
   const open = distrito !== undefined;
   const [nombre, setNombre] = useState('');
+  const [brochureUrl, setBrochureUrl] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setNombre(distrito?.nombre ?? '');
+    setBrochureUrl(distrito?.brochureUrl ?? '');
   }, [distrito]);
 
   async function save(event: FormEvent) {
@@ -634,10 +742,11 @@ function DistritoDialog({
       if (distrito?.id) {
         await api.updateEducacionCatalogDistrito(distrito.id, {
           nombre,
+          brochureUrl,
           sortOrder: distrito.sortOrder,
         });
       } else {
-        await api.createEducacionCatalogDistrito({ nombre });
+        await api.createEducacionCatalogDistrito({ nombre, brochureUrl });
       }
       toast.success('Distrito guardado');
       onClose();
@@ -660,6 +769,217 @@ function DistritoDialog({
           <label className="grid gap-2 text-sm">
             Nombre
             <Input value={nombre} onChange={(event) => setNombre(event.target.value)} required />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Brochure (opcional)
+            <Input value={brochureUrl} onChange={(event) => setBrochureUrl(event.target.value)} />
+          </label>
+          <Button type="submit" className="justify-self-end" disabled={saving}>
+            {saving ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AreasPanel({
+  areas,
+  loading,
+  onCreate,
+  onCreateLinea,
+  onEdit,
+  onDelete,
+}: {
+  areas: Area[];
+  loading: boolean;
+  onCreate: () => void;
+  onCreateLinea: (parentId: string) => void;
+  onEdit: (item: Area) => void;
+  onDelete: (item: Area) => void;
+}) {
+  const roots = areas.filter((area) => !area.parentId);
+  return (
+    <Card className="mt-4 overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <p className="text-sm text-muted">
+          El área separa Cursos de Arte y Extensión Profesional. La línea vive dentro de un área.
+        </p>
+        <Button type="button" onClick={onCreate}>
+          <Plus className="size-4" /> Nueva área
+        </Button>
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-10"><Spinner /></div>
+      ) : roots.length === 0 ? (
+        <EmptyState
+          title="Sin áreas"
+          description="Crea Cursos de Arte y Extensión Profesional. Dentro de esta última van las líneas."
+        />
+      ) : (
+        <div>
+          {roots.map((area) => {
+            const lineas = areas.filter((item) => item.parentId === area.id);
+            return (
+              <section key={area.id} className="border-b border-border last:border-b-0">
+                <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{area.nombre}</p>
+                    <p className="text-sm text-muted">
+                      {WHATSAPP_AREA_LABEL[area.whatsappArea ?? ''] ?? 'Sin línea de WhatsApp'}
+                      {' · '}
+                      {area.cursos} {area.cursos === 1 ? 'curso' : 'cursos'}
+                      {area.activo ? '' : ' · Inactiva'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => onCreateLinea(area.id)}>
+                      <Plus className="size-4" /> Línea
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => onEdit(area)}>
+                      <Pencil className="size-4" /> Editar
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => onDelete(area)}>
+                      <Trash2 className="size-4" /> Eliminar
+                    </Button>
+                  </div>
+                </div>
+                {lineas.length === 0 ? (
+                  <p className="px-4 pb-3 text-sm text-muted">Sin líneas. Los cursos pueden asignarse directo a esta área.</p>
+                ) : lineas.map((linea) => (
+                  <div key={linea.id} className="flex flex-wrap items-center gap-3 border-t border-border px-4 py-3 pl-8">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{linea.nombre}</p>
+                      <p className="text-sm text-muted">
+                        Línea · {linea.cursos} {linea.cursos === 1 ? 'curso' : 'cursos'}
+                        {linea.activo ? '' : ' · Inactiva'}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => onEdit(linea)}>
+                        <Pencil className="size-4" /> Editar
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onDelete(linea)}>
+                        <Trash2 className="size-4" /> Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function AreaDialog({
+  state,
+  areas,
+  onClose,
+  onSaved,
+}: {
+  state: { item: Area | null; parentId: string } | null;
+  areas: Area[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const item = state?.item;
+  const roots = areas.filter((area) => !area.parentId && area.id !== item?.id);
+  const lockedAsArea = (item?.lineas ?? 0) > 0;
+  const [nombre, setNombre] = useState('');
+  const [parentId, setParentId] = useState('');
+  const [whatsappArea, setWhatsappArea] = useState('educacion_ep');
+  const [activo, setActivo] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setNombre(item?.nombre ?? '');
+    setParentId(lockedAsArea ? '' : (item?.parentId ?? state?.parentId ?? ''));
+    setWhatsappArea(item?.whatsappArea || 'educacion_ep');
+    setActivo(item?.activo ?? true);
+  }, [item, state?.parentId, lockedAsArea]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    const isLinea = !lockedAsArea && parentId !== '';
+    const body = {
+      nombre,
+      parentId: isLinea ? parentId : null,
+      whatsappArea: isLinea ? null : whatsappArea,
+      activo,
+      ...(item ? { sortOrder: item.sortOrder } : {}),
+    };
+    try {
+      if (item) await api.updateEducacionCatalogArea(item.id, body);
+      else await api.createEducacionCatalogArea(body);
+      toast.success('Guardado');
+      onClose();
+      onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isLinea = !lockedAsArea && parentId !== '';
+  const title = item
+    ? item.parentId ? 'Editar línea' : 'Editar área'
+    : parentId ? 'Nueva línea' : 'Nueva área';
+
+  return (
+    <Dialog open={!!state} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Una línea pertenece a un área. La línea de WhatsApp se define en el área.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-3" onSubmit={(event) => void save(event)}>
+          <label className="grid gap-2 text-sm">
+            Nombre
+            <Input value={nombre} onChange={(event) => setNombre(event.target.value)} required />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Pertenece a
+            <Select
+              value={parentId || '__area__'}
+              onValueChange={(value) => setParentId(value === '__area__' ? '' : value)}
+              disabled={lockedAsArea}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__area__">Es un área</SelectItem>
+                {roots.map((area) => (
+                  <SelectItem key={area.id} value={area.id}>{area.nombre}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </label>
+          {isLinea ? null : (
+            <label className="grid gap-2 text-sm">
+              WhatsApp
+              <Select value={whatsappArea} onValueChange={setWhatsappArea}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="educacion_ca">Educación CA</SelectItem>
+                  <SelectItem value="educacion_ep">Educación EP</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          )}
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={activo} onCheckedChange={(value) => setActivo(value === true)} />
+            Activa
           </label>
           <Button type="submit" className="justify-self-end" disabled={saving}>
             {saving ? 'Guardando…' : 'Guardar'}

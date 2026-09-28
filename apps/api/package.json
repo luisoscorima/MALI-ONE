@@ -11,6 +11,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:seed:widgets": "tsx prisma/seed-widgets.ts",
+    "prisma:seed:catalog": "tsx prisma/seed-educacion-catalog.ts",
     "prisma:seed:todos": "tsx prisma/seed-todos.ts",
     "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts"
   },

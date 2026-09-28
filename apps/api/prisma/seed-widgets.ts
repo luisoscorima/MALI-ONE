@@ -10,9 +10,6 @@ import { join } from 'path';
 const prisma = new PrismaClient();
 const DATA_DIR = join(__dirname, 'seed-data');
 
-/** Slugs obsoletos de seeds anteriores — se desactivan al re-sembrar */
-const OBSOLETE_SEDE_SLUGS = ['principal', 'virtual'];
-
 type EducacionSettings = {
   whatsapp: string;
   telefono: string;
@@ -27,19 +24,6 @@ type EducacionSettings = {
 };
 
 type DistrictSeed = { slug: string; name: string; sortOrder: number };
-
-type SedeSeed = {
-  slug: string;
-  nombre: string;
-  direccion?: string;
-  lat?: number;
-  lng?: number;
-  horarioHtml?: string;
-  brochureUrl: string;
-  districtSlug?: string;
-  showOnMap: boolean;
-  sortOrder: number;
-};
 
 type SelectorSedeSeed = {
   slug: string;
@@ -81,25 +65,6 @@ function loadJson<T>(filename: string): T {
   return JSON.parse(readFileSync(join(DATA_DIR, filename), 'utf8')) as T;
 }
 
-function sedeRow(
-  s: SedeSeed,
-  districtIds: Record<string, string>,
-) {
-  return {
-    slug: s.slug,
-    nombre: s.nombre,
-    direccion: s.direccion ?? null,
-    lat: s.lat ?? null,
-    lng: s.lng ?? null,
-    horarioHtml: s.horarioHtml ?? null,
-    brochureUrl: s.brochureUrl,
-    districtId: s.districtSlug ? districtIds[s.districtSlug] ?? null : null,
-    showOnMap: s.showOnMap,
-    sortOrder: s.sortOrder,
-    activo: true,
-  };
-}
-
 function selectorSedeRow(s: SelectorSedeSeed) {
   return {
     slug: s.slug,
@@ -113,9 +78,8 @@ function selectorSedeRow(s: SelectorSedeSeed) {
 async function seedEducacion() {
   const settings = loadJson<EducacionSettings>('educacion-settings.json');
   const districts = loadJson<DistrictSeed[]>('educacion-districts.json');
-  const { mapSedes, selectorSedes } = loadJson<{
-    mapSedes: SedeSeed[];
-    selectorSedes: SedeSeed[];
+  const { selectorSedes } = loadJson<{
+    selectorSedes: SelectorSedeSeed[];
   }>('educacion-sedes.json');
 
   const settingsData = {
@@ -132,36 +96,13 @@ async function seedEducacion() {
     update: settingsData,
   });
 
-  const districtIds: Record<string, string> = {};
   for (const d of districts) {
-    const row = await prisma.educacionDistrict.upsert({
+    await prisma.educacionDistrict.upsert({
       where: { slug: d.slug },
       create: d,
       update: { name: d.name, sortOrder: d.sortOrder },
     });
-    districtIds[d.slug] = row.id;
   }
-
-  const mapActiveSlugs = new Set(mapSedes.map((s) => s.slug));
-
-  for (const s of mapSedes) {
-    const data = sedeRow(s, districtIds);
-    await prisma.educacionSede.upsert({
-      where: { slug: s.slug },
-      create: data,
-      update: data,
-    });
-  }
-
-  await prisma.educacionSede.updateMany({
-    where: {
-      OR: [
-        { slug: { in: OBSOLETE_SEDE_SLUGS } },
-        { slug: { notIn: [...mapActiveSlugs] } },
-      ],
-    },
-    data: { activo: false },
-  });
 
   const selectorActiveSlugs = new Set(selectorSedes.map((s) => s.slug));
   for (const s of selectorSedes) {

@@ -1,0 +1,89 @@
+{
+  "areas": [
+    {
+      "slug": "cursos-de-arte",
+      "nombre": "Cursos de Arte",
+      "whatsappArea": "educacion_ca",
+      "sortOrder": 0,
+      "cursos": [
+        "Bachata",
+        "Ballet",
+        "Caligrafía artística",
+        "Caporales",
+        "Clown y teatro",
+        "Dance for kids",
+        "Danzas afroperuanas",
+        "Danzas folklóricas",
+        "Dibujo y pintura",
+        "Fotografía digital",
+        "Guitarra",
+        "Historieta, manga y cómics",
+        "Impostación vocal para el canto",
+        "Impostación vocal para el habla",
+        "Improvisación teatral",
+        "K Pop",
+        "Locución",
+        "Marinera norteña",
+        "Oratoria para profesionales",
+        "Oratoria y liderazgo",
+        "Órgano electrónico",
+        "Pequeñas estrellas",
+        "Pequeños artistas",
+        "Pintura al óleo",
+        "Pintura y escultura recreativa",
+        "Retrato y figura humana",
+        "Ritmos latinos",
+        "Salsa dance",
+        "Tae Kwon Do",
+        "Teatro y actuación",
+        "Urban dance",
+        "Violín"
+      ]
+    },
+    {
+      "slug": "extension-profesional",
+      "nombre": "Extensión Profesional",
+      "whatsappArea": "educacion_ep",
+      "sortOrder": 1,
+      "cursos": []
+    },
+    {
+      "slug": "arte-y-cultura",
+      "nombre": "Arte y Cultura",
+      "parentSlug": "extension-profesional",
+      "sortOrder": 0,
+      "cursos": [
+        "Apreciación e historia del arte contemporáneo",
+        "Apreciación e historia del arte precolombino",
+        "Bases de la gestión cultural",
+        "Coaching teatral para el desarrollo de niños líderes",
+        "Coaching teatral para el desarrollo de profesionales líderes",
+        "Curaduría y gestión de exposiciones de arte",
+        "Desarrollo de Públicos para la Cultura",
+        "Diseño de Proyectos Culturales",
+        "Diseño Estratégico de Proyectos Culturales",
+        "Economía, cultura e industrias creativas",
+        "Financiamiento de la cultura",
+        "Gestión cultural",
+        "Gestión Cultural y Políticas Públicas",
+        "Gestión del patrimonio cultural",
+        "Gestión estratégicas de las organizaciones culturales",
+        "Legislación cinematográfica y políticas públicas",
+        "Legislación cultural",
+        "Marketing cultural y estrategia digital",
+        "Museografía y diseño de exhibiciones",
+        "Políticas culturales e Institucionalidad",
+        "Producción Técnica para Instalaciones de Arte y Tecnología",
+        "Storytelling estratégico",
+        "Storytelling estratégico avanzado"
+      ]
+    },
+    {
+      "slug": "diseno-y-comunicaciones",
+      "nombre": "Diseño y Comunicaciones",
+      "parentSlug": "extension-profesional",
+      "sortOrder": 1,
+      "cursos": []
+    }
+  ]
+}

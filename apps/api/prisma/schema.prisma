@@ -193,17 +193,40 @@ model ShortLink {
   @@index([tags], type: Gin)
 }
 
+model EducacionCatalogArea {
+  id           String                  @id @default(cuid())
+  slug         String                  @unique
+  nombre       String
+  /// Null = área (Cursos de Arte, Extensión Profesional). Con padre = línea.
+  parentId     String?
+  parent       EducacionCatalogArea?   @relation("CatalogAreaLinea", fields: [parentId], references: [id], onDelete: Restrict)
+  children     EducacionCatalogArea[]  @relation("CatalogAreaLinea")
+  /// educacion_ca | educacion_ep. Solo en el área. La línea hereda la de su padre.
+  whatsappArea String?
+  activo       Boolean                 @default(true)
+  sortOrder    Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  cursos       EducacionCatalogCurso[]
+
+  @@index([parentId])
+}
+
 model EducacionCatalogCurso {
-  id        String      @id @default(cuid())
+  id        String                @id @default(cuid())
   nombre    String
-  precio    Decimal?    @db.Decimal(10, 2)
+  precio    Decimal?              @db.Decimal(10, 2)
   descuento String?
   horario   String?
-  activo    Boolean     @default(true)
-  sortOrder Int         @default(0)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  activo    Boolean               @default(true)
+  sortOrder Int                   @default(0)
+  areaId    String?
+  area      EducacionCatalogArea? @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
   links     ShortLink[]
+
+  @@index([areaId])
 }
 
 model EducacionCatalogPrograma {
@@ -279,27 +302,9 @@ model EducacionDistrict {
   id           String                 @id @default(cuid())
   name         String
   slug         String                 @unique
+  brochureUrl  String?
   sortOrder    Int                    @default(0)
-  sedes        EducacionSede[]
   catalogSedes EducacionCatalogSede[]
-}
-
-model EducacionSede {
-  id             String             @id @default(cuid())
-  slug           String             @unique
-  nombre         String
-  direccion      String?
-  lat            Float?
-  lng            Float?
-  horarioHtml    String?            @db.Text
-  brochureUrl    String
-  districtId     String?
-  district       EducacionDistrict? @relation(fields: [districtId], references: [id], onDelete: SetNull)
-  showOnMap      Boolean            @default(true)
-  sortOrder      Int                @default(0)
-  activo         Boolean            @default(true)
-
-  @@index([districtId])
 }
 
 model EducacionSelectorSede {

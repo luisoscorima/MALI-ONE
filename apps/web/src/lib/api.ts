@@ -133,6 +133,8 @@ type EducacionOfertaDto = {
   horario: string | null;
   activo: boolean;
   sortOrder: number;
+  areaId: string | null;
+  area: { id: string; nombre: string; parentNombre: string | null } | null;
 };
 
 type EducacionOfertaInput = {
@@ -140,6 +142,27 @@ type EducacionOfertaInput = {
   precio?: number | null;
   descuento?: string | null;
   horario?: string | null;
+  activo?: boolean;
+  sortOrder?: number;
+  areaId?: string | null;
+};
+
+type EducacionAreaDto = {
+  id: string;
+  slug: string;
+  nombre: string;
+  parentId: string | null;
+  whatsappArea: string | null;
+  activo: boolean;
+  sortOrder: number;
+  lineas: number;
+  cursos: number;
+};
+
+type EducacionAreaInput = {
+  nombre: string;
+  parentId?: string | null;
+  whatsappArea?: string | null;
   activo?: boolean;
   sortOrder?: number;
 };
@@ -181,6 +204,7 @@ type EducacionDistritoDto = {
   id: string;
   nombre: string;
   slug: string;
+  brochureUrl: string | null;
   sortOrder: number;
   sedes: number;
 };
@@ -357,6 +381,13 @@ export const api = {
       sedes: Array<{ id: string; nombre: string }>;
     }>('/api/links/whatsapp-catalog-options'),
 
+  listEducacionCatalogAreas: () => request<EducacionAreaDto[]>('/api/educacion-catalog/areas'),
+  createEducacionCatalogArea: (body: EducacionAreaInput) =>
+    request<EducacionAreaDto>('/api/educacion-catalog/areas', { method: 'POST', body: JSON.stringify(body) }),
+  updateEducacionCatalogArea: (id: string, body: EducacionAreaInput) =>
+    request<EducacionAreaDto>(`/api/educacion-catalog/areas/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteEducacionCatalogArea: (id: string) =>
+    request(`/api/educacion-catalog/areas/${id}`, { method: 'DELETE' }),
   listEducacionCatalogCursos: () => request<EducacionOfertaDto[]>('/api/educacion-catalog/cursos'),
   createEducacionCatalogCurso: (body: EducacionOfertaInput) =>
     request<EducacionOfertaDto>('/api/educacion-catalog/cursos', { method: 'POST', body: JSON.stringify(body) }),
@@ -373,9 +404,9 @@ export const api = {
     request(`/api/educacion-catalog/programas/${id}`, { method: 'DELETE' }),
   listEducacionCatalogDistritos: () =>
     request<EducacionDistritoDto[]>('/api/educacion-catalog/distritos'),
-  createEducacionCatalogDistrito: (body: { nombre: string; sortOrder?: number }) =>
+  createEducacionCatalogDistrito: (body: { nombre: string; brochureUrl?: string | null; sortOrder?: number }) =>
     request<EducacionDistritoDto>('/api/educacion-catalog/distritos', { method: 'POST', body: JSON.stringify(body) }),
-  updateEducacionCatalogDistrito: (id: string, body: { nombre: string; sortOrder?: number }) =>
+  updateEducacionCatalogDistrito: (id: string, body: { nombre: string; brochureUrl?: string | null; sortOrder?: number }) =>
     request<EducacionDistritoDto>(`/api/educacion-catalog/distritos/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteEducacionCatalogDistrito: (id: string) =>
     request(`/api/educacion-catalog/distritos/${id}`, { method: 'DELETE' }),

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
+  UpsertEducacionAreaDto,
   UpsertEducacionDistrictDto,
   UpsertEducacionOfertaDto,
   UpsertEducacionSedeDto,
@@ -31,10 +32,18 @@ function money(value: Prisma.Decimal | null): number | null {
 export class CatalogEducacionService {
   constructor(private readonly prisma: PrismaService) {}
 
+  listAreas() {
+    return this.prisma.educacionCatalogArea.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
+      include: { _count: { select: { children: true, cursos: true } } },
+    }).then((rows) => rows.map((row) => this.areaDto(row)));
+  }
+
   listCursos() {
     return this.prisma.educacionCatalogCurso.findMany({
       orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
-    }).then((rows) => rows.map((row) => this.ofertaDto(row)));
+      include: { area: { include: { parent: { select: { nombre: true } } } } },
+    }).then((rows) => rows.map((row) => this.ofertaDto(row, row.area)));
   }
 
   listProgramas() {
@@ -54,7 +63,7 @@ export class CatalogEducacionService {
     return this.prisma.educacionDistrict.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: {
-        _count: { select: { sedes: true, catalogSedes: true } },
+        _count: { select: { catalogSedes: true } },
       },
     }).then((rows) => rows.map((row) => this.districtDto(row)));
   }
@@ -81,19 +90,23 @@ export class CatalogEducacionService {
   }
 
   async createCurso(dto: UpsertEducacionOfertaDto) {
+    const areaId = await this.resolveAreaId(dto.areaId);
     const row = await this.prisma.educacionCatalogCurso.create({
-      data: this.ofertaData(dto),
+      data: { ...this.ofertaData(dto), areaId },
+      include: { area: { include: { parent: { select: { nombre: true } } } } },
     });
-    return this.ofertaDto(row);
+    return this.ofertaDto(row, row.area);
   }
 
   async updateCurso(id: string, dto: UpsertEducacionOfertaDto) {
     await this.ensureCurso(id);
+    const areaId = dto.areaId === undefined ? undefined : await this.resolveAreaId(dto.areaId);
     const row = await this.prisma.educacionCatalogCurso.update({
       where: { id },
-      data: this.ofertaData(dto),
+      data: { ...this.ofertaData(dto), ...(areaId !== undefined ? { areaId } : {}) },
+      include: { area: { include: { parent: { select: { nombre: true } } } } },
     });
-    return this.ofertaDto(row);
+    return this.ofertaDto(row, row.area);
   }
 
   async deleteCurso(id: string) {
@@ -161,9 +174,10 @@ export class CatalogEducacionService {
       data: {
         name: nombre,
         slug: await this.uniqueDistrictSlug(nombre),
+        brochureUrl: emptyToNull(dto.brochureUrl),
         sortOrder: dto.sortOrder ?? (max._max.sortOrder ?? -1) + 1,
       },
-      include: { _count: { select: { sedes: true, catalogSedes: true } } },
+      include: { _count: { select: { catalogSedes: true } } },
     });
     return this.districtDto(row);
   }
@@ -174,27 +188,79 @@ export class CatalogEducacionService {
       where: { id },
       data: {
         name: dto.nombre.trim(),
+        brochureUrl: emptyToNull(dto.brochureUrl),
         ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
       },
-      include: { _count: { select: { sedes: true, catalogSedes: true } } },
+      include: { _count: { select: { catalogSedes: true } } },
     });
     return this.districtDto(row);
+  }
+
+  async createArea(dto: UpsertEducacionAreaDto) {
+    const parentId = await this.assertAreaParent(null, emptyToNull(dto.parentId));
+    const nombre = dto.nombre.trim();
+    const row = await this.prisma.educacionCatalogArea.create({
+      data: {
+        nombre,
+        slug: await this.uniqueAreaSlug(nombre),
+        parentId,
+        whatsappArea: parentId ? null : emptyToNull(dto.whatsappArea),
+        activo: dto.activo ?? true,
+        sortOrder: dto.sortOrder ?? await this.nextAreaSort(parentId),
+      },
+      include: { _count: { select: { children: true, cursos: true } } },
+    });
+    return this.areaDto(row);
+  }
+
+  async updateArea(id: string, dto: UpsertEducacionAreaDto) {
+    await this.ensureArea(id);
+    const parentId = await this.assertAreaParent(id, emptyToNull(dto.parentId));
+    const row = await this.prisma.educacionCatalogArea.update({
+      where: { id },
+      data: {
+        nombre: dto.nombre.trim(),
+        parentId,
+        whatsappArea: parentId ? null : emptyToNull(dto.whatsappArea),
+        activo: dto.activo ?? true,
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+      include: { _count: { select: { children: true, cursos: true } } },
+    });
+    return this.areaDto(row);
+  }
+
+  async deleteArea(id: string) {
+    const row = await this.prisma.educacionCatalogArea.findUnique({
+      where: { id },
+      include: { _count: { select: { children: true, cursos: true } } },
+    });
+    if (!row) throw new NotFoundException('Área no encontrada');
+    const label = row.parentId ? 'línea' : 'área';
+    if (row._count.children > 0) {
+      throw new BadRequestException('Esta área tiene líneas. Elimínalas antes.');
+    }
+    if (row._count.cursos > 0) {
+      throw new BadRequestException(`Esta ${label} tiene cursos. Cámbialos de área antes de eliminarla.`);
+    }
+    await this.prisma.educacionCatalogArea.delete({ where: { id } });
+    return { ok: true };
   }
 
   async deleteDistrito(id: string) {
     const row = await this.prisma.educacionDistrict.findUnique({
       where: { id },
-      include: { _count: { select: { sedes: true, catalogSedes: true } } },
+      include: { _count: { select: { catalogSedes: true } } },
     });
     if (!row) throw new NotFoundException('Distrito no encontrado');
-    if (row._count.sedes + row._count.catalogSedes > 0) {
+    if (row._count.catalogSedes > 0) {
       throw new BadRequestException('Este distrito todavía tiene sedes. Cámbialas de distrito antes de eliminarlo.');
     }
     await this.prisma.educacionDistrict.delete({ where: { id } });
     return { ok: true };
   }
 
-  private ofertaData(dto: UpsertEducacionOfertaDto): Prisma.EducacionCatalogCursoCreateInput {
+  private ofertaData(dto: UpsertEducacionOfertaDto) {
     return {
       nombre: dto.nombre.trim(),
       precio: dto.precio == null ? null : new Prisma.Decimal(dto.precio),
@@ -237,15 +303,18 @@ export class CatalogEducacionService {
     return slug;
   }
 
-  private ofertaDto(row: {
-    id: string;
-    nombre: string;
-    precio: Prisma.Decimal | null;
-    descuento: string | null;
-    horario: string | null;
-    activo: boolean;
-    sortOrder: number;
-  }) {
+  private ofertaDto(
+    row: {
+      id: string;
+      nombre: string;
+      precio: Prisma.Decimal | null;
+      descuento: string | null;
+      horario: string | null;
+      activo: boolean;
+      sortOrder: number;
+    },
+    area?: { id: string; nombre: string; parent: { nombre: string } | null } | null,
+  ) {
     return {
       id: row.id,
       nombre: row.nombre,
@@ -254,6 +323,37 @@ export class CatalogEducacionService {
       horario: row.horario,
       activo: row.activo,
       sortOrder: row.sortOrder,
+      areaId: area?.id ?? null,
+      area: area
+        ? {
+            id: area.id,
+            nombre: area.nombre,
+            parentNombre: area.parent?.nombre ?? null,
+          }
+        : null,
+    };
+  }
+
+  private areaDto(row: {
+    id: string;
+    slug: string;
+    nombre: string;
+    parentId: string | null;
+    whatsappArea: string | null;
+    activo: boolean;
+    sortOrder: number;
+    _count: { children: number; cursos: number };
+  }) {
+    return {
+      id: row.id,
+      slug: row.slug,
+      nombre: row.nombre,
+      parentId: row.parentId,
+      whatsappArea: row.whatsappArea,
+      activo: row.activo,
+      sortOrder: row.sortOrder,
+      lineas: row._count.children,
+      cursos: row._count.cursos,
     };
   }
 
@@ -296,16 +396,81 @@ export class CatalogEducacionService {
     id: string;
     name: string;
     slug: string;
+    brochureUrl: string | null;
     sortOrder: number;
-    _count: { sedes: number; catalogSedes: number };
+    _count: { catalogSedes: number };
   }) {
     return {
       id: row.id,
       nombre: row.name,
       slug: row.slug,
+      brochureUrl: row.brochureUrl,
       sortOrder: row.sortOrder,
-      sedes: row._count.sedes + row._count.catalogSedes,
+      sedes: row._count.catalogSedes,
     };
+  }
+
+  private async resolveAreaId(value: string | null | undefined) {
+    const id = emptyToNull(value);
+    if (!id) return null;
+    const row = await this.prisma.educacionCatalogArea.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!row) throw new BadRequestException('El área no está en el catálogo');
+    return id;
+  }
+
+  private async assertAreaParent(id: string | null, parentId: string | null) {
+    if (!parentId) return null;
+    if (id && parentId === id) {
+      throw new BadRequestException('Un área no puede ser su propia línea.');
+    }
+    const parent = await this.prisma.educacionCatalogArea.findUnique({
+      where: { id: parentId },
+      select: { id: true, parentId: true },
+    });
+    if (!parent) throw new BadRequestException('El área padre no está en el catálogo');
+    if (parent.parentId) {
+      throw new BadRequestException('Una línea no puede contener otra línea.');
+    }
+    if (id) {
+      const children = await this.prisma.educacionCatalogArea.count({ where: { parentId: id } });
+      if (children > 0) {
+        throw new BadRequestException('Esta área tiene líneas y no puede pasar a ser una línea.');
+      }
+    }
+    return parentId;
+  }
+
+  private async nextAreaSort(parentId: string | null) {
+    const max = await this.prisma.educacionCatalogArea.aggregate({
+      where: { parentId },
+      _max: { sortOrder: true },
+    });
+    return (max._max.sortOrder ?? -1) + 1;
+  }
+
+  private async uniqueAreaSlug(nombre: string) {
+    const raw = slugify(nombre);
+    const base = raw === 'sede' ? 'area' : raw;
+    let slug = base;
+    let n = 2;
+    while (
+      await this.prisma.educacionCatalogArea.findFirst({
+        where: { slug },
+        select: { id: true },
+      })
+    ) {
+      slug = `${base}-${n}`;
+      n += 1;
+    }
+    return slug;
+  }
+
+  private async ensureArea(id: string) {
+    const row = await this.prisma.educacionCatalogArea.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Área no encontrada');
   }
 
   private async resolveDistrictId(value: string | null | undefined) {
