@@ -173,11 +173,13 @@ model ShortLink {
   createdById String
   createdBy   User        @relation(fields: [createdById], references: [id])
   createdAt   DateTime    @default(now())
+  archivedAt  DateTime?
   clickCount  Int         @default(0)
   tags        String[]    @default([])
   clicks      LinkClick[]
 
   @@index([createdById])
+  @@index([createdById, archivedAt])
   @@index([tags], type: Gin)
 }
 

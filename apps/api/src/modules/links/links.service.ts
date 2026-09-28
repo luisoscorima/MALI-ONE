@@ -295,6 +295,7 @@ export class LinksService {
       type?: string;
       createdFrom?: string;
       createdTo?: string;
+      includeArchived?: boolean;
     },
   ) {
     const ownershipWhere: Prisma.ShortLinkWhereInput =
@@ -311,8 +312,12 @@ export class LinksService {
       throw new BadRequestException('Rango de fechas inválido');
     }
 
+    const visibilityWhere: Prisma.ShortLinkWhereInput = options.includeArchived
+      ? {}
+      : { archivedAt: null };
+
     const tagRows = await this.prisma.shortLink.findMany({
-      where: ownershipWhere,
+      where: { ...ownershipWhere, ...visibilityWhere },
       select: { tags: true },
     });
     const tags = [...new Set(tagRows.flatMap((row) => row.tags))].sort();
@@ -322,6 +327,7 @@ export class LinksService {
 
     const where: Prisma.ShortLinkWhereInput = {
       ...ownershipWhere,
+      ...visibilityWhere,
       ...(normalizedTag ? { tags: { has: normalizedTag } } : {}),
       ...(type ? { type } : {}),
       ...(createdFrom || createdTo
@@ -455,6 +461,27 @@ export class LinksService {
     if (data.targetUrl) {
       await this.refreshCache(link.slug, data.targetUrl);
     }
+
+    return this.toDto(updated, false);
+  }
+
+  /**
+   * Oculta o devuelve el enlace a la lista. No toca la URL, la caché,
+   * el QR ni el catálogo de WhatsApp.
+   */
+  async setLinkArchived(user: User, id: string, archived: boolean) {
+    const link = await this.findOwnedLink(user, id);
+    if (archived && link.archivedAt) {
+      return this.toDto(link, false);
+    }
+    if (!archived && !link.archivedAt) {
+      return this.toDto(link, false);
+    }
+
+    const updated = await this.prisma.shortLink.update({
+      where: { id },
+      data: { archivedAt: archived ? new Date() : null },
+    });
 
     return this.toDto(updated, false);
   }
@@ -937,7 +964,10 @@ export class LinksService {
     return `https://api.whatsapp.com/send?${params.toString()}`;
   }
 
-  /** Catálogo WHATSAPP para mali-whatsapp (match por ref/texto). */
+  /**
+   * Catálogo WHATSAPP para mali-whatsapp (match por ref/texto).
+   * Incluye enlaces archivados: archivar solo los oculta en la lista.
+   */
   async listWhatsappCatalog(): Promise<
     Array<{
       slug: string;
@@ -967,7 +997,8 @@ export class LinksService {
   }
 
   /**
-   * Añade/corrige ` · ref:{slug}` en todos los links WHATSAPP existentes.
+   * Deja `ref:{slug} ·` al inicio de todos los links WHATSAPP existentes.
+   * También corrige los que aún lo tienen al final.
    * Idempotente: no cambia filas que ya tienen el ref correcto.
    */
   async backfillWhatsappRefs(): Promise<{
@@ -1043,6 +1074,7 @@ export class LinksService {
       qrLogoKey: string | null;
       clickCount: number;
       createdAt: Date;
+      archivedAt: Date | null;
       tags: string[];
       createdById?: string;
       createdBy?: {
@@ -1087,6 +1119,7 @@ export class LinksService {
       s3Key: link.s3Key,
       clickCount: link.clickCount,
       createdAt: link.createdAt.toISOString(),
+      archivedAt: link.archivedAt?.toISOString() ?? null,
       createdBy: link.createdBy
         ? {
             id: link.createdBy.id,

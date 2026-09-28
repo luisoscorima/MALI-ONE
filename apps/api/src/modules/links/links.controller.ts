@@ -25,6 +25,7 @@ import { BulkWhatsappDto } from './dto/bulk-whatsapp.dto';
 import { CreateWhatsappLinkDto } from './dto/create-whatsapp.dto';
 import { SaveQrDefaultStyleDto } from './dto/save-qr-default-style.dto';
 import { ShortenUrlDto } from './dto/shorten-url.dto';
+import { SetLinkArchivedDto } from './dto/set-link-archived.dto';
 import { UpdateLinkDto } from './dto/update-link.dto';
 import {
   UpdateQrStyleDto,
@@ -165,6 +166,7 @@ export class LinksController {
     @Query('type') type?: string,
     @Query('createdFrom') createdFrom?: string,
     @Query('createdTo') createdTo?: string,
+    @Query('includeArchived') includeArchived?: string,
   ) {
     const parsedPage = Number(page ?? 1);
     const parsedPageSize = Number(pageSize ?? 25);
@@ -179,6 +181,8 @@ export class LinksController {
       type,
       createdFrom,
       createdTo,
+      includeArchived:
+        includeArchived === '1' || includeArchived === 'true',
     });
   }
 
@@ -288,6 +292,19 @@ export class LinksController {
   @Delete(':id/qr-logo')
   removeQrLogo(@Req() req: Request, @Param('id') id: string) {
     return this.links.removeLinkQrLogo(req.user as User, id);
+  }
+
+  @Patch(':id/archive')
+  setArchived(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: SetLinkArchivedDto,
+  ) {
+    return this.links.setLinkArchived(
+      req.user as User,
+      id,
+      body.archived,
+    );
   }
 
   @Delete(':id')

@@ -583,6 +583,7 @@ export interface ShortLinkDto {
   s3Key: string | null;
   clickCount: number;
   createdAt: string;
+  archivedAt: string | null;
   createdBy?: {
     id: string;
     name: string;

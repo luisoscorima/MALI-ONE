@@ -345,6 +345,7 @@ export const api = {
     type?: string;
     createdFrom?: string;
     createdTo?: string;
+    includeArchived?: boolean;
   } = {}) => {
     const params = new URLSearchParams();
     if (options.page) params.set('page', String(options.page));
@@ -354,6 +355,7 @@ export const api = {
     if (options.type && options.type !== 'all') params.set('type', options.type);
     if (options.createdFrom) params.set('createdFrom', options.createdFrom);
     if (options.createdTo) params.set('createdTo', options.createdTo);
+    if (options.includeArchived) params.set('includeArchived', '1');
     const qs = params.toString();
     return request<import('@mali-one/shared').ShortLinksPageDto>(
       `/api/links${qs ? `?${qs}` : ''}`,
@@ -365,6 +367,15 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+
+  setLinkArchived: (id: string, archived: boolean) =>
+    request<import('@mali-one/shared').ShortLinkDto>(
+      `/api/links/${id}/archive`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ archived }),
+      },
+    ),
 
   deleteLink: (id: string) =>
     request(`/api/links/${id}`, { method: 'DELETE' }),

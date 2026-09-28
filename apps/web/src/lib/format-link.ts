@@ -1,4 +1,5 @@
 import type { ShortLinkDto } from '@mali-one/shared';
+import { stripWhatsappRef } from '@/lib/parse-tags';
 
 export function formatLinkDestination(link: ShortLinkDto): {
   primary: string;
@@ -16,7 +17,7 @@ export function formatLinkDestination(link: ShortLinkDto): {
     try {
       const parsed = new URL(link.targetUrl);
       const phone = parsed.searchParams.get('phone') ?? '';
-      const text = parsed.searchParams.get('text');
+      const text = stripWhatsappRef(parsed.searchParams.get('text'));
       return {
         primary: phone ? `WhatsApp · +${phone}` : 'WhatsApp',
         secondary: text

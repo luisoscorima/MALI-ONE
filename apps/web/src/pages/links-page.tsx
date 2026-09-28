@@ -1,5 +1,5 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2, Upload } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2, Upload } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE, formatLimaDateTime } from '@mali-one/shared';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -187,6 +187,7 @@ export function LinksPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [datePeriod, setDatePeriod] = useState<DatePeriod>('30d');
+  const [showArchived, setShowArchived] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileDropActive, setFileDropActive] = useState(false);
   const [links, setLinks] = useState<ShortLinkDto[]>([]);
@@ -235,7 +236,7 @@ export function LinksPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [datePeriod, debouncedSearch, tagFilter, typeFilter]);
+  }, [datePeriod, debouncedSearch, showArchived, tagFilter, typeFilter]);
 
   function openQrDesigner(link: ShortLinkDto) {
     setQrModalSavedStyle(link.qrStyle ?? defaultQrStyle);
@@ -265,6 +266,7 @@ export function LinksPage() {
         search: debouncedSearch || undefined,
         tag: tagFilter || undefined,
         type: typeFilter,
+        includeArchived: showArchived,
         ...getDatePeriodRange(datePeriod),
       });
       if (requestId !== listRequestId.current) return;
@@ -283,7 +285,7 @@ export function LinksPage() {
     } finally {
       if (requestId === listRequestId.current) setListLoading(false);
     }
-  }, [datePeriod, debouncedSearch, page, tagFilter, toast, typeFilter]);
+  }, [datePeriod, debouncedSearch, page, showArchived, tagFilter, toast, typeFilter]);
 
   useEffect(() => {
     void loadLinks();
@@ -428,18 +430,56 @@ export function LinksPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleArchive(link: ShortLinkDto) {
+    const archiving = !link.archivedAt;
+    if (archiving) {
+      const ok = await confirm({
+        title:
+          link.type === 'WHATSAPP'
+            ? '¿Archivar este enlace de WhatsApp?'
+            : '¿Archivar este enlace?',
+        description:
+          link.type === 'WHATSAPP'
+            ? 'Deja de verse en la lista. La URL sigue funcionando y los mensajes nuevos se siguen atribuyendo a este enlace.'
+            : 'Deja de verse en la lista. La URL y el QR siguen funcionando.',
+        confirmLabel: 'Archivar',
+      });
+      if (!ok) return;
+    }
+
+    try {
+      await api.setLinkArchived(link.id, archiving);
+      toast.success(
+        archiving
+          ? 'Enlace archivado. Sigue activo, solo queda fuera de la lista.'
+          : 'Enlace visible de nuevo en la lista',
+      );
+      await loadLinks();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'No se pudo actualizar el archivo';
+      setError(msg);
+      toast.error(msg);
+    }
+  }
+
+  async function handleDelete(link: ShortLinkDto) {
     const ok = await confirm({
-      title: '¿Eliminar este enlace?',
-      description: 'Esta acción no se puede deshacer.',
+      title:
+        link.type === 'WHATSAPP'
+          ? '¿Eliminar este enlace de WhatsApp?'
+          : '¿Eliminar este enlace?',
+      description:
+        link.type === 'WHATSAPP'
+          ? 'Eliminar apaga la URL. Ya no recibirás mensajes de este enlace. Si aún ingresan, entran como WhatsApp orgánico al CRM. Los leads ya guardados no cambian.'
+          : 'Esta acción no se puede deshacer.',
       confirmLabel: 'Eliminar',
       variant: 'destructive',
     });
     if (!ok) return;
     try {
-      await api.deleteLink(id);
-      if (qrModalLink?.id === id) closeQrDesigner();
-      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+      await api.deleteLink(link.id);
+      if (qrModalLink?.id === link.id) closeQrDesigner();
+      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== link.id));
       toast.success('Enlace eliminado');
       await loadLinks();
     } catch (e) {
@@ -537,7 +577,8 @@ export function LinksPage() {
     debouncedSearch ||
     tagFilter ||
     typeFilter !== 'all' ||
-    datePeriod !== '30d'
+    datePeriod !== '30d' ||
+    showArchived
   );
   const visibleSelectedCount = links.filter((link) => selectedIds.includes(link.id)).length;
   const hiddenSelectedCount = selectedIds.length - visibleSelectedCount;
@@ -546,6 +587,7 @@ export function LinksPage() {
     setTagFilter('');
     setTypeFilter('all');
     setDatePeriod('30d');
+    setShowArchived(false);
   }
   const exportTargets = getExportTargets(links);
   const exportScopeLabel =
@@ -847,7 +889,18 @@ export function LinksPage() {
                 </SelectContent>
               </Select>
             </div>
-            {hasFilters && <Button type="button" variant="ghost" onClick={resetFilters}>Restablecer filtros</Button>}
+            <label className="mb-2 inline-flex items-center gap-2 self-end text-sm">
+              <Checkbox
+                checked={showArchived}
+                onCheckedChange={(value) => setShowArchived(value === true)}
+              />
+              Mostrar archivados
+            </label>
+            {hasFilters && (
+              <Button type="button" variant="ghost" className="mb-2 self-end" onClick={resetFilters}>
+                Restablecer filtros
+              </Button>
+            )}
           </div>
           <p role="status" className="mt-2 text-sm text-muted-foreground">
             {listLoading ? 'Cargando enlaces…' : `${links.length} de ${total} enlaces`}
@@ -1044,7 +1097,10 @@ export function LinksPage() {
                 {links.map((link) => {
                   const dest = formatLinkDestination(link);
                   return (
-                    <TableRow key={link.id} className="border-border/60">
+                    <TableRow
+                      key={link.id}
+                      className={link.archivedAt ? 'border-border/60 opacity-80' : 'border-border/60'}
+                    >
                       <TableCell className="p-4">
                         <Checkbox
                           checked={selectedIds.includes(link.id)}
@@ -1063,17 +1119,24 @@ export function LinksPage() {
                         </a>
                       </TableCell>
                       <TableCell className="p-4">
-                        <span
-                          className={
-                            link.type === 'FILE'
-                              ? 'rounded bg-primary/15 px-2 py-0.5 text-xs text-primary'
-                              : link.type === 'WHATSAPP'
-                                ? 'rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400'
-                                : 'rounded bg-border px-2 py-0.5 text-xs'
-                          }
-                        >
-                          {link.type === 'FILE' ? 'Archivo' : link.type === 'WHATSAPP' ? 'WhatsApp' : 'URL'}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span
+                            className={
+                              link.type === 'FILE'
+                                ? 'rounded bg-primary/15 px-2 py-0.5 text-xs text-primary'
+                                : link.type === 'WHATSAPP'
+                                  ? 'rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400'
+                                  : 'rounded bg-border px-2 py-0.5 text-xs'
+                            }
+                          >
+                            {link.type === 'FILE' ? 'Archivo' : link.type === 'WHATSAPP' ? 'WhatsApp' : 'URL'}
+                          </span>
+                          {link.archivedAt ? (
+                            <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                              Archivado
+                            </span>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="p-4">
                         {link.tags.length > 0 ? (
@@ -1138,9 +1201,19 @@ export function LinksPage() {
                             <Copy className="size-4" />
                           </IconActionButton>
                           <IconActionButton
+                            label={link.archivedAt ? 'Desarchivar' : 'Archivar'}
+                            onClick={() => void handleArchive(link)}
+                          >
+                            {link.archivedAt ? (
+                              <ArchiveRestore className="size-4" />
+                            ) : (
+                              <Archive className="size-4" />
+                            )}
+                          </IconActionButton>
+                          <IconActionButton
                             label="Eliminar"
                             variant="danger"
-                            onClick={() => void handleDelete(link.id)}
+                            onClick={() => void handleDelete(link)}
                           >
                             <Trash2 className="size-4" />
                           </IconActionButton>
@@ -1243,6 +1316,9 @@ export function LinksPage() {
                         }
                         rows={4}
                       />
+                      <p className="mt-1 text-xs text-muted">
+                        Al guardar se añade ref:{editLink.link.slug} al inicio. El lead lo envía con el mensaje.
+                      </p>
                     </label>
                   </>
                 )}
