@@ -10,7 +10,7 @@ import { api, type EducationArea, type EducationCatalog, type EducationContact,
 import {
   Badge, Button, DataTable, DropdownMenu, DropdownMenuCheckboxItem,
   DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
 
@@ -55,6 +55,48 @@ function formatDate(value: string) {
 
 function waUsername(value: string | null) {
   return value ? `@${value.replace(/^@/, '')}` : null;
+}
+
+const LEAD_STATUS_PATH = ['por_contactar', 'contactado', 'evaluando', 'promesa', 'venta_exitosa'] as const;
+const LEAD_STATUS_EXITS = ['no_contesta', 'no_interesado', 'perdido'] as const;
+
+function LeadStatusSelect({
+  area, value, disabled, statuses, onChange, className,
+}: {
+  area: EducationArea;
+  value: string;
+  disabled: boolean;
+  statuses: EducationManagementCatalog['statuses'];
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const ofArea = statuses.filter((status) => status.area === area);
+  const bySlug = (slugs: readonly string[]) => slugs
+    .map((slug) => ofArea.find((status) => status.slug === slug))
+    .filter((status): status is (typeof ofArea)[number] => Boolean(status));
+  const path = bySlug(LEAD_STATUS_PATH);
+  const exits = bySlug(LEAD_STATUS_EXITS);
+  const known = new Set<string>([...LEAD_STATUS_PATH, ...LEAD_STATUS_EXITS]);
+  const other = ofArea.filter((status) => !known.has(status.slug));
+  const group = (label: string, items: typeof ofArea) => items.length === 0 ? null : (
+    <SelectGroup>
+      <SelectLabel>{label}</SelectLabel>
+      {items.map((status) => (
+        <SelectItem key={status.id} value={String(status.id)}>{status.label}</SelectItem>
+      ))}
+    </SelectGroup>
+  );
+  return (
+    <Select value={value} disabled={disabled} onValueChange={onChange}>
+      <SelectTrigger className={className}><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">Sin estado</SelectItem>
+        {group('Inscripción', path)}
+        {group('Intento o cierre', exits)}
+        {group('Otros', other)}
+      </SelectContent>
+    </Select>
+  );
 }
 
 function prospectiaLabel(match: string | null | undefined) {
@@ -351,17 +393,15 @@ export function CrmEducacionPage() {
     } },
     { id: 'status', header: 'Estado del lead', cell: ({ row }) => {
       const lead = row.original;
-      return <Select value={lead.lead_status_id ? String(lead.lead_status_id) : '__none__'}
+      return <LeadStatusSelect
+        area={lead.area}
+        className="min-w-40"
+        value={lead.lead_status_id ? String(lead.lead_status_id) : '__none__'}
         disabled={!lead.is_current_cycle || managementSaving}
-        onValueChange={(value) => void updateManagement(lead.contact_id!, lead.area,
-          { lead_status_id: value === '__none__' ? null : Number(value) })}>
-        <SelectTrigger className="min-w-36"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">Sin estado</SelectItem>
-          {managementCatalog.statuses.filter((status) => status.area === lead.area)
-            .map((status) => <SelectItem key={status.id} value={String(status.id)}>{status.label}</SelectItem>)}
-        </SelectContent>
-      </Select>;
+        statuses={managementCatalog.statuses}
+        onChange={(value) => void updateManagement(lead.contact_id!, lead.area,
+          { lead_status_id: value === '__none__' ? null : Number(value) })}
+      />;
     } },
     { id: 'first', header: 'Primera captación', cell: ({ row }) => formatDate(row.original.first_seen_at) },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_seen_at) },
@@ -535,17 +575,14 @@ export function CrmEducacionPage() {
           </div>
           <div className="space-y-1">
             <Label>Estado del lead</Label>
-            <Select value={contact.lead_status_id ? String(contact.lead_status_id) : '__none__'}
+            <LeadStatusSelect
+              area={contact.area}
+              value={contact.lead_status_id ? String(contact.lead_status_id) : '__none__'}
               disabled={managementSaving}
-              onValueChange={(value) => void updateManagement(contact.contact_id, contact.area,
-                { lead_status_id: value === '__none__' ? null : Number(value) })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Sin estado</SelectItem>
-                {managementCatalog.statuses.filter((status) => status.area === contact.area)
-                  .map((status) => <SelectItem key={status.id} value={String(status.id)}>{status.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+              statuses={managementCatalog.statuses}
+              onChange={(value) => void updateManagement(contact.contact_id, contact.area,
+                { lead_status_id: value === '__none__' ? null : Number(value) })}
+            />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">

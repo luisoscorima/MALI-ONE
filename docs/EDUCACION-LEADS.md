@@ -2,6 +2,8 @@
 
 Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLead` → WhatsApp CRM (+ Google Sheets opcional).
 
+Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md).
+
 ## Checklist go-live
 
 1. **Migración**
