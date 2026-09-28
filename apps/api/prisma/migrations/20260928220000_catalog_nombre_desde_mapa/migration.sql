@@ -8,7 +8,7 @@ SET
         WHEN sel."nombre" <> map."nombre" THEN sel."nombre"
         ELSE NULL
     END
-FROM "EducacionSede" AS map
-INNER JOIN "EducacionSelectorSede" AS sel ON sel."id" = catalog."id"
-WHERE catalog."brochureUrl" IS NOT NULL
+FROM "EducacionSede" AS map, "EducacionSelectorSede" AS sel
+WHERE catalog."id" = sel."id"
+  AND catalog."brochureUrl" IS NOT NULL
   AND catalog."brochureUrl" = map."brochureUrl";
