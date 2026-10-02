@@ -346,13 +346,18 @@ export class WhatsappCrmClientService {
 
     const area = String(lead.whatsappArea || 'educacion_ep').trim();
     const lastName = String(lead.apellidos ?? '').trim();
+    const isLanding = lead.captureSource === 'landing';
 
     await this.request('POST', '/api/crm/origins', {
       area,
       channel: 'widget',
       external_id: String(lead.id),
-      source_key: 'educacion_lead_widget',
-      source_label: lead.fuente || 'Web MALI Educación',
+      source_key: isLanding
+        ? 'educacion_landing'
+        : 'educacion_lead_widget',
+      source_label: isLanding
+        ? 'Landing MALI Educación'
+        : 'Ficha web MALI Educación',
       name: lead.nombres,
       last_name: lastName,
       phone: phone || undefined,
@@ -366,6 +371,16 @@ export class WhatsappCrmClientService {
         programa: this.resolveEducacionPrograma(lead),
         curso: lead.courseTitle ?? lead.courseSlug,
         curso_url: lead.pageUrl,
+        page_url: lead.pageUrl,
+        capture_source: lead.captureSource,
+        referrer: lead.referrer,
+        utm_source: lead.utmSource,
+        utm_medium: lead.utmMedium,
+        utm_campaign: lead.utmCampaign,
+        utm_content: lead.utmContent,
+        utm_term: lead.utmTerm,
+        gclid: lead.gclid,
+        fbclid: lead.fbclid,
         educacion_lead_id: lead.id,
       },
     });

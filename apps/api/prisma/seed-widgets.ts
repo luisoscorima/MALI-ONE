@@ -25,6 +25,20 @@ type EducacionSettings = {
 
 type DistrictSeed = { slug: string; name: string; sortOrder: number };
 
+type CatalogSedeSeed = {
+  slug: string;
+  nombre: string;
+  direccion?: string;
+  lat?: number;
+  lng?: number;
+  horarioHtml?: string;
+  brochureUrl: string;
+  districtSlug?: string;
+  showOnMap?: boolean;
+  showOnSelector?: boolean;
+  sortOrder: number;
+};
+
 type SelectorSedeSeed = {
   slug: string;
   nombre: string;
@@ -75,11 +89,44 @@ function selectorSedeRow(s: SelectorSedeSeed) {
   };
 }
 
+function catalogMapSedeRow(
+  s: CatalogSedeSeed,
+  districtIds: Record<string, string>,
+) {
+  return {
+    slug: s.slug,
+    nombre: s.nombre,
+    direccion: s.direccion ?? null,
+    lat: s.lat ?? null,
+    lng: s.lng ?? null,
+    horarioHtml: s.horarioHtml ?? null,
+    brochureUrl: s.brochureUrl,
+    districtId: s.districtSlug ? districtIds[s.districtSlug] ?? null : null,
+    showOnMap: s.showOnMap ?? true,
+    showOnSelector: s.showOnSelector ?? false,
+    sortOrder: s.sortOrder,
+    activo: true,
+  };
+}
+
+function catalogSelectorSedeRow(s: CatalogSedeSeed) {
+  return {
+    slug: s.slug,
+    nombre: s.nombre,
+    brochureUrl: s.brochureUrl,
+    showOnMap: s.showOnMap ?? false,
+    showOnSelector: s.showOnSelector ?? true,
+    sortOrder: s.sortOrder,
+    activo: true,
+  };
+}
+
 async function seedEducacion() {
   const settings = loadJson<EducacionSettings>('educacion-settings.json');
   const districts = loadJson<DistrictSeed[]>('educacion-districts.json');
-  const { selectorSedes } = loadJson<{
-    selectorSedes: SelectorSedeSeed[];
+  const { mapSedes, selectorSedes } = loadJson<{
+    mapSedes: CatalogSedeSeed[];
+    selectorSedes: CatalogSedeSeed[];
   }>('educacion-sedes.json');
 
   const settingsData = {
@@ -96,11 +143,46 @@ async function seedEducacion() {
     update: settingsData,
   });
 
+  const districtIds: Record<string, string> = {};
   for (const d of districts) {
-    await prisma.educacionDistrict.upsert({
+    const row = await prisma.educacionDistrict.upsert({
       where: { slug: d.slug },
       create: d,
       update: { name: d.name, sortOrder: d.sortOrder },
+    });
+    districtIds[d.slug] = row.id;
+  }
+
+  for (const s of mapSedes) {
+    const data = catalogMapSedeRow(s, districtIds);
+    await prisma.educacionCatalogSede.upsert({
+      where: { slug: s.slug },
+      create: data,
+      // Restaura datos del mapa sin pisar nombreMapa / nombreSelector editados
+      update: {
+        direccion: data.direccion,
+        lat: data.lat,
+        lng: data.lng,
+        horarioHtml: data.horarioHtml,
+        brochureUrl: data.brochureUrl,
+        districtId: data.districtId,
+        showOnMap: data.showOnMap,
+        sortOrder: data.sortOrder,
+        activo: true,
+      },
+    });
+  }
+
+  for (const s of selectorSedes) {
+    const data = catalogSelectorSedeRow(s);
+    await prisma.educacionCatalogSede.upsert({
+      where: { slug: s.slug },
+      create: data,
+      update: {
+        showOnSelector: true,
+        sortOrder: data.sortOrder,
+        activo: true,
+      },
     });
   }
 

@@ -358,6 +358,19 @@
   var courseSlug = params.get('curso') || params.get('course') || '';
   var courseTitle = params.get('titulo') || params.get('title') || '';
   var pageUrl = params.get('url') || params.get('pageUrl') || '';
+  var captureSource = params.get('captureSource') === 'landing' ? 'landing' : 'wordpress_widget';
+  var submitLabel = String(params.get('submit') || 'Enviar información').trim().slice(0, 80);
+  var referrer = params.get('referrer') || '';
+  var attribution = {
+    utmSource: params.get('utm_source') || '',
+    utmMedium: params.get('utm_medium') || '',
+    utmCampaign: params.get('utm_campaign') || '',
+    utmContent: params.get('utm_content') || '',
+    utmTerm: params.get('utm_term') || '',
+    gclid: params.get('gclid') || '',
+    fbclid: params.get('fbclid') || '',
+  };
+  var parentOrigin = '*';
   var area = params.get('area') || 'educacion_ep';
   if (area !== 'educacion_ep' && area !== 'educacion_ca') {
     area = 'educacion_ep';
@@ -378,6 +391,40 @@
   var btn = document.getElementById('submit-btn');
   var waLink = document.getElementById('wa-link');
   var api = (window.MALI_WIDGET_API || (location.origin + '/api/widgets')) + '/educacion/leads';
+  btn.textContent = submitLabel;
+
+  function cleanContextValue(value, maxLength) {
+    return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
+  }
+
+  function allowedParentOrigin(origin) {
+    try {
+      var parsed = new URL(origin);
+      var maliHost = parsed.hostname === 'mali.pe' || parsed.hostname.endsWith('.mali.pe');
+      var localHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      return (parsed.protocol === 'https:' && maliHost) || (parsed.protocol === 'http:' && localHost);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  window.addEventListener('message', function (event) {
+    if (event.source !== window.parent || !allowedParentOrigin(event.origin)) return;
+    if (!event.data || event.data.type !== 'mali-lead-context') return;
+    var context = event.data.context;
+    if (!context || typeof context !== 'object') return;
+    parentOrigin = event.origin;
+    captureSource = context.captureSource === 'landing' ? 'landing' : 'wordpress_widget';
+    pageUrl = cleanContextValue(context.pageUrl, 1000) || pageUrl;
+    referrer = cleanContextValue(context.referrer, 1000);
+    attribution.utmSource = cleanContextValue(context.utmSource, 120);
+    attribution.utmMedium = cleanContextValue(context.utmMedium, 120);
+    attribution.utmCampaign = cleanContextValue(context.utmCampaign, 200);
+    attribution.utmContent = cleanContextValue(context.utmContent, 200);
+    attribution.utmTerm = cleanContextValue(context.utmTerm, 200);
+    attribution.gclid = cleanContextValue(context.gclid, 255);
+    attribution.fbclid = cleanContextValue(context.fbclid, 255);
+  });
 
   var dniFieldWrap = document.querySelector('.lead-form__field--dni');
   if (dniFieldWrap) {
@@ -473,12 +520,25 @@
   function openWhatsApp(url) {
     if (!url) return;
     waLink.href = url;
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage({ type: 'mali-lead-open-whatsapp', url: url }, parentOrigin);
+      } catch (e) {}
+      return;
+    }
+    try { window.open(url, '_blank', 'noopener,noreferrer'); } catch (e2) {}
+  }
+
+  function notifySubmitted(leadId) {
+    if (window.parent === window) return;
     try {
-      window.parent.postMessage({ type: 'mali-lead-open-whatsapp', url: url }, '*');
+      window.parent.postMessage({
+        type: 'mali-lead-submitted',
+        leadId: leadId || '',
+        courseTitle: courseTitle,
+        captureSource: captureSource,
+      }, parentOrigin);
     } catch (e) {}
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (e2) {}
   }
 
   function notifyResize() {
@@ -573,6 +633,15 @@
       courseSlug: courseSlug || undefined,
       courseTitle: courseTitle || undefined,
       pageUrl: pageUrl || undefined,
+      captureSource: captureSource,
+      referrer: referrer || undefined,
+      utmSource: attribution.utmSource || undefined,
+      utmMedium: attribution.utmMedium || undefined,
+      utmCampaign: attribution.utmCampaign || undefined,
+      utmContent: attribution.utmContent || undefined,
+      utmTerm: attribution.utmTerm || undefined,
+      gclid: attribution.gclid || undefined,
+      fbclid: attribution.fbclid || undefined,
       whatsappArea: area,
     };
 
@@ -610,6 +679,7 @@
           throw new Error(String(err));
         }
         form.classList.add('lead-form--done');
+        notifySubmitted(result.body && result.body.id);
         var waUrl = buildWhatsAppUrl();
         if (waUrl) {
           setMsg('¡Gracias! Te abrimos WhatsApp para que envíes tu mensaje y un asesor te atienda.', 'ok');
@@ -621,7 +691,7 @@
       .catch(function (err) {
         setMsg(err.message || 'No se pudo enviar. Intenta de nuevo.', 'error');
         btn.disabled = false;
-        btn.textContent = 'Enviar información';
+        btn.textContent = submitLabel;
       });
   });
 

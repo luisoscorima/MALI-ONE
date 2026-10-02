@@ -16,6 +16,11 @@ export const EDUCACION_WHATSAPP_AREAS = [
   'educacion_ca',
 ] as const;
 
+export const EDUCACION_LEAD_CAPTURE_SOURCES = [
+  'wordpress_widget',
+  'landing',
+] as const;
+
 function emptyToUndefined({ value }: { value: unknown }) {
   if (typeof value !== 'string') return value;
   const trimmed = value.trim();
@@ -72,8 +77,52 @@ export class CreateEducacionLeadDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(500)
+  @MaxLength(1000)
   pageUrl?: string;
+
+  @IsOptional()
+  @IsIn([...EDUCACION_LEAD_CAPTURE_SOURCES])
+  captureSource?: (typeof EDUCACION_LEAD_CAPTURE_SOURCES)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  referrer?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  utmSource?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  utmMedium?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  utmCampaign?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  utmContent?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  utmTerm?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  gclid?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  fbclid?: string;
 
   @IsOptional()
   @IsIn([...EDUCACION_WHATSAPP_AREAS])

@@ -70,7 +70,11 @@ export class EducacionWidgetsService {
       this.ensureSettings(),
       this.prisma.educacionDistrict.findMany({ orderBy: { sortOrder: 'asc' } }),
       this.prisma.educacionCatalogSede.findMany({
-        where: { showOnMap: true },
+        where: {
+          showOnMap: true,
+          activo: true,
+          districtId: { not: null },
+        },
         orderBy: [{ sortOrder: 'asc' }, { nombre: 'asc' }],
         include: { district: true },
       }),
@@ -242,14 +246,19 @@ export class EducacionWidgetsService {
 
   async updateSede(id: string, dto: UpdateEducacionSedeDto) {
     await this.findCatalogSede(id);
+    const data: {
+      showOnMap?: boolean;
+      nombreMapa?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+    } = {};
+    if (dto.showOnMap !== undefined) data.showOnMap = dto.showOnMap;
+    if (dto.nombreMapa !== undefined) data.nombreMapa = blankToNull(dto.nombreMapa);
+    if (dto.lat !== undefined) data.lat = dto.lat;
+    if (dto.lng !== undefined) data.lng = dto.lng;
     return this.prisma.educacionCatalogSede.update({
       where: { id },
-      data: {
-        showOnMap: dto.showOnMap ?? false,
-        nombreMapa: blankToNull(dto.nombreMapa),
-        lat: dto.lat ?? null,
-        lng: dto.lng ?? null,
-      },
+      data,
     });
   }
 
@@ -263,13 +272,21 @@ export class EducacionWidgetsService {
 
   async updateSelectorSede(id: string, dto: UpdateEducacionSelectorSedeDto) {
     await this.findCatalogSede(id);
+    const data: {
+      showOnSelector?: boolean;
+      nombreSelector?: string | null;
+      icon?: string;
+    } = {};
+    if (dto.showOnSelector !== undefined) data.showOnSelector = dto.showOnSelector;
+    if (dto.nombreSelector !== undefined) {
+      data.nombreSelector = blankToNull(dto.nombreSelector);
+    }
+    if (dto.icon !== undefined) {
+      data.icon = blankToNull(dto.icon) || 'location_on';
+    }
     return this.prisma.educacionCatalogSede.update({
       where: { id },
-      data: {
-        showOnSelector: dto.showOnSelector ?? false,
-        nombreSelector: blankToNull(dto.nombreSelector),
-        icon: blankToNull(dto.icon) || 'location_on',
-      },
+      data,
     });
   }
 

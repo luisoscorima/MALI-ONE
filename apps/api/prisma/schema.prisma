@@ -494,6 +494,15 @@ model EducacionLead {
   courseSlug      String?
   courseTitle     String?
   pageUrl         String?
+  captureSource   String   @default("wordpress_widget")
+  referrer        String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmContent      String?
+  utmTerm         String?
+  gclid           String?
+  fbclid          String?
   /// Área WhatsApp: educacion_ep (Extensión Profesional) | educacion_ca (Cursos de Arte)
   whatsappArea    String   @default("educacion_ep")
   fuente          String   @default("Web MALI Educación")
@@ -510,6 +519,8 @@ model EducacionLead {
   @@index([email])
   @@index([createdAt])
   @@index([whatsappArea])
+  @@index([captureSource])
+  @@index([utmCampaign])
 }
 
 model ScreenCastPlaylist {

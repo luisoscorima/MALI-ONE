@@ -75,6 +75,9 @@
             list-style: none;
             padding: 0;
         }
+        .district-group {
+            list-style: none;
+        }
         .district {
             cursor: pointer;
             padding: 10px;
@@ -88,13 +91,14 @@
             display: none;
             list-style: none;
             padding-left: 20px;
+            margin: 0;
         }
-        .addresses li {
+        .addresses li.school {
             cursor: pointer;
             padding: 5px;
             border-bottom: 1px solid #ddd;
         }
-        .addresses li:hover {
+        .addresses li.school:hover {
             background: #e0e0e0;
         }
         .title {
@@ -107,10 +111,12 @@
         }
         .details {
             display: none;
+            list-style: none;
             padding: 10px;
             background: #dcdcdc;
             margin-top: 5px;
             border-radius: 0px;
+            cursor: default;
         }
         .details button {
             font-family: 'BentonSansFB', sans-serif; /* Usa la fuente declarada */
@@ -193,55 +199,54 @@
         }
 
         function setMarker(lat, lng, title) {
+            if (!window.marker || !window.map) return;
+            if (typeof lat !== 'number' || typeof lng !== 'number') return;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
             window.marker.setPosition({ lat, lng });
-            window.marker.setTitle(title);
+            if (title) window.marker.setTitle(title);
             window.map.setCenter({ lat, lng });
-            window.map.setZoom(15); // Volvemos al zoom por defecto
+            window.map.setZoom(15);
         }
 
         function toggleAddresses(id) {
             const element = document.getElementById(id);
+            if (!element) return;
             const isVisible = element.style.display === 'block';
-            
+
             document.querySelectorAll('.addresses').forEach(address => address.style.display = 'none');
             document.querySelectorAll('.details').forEach(detail => detail.style.display = 'none');
-            
+
             element.style.display = isVisible ? 'none' : 'block';
         }
 
         function toggleDetails(id) {
             const element = document.getElementById(id);
+            if (!element) return;
             element.style.display = (element.style.display === 'none' || element.style.display === '') ? 'block' : 'none';
         }
         function selectSchool(lat, lng, id) {
-            setMarker(lat, lng);
             const element = document.getElementById(id);
+            if (!element) return;
 
-            // Alternar visibilidad del detalle
+            // Primero el detalle: no depender de que Google Maps ya haya cargado
             if (element.style.display === 'block') {
                 element.style.display = 'none';
             } else {
                 document.querySelectorAll('.details').forEach(detail => detail.style.display = 'none');
                 element.style.display = 'block';
             }
+
+            setMarker(lat, lng);
         }
         function moveMarker(element, id) {
             const marker = document.getElementById("active-marker");
-            
-            // Mueve el marcador ⬤ al lado del distrito seleccionado
-            element.prepend(marker);
-
-            // Alternar visibilidad de direcciones
+            if (marker && element) element.prepend(marker);
             toggleAddresses(id);
         }
         function resetMarker() {
             const marker = document.getElementById("active-marker");
-            const sedePrincipal = document.querySelector("h3"); // Seleccionamos el título de la sede principal
-
-            // Mueve el ⬤ al lado de "Sede Principal"
-            sedePrincipal.prepend(marker);
-
-            // Restablece la posición y zoom del mapa
+            const sedePrincipal = document.querySelector("h3");
+            if (marker && sedePrincipal) sedePrincipal.prepend(marker);
             setMarker(-12.060064822464469, -77.03735101905501, "Sede Principal");
         }
     </script>

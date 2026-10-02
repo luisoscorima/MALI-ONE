@@ -17,8 +17,15 @@ el contenido ni carga su theme.
 
 La plantilla inicial `gestion-cultural` toma la información de la ficha vigente
 de MALI Educación. No contiene precios, promociones ni testimonios que no estén
-en esa fuente. El formulario usa el flujo actual de leads de MALI ONE; no envía
-datos a Prospectia.
+en esa fuente. El bloque `lead_form` reutiliza el widget oficial de Educación y
+su flujo MALI ONE → MALI WhatsApp; no envía datos a otros CRM.
+
+El mismo widget distingue el origen `landing` de `wordpress_widget`. En ambos
+casos conserva durante la sesión y envía `utm_source`, `utm_medium`,
+`utm_campaign`, `utm_content`, `utm_term`, `gclid`, `fbclid`, la URL pública y
+el referrer. MALI ONE guarda estos datos en `EducacionLead` y los incluye en el
+payload del origen que crea en MALI WhatsApp. El mensaje prellenado de WhatsApp
+no expone estos datos de atribución.
 
 ## Configuración
 
@@ -48,7 +55,7 @@ pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:landings
 ```
 
-Después se actualiza/activa `mali-one-embed`. La versión `1.1.0` refresca las
+Después se actualiza/activa `mali-one-embed`. La versión `1.1.1` refresca las
 reglas de rewrite una vez desde `admin_init`; también pueden guardarse de nuevo
 los enlaces permanentes de WordPress si la ruta todavía no responde.
 

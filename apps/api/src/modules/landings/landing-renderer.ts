@@ -223,30 +223,26 @@ function renderCta(block: LandingBlock): string {
 
 function renderLeadForm(block: LandingBlock, apiBase: string): string {
   const data = block.data;
-  const config = {
-    endpoint: `${apiBase}/api/widgets/educacion/leads`,
+  const params = new URLSearchParams({
     area:
       text(data.area, 40) === 'educacion_ca'
         ? 'educacion_ca'
         : 'educacion_ep',
-    courseSlug: text(data.courseSlug, 200),
-    courseTitle: text(data.courseTitle, 300),
-  };
+    curso: text(data.courseSlug, 200),
+    titulo: text(data.courseTitle, 300),
+    submit: text(data.submitLabel, 80) || 'Enviar información',
+    captureSource: 'landing',
+  });
   const privacyUrl = safeUrl(data.privacyUrl);
+  if (privacyUrl) params.set('privacy', privacyUrl);
+  const whatsappPhone = text(data.whatsappPhone, 30).replace(/\D/g, '');
+  if (whatsappPhone) params.set('wa', whatsappPhone);
+  const backgroundColor = color(data.backgroundColor, '');
+  if (backgroundColor) params.set('bg', backgroundColor);
+  const widgetUrl = `${apiBase}/widgets/educacion/lead-form.html?${params.toString()}`;
   return `<section class="contact" id="contacto"><div class="shell contact__grid">
     <div>${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><p>${escapeHtml(data.body)}</p></div>
-    <form class="lead-form" id="landingLeadForm" data-config='${escapeHtml(scriptJson(config))}'>
-      <div class="form-grid">
-        <label>Nombres*<input name="nombres" autocomplete="given-name" required maxlength="120"></label>
-        <label>Apellidos*<input name="apellidos" autocomplete="family-name" required maxlength="160"></label>
-        <label>Celular / WhatsApp*<input name="celular" autocomplete="tel" inputmode="tel" required minlength="7" maxlength="20"></label>
-        <label>Correo electrónico<input name="email" autocomplete="email" type="email" maxlength="160"></label>
-      </div>
-      <label class="check"><input name="optInMarketing" type="checkbox"> <span>Autorizo el envío de publicidad e información comercial.</span></label>
-      <label class="check"><input name="acceptPrivacy" type="checkbox" required> <span>He leído y acepto ${privacyUrl ? `<a href="${escapeHtml(privacyUrl)}" target="_blank" rel="noopener noreferrer">las políticas de privacidad</a>` : 'las políticas de privacidad'}.*</span></label>
-      <button class="button button--primary" type="submit">${escapeHtml(data.submitLabel || 'Enviar información')}</button>
-      <p class="form-status" id="landingFormStatus" role="status" aria-live="polite"></p>
-    </form>
+    <iframe class="lead-frame" id="landingLeadFormFrame" src="${escapeHtml(widgetUrl)}" title="${escapeHtml(data.title || 'Formulario de contacto')}" loading="lazy" scrolling="no"></iframe>
   </div></section>`;
 }
 
@@ -321,8 +317,8 @@ export function renderLandingHtml(input: {
   <link rel="stylesheet" href="${escapeHtml(apiBase)}/widgets/educacion/benton-sans.css">
   <style>
     :root{--primary:${document.theme.primary};--secondary:${document.theme.secondary};--accent:${document.theme.accent};--ink:${document.theme.ink};--surface:${document.theme.surface};--white:#fff;--line:#e8e4ec;--shell:1180px}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:#fff;font-family:"BentonSansFB",Arial,Helvetica,sans-serif;line-height:1.55}img{display:block;max-width:100%}a{color:inherit}button,input{font:inherit}.shell{width:min(var(--shell),calc(100% - 40px));margin-inline:auto}.site-head{height:76px;display:flex;align-items:center;position:absolute;inset:0 0 auto;z-index:20;color:#fff}.site-head .shell{display:flex;align-items:center;justify-content:space-between;gap:24px}.site-logo{display:block;width:auto;max-width:210px;max-height:54px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border:0;border-radius:999px;font-weight:700;text-decoration:none;cursor:pointer}.button--primary{color:#fff;background:linear-gradient(100deg,var(--primary),var(--accent));box-shadow:0 12px 30px color-mix(in srgb,var(--primary) 28%,transparent)}.button--light{background:#fff;color:var(--primary)}.header-cta{min-height:42px;padding-inline:18px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.5);color:#fff}.hero{position:relative;min-height:720px;display:grid;align-items:end;background:#130b1a;color:#fff;overflow:hidden}.hero__image,.hero__shade{position:absolute;inset:0;width:100%;height:100%}.hero__image{object-fit:cover}.hero__shade{background:linear-gradient(90deg,rgba(11,5,18,.96) 0%,rgba(20,8,31,.82) 48%,rgba(20,8,31,.18) 100%)}.hero__content{position:relative;z-index:2;padding-block:150px 72px}.eyebrow{margin:0 0 13px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}.hero .eyebrow{color:#f1bce0}.hero h1,.section h2,.contact h2{margin:0;max-width:850px;font-size:clamp(38px,6vw,76px);line-height:.98;letter-spacing:-.045em}.hero__lead{max-width:700px;margin:24px 0 30px;font-size:clamp(18px,2vw,22px);color:#eee4f3}.facts{display:flex;flex-wrap:wrap;gap:10px;margin:36px 0 0;padding:0;list-style:none}.facts li{display:grid;gap:3px;min-width:190px;padding:14px 16px;border:1px solid rgba(255,255,255,.2);border-radius:16px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px)}.facts small{text-transform:uppercase;letter-spacing:.1em;color:#d6c9dd}.section{padding:96px 0}.section--soft{background:var(--surface)}.section h2,.contact h2{font-size:clamp(34px,4.5vw,58px)}.section__head{max-width:760px;margin-bottom:38px}.section__head>p:last-child,.prose p{font-size:18px;color:#5f5865}.prose{max-width:900px}.feature-grid,.schedule-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.feature,.schedule-card{padding:28px;border:1px solid var(--line);border-radius:24px;background:#fff}.feature>span{color:var(--accent);font-size:13px;font-weight:700}.feature h3,.schedule-card h3{margin:10px 0 8px;font-size:24px}.feature p,.schedule-card p{margin:5px 0;color:#635c68}.cta-panel{display:flex;align-items:center;justify-content:space-between;gap:30px;padding:46px;border-radius:30px;background:linear-gradient(120deg,var(--primary),var(--secondary));color:#fff}.cta-panel h2{font-size:clamp(30px,4vw,50px)}.cta-panel .eyebrow{color:#f4c7e3}.faq{max-width:900px}.faq h2{margin-bottom:30px}.faq details{border-top:1px solid var(--line);padding:20px 0}.faq details:last-child{border-bottom:1px solid var(--line)}.faq summary{cursor:pointer;font-size:18px;font-weight:700}.faq details p{margin:12px 0 0;color:#625b67}.contact{padding:100px 0;background:#120b18;color:#fff}.contact__grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(420px,1.1fr);gap:60px;align-items:start}.contact__grid>div>p:last-child{font-size:20px;color:#d6cadb}.lead-form{padding:30px;border-radius:26px;background:#fff;color:var(--ink)}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.lead-form label{display:grid;gap:7px;font-size:13px;font-weight:700}.lead-form input{width:100%;height:48px;padding:0 13px;border:1px solid #d9d3de;border-radius:12px}.lead-form input:focus{outline:3px solid color-mix(in srgb,var(--primary) 18%,transparent);border-color:var(--primary)}.check{grid-template-columns:auto 1fr!important;align-items:start;margin:18px 0;font-weight:400!important}.check input{width:18px;height:18px}.check a{color:var(--primary)}.form-status{min-height:24px;margin:14px 0 0}.form-status.is-error{color:#a40032}.form-status.is-success{color:#116b3a}footer{padding:28px 0;background:#08050b;color:#d7cedb;text-align:center;font-size:13px}
-    @media(max-width:760px){.shell{width:min(100% - 28px,var(--shell))}.site-head{height:68px}.site-logo{max-width:155px}.header-cta{font-size:13px;padding-inline:14px}.hero{min-height:680px}.hero__shade{background:linear-gradient(0deg,rgba(11,5,18,.98) 0%,rgba(20,8,31,.68) 72%,rgba(20,8,31,.35) 100%)}.hero__content{padding-block:120px 45px}.facts{display:grid;grid-template-columns:1fr}.facts li{min-width:0}.section{padding:70px 0}.feature-grid,.schedule-grid,.contact__grid,.form-grid{grid-template-columns:1fr}.contact__grid{gap:32px}.cta-panel{align-items:flex-start;flex-direction:column;padding:32px 24px}.lead-form{padding:22px}.contact{padding:72px 0}}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:#fff;font-family:"BentonSansFB",Arial,Helvetica,sans-serif;line-height:1.55}img{display:block;max-width:100%}a{color:inherit}button,input{font:inherit}.shell{width:min(var(--shell),calc(100% - 40px));margin-inline:auto}.site-head{height:76px;display:flex;align-items:center;position:absolute;inset:0 0 auto;z-index:20;color:#fff}.site-head .shell{display:flex;align-items:center;justify-content:space-between;gap:24px}.site-logo{display:block;width:auto;max-width:210px;max-height:54px}.button{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 22px;border:0;border-radius:999px;font-weight:700;text-decoration:none;cursor:pointer}.button--primary{color:#fff;background:linear-gradient(100deg,var(--primary),var(--accent));box-shadow:0 12px 30px color-mix(in srgb,var(--primary) 28%,transparent)}.button--light{background:#fff;color:var(--primary)}.header-cta{min-height:42px;padding-inline:18px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.5);color:#fff}.hero{position:relative;min-height:720px;display:grid;align-items:end;background:#130b1a;color:#fff;overflow:hidden}.hero__image,.hero__shade{position:absolute;inset:0;width:100%;height:100%}.hero__image{object-fit:cover}.hero__shade{background:linear-gradient(90deg,rgba(11,5,18,.96) 0%,rgba(20,8,31,.82) 48%,rgba(20,8,31,.18) 100%)}.hero__content{position:relative;z-index:2;padding-block:150px 72px}.eyebrow{margin:0 0 13px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}.hero .eyebrow{color:#f1bce0}.hero h1,.section h2,.contact h2{margin:0;max-width:850px;font-size:clamp(38px,6vw,76px);line-height:.98;letter-spacing:-.045em}.hero__lead{max-width:700px;margin:24px 0 30px;font-size:clamp(18px,2vw,22px);color:#eee4f3}.facts{display:flex;flex-wrap:wrap;gap:10px;margin:36px 0 0;padding:0;list-style:none}.facts li{display:grid;gap:3px;min-width:190px;padding:14px 16px;border:1px solid rgba(255,255,255,.2);border-radius:16px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px)}.facts small{text-transform:uppercase;letter-spacing:.1em;color:#d6c9dd}.section{padding:96px 0}.section--soft{background:var(--surface)}.section h2,.contact h2{font-size:clamp(34px,4.5vw,58px)}.section__head{max-width:760px;margin-bottom:38px}.section__head>p:last-child,.prose p{font-size:18px;color:#5f5865}.prose{max-width:900px}.feature-grid,.schedule-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.feature,.schedule-card{padding:28px;border:1px solid var(--line);border-radius:24px;background:#fff}.feature>span{color:var(--accent);font-size:13px;font-weight:700}.feature h3,.schedule-card h3{margin:10px 0 8px;font-size:24px}.feature p,.schedule-card p{margin:5px 0;color:#635c68}.cta-panel{display:flex;align-items:center;justify-content:space-between;gap:30px;padding:46px;border-radius:30px;background:linear-gradient(120deg,var(--primary),var(--secondary));color:#fff}.cta-panel h2{font-size:clamp(30px,4vw,50px)}.cta-panel .eyebrow{color:#f4c7e3}.faq{max-width:900px}.faq h2{margin-bottom:30px}.faq details{border-top:1px solid var(--line);padding:20px 0}.faq details:last-child{border-bottom:1px solid var(--line)}.faq summary{cursor:pointer;font-size:18px;font-weight:700}.faq details p{margin:12px 0 0;color:#625b67}.contact{padding:100px 0;background:#120b18;color:#fff}.contact__grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(420px,1.1fr);gap:60px;align-items:start}.contact__grid>div>p:last-child{font-size:20px;color:#d6cadb}.lead-frame{width:100%;min-height:650px;border:0;border-radius:26px;background:transparent}footer{padding:28px 0;background:#08050b;color:#d7cedb;text-align:center;font-size:13px}
+    @media(max-width:760px){.shell{width:min(100% - 28px,var(--shell))}.site-head{height:68px}.site-logo{max-width:155px}.header-cta{font-size:13px;padding-inline:14px}.hero{min-height:680px}.hero__shade{background:linear-gradient(0deg,rgba(11,5,18,.98) 0%,rgba(20,8,31,.68) 72%,rgba(20,8,31,.35) 100%)}.hero__content{padding-block:120px 45px}.facts{display:grid;grid-template-columns:1fr}.facts li{min-width:0}.section{padding:70px 0}.feature-grid,.schedule-grid,.contact__grid{grid-template-columns:1fr}.contact__grid{gap:32px}.cta-panel{align-items:flex-start;flex-direction:column;padding:32px 24px}.contact{padding:72px 0}}
   </style>
 </head>
 <body data-landing="${escapeHtml(input.slug)}">
@@ -347,27 +343,34 @@ export function renderLandingHtml(input: {
         if(el.getAttribute('href')==='#contacto')track('open_form',{cta:action});
       });
     });
-    var form=document.getElementById('landingLeadForm');
-    if(!form)return;
-    var status=document.getElementById('landingFormStatus');
-    var config=JSON.parse(form.getAttribute('data-config')||'{}');
-    form.addEventListener('submit',async function(event){
-      event.preventDefault();
-      var button=form.querySelector('button[type="submit"]');
-      button.disabled=true;status.className='form-status';status.textContent='Enviando…';
-      var values=new FormData(form);
-      try{
-        var response=await fetch(config.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-          nombres:String(values.get('nombres')||''),apellidos:String(values.get('apellidos')||''),celular:String(values.get('celular')||''),email:String(values.get('email')||''),
-          optInMarketing:values.get('optInMarketing')==='on',acceptPrivacy:values.get('acceptPrivacy')==='on',courseSlug:config.courseSlug,courseTitle:config.courseTitle,pageUrl:window.location.href,whatsappArea:config.area
-        })});
-        var payload=await response.json().catch(function(){return {};});
-        if(!response.ok)throw new Error(Array.isArray(payload.message)?payload.message.join(', '):(payload.message||'No se pudo enviar la información'));
-        form.reset();status.className='form-status is-success';status.textContent='Gracias. Recibimos tu solicitud.';track('generate_lead',{programa:config.courseTitle});
-      }catch(error){status.className='form-status is-error';status.textContent=error instanceof Error?error.message:'No se pudo enviar. Intenta nuevamente.';}
-      finally{button.disabled=false;}
-    });
     track('view_program',{programa:${scriptJson(text(heroTitle, 300))}});
+    var frame=document.getElementById('landingLeadFormFrame');
+    if(!frame)return;
+    var widgetOrigin=${scriptJson(apiBase ? new URL(apiBase).origin : '')};
+    var attributionKeys=['utm_source','utm_medium','utm_campaign','utm_content','utm_term','gclid','fbclid'];
+    function attribution(){
+      var current={};var query=new URLSearchParams(window.location.search);
+      attributionKeys.forEach(function(key){var value=query.get(key);if(value)current[key]=value;});
+      var stored={};
+      try{stored=JSON.parse(sessionStorage.getItem('mali_lead_attribution_v1')||'{}')||{};}catch(error){}
+      if(Object.keys(current).length){stored=current;try{sessionStorage.setItem('mali_lead_attribution_v1',JSON.stringify(stored));}catch(error){}}
+      return stored;
+    }
+    function leadContext(){
+      var attrs=attribution();
+      return {captureSource:'landing',pageUrl:window.location.href,referrer:document.referrer||'',utmSource:attrs.utm_source||'',utmMedium:attrs.utm_medium||'',utmCampaign:attrs.utm_campaign||'',utmContent:attrs.utm_content||'',utmTerm:attrs.utm_term||'',gclid:attrs.gclid||'',fbclid:attrs.fbclid||''};
+    }
+    function sendLeadContext(){
+      if(frame.contentWindow&&widgetOrigin)frame.contentWindow.postMessage({type:'mali-lead-context',context:leadContext()},widgetOrigin);
+    }
+    frame.addEventListener('load',sendLeadContext);
+    setTimeout(sendLeadContext,250);
+    window.addEventListener('message',function(event){
+      if(event.origin!==widgetOrigin||event.source!==frame.contentWindow||!event.data)return;
+      if(event.data.type==='mali-lead-iframe-resize'&&event.data.height){frame.style.height=Math.max(420,Math.min(1400,Math.ceil(event.data.height)))+'px';return;}
+      if(event.data.type==='mali-lead-submitted'){track('generate_lead',{programa:event.data.courseTitle||'',capture_source:'landing'});return;}
+      if(event.data.type==='mali-lead-open-whatsapp'&&event.data.url){track('click_whatsapp',{cta:'lead-form'});window.open(event.data.url,'_blank','noopener,noreferrer');}
+    });
   })();
   </script>
 </body>

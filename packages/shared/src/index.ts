@@ -1332,6 +1332,8 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
         courseSlug:
           'industrias-culturales-programa-especializacion-gestion-cultural',
         courseTitle: 'Programa de Especialización en Gestión Cultural',
+        whatsappPhone: '922172157',
+        backgroundColor: '#b4b3ff',
         privacyUrl:
           'https://educacion.mali.pe/wp-content/uploads/2026/01/Uso_de_datos_Terminos_y_condiciones_Mali_Educacion_2026.pdf',
       },

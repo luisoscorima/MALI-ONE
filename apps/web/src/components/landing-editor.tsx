@@ -121,6 +121,8 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
           area: 'educacion_ep',
           courseSlug: '',
           courseTitle: '',
+          whatsappPhone: '',
+          backgroundColor: '#b4b3ff',
           privacyUrl: '',
         },
       };
@@ -319,6 +321,8 @@ function BlockFields({
           </div>
           {field('Slug del curso', 'courseSlug')}
           {field('Nombre del curso', 'courseTitle')}
+          {field('Número de WhatsApp', 'whatsappPhone')}
+          {field('Color de fondo', 'backgroundColor')}
           {field('URL de privacidad', 'privacyUrl')}
         </div>
       );

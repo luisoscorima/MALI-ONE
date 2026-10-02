@@ -165,7 +165,7 @@ export class CatalogEducacionService {
     const districtId = await this.resolveDistrictId(dto.districtId);
     const row = await this.prisma.educacionCatalogSede.create({
       data: {
-        ...this.sedeFields(dto),
+        ...this.sedeCreateFields(dto),
         districtId,
         slug: await this.uniqueSlug(dto.nombre),
       },
@@ -176,10 +176,13 @@ export class CatalogEducacionService {
 
   async updateSede(id: string, dto: UpsertEducacionSedeDto) {
     await this.ensureSede(id);
-    const districtId = await this.resolveDistrictId(dto.districtId);
+    const data = this.sedeUpdateFields(dto);
+    if (dto.districtId !== undefined) {
+      data.districtId = await this.resolveDistrictId(dto.districtId);
+    }
     const row = await this.prisma.educacionCatalogSede.update({
       where: { id },
-      data: { ...this.sedeFields(dto), districtId },
+      data,
       include: { district: { select: { id: true, name: true } } },
     });
     return this.sedeDto(row);
@@ -295,7 +298,7 @@ export class CatalogEducacionService {
     };
   }
 
-  private sedeFields(dto: UpsertEducacionSedeDto) {
+  private sedeCreateFields(dto: UpsertEducacionSedeDto) {
     return {
       nombre: dto.nombre.trim(),
       direccion: emptyToNull(dto.direccion),
@@ -309,6 +312,35 @@ export class CatalogEducacionService {
       activo: dto.activo ?? true,
       sortOrder: dto.sortOrder ?? 0,
     };
+  }
+
+  private sedeUpdateFields(dto: UpsertEducacionSedeDto) {
+    const data: {
+      nombre?: string;
+      direccion?: string | null;
+      brochureUrl?: string | null;
+      icon?: string;
+      horarioHtml?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+      showOnSelector?: boolean;
+      showOnMap?: boolean;
+      activo?: boolean;
+      sortOrder?: number;
+      districtId?: string | null;
+    } = {};
+    if (dto.nombre !== undefined) data.nombre = dto.nombre.trim();
+    if (dto.direccion !== undefined) data.direccion = emptyToNull(dto.direccion);
+    if (dto.brochureUrl !== undefined) data.brochureUrl = emptyToNull(dto.brochureUrl);
+    if (dto.icon !== undefined) data.icon = emptyToNull(dto.icon) || 'location_on';
+    if (dto.horarioHtml !== undefined) data.horarioHtml = emptyToNull(dto.horarioHtml);
+    if (dto.lat !== undefined) data.lat = dto.lat;
+    if (dto.lng !== undefined) data.lng = dto.lng;
+    if (dto.showOnSelector !== undefined) data.showOnSelector = dto.showOnSelector;
+    if (dto.showOnMap !== undefined) data.showOnMap = dto.showOnMap;
+    if (dto.activo !== undefined) data.activo = dto.activo;
+    if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
+    return data;
   }
 
   private async uniqueSlug(nombre: string) {
@@ -407,6 +439,7 @@ export class CatalogEducacionService {
     horarioHtml: string | null;
     lat: number | null;
     lng: number | null;
+    districtId?: string | null;
     showOnSelector: boolean;
     showOnMap: boolean;
     activo: boolean;
@@ -423,7 +456,7 @@ export class CatalogEducacionService {
       horarioHtml: row.horarioHtml,
       lat: row.lat,
       lng: row.lng,
-      districtId: row.district?.id ?? null,
+      districtId: row.district?.id ?? row.districtId ?? null,
       distrito: row.district ? { id: row.district.id, nombre: row.district.name } : null,
       showOnSelector: row.showOnSelector,
       showOnMap: row.showOnMap,

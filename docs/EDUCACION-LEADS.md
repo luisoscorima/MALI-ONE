@@ -1,6 +1,20 @@
 # Leads Educación — go-live y apagado del Sheet
 
-Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLead` → WhatsApp CRM (+ Google Sheets opcional).
+Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLead` → MALI WhatsApp (+ Google Sheets opcional).
+
+El widget es único para las fichas oficiales de WordPress y las landings. El
+documento padre le entrega por `postMessage` la URL real, referrer, origen de
+captura y atribución. Se aceptan estos campos:
+
+- `captureSource`: `wordpress_widget` o `landing`.
+- `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`.
+- `gclid`, `fbclid`, `pageUrl` y `referrer`.
+
+Si una visita entra con atribución y navega antes de enviar, los valores se
+conservan en `sessionStorage`. Una URL con una campaña nueva reemplaza la
+atribución anterior de esa sesión. Después del alta, el widget abre el prefill
+de WhatsApp; las UTMs quedan en MALI ONE y en el origen de MALI WhatsApp, no en
+el texto visible del mensaje.
 
 Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md).
 
@@ -33,13 +47,14 @@ Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-
 
    Para cambiar de libro: solo edita la URL/ID en `.env` y reinicia la API.
 4. **WordPress**
-   - Plugin `mali-one-embed` ≥ 1.0.5
+   - Plugin `mali-one-embed` ≥ 1.1.1 para atribución y eventos del formulario
    - `MALI_ONE_URL` apunta al entorno correcto
    - Plantillas EP / cursos ya usan `[mali_lead_form]`
 5. **Prueba E2E** (curso EP de prueba):
    - Enviar formulario «Conversemos»
    - Verificar fila en tabla `EducacionLead` (`waStatus=ok`)
-   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con origen `channel=widget` (curso/fuente en payload del origen; **no** attrs `source`/`fuente`/`curso`)
+   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con origen `channel=widget`; `source_key=educacion_lead_widget` para fichas o `source_key=educacion_landing` para landings
+   - Confirmar en el payload del origen: curso, URL, `capture_source`, referrer, UTMs y click IDs presentes en la URL de prueba
    - Si Sheets está on: fila nueva en el rango configurado
    - Apagar Sheet a propósito (`ENABLED=false`) y confirmar que el submit sigue OK y WA sync funciona
 
