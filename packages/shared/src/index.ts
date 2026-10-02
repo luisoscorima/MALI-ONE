@@ -13,6 +13,7 @@ export type AppModule =
   | 'bsale_reports'
   | 'mailing'
   | 'newsletters'
+  | 'landings'
   | 'crm_pam'
   | 'crm_educacion'
   | 'catalog_educacion'
@@ -1037,6 +1038,314 @@ export interface UpdateNewsletterDto {
   designJson?: string | null;
   status?: NewsletterStatus;
 }
+
+export type LandingStatus = 'draft' | 'published' | 'archived';
+
+export type LandingBlockType =
+  | 'hero'
+  | 'text'
+  | 'feature_list'
+  | 'schedule'
+  | 'faq'
+  | 'cta'
+  | 'lead_form'
+  | 'footer';
+
+export interface LandingBlock {
+  id: string;
+  type: LandingBlockType;
+  enabled: boolean;
+  data: Record<string, unknown>;
+}
+
+export interface LandingTheme {
+  primary: string;
+  secondary: string;
+  accent: string;
+  ink: string;
+  surface: string;
+}
+
+export interface LandingDocument {
+  logoUrl: string;
+  logoAlt: string;
+  headerCtaLabel: string;
+  theme: LandingTheme;
+  blocks: LandingBlock[];
+}
+
+export interface LandingPageDto {
+  id: string;
+  slug: string;
+  name: string;
+  status: LandingStatus;
+  content?: LandingDocument;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  ogImageUrl: string | null;
+  publishedVersion: number;
+  publishedAt: string | null;
+  publicUrl: string | null;
+  createdBy?: { name: string; email: string } | null;
+  updatedBy?: { name: string; email: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLandingPageDto {
+  slug: string;
+  name: string;
+  content: LandingDocument;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  ogImageUrl?: string | null;
+}
+
+export interface UpdateLandingPageDto {
+  name?: string;
+  content?: LandingDocument;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  ogImageUrl?: string | null;
+}
+
+export interface LandingPreviewDto {
+  name: string;
+  content: LandingDocument;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  ogImageUrl?: string | null;
+}
+
+/**
+ * Plantilla inicial basada exclusivamente en la ficha pública vigente de
+ * Gestión Cultural. El contenido comercial debe revisarse por edición antes
+ * de publicarse.
+ */
+export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
+  logoUrl:
+    'https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Educacion.png',
+  logoAlt: 'MALI Educación',
+  headerCtaLabel: 'Solicitar información',
+  theme: {
+    primary: '#5c1599',
+    secondary: '#7f21c3',
+    accent: '#e2008c',
+    ink: '#101018',
+    surface: '#f8f6fb',
+  },
+  blocks: [
+    {
+      id: 'hero',
+      type: 'hero',
+      enabled: true,
+      data: {
+        eyebrow: 'Extensión Profesional',
+        title: 'Programa de Especialización en Gestión Cultural',
+        body:
+          'Formación integral para profesionalizar a quienes desean liderar, diseñar y gestionar proyectos culturales con impacto social, institucional y creativo.',
+        imageUrl:
+          'https://educacion.mali.pe/wp-content/uploads/2025/11/Gestion-Cultural.webp',
+        imageAlt:
+          'Gestor cultural presentando un proyecto durante la especialización en gestión cultural del MALI',
+        ctaLabel: 'Quiero recibir información',
+        facts: [
+          { label: 'Duración', value: '9 meses · 280 horas académicas' },
+          { label: 'Virtual', value: 'Inicio 25 de noviembre de 2026' },
+          { label: 'Presencial', value: 'Inicio 26 de noviembre de 2026' },
+        ],
+      },
+    },
+    {
+      id: 'programa',
+      type: 'text',
+      enabled: true,
+      data: {
+        eyebrow: 'Sobre el programa',
+        title: 'Te contamos sobre el programa',
+        body:
+          'Desde 2008, el MALI forma gestores culturales con una visión estratégica, crítica y aplicada. A lo largo de 9 meses, los participantes adquieren herramientas prácticas para desarrollar proyectos culturales, analizar políticas culturales, gestionar organizaciones culturales y comprender el funcionamiento de la industria creativa en contextos locales y nacionales.',
+      },
+    },
+    {
+      id: 'beneficios',
+      type: 'feature_list',
+      enabled: true,
+      data: {
+        eyebrow: 'Beneficios',
+        title: 'Una formación conectada con el sector cultural',
+        intro: '',
+        items: [
+          {
+            title: 'Experiencia docente',
+            description:
+              'Docentes con amplia experiencia nacional e internacional.',
+          },
+          {
+            title: 'Red profesional',
+            description:
+              'Red de contactos profesionales en el sector cultural.',
+          },
+          {
+            title: 'Enfoque aplicado',
+            description:
+              'Formación aplicada y alineada al contexto peruano.',
+          },
+          {
+            title: 'Experiencia MALI',
+            description:
+              'Clases presenciales en el Museo de Arte de Lima.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'metodologia',
+      type: 'feature_list',
+      enabled: true,
+      data: {
+        eyebrow: 'Metodología',
+        title: 'Aprendizaje teórico y práctico',
+        intro: '',
+        items: [
+          {
+            title: 'Clases aplicadas',
+            description: 'Clases con enfoque teórico-práctico.',
+          },
+          {
+            title: 'Casos reales',
+            description: 'Resolución de casos reales del sector cultural.',
+          },
+          {
+            title: 'Trabajo colaborativo',
+            description: 'Talleres aplicados y trabajo colaborativo.',
+          },
+          {
+            title: 'Especialistas',
+            description:
+              'Charlas maestras con especialistas nacionales e internacionales.',
+          },
+          {
+            title: 'Proyecto final',
+            description:
+              'Acompañamiento docente y asesorías para el proyecto final.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'modalidades',
+      type: 'schedule',
+      enabled: true,
+      data: {
+        eyebrow: 'Modalidades',
+        title: 'Elige cómo participar',
+        items: [
+          {
+            title: 'Virtual',
+            date: 'Inicio: 25 de noviembre de 2026',
+            location: 'Av. Paseo Colón 125 · Museo de Arte de Lima',
+            schedule:
+              'Lunes y miércoles de 7:00 a 10:30 p. m. (30 min de break)',
+          },
+          {
+            title: 'Presencial',
+            date: 'Inicio: 26 de noviembre de 2026',
+            location: 'Museo de Arte de Lima · Av. Paseo Colón 125',
+            schedule:
+              'Martes y jueves de 7:00 a 10:10 p. m. (10 min de break)',
+          },
+        ],
+      },
+    },
+    {
+      id: 'whatsapp',
+      type: 'cta',
+      enabled: true,
+      data: {
+        eyebrow: 'Atención Extensión Profesional',
+        title: '¿Tienes consultas sobre el programa?',
+        body: 'Nuestros asesores están listos para atender tus consultas.',
+        label: 'Conversar por WhatsApp',
+        url: 'https://api.whatsapp.com/send?phone=922172157&text=%C2%A1Hola+MALI+Educaci%C3%B3n%21+Deseo+informaci%C3%B3n+del+curso+Programa+de+Especializaci%C3%B3n+en+Gesti%C3%B3n+Cultural',
+      },
+    },
+    {
+      id: 'brochure',
+      type: 'cta',
+      enabled: true,
+      data: {
+        eyebrow: 'Información completa',
+        title: 'Conoce todos los detalles del programa',
+        body:
+          'Revisa la información académica y práctica en el brochure oficial.',
+        label: 'Descargar brochure',
+        url: 'https://educacion.mali.pe/wp-content/uploads/2026/01/Brochure-Gestion-Cultural.pdf',
+      },
+    },
+    {
+      id: 'preguntas',
+      type: 'faq',
+      enabled: true,
+      data: {
+        eyebrow: 'Preguntas frecuentes',
+        title: 'Resolvemos tus dudas',
+        items: [
+          {
+            question: '¿Qué es la gestión cultural y para qué sirve?',
+            answer:
+              'Es el conjunto de estrategias para planificar, gestionar y desarrollar proyectos culturales con impacto social.',
+          },
+          {
+            question: '¿Quién puede estudiar esta especialización?',
+            answer:
+              'Profesionales del sector cultural, funcionarios públicos y personas interesadas en la formación cultural.',
+          },
+          {
+            question: '¿Necesito experiencia previa?',
+            answer:
+              'No. El programa parte de bases y avanza hacia la aplicación práctica.',
+          },
+          {
+            question: '¿Qué certificado obtengo?',
+            answer:
+              'Un certificado de especialización otorgado por el Museo de Arte de Lima – MALI.',
+          },
+          {
+            question: '¿Dónde se dictan las clases?',
+            answer:
+              'De forma presencial en el Museo de Arte de Lima y de forma virtual a través de la plataforma del MALI.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'contacto',
+      type: 'lead_form',
+      enabled: true,
+      data: {
+        eyebrow: 'Conversemos',
+        title: 'Quiero recibir información',
+        body: 'Estamos listos para brindarte la asesoría que necesitas.',
+        submitLabel: 'Enviar información',
+        area: 'educacion_ep',
+        courseSlug:
+          'industrias-culturales-programa-especializacion-gestion-cultural',
+        courseTitle: 'Programa de Especialización en Gestión Cultural',
+        privacyUrl:
+          'https://educacion.mali.pe/wp-content/uploads/2026/01/Uso_de_datos_Terminos_y_condiciones_Mali_Educacion_2026.pdf',
+      },
+    },
+    {
+      id: 'footer',
+      type: 'footer',
+      enabled: true,
+      data: {
+        text: 'MALI Educación · Museo de Arte de Lima',
+      },
+    },
+  ],
+};
 
 export interface EmailCampaignDto {
   id: string;

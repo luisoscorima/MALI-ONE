@@ -11,6 +11,7 @@ import {
   ListTodo,
   Mail,
   MonitorPlay,
+  PanelsTopLeft,
   PackageSearch,
   Users,
   Newspaper,
@@ -24,7 +25,13 @@ export const moduleMeta: Record<
   {
     to: string;
     icon: typeof Link2;
-    group: 'operaciones' | 'crms' | 'widgets' | 'herramientas' | 'general';
+    group:
+      | 'operaciones'
+      | 'contenido'
+      | 'crms'
+      | 'widgets'
+      | 'herramientas'
+      | 'general';
     accent: ModuleCardAccent;
   }
 > = {
@@ -95,6 +102,12 @@ export const moduleMeta: Record<
     group: 'widgets',
     accent: 'rose',
   },
+  landings: {
+    to: '/admin/landings',
+    icon: PanelsTopLeft,
+    group: 'contenido',
+    accent: 'violet',
+  },
   newsletters: {
     to: '/admin/newsletters',
     icon: Newspaper,
@@ -130,6 +143,7 @@ export const moduleMeta: Record<
 export const groupLabels: Record<string, string> = {
   general: 'General',
   operaciones: 'Operaciones',
+  contenido: 'Contenido',
   crms: 'CRMs',
   widgets: 'Widgets y sitios',
   herramientas: 'Herramientas',

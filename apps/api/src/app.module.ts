@@ -24,6 +24,7 @@ import { ScreenCastModule } from './modules/screen-cast/screen-cast.module';
 import { BsaleModule } from './modules/bsale/bsale.module';
 import { CrmClientModule } from './modules/crm/crm-client.module';
 import { NewslettersModule } from './modules/newsletters/newsletters.module';
+import { LandingsModule } from './modules/landings/landings.module';
 import { CrmPamModule } from './modules/crm-pam/crm-pam.module';
 import { CatalogEducacionModule } from './modules/catalog-educacion/catalog-educacion.module';
 import { CrmEducacionModule } from './modules/crm-educacion/crm-educacion.module';
@@ -50,6 +51,7 @@ import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
     ScreenCastModule,
     BsaleModule,
     NewslettersModule,
+    LandingsModule,
     CrmPamModule,
     CrmEducacionModule,
     CatalogEducacionModule,

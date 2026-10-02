@@ -62,6 +62,12 @@ export const APP_MODULES: {
       'Editor visual drag & drop de boletines con URL pública compartible.',
   },
   {
+    id: 'landings',
+    label: 'Landings',
+    description:
+      'Crear y publicar páginas de campaña para MALI Educación.',
+  },
+  {
     id: 'crm_pam',
     label: 'CRM PAM',
     description:

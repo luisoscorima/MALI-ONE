@@ -1224,6 +1224,48 @@ export const api = {
       method: 'DELETE',
     }),
 
+  listLandings: () =>
+    request<import('@mali-one/shared').LandingPageDto[]>('/api/landings'),
+
+  getLanding: (id: string) =>
+    request<import('@mali-one/shared').LandingPageDto>(`/api/landings/${id}`),
+
+  createLanding: (body: import('@mali-one/shared').CreateLandingPageDto) =>
+    request<import('@mali-one/shared').LandingPageDto>('/api/landings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateLanding: (
+    id: string,
+    body: import('@mali-one/shared').UpdateLandingPageDto,
+  ) =>
+    request<import('@mali-one/shared').LandingPageDto>(`/api/landings/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  previewLanding: (body: import('@mali-one/shared').LandingPreviewDto) =>
+    request<{ html: string }>('/api/landings/preview', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  publishLanding: (id: string) =>
+    request<import('@mali-one/shared').LandingPageDto>(
+      `/api/landings/${id}/publish`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  unpublishLanding: (id: string) =>
+    request<import('@mali-one/shared').LandingPageDto>(
+      `/api/landings/${id}/unpublish`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  deleteLanding: (id: string) =>
+    request<{ ok: boolean }>(`/api/landings/${id}`, { method: 'DELETE' }),
+
   listCrmPamContacts: (params?: {
     q?: string;
     segment?: string;

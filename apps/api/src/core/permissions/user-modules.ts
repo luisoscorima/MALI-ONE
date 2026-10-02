@@ -12,6 +12,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.screen_cast,
   AppModule.bsale_reports,
   AppModule.newsletters,
+  AppModule.landings,
   AppModule.crm_pam,
   AppModule.crm_educacion,
   AppModule.catalog_educacion,

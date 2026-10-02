@@ -18,6 +18,7 @@ import {
   Contact,
   FolderOpen,
   ScrollText,
+  PanelsTopLeft,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -83,6 +84,17 @@ export const appNavSections: AppNavSection[] = [
         label: 'Kardex Bsale',
         icon: PackageSearch,
         module: 'bsale_reports',
+      },
+    ],
+  },
+  {
+    label: 'Contenido',
+    items: [
+      {
+        to: '/admin/landings',
+        label: 'Landings',
+        icon: PanelsTopLeft,
+        module: 'landings',
       },
     ],
   },

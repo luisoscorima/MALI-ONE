@@ -38,6 +38,7 @@ import { CrmEducacionPage } from '@/pages/crm-educacion-page';
 import { PresentacionPage } from '@/pages/presentacion-page';
 import { PortfolioPage } from '@/pages/portfolio-page';
 import { FilesPage } from '@/pages/files-page';
+import { LandingsPage } from '@/pages/landings-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -152,6 +153,9 @@ function AuthenticatedApp() {
                       path="admin/newsletters"
                       element={<NewslettersPage />}
                     />
+                  </Route>
+                  <Route element={<ModuleGuard module="landings" />}>
+                    <Route path="admin/landings" element={<LandingsPage />} />
                   </Route>
                   <Route element={<ModuleGuard module="crm_pam" />}>
                     <Route path="admin/crm-pam" element={<CrmPamPage />} />
