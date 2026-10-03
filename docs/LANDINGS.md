@@ -11,7 +11,7 @@ el contenido ni carga su theme.
 3. **Guardar y publicar** genera un nuevo snapshot HTML y aumenta su versión.
 4. El plugin `mali-one-embed` resuelve `/landing/{slug}/`, consulta el snapshot
    público y lo entrega como documento completo.
-5. El plugin conserva cinco minutos de caché y un respaldo de siete días para
+5. El plugin conserva un minuto de caché y un respaldo de siete días para
    errores temporales de MALI ONE. Un `404` elimina el respaldo, de modo que una
    landing despublicada deja de servirse al vencer la caché corta.
 
@@ -19,6 +19,11 @@ La plantilla inicial `gestion-cultural` toma la información de la ficha vigente
 de MALI Educación. No contiene precios, promociones ni testimonios que no estén
 en esa fuente. El bloque `lead_form` reutiliza el widget oficial de Educación y
 su flujo MALI ONE → MALI WhatsApp; no envía datos a otros CRM.
+
+El editor mantiene bloques controlados y reordenables. Además de hero, texto,
+beneficios, horarios, CTA, preguntas, formulario y footer, incluye `faculty`
+para una plana docente con datos opcionales y `gallery` para una selección
+editorial de imágenes. No se incorporan videos en esta fase.
 
 El mismo widget distingue el origen `landing` de `wordpress_widget`. En ambos
 casos conserva durante la sesión y envía `utm_source`, `utm_medium`,
@@ -55,9 +60,16 @@ pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:landings
 ```
 
-Después se actualiza/activa `mali-one-embed`. La versión `1.1.1` refresca las
+Después se actualiza/activa `mali-one-embed`. La versión `1.1.3` refresca las
 reglas de rewrite una vez desde `admin_init`; también pueden guardarse de nuevo
 los enlaces permanentes de WordPress si la ruta todavía no responde.
 
-El seed crea `gestion-cultural` como borrador y no sobrescribe cambios si ya
-existe. La publicación siempre se hace explícitamente desde MALI ONE.
+El plugin aísla visualmente estas páginas de los elementos globales de GSpeech
+(`.gspeech_pro_main_wrapper` y `#sexy_tooltip_title`). GSpeech continúa activo
+en las fichas de cursos y en el resto del sitio WordPress.
+
+El seed crea `gestion-cultural` como borrador. Si ya existe, conserva sus
+ediciones y solo añade los bloques visuales `docentes` y `experiencia-mali`
+cuando todavía no están presentes. Nunca publica ni reemplaza bloques
+existentes: la revisión y publicación siempre se hacen explícitamente desde
+MALI ONE.

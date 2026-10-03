@@ -1045,6 +1045,8 @@ export type LandingBlockType =
   | 'hero'
   | 'text'
   | 'feature_list'
+  | 'faculty'
+  | 'gallery'
   | 'schedule'
   | 'faq'
   | 'cta'
@@ -1229,6 +1231,80 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
             title: 'Proyecto final',
             description:
               'Acompañamiento docente y asesorías para el proyecto final.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'docentes',
+      type: 'faculty',
+      enabled: true,
+      data: {
+        eyebrow: 'Plana docente',
+        title: 'Aprende de profesionales vinculados al sector cultural',
+        intro:
+          'El programa cuenta con docentes de amplia experiencia nacional e internacional.',
+        note: 'La participación de docentes puede variar según la edición del programa.',
+        items: [
+          {
+            name: '',
+            role: '',
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_1.jpg',
+            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
+          },
+          {
+            name: '',
+            role: '',
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_2.jpg',
+            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
+          },
+          {
+            name: '',
+            role: '',
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_3.jpg',
+            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
+          },
+          {
+            name: '',
+            role: '',
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_6.jpg',
+            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
+          },
+        ],
+      },
+    },
+    {
+      id: 'experiencia-mali',
+      type: 'gallery',
+      enabled: true,
+      data: {
+        eyebrow: 'Experiencia MALI',
+        title: 'Una formación conectada con la comunidad y el museo',
+        intro:
+          'Espacios, encuentros y experiencias que forman parte del ecosistema de MALI Educación.',
+        items: [
+          {
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/estudiantes_grupal_2.jpg',
+            imageAlt:
+              'Participantes y profesionales reunidos en una actividad cultural',
+            caption: 'Comunidad y proyectos culturales',
+          },
+          {
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/ambiente_recepcion_area_educacion.jpg',
+            imageAlt: 'Recepción del área de MALI Educación',
+            caption: 'Espacios de MALI Educación',
+          },
+          {
+            imageUrl:
+              'https://educacion.mali.pe/wp-content/uploads/2026/10/estudiantes_grupal.jpg',
+            imageAlt: 'Participantes del MALI mostrando sus certificados',
+            caption: 'Cierre y certificación',
           },
         ],
       },

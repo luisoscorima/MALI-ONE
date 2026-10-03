@@ -34,6 +34,8 @@ const BLOCK_LABELS: Record<LandingBlockType, string> = {
   hero: 'Hero',
   text: 'Texto',
   feature_list: 'Lista de beneficios',
+  faculty: 'Plana docente',
+  gallery: 'Galería de imágenes',
   schedule: 'Modalidades y horarios',
   faq: 'Preguntas frecuentes',
   cta: 'Llamada a la acción',
@@ -94,6 +96,27 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
       return {
         ...common,
         data: { eyebrow: '', title: 'Beneficios', intro: '', items: [] },
+      };
+    case 'faculty':
+      return {
+        ...common,
+        data: {
+          eyebrow: 'Plana docente',
+          title: 'Conoce a nuestros docentes',
+          intro: '',
+          note: 'La participación de docentes puede variar según la edición.',
+          items: [],
+        },
+      };
+    case 'gallery':
+      return {
+        ...common,
+        data: {
+          eyebrow: 'Experiencia MALI',
+          title: 'Vive la experiencia MALI',
+          intro: '',
+          items: [],
+        },
       };
     case 'schedule':
       return {
@@ -234,6 +257,72 @@ function BlockFields({
                 )
               }
               placeholder={'Título | Descripción\nCasos reales | Aprende con situaciones del sector'}
+              rows={7}
+            />
+          </div>
+        </div>
+      );
+    case 'faculty':
+      return (
+        <div className="grid gap-3">
+          {field('Antetítulo', 'eyebrow')}
+          {field('Título', 'title')}
+          {field('Introducción', 'intro', true)}
+          {field('Nota', 'note', true)}
+          <div className="space-y-1">
+            <Label>Docentes</Label>
+            <Textarea
+              value={rows(block.data.items, [
+                'name',
+                'role',
+                'imageUrl',
+                'imageAlt',
+              ])}
+              onChange={(event) =>
+                update(
+                  'items',
+                  parseRows(event.target.value, [
+                    'name',
+                    'role',
+                    'imageUrl',
+                    'imageAlt',
+                  ]),
+                )
+              }
+              placeholder="Nombre | Especialidad o cargo | URL de imagen | Texto alternativo"
+              rows={8}
+            />
+            <p className="text-xs text-muted-foreground">
+              El nombre y la especialidad son opcionales hasta que se validen.
+            </p>
+          </div>
+        </div>
+      );
+    case 'gallery':
+      return (
+        <div className="grid gap-3">
+          {field('Antetítulo', 'eyebrow')}
+          {field('Título', 'title')}
+          {field('Introducción', 'intro', true)}
+          <div className="space-y-1">
+            <Label>Imágenes</Label>
+            <Textarea
+              value={rows(block.data.items, [
+                'imageUrl',
+                'imageAlt',
+                'caption',
+              ])}
+              onChange={(event) =>
+                update(
+                  'items',
+                  parseRows(event.target.value, [
+                    'imageUrl',
+                    'imageAlt',
+                    'caption',
+                  ]),
+                )
+              }
+              placeholder="URL de imagen | Texto alternativo | Leyenda"
               rows={7}
             />
           </div>
