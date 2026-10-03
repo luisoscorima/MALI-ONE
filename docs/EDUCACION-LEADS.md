@@ -47,7 +47,7 @@ Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-
 
    Para cambiar de libro: solo edita la URL/ID en `.env` y reinicia la API.
 4. **WordPress**
-   - Plugin `mali-one-embed` ≥ 1.1.3 para atribución, eventos, caché de landings de 60 segundos y aislamiento de GSpeech
+   - Plugin `mali-one-embed` ≥ 1.1.4 para atribución, eventos, caché de landings de 60 segundos y aislamiento de GSpeech (incluida la pantalla de landing no encontrada)
    - `MALI_ONE_URL` apunta al entorno correcto
    - Plantillas EP / cursos ya usan `[mali_lead_form]`
 5. **Prueba E2E** (curso EP de prueba):

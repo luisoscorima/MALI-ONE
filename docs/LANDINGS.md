@@ -60,7 +60,7 @@ pnpm --filter @mali-one/api prisma:migrate
 pnpm --filter @mali-one/api prisma:seed:landings
 ```
 
-Después se actualiza/activa `mali-one-embed`. La versión `1.1.3` refresca las
+Después se actualiza/activa `mali-one-embed`. La versión `1.1.4` refresca las
 reglas de rewrite una vez desde `admin_init`; también pueden guardarse de nuevo
 los enlaces permanentes de WordPress si la ruta todavía no responde.
 
