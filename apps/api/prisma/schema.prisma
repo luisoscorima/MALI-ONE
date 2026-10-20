@@ -31,6 +31,57 @@ enum AppModule {
   catalog_educacion
   portfolio
   files
+  treasury
+}
+
+enum TreasuryProvider {
+  bcp
+  niubiz_sales
+  niubiz_settlements
+  diners
+  expressnet
+  pagoefectivo
+  mercadopago
+}
+
+enum TreasuryTargetKind {
+  bank_account
+  merchant
+}
+
+enum TreasuryCurrency {
+  PEN
+  USD
+}
+
+/// Inventory only. No credentials or connector execution in this initial module.
+model TreasurySource {
+  id                  String            @id @default(cuid())
+  provider            TreasuryProvider
+  name                String            @db.VarChar(120)
+  legalEntity         String            @db.VarChar(160)
+  active              Boolean           @default(true)
+  syncIntervalMinutes Int               @default(60)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  targets             TreasuryTarget[]
+
+  @@unique([provider, name])
+}
+
+model TreasuryTarget {
+  id        String             @id @default(cuid())
+  sourceId  String
+  source    TreasurySource     @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  kind      TreasuryTargetKind
+  name      String             @db.VarChar(120)
+  reference String             @db.VarChar(64)
+  currency  TreasuryCurrency
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([sourceId, reference, currency])
 }
 
 enum TodoPriority {

@@ -21,9 +21,16 @@ Integrador Final, perfil del participante y ocho docentes. Las fotos se referenc
 desde WordPress (`docente_1.jpg` a `docente_8.jpg`, en ese orden); no se incluyen
 archivos de imagen en el repositorio. Los enlaces de LinkedIn quedan vacíos hasta
 completarlos y sus botones solo aparecen cuando hay una URL válida.
-Los docentes se presentan en un carrusel de tarjetas verticales, con fotografía
-completa en proporción de retrato y biografía debajo. Incluye flechas, contador,
-navegación con teclado y desplazamiento táctil; no avanza automáticamente.
+Los docentes se presentan en un carrusel de tarjetas verticales, con un marco de
+foto uniforme 3:4 y biografía debajo. La imagen cubre ese marco sin deformarse,
+con el encuadre centrado arriba. Incluye flechas, contador, navegación con teclado
+y desplazamiento táctil. Avanza cada cinco segundos mientras está visible y vuelve
+al inicio al llegar al final. Se pausa al pasar el mouse, enfocar o tocar el
+carrusel; también ofrece pausa manual. El movimiento reducido desactiva el avance
+automático. Las barras del carrusel y del panel del formulario se ocultan sin
+deshabilitar su desplazamiento.
+Cada docente tiene un punto de navegación seleccionable. El punto y la tarjeta
+activos se resaltan al avanzar automáticamente, usar las flechas o deslizar.
 
 La matrícula inicial confirmada es S/ 490. Las diez cuotas de S/ 630 se conservan
 como referencia del HTML y deben revisarse antes de publicar. Matrícula, moneda,
@@ -47,6 +54,14 @@ crea un reproductor. Con video, se funde con el fondo, se reproduce sin audio y
 en bucle y permite pausarlo; se respeta la preferencia de movimiento reducido.
 El tamaño del logo y los enlaces de navegación por sección son editables.
 Las secciones ocultas no aparecen en la navbar.
+Los bloques de contenido alternan fondos blanco y lavanda, derivados del color
+principal, según su orden visible. Reordenar u ocultar bloques recalcula esta
+alternancia; hero, docentes y llamadas a la acción conservan sus fondos propios.
+La tipografía usa una escala común: títulos de sección de 32 px (28 px en móvil),
+subtítulos de 20 px, cuerpo de 16 px y etiquetas/notas de 14 px. Solo el título
+principal del hero tiene una escala mayor adaptable. Los párrafos excluyen las
+etiquetas para evitar que el antetítulo de una sección cambie de tamaño. El
+formulario compacto aplica la misma escala sin alterar los embeds tradicionales.
 
 El modo `sticky` del formulario reserva una columna después del hero hasta antes
 del footer. En pantallas de hasta 1100 px se usa un botón desplegable después del

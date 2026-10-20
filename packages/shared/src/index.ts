@@ -20,7 +20,10 @@ export type AppModule =
   | 'crm_educacion'
   | 'catalog_educacion'
   | 'portfolio'
-  | 'files';
+  | 'files'
+  | 'treasury';
+
+export * from './treasury';
 
 export type TodoPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TodoEffort = 'xs' | 's' | 'm' | 'l' | 'xl';

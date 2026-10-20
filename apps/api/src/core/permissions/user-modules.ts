@@ -18,6 +18,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.catalog_educacion,
   AppModule.portfolio,
   AppModule.files,
+  AppModule.treasury,
 ];
 
 type UserWithModules = User & {

@@ -39,6 +39,7 @@ import { PresentacionPage } from '@/pages/presentacion-page';
 import { PortfolioPage } from '@/pages/portfolio-page';
 import { FilesPage } from '@/pages/files-page';
 import { LandingsPage } from '@/pages/landings-page';
+import { TreasuryPage } from '@/pages/treasury-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -53,6 +54,9 @@ function AuthenticatedApp() {
               <Route element={<AuthGuard />}>
                 <Route element={<AppLayout />}>
                   <Route index element={<DashboardPage />} />
+                  <Route element={<ModuleGuard module="treasury" />}>
+                    <Route path="treasury" element={<TreasuryPage />} />
+                  </Route>
                   <Route element={<ModuleGuard module="portfolio" />}>
                     <Route path="portfolio" element={<PortfolioPage />} />
                     <Route

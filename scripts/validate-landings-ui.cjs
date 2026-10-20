@@ -58,7 +58,8 @@ const server = http.createServer(async (req, res) => {
       if (!request.url().startsWith(base)) {
         // Las imágenes externas no se descargan ni se guardan en el repositorio.
         if (request.resourceType() === 'image') {
-          const height = /docente_\d+\.jpg/.test(request.url()) ? 900 : 450;
+          const teacher = request.url().match(/docente_(\d+)\.jpg/);
+          const height = teacher ? (Number(teacher[1]) % 2 ? 1100 : 760) : 450;
           return route.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="${height}"><rect width="600" height="${height}" fill="#ddd"/></svg>` });
         }
         return route.abort();
@@ -90,6 +91,19 @@ const server = http.createServer(async (req, res) => {
     let panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= hero.y + hero.height, 'El formulario debe empezar después del hero');
     await page.screenshot({ path: path.join(output, 'desktop-hero.png') });
+    await page.locator('#programa').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 120));
+    await page.screenshot({ path: path.join(output, 'desktop-tipografia.png') });
+    const typeGroups = await page.evaluate(() => {
+      const groups = {
+        labels: ['#programa .eyebrow', '#beneficios .eyebrow', '#malla .eyebrow', '#docentes .eyebrow'],
+        headings: ['#programa h2', '#beneficios h2', '#malla h2', '#docentes h2', '#inversion h2', '#whatsapp h2', '#brochure h2'],
+        paragraphs: ['#programa p:not(.eyebrow)', '#beneficios .feature p', '#docentes .faculty-card__copy p', '#inversion p:not(.eyebrow)', '#whatsapp .cta-panel__copy p:not(.eyebrow)'],
+        notes: ['.section-note', '.faculty-position'],
+      };
+      return Object.fromEntries(Object.entries(groups).map(([key, selectors]) => [key, selectors.map((selector) => getComputedStyle(document.querySelector(selector)).fontSize)]));
+    });
+    for (const [group, sizes] of Object.entries(typeGroups)) assert.equal(new Set(sizes).size, 1, 'Tipografía consistente entre bloques: ' + group);
+    console.log('Escala tipográfica: ' + JSON.stringify(typeGroups));
     await page.locator('#inversion').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 120));
     await page.screenshot({ path: path.join(output, 'desktop-acciones.png') });
     await page.locator('#malla').scrollIntoViewIfNeeded();
@@ -104,20 +118,34 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await page.locator('.curriculum-module').nth(1).getAttribute('open'), '');
     await page.locator('.site-nav').getByRole('link', { name: 'Docentes', exact: true }).click();
     const carousel = page.locator('.faculty-carousel');
+    const teacherDots = page.locator('.faculty-dot');
+    assert.equal(await teacherDots.count(), 8, 'Un punto por docente');
+    assert.equal(await page.locator('.faculty-dot[aria-current="true"]').count(), 1, 'Un solo punto activo');
+    assert.equal(await teacherDots.first().getAttribute('aria-current'), 'true');
     const previousTeacher = page.getByRole('button', { name: 'Ver docentes anteriores' });
     const nextTeacher = page.getByRole('button', { name: 'Ver docentes siguientes' });
     const photo = await page.locator('.faculty-card__photo').first().boundingBox();
     assert.ok(photo.height > photo.width, 'Las fotografías deben tener formato vertical');
-    assert.equal(await page.locator('.faculty-card img').first().evaluate((el) => getComputedStyle(el).objectFit), 'contain', 'Conservar la fotografía completa');
+    assert.equal(await page.locator('.faculty-card img').first().evaluate((el) => getComputedStyle(el).objectFit), 'cover', 'Encuadre uniforme sin deformar las fotografías');
+    const photoBottoms = await page.locator('.faculty-card img').evaluateAll((images) => images.map((image) => image.getBoundingClientRect().bottom));
+    assert.ok(photoBottoms.every((bottom) => Math.abs(bottom - photoBottoms[0]) < 1), 'Todas las fotografías deben terminar a la misma altura aunque sus proporciones originales sean distintas');
+    assert.equal(await carousel.evaluate((el) => getComputedStyle(el).scrollbarWidth), 'none');
+    assert.equal(await page.locator('.lead-panel').evaluate((el) => getComputedStyle(el).scrollbarWidth), 'none');
     assert.equal(await previousTeacher.isDisabled(), true);
     await nextTeacher.click();
     await page.waitForFunction(() => document.querySelector('.faculty-carousel').scrollLeft > 100);
+    assert.equal(await teacherDots.nth(1).getAttribute('aria-current'), 'true', 'Las flechas actualizan el punto activo');
     await carousel.focus();
     await carousel.press('End');
     await page.waitForFunction(() => document.querySelector('[data-faculty-next]').disabled);
     assert.match(await page.locator('.faculty-position').textContent(), /8 de 8$/);
     await carousel.press('Home');
     await page.waitForFunction(() => document.querySelector('[data-faculty-prev]').disabled);
+    await teacherDots.last().click();
+    assert.equal(await teacherDots.last().getAttribute('aria-current'), 'true', 'El último punto permite seleccionar al octavo docente');
+    assert.equal(await page.locator('.faculty-card.is-current h3').textContent(), 'Melissa Giorgio');
+    await teacherDots.first().click();
+    assert.equal(await teacherDots.first().getAttribute('aria-current'), 'true');
     await page.screenshot({ path: path.join(output, 'desktop-docentes.png') });
     await page.locator('footer').scrollIntoViewIfNeeded();
     panel = await page.locator('.lead-panel').boundingBox();
@@ -127,6 +155,11 @@ const server = http.createServer(async (req, res) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(base + '/qa/landing');
       if (width === 390) await logAlignment(width);
+      if (width === 390) {
+        await page.locator('#programa').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 104));
+        await page.screenshot({ path: path.join(output, 'mobile-tipografia.png') });
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Sin desbordamiento en ' + width);
       assert.equal(await page.locator('.lead-toggle').isVisible(), false);
       await page.locator('.nav-toggle').click();
@@ -200,6 +233,27 @@ const server = http.createServer(async (req, res) => {
     assert.equal(lastLeadPayload.whatsappArea, 'educacion_ep');
     await page.waitForFunction(() => document.getElementById('landingLeadFormFrame').getBoundingClientRect().height < 400);
     console.log('PASS captura pública simulada: un envío local con UTMs, origen landing y evento generate_lead');
+    const autoPage = await context.newPage();
+    await autoPage.emulateMedia({ reducedMotion: 'no-preference' });
+    await autoPage.goto(base + '/qa/landing');
+    await autoPage.locator('#docentes').scrollIntoViewIfNeeded();
+    await autoPage.waitForFunction(() => document.querySelector('.faculty-carousel').scrollLeft > 100, null, { timeout: 10000 });
+    assert.equal(await autoPage.locator('.faculty-dot').nth(1).getAttribute('aria-current'), 'true', 'El avance automático actualiza el punto activo');
+    await autoPage.getByRole('button', { name: 'Pausar carrusel', exact: true }).click();
+    await autoPage.locator('.brand').focus();
+    await autoPage.mouse.move(0, 0);
+    await autoPage.waitForTimeout(700);
+    const stoppedAt = await autoPage.locator('.faculty-carousel').evaluate((el) => el.scrollLeft);
+    await autoPage.waitForTimeout(5500);
+    assert.equal(await autoPage.locator('.faculty-carousel').evaluate((el) => el.scrollLeft), stoppedAt, 'Pausa manual del avance automático');
+    await autoPage.getByRole('button', { name: 'Reanudar carrusel', exact: true }).click();
+    await autoPage.locator('.brand').focus();
+    await autoPage.mouse.move(0, 0);
+    await autoPage.waitForFunction((previous) => document.querySelector('.faculty-carousel').scrollLeft > previous + 50, stoppedAt, { timeout: 10000 });
+    await autoPage.emulateMedia({ reducedMotion: 'reduce' });
+    await autoPage.waitForFunction(() => document.querySelector('[data-faculty-autoplay]').hidden);
+    await autoPage.close();
+    console.log('PASS carrusel: fotos uniformes, barras ocultas, avance automático, pausa y reanudación');
     console.log('Capturas QA: ' + output + ' (imágenes externas sustituidas durante las pruebas)');
   } finally {
     if (browser) await browser.close();

@@ -212,6 +212,15 @@ type EducacionDistritoDto = {
 };
 
 export const api = {
+  treasuryOverview: () => request<import('@mali-one/shared').TreasuryOverviewDto>('/api/treasury'),
+  saveTreasurySource: (body: import('@mali-one/shared').TreasurySourceInput, id?: string) =>
+    request<{ id: string }>(`/api/treasury/sources${id ? `/${encodeURIComponent(id)}` : ''}`, {
+      method: id ? 'PUT' : 'POST', body: JSON.stringify(body),
+    }),
+  saveTreasuryTarget: (sourceId: string, body: import('@mali-one/shared').TreasuryTargetInput, id?: string) =>
+    request<{ id: string }>(`/api/treasury/sources/${encodeURIComponent(sourceId)}/targets${id ? `/${encodeURIComponent(id)}` : ''}`, {
+      method: id ? 'PUT' : 'POST', body: JSON.stringify(body),
+    }),
   checkCrmEducationProspectia: (subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) =>
     request<{ enabled: boolean; matches: Record<string, ProspectiaMatch> }>(
       '/api/crm-educacion/prospectia/check',

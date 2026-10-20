@@ -48,6 +48,7 @@ export const appNavSections: AppNavSection[] = [
   {
     label: 'Operaciones',
     items: [
+      { to: '/treasury', label: 'Tesorería y conciliación', icon: Landmark, module: 'treasury' },
       { to: '/links', label: 'Enlaces y QR', icon: Link2, module: 'links' },
       {
         to: '/admin/users',

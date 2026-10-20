@@ -260,11 +260,19 @@
     .lead-form--done .lead-form__submit {
       display: none;
     }
-    .lead-compact .lead-form { padding: 20px 18px; --lead-text: #101018; --lead-btn: #0022cc; }
-    .lead-compact .lead-form__title { font-size: 1.4rem; }
-    .lead-compact .lead-form__subtitle { margin-bottom: 14px; font-size: .85rem; }
+    .lead-compact .lead-form { padding: 20px 18px; --lead-text: #101018; --lead-btn: #0022cc; --text-subtitle: 20px; --text-body: 16px; --text-meta: 14px; font-size: var(--text-body); }
+    .lead-compact .lead-form__title { font-size: var(--text-subtitle); }
+    .lead-compact .lead-form__subtitle { margin-bottom: 14px; font-size: var(--text-body); line-height: 1.6; }
     .lead-compact .lead-form__field { margin-bottom: 9px; }
-    .lead-compact .lead-form__check { font-size: .78rem; }
+    .lead-compact .lead-form__field label,
+    .lead-compact .lead-form__check,
+    .lead-compact .lead-form__msg { font-size: var(--text-meta); line-height: 1.5; }
+    .lead-compact .lead-form__field input,
+    .lead-compact .lead-form__field select,
+    .lead-compact .lead-form__prefix-btn,
+    .lead-compact .lead-form__prefix-option,
+    .lead-compact .lead-form__submit,
+    .lead-compact .lead-form__wa a { font-size: var(--text-body); }
     .lead-preview .lead-form__wa { display: none !important; }
   </style>
 </head>

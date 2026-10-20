@@ -94,4 +94,9 @@ export const APP_MODULES: {
     label: 'Archivos TMS',
     description: 'Explorar el disco de TMS.',
   },
+  {
+    id: 'treasury',
+    label: 'Tesorería y conciliación',
+    description: 'Configurar entidades, cuentas y comercios para el control de ingresos.',
+  },
 ];

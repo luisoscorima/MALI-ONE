@@ -30,6 +30,7 @@ import { CatalogEducacionModule } from './modules/catalog-educacion/catalog-educ
 import { CrmEducacionModule } from './modules/crm-educacion/crm-educacion.module';
 import { TodosModule } from './modules/todos/todos.module';
 import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
+import { TreasuryModule } from './modules/treasury/treasury.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
     CatalogEducacionModule,
     TodosModule,
     SftpgoFilesModule,
+    TreasuryModule,
   ],
   controllers: [HealthController],
   providers: [

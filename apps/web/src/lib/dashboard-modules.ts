@@ -35,6 +35,7 @@ export const moduleMeta: Record<
     accent: ModuleCardAccent;
   }
 > = {
+  treasury: { to: '/treasury', icon: Landmark, group: 'operaciones', accent: 'emerald' },
   portfolio: {
     to: '/portfolio',
     icon: ListTodo,
