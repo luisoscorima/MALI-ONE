@@ -217,12 +217,14 @@
             document.querySelectorAll('.details').forEach(detail => detail.style.display = 'none');
 
             element.style.display = isVisible ? 'none' : 'block';
+            syncExpandedState();
         }
 
-        function toggleDetails(id) {
-            const element = document.getElementById(id);
-            if (!element) return;
-            element.style.display = (element.style.display === 'none' || element.style.display === '') ? 'block' : 'none';
+        function syncExpandedState() {
+            document.querySelectorAll('[aria-controls]').forEach(control => {
+                const target = document.getElementById(control.getAttribute('aria-controls'));
+                control.setAttribute('aria-expanded', String(!!target && target.style.display === 'block'));
+            });
         }
         function selectSchool(lat, lng, id) {
             const element = document.getElementById(id);
@@ -236,6 +238,7 @@
                 element.style.display = 'block';
             }
 
+            syncExpandedState();
             setMarker(lat, lng);
         }
         function moveMarker(element, id) {

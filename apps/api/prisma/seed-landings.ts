@@ -1,35 +1,18 @@
 import { Prisma, PrismaClient } from '@prisma/client';
 import {
   DEFAULT_GESTION_CULTURAL_LANDING_CONTENT,
-  type LandingBlock,
+  upgradeGestionCulturalLanding,
   type LandingDocument,
 } from '@mali-one/shared';
 
 const prisma = new PrismaClient();
 
-const PILOT_VISUAL_BLOCKS = new Set(['docentes', 'experiencia-mali']);
-
 function upgradePilotContent(value: Prisma.JsonValue): LandingDocument | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const current = value as unknown as LandingDocument;
   if (!Array.isArray(current.blocks)) return null;
-
-  const blocks = [...current.blocks];
-  const defaultBlocks = DEFAULT_GESTION_CULTURAL_LANDING_CONTENT.blocks.filter(
-    (block) => PILOT_VISUAL_BLOCKS.has(block.id),
-  );
-  let changed = false;
-
-  for (const block of defaultBlocks) {
-    if (blocks.some((item) => item.id === block.id)) continue;
-    const anchorId = block.id === 'docentes' ? 'metodologia' : 'docentes';
-    const anchorIndex = blocks.findIndex((item) => item.id === anchorId);
-    const insertionIndex = anchorIndex >= 0 ? anchorIndex + 1 : blocks.length;
-    blocks.splice(insertionIndex, 0, block as LandingBlock);
-    changed = true;
-  }
-
-  return changed ? { ...current, blocks } : null;
+  const upgraded = upgradeGestionCulturalLanding(current);
+  return JSON.stringify(current) === JSON.stringify(upgraded) ? null : upgraded;
 }
 
 async function main() {

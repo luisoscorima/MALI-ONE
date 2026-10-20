@@ -15,15 +15,44 @@ el contenido ni carga su theme.
    errores temporales de MALI ONE. Un `404` elimina el respaldo, de modo que una
    landing despublicada deja de servirse al vencer la caché corta.
 
-La plantilla inicial `gestion-cultural` toma la información de la ficha vigente
-de MALI Educación. No contiene precios, promociones ni testimonios que no estén
-en esa fuente. El bloque `lead_form` reutiliza el widget oficial de Educación y
+La plantilla inicial `gestion-cultural` incorpora el contenido académico aprobado
+del HTML `mali_gestion_cultural_landing_v7_sin_banner.html`: 13 módulos, Proyecto
+Integrador Final, perfil del participante y ocho docentes. Las fotos se referencian
+desde WordPress (`docente_1.jpg` a `docente_8.jpg`, en ese orden); no se incluyen
+archivos de imagen en el repositorio. Los enlaces de LinkedIn quedan vacíos hasta
+completarlos y sus botones solo aparecen cuando hay una URL válida.
+
+La matrícula inicial confirmada es S/ 490. Las diez cuotas de S/ 630 se conservan
+como referencia del HTML y deben revisarse antes de publicar. Matrícula, moneda,
+cantidad e importe de cuotas y condiciones se editan en el bloque `investment`.
+No se incorporan el popup promocional ni los testimonios de ejemplo del HTML.
+El bloque `lead_form` reutiliza el widget oficial de Educación y
 su flujo MALI ONE → MALI WhatsApp; no envía datos a otros CRM.
 
 El editor mantiene bloques controlados y reordenables. Además de hero, texto,
 beneficios, horarios, CTA, preguntas, formulario y footer, incluye `faculty`
 para una plana docente con datos opcionales y `gallery` para una selección
-editorial de imágenes. No se incorporan videos en esta fase.
+editorial de imágenes, `curriculum` e `investment`. Los elementos de listas tienen
+campos individuales para conservar espacios y saltos de línea. El máximo es de
+50 bloques por landing y 50 elementos por lista; superar el límite devuelve un
+error y no descarta contenido silenciosamente.
+
+El hero tiene fondo sólido `#0022cc` y una URL opcional de video. Sin URL no se
+crea un reproductor. Con video, se funde con el fondo, se reproduce sin audio y
+en bucle y permite pausarlo; se respeta la preferencia de movimiento reducido.
+El tamaño del logo y los enlaces de navegación por sección son editables.
+Las secciones ocultas no aparecen en la navbar.
+
+El modo `sticky` del formulario reserva una columna después del hero hasta antes
+del footer. En pantallas de hasta 1100 px se usa un botón desplegable después del
+hero; cerrar y abrir conserva los datos. El modo `inline` mantiene la sección
+tradicional. Solo se monta una instancia del widget en ambos casos. Los cambios
+de presentación del widget se activan con `compact=1` y no afectan los embeds
+habituales de WordPress.
+
+La vista previa omite GTM y eventos comerciales y transmite `preview=1` al widget.
+El botón de envío muestra un mensaje de prueba sin enviar datos ni abrir WhatsApp.
+La publicación mantiene el flujo real de captura y atribución.
 
 El mismo widget distingue el origen `landing` de `wordpress_widget`. En ambos
 casos conserva durante la sesión y envía `utm_source`, `utm_medium`,
@@ -68,8 +97,24 @@ El plugin aísla visualmente estas páginas de los elementos globales de GSpeech
 (`.gspeech_pro_main_wrapper` y `#sexy_tooltip_title`). GSpeech continúa activo
 en las fichas de cursos y en el resto del sitio WordPress.
 
-El seed crea `gestion-cultural` como borrador. Si ya existe, conserva sus
-ediciones y solo añade los bloques visuales `docentes` y `experiencia-mali`
-cuando todavía no están presentes. Nunca publica ni reemplaza bloques
-existentes: la revisión y publicación siempre se hacen explícitamente desde
-MALI ONE.
+El seed crea `gestion-cultural` como borrador. Si ya existe, añade los bloques
+faltantes de perfil, malla, docentes, galería e inversión y completa las opciones
+nuevas cuando aún no existen. Solo sustituye la lista antigua de docentes si no
+tiene nombres, cargos, biografías ni LinkedIn editados. Conserva los demás textos,
+tarifas y perfiles. Nunca publica. La misma mejora se puede incorporar desde el
+botón **Incorporar mejoras de Gestión Cultural** del editor; luego hay que revisar
+y guardar o publicar explícitamente. Ejecutar el seed nuevamente es idempotente.
+
+## Verificación local
+
+```bash
+node --test scripts/landings.test.cjs
+pnpm --filter @mali-one/web build
+node scripts/validate-landings-ui.cjs
+```
+
+La prueba de interfaz requiere Playwright y Edge. Puede configurarse la ruta de
+Playwright con `LANDINGS_PLAYWRIGHT_PATH` y la carpeta de capturas con
+`LANDINGS_QA_DIR`. Usa una API simulada local, sustituye imágenes externas y no
+envía datos a servicios reales. Cubre navbar, malla, límites del formulario sticky,
+desplegable móvil, vista previa y edición/guardado/reapertura de matrícula y bio.

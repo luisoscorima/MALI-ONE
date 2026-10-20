@@ -260,6 +260,12 @@
     .lead-form--done .lead-form__submit {
       display: none;
     }
+    .lead-compact .lead-form { padding: 20px 18px; --lead-text: #101018; --lead-btn: #0022cc; }
+    .lead-compact .lead-form__title { font-size: 1.4rem; }
+    .lead-compact .lead-form__subtitle { margin-bottom: 14px; font-size: .85rem; }
+    .lead-compact .lead-form__field { margin-bottom: 9px; }
+    .lead-compact .lead-form__check { font-size: .78rem; }
+    .lead-preview .lead-form__wa { display: none !important; }
   </style>
 </head>
 <body>
@@ -371,6 +377,16 @@
     fbclid: params.get('fbclid') || '',
   };
   var parentOrigin = '*';
+  var isPreview = params.get('preview') === '1';
+  if (params.get('compact') === '1') document.body.classList.add('lead-compact');
+  if (isPreview) document.body.classList.add('lead-preview');
+  if (params.get('formTitle')) document.querySelector('.lead-form__title').textContent = params.get('formTitle');
+  if (params.get('formDescription')) document.querySelector('.lead-form__subtitle').textContent = params.get('formDescription');
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && window.parent !== window) {
+      window.parent.postMessage({ type: 'mali-lead-close' }, parentOrigin);
+    }
+  });
   var area = params.get('area') || 'educacion_ep';
   if (area !== 'educacion_ep' && area !== 'educacion_ca') {
     area = 'educacion_ep';
@@ -543,7 +559,9 @@
 
   function notifyResize() {
     try {
-      var height = Math.ceil(document.documentElement.scrollHeight || document.body.scrollHeight);
+      var height = Math.ceil(params.get('compact') === '1'
+        ? form.getBoundingClientRect().height
+        : (document.documentElement.scrollHeight || document.body.scrollHeight));
       window.parent.postMessage({ type: 'mali-lead-iframe-resize', height: height }, '*');
     } catch (e) {}
   }
@@ -606,6 +624,10 @@
   form.addEventListener('submit', function (ev) {
     ev.preventDefault();
     setMsg('');
+    if (isPreview) {
+      setMsg('Vista previa: no se enviaron datos ni se creó un contacto.', 'ok');
+      return;
+    }
 
     if (!document.getElementById('acceptPrivacy').checked) {
       setMsg('Debes aceptar las políticas de privacidad.', 'error');

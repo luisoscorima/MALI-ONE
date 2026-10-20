@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import {
   DEFAULT_GESTION_CULTURAL_LANDING_CONTENT,
+  upgradeGestionCulturalLanding,
   type LandingDocument,
   type LandingPageDto,
 } from '@mali-one/shared';
@@ -257,6 +258,19 @@ export function LandingsPage() {
     toast.success('URL copiada');
   }
 
+  async function incorporateContent() {
+    const accepted = await confirm({
+      title: '¿Incorporar las mejoras de Gestión Cultural?',
+      description: 'Añade la malla, inversión y perfiles faltantes, el hero azul y la navegación. Conserva los textos, tarifas y perfiles que ya hayas editado. Revisa el resultado antes de guardar.',
+      confirmLabel: 'Incorporar mejoras',
+    });
+    if (accepted) {
+      setContent(upgradeGestionCulturalLanding(content));
+      setPreviewHtml('');
+      toast.success('Mejoras incorporadas al editor. Revisa y guarda los cambios.');
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -269,7 +283,7 @@ export function LandingsPage() {
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={closeEditor}>
+              <Button type="button" variant="outline" disabled={saving} onClick={closeEditor}>
                 Cancelar
               </Button>
               <Button type="button" variant="outline" onClick={() => void preview()}>
@@ -324,7 +338,15 @@ export function LandingsPage() {
             </div>
           </section>
 
-          <LandingEditor value={content} onChange={setContent} />
+          {mode === 'edit' && slug === 'gestion-cultural' ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+              <p className="text-sm">Añade el contenido aprobado y las nuevas opciones a esta landing.</p>
+              <Button type="button" variant="outline" disabled={saving} onClick={() => void incorporateContent()}>Incorporar mejoras de Gestión Cultural</Button>
+            </div>
+          ) : null}
+          <fieldset disabled={saving} className="min-w-0">
+            <LandingEditor value={content} onChange={setContent} />
+          </fieldset>
 
           {previewHtml ? (
             <section id="landing-preview" className="space-y-2">

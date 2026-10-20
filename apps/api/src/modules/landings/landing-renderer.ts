@@ -11,6 +11,8 @@ const BLOCK_TYPES = new Set<LandingBlockType>([
   'faculty',
   'gallery',
   'schedule',
+  'curriculum',
+  'investment',
   'faq',
   'cta',
   'lead_form',
@@ -36,7 +38,15 @@ function object(value: unknown): Record<string, unknown> {
 }
 
 function array(value: unknown): unknown[] {
-  return Array.isArray(value) ? value.slice(0, 50) : [];
+  return Array.isArray(value) ? value : [];
+}
+
+function assetUrl(value: unknown, apiBase: string): string {
+  const candidate = text(value, 1000);
+  if (candidate.startsWith('/widgets/') && !candidate.includes('\\')) {
+    return safeUrl(`${apiBase}${candidate}`);
+  }
+  return safeUrl(value);
 }
 
 function color(value: unknown, fallback: string): string {
@@ -95,7 +105,12 @@ export function normalizeLandingDocument(value: unknown): LandingDocument {
     if (!BLOCK_TYPES.has(type)) continue;
     let id = text(block.id, 80).replace(/[^a-z0-9_-]/gi, '-');
     if (!id) id = `${type}-${blocks.length + 1}`;
-    if (seen.has(id)) id = `${id}-${blocks.length + 1}`;
+    // El formulario tiene un destino estable para todos los CTA.
+    if (type === 'lead_form') id = 'contacto';
+    else if (id === 'contacto') id = 'seccion-contacto';
+    const baseId = id;
+    let suffix = 1;
+    while (seen.has(id)) id = `${baseId}-${suffix++}`;
     seen.add(id);
     blocks.push({
       id,
@@ -110,6 +125,11 @@ export function normalizeLandingDocument(value: unknown): LandingDocument {
     logoAlt: text(source.logoAlt, 160) || 'MALI Educación',
     headerCtaLabel:
       text(source.headerCtaLabel, 80) || 'Solicitar información',
+    logoWidth: Math.max(180, Math.min(340, Number(source.logoWidth) || 270)),
+    leadFormLayout: source.leadFormLayout === 'sticky' ? 'sticky' : 'inline',
+    navigation: array(source.navigation).map(object).map((item) => ({
+      blockId: text(item.blockId, 80), label: text(item.label, 60),
+    })).filter((item) => item.blockId && item.label),
     theme: {
       primary: color(theme.primary, DEFAULT_THEME.primary),
       secondary: color(theme.secondary, DEFAULT_THEME.secondary),
@@ -126,9 +146,11 @@ function eyebrow(data: Record<string, unknown>): string {
   return value ? `<p class="eyebrow">${escapeHtml(value)}</p>` : '';
 }
 
-function renderHero(block: LandingBlock): string {
+function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): string {
   const data = block.data;
-  const imageUrl = safeUrl(data.imageUrl);
+  const imageUrl = assetUrl(data.imageUrl, apiBase);
+  const videoUrl = safeUrl(data.videoUrl);
+  const background = color(data.backgroundColor, '#0022cc');
   const facts = array(data.facts)
     .map(object)
     .map(
@@ -136,14 +158,14 @@ function renderHero(block: LandingBlock): string {
         `<li><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong></li>`,
     )
     .join('');
-  return `<section class="hero" id="${escapeHtml(block.id)}">
-    ${imageUrl ? `<img class="hero__image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(data.imageAlt)}" fetchpriority="high">` : ''}
+  return `<section class="hero" id="${escapeHtml(block.id)}" style="--hero-bg:${background}">
+    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><button class="hero__pause" type="button" aria-pressed="false">Pausar video</button>` : ''}
     <div class="hero__shade"></div>
     <div class="shell hero__content">
       ${eyebrow(data)}
       <h1>${escapeHtml(data.title)}</h1>
       <p class="hero__lead">${escapeHtml(data.body)}</p>
-      <a class="button button--primary" href="#contacto" data-track="hero-cta">${escapeHtml(data.ctaLabel || 'Solicitar información')}</a>
+      ${hasForm ? `<a class="button button--primary" href="#contacto" data-track="hero-cta">${escapeHtml(data.ctaLabel || 'Solicitar información')}</a>` : ''}
       ${facts ? `<ul class="facts">${facts}</ul>` : ''}
     </div>
   </section>`;
@@ -174,21 +196,23 @@ function renderFeatureList(block: LandingBlock): string {
   </div></section>`;
 }
 
-function renderFaculty(block: LandingBlock): string {
+function renderFaculty(block: LandingBlock, apiBase: string): string {
   const data = block.data;
   const items = array(data.items)
     .map(object)
     .map((item) => ({
       name: text(item.name, 160),
       role: text(item.role, 240),
-      imageUrl: safeUrl(item.imageUrl),
+      imageUrl: assetUrl(item.imageUrl, apiBase),
       imageAlt: text(item.imageAlt, 240),
+      description: text(item.description, 1500),
+      linkedinUrl: safeUrl(item.linkedinUrl),
     }))
-    .filter((item) => item.imageUrl)
+    .filter((item) => item.imageUrl || item.name)
     .map(
       (item) => `<article class="faculty-card">
-        <img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy">
-        ${item.name || item.role ? `<div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p>${escapeHtml(item.role)}</p>` : ''}</div>` : ''}
+        ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy">` : ''}
+        <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p>${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span> ↗</a>` : ''}</div>
       </article>`,
     )
     .join('');
@@ -260,9 +284,10 @@ function renderFaq(block: LandingBlock): string {
   </div></section>`;
 }
 
-function renderCta(block: LandingBlock): string {
+function renderCta(block: LandingBlock, hasForm: boolean): string {
   const data = block.data;
   const href = safeUrl(data.url, true) || '#contacto';
+  if (href === '#contacto' && !hasForm) return '';
   const tracking = /(?:wa\.me|whatsapp\.com)/i.test(href)
     ? 'whatsapp'
     : /\.pdf(?:$|[?#])/i.test(href)
@@ -274,7 +299,7 @@ function renderCta(block: LandingBlock): string {
   </div></section>`;
 }
 
-function renderLeadForm(block: LandingBlock, apiBase: string): string {
+function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, sticky = false): string {
   const data = block.data;
   const params = new URLSearchParams({
     area:
@@ -285,6 +310,8 @@ function renderLeadForm(block: LandingBlock, apiBase: string): string {
     titulo: text(data.courseTitle, 300),
     submit: text(data.submitLabel, 80) || 'Enviar información',
     captureSource: 'landing',
+    formTitle: text(data.title, 200),
+    formDescription: text(data.body, 500),
   });
   const privacyUrl = safeUrl(data.privacyUrl);
   if (privacyUrl) params.set('privacy', privacyUrl);
@@ -292,7 +319,13 @@ function renderLeadForm(block: LandingBlock, apiBase: string): string {
   if (whatsappPhone) params.set('wa', whatsappPhone);
   const backgroundColor = color(data.backgroundColor, '');
   if (backgroundColor) params.set('bg', backgroundColor);
+  if (preview) params.set('preview', '1');
+  if (sticky) params.set('compact', '1');
   const widgetUrl = `${apiBase}/widgets/educacion/lead-form.html?${params.toString()}`;
+  if (sticky) return `<aside class="lead-sidebar" aria-label="Solicitar información"><div class="lead-panel" id="contacto" tabindex="-1">
+    <button class="lead-close" type="button" aria-label="Cerrar formulario">Cerrar ×</button>
+    <iframe class="lead-frame" id="landingLeadFormFrame" src="${escapeHtml(widgetUrl)}" title="${escapeHtml(data.title || 'Formulario de contacto')}" loading="lazy" scrolling="no"></iframe>
+  </div></aside>`;
   return `<section class="contact" id="contacto"><div class="shell contact__grid">
     <div>${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><p>${escapeHtml(data.body)}</p></div>
     <iframe class="lead-frame" id="landingLeadFormFrame" src="${escapeHtml(widgetUrl)}" title="${escapeHtml(data.title || 'Formulario de contacto')}" loading="lazy" scrolling="no"></iframe>
@@ -303,26 +336,41 @@ function renderFooter(block: LandingBlock): string {
   return `<footer><div class="shell">${escapeHtml(block.data.text)}</div></footer>`;
 }
 
-function renderBlock(block: LandingBlock, apiBase: string): string {
+function renderCurriculum(block: LandingBlock): string {
+  const data = block.data;
+  const items = array(data.items).map(object).map((item, index) => `<details class="curriculum-module"${index === 0 ? ' open' : ''}><summary><span>${String(index + 1).padStart(2, '0')}</span>${escapeHtml(item.title)}</summary>${paragraphs(item.description)}</details>`).join('');
+  return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell"><div class="section__head">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.intro)}</div>${items}${data.finalTitle ? `<article class="final-project"><h3>${escapeHtml(data.finalTitle)}</h3>${paragraphs(data.finalDescription)}</article>` : ''}</div></section>`;
+}
+
+function renderInvestment(block: LandingBlock, hasForm: boolean): string {
+  const data = block.data;
+  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}${hasForm ? `<a class="button button--primary" href="#contacto" data-track="investment-cta">${escapeHtml(data.label || 'Consultar beneficios')}</a>` : ''}</div></div></section>`;
+}
+
+function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, preview: boolean): string {
   switch (block.type) {
     case 'hero':
-      return renderHero(block);
+      return renderHero(block, hasForm, apiBase);
     case 'text':
       return renderText(block);
     case 'feature_list':
       return renderFeatureList(block);
     case 'faculty':
-      return renderFaculty(block);
+      return renderFaculty(block, apiBase);
     case 'gallery':
       return renderGallery(block);
     case 'schedule':
       return renderSchedule(block);
+    case 'curriculum':
+      return renderCurriculum(block);
+    case 'investment':
+      return renderInvestment(block, hasForm);
     case 'faq':
       return renderFaq(block);
     case 'cta':
-      return renderCta(block);
+      return renderCta(block, hasForm);
     case 'lead_form':
-      return renderLeadForm(block, apiBase);
+      return renderLeadForm(block, apiBase, preview);
     case 'footer':
       return renderFooter(block);
   }
@@ -338,6 +386,7 @@ export function renderLandingHtml(input: {
   canonicalUrl: string;
   apiBase: string;
   gtmId?: string;
+  preview?: boolean;
 }): string {
   const document = normalizeLandingDocument(input.content);
   const title = text(input.seoTitle, 200) || text(input.name, 180);
@@ -345,13 +394,26 @@ export function renderLandingHtml(input: {
   const ogImage = safeUrl(input.ogImageUrl);
   const canonical = safeUrl(input.canonicalUrl);
   const apiBase = safeUrl(input.apiBase).replace(/\/$/, '');
-  const gtmId = /^GTM-[A-Z0-9]+$/.test(text(input.gtmId, 40).toUpperCase())
+  const gtmId = !input.preview && /^GTM-[A-Z0-9]+$/.test(text(input.gtmId, 40).toUpperCase())
     ? text(input.gtmId, 40).toUpperCase()
     : '';
-  const blocks = document.blocks
-    .filter((block) => block.enabled)
-    .map((block) => renderBlock(block, apiBase))
-    .join('');
+  const enabled = document.blocks.filter((block) => block.enabled);
+  const form = enabled.find((block) => block.type === 'lead_form');
+  const sticky = !!form && document.leadFormLayout === 'sticky';
+  const targets = new Set(enabled.map((block) => block.id));
+  const render = (block: LandingBlock) => {
+    if (block.type === 'cta' && typeof block.data.url === 'string' &&
+      block.data.url.startsWith('#') && !targets.has(block.data.url.slice(1))) {
+      return renderBlock({ ...block, data: { ...block.data, url: '' } }, apiBase, !!form, !!input.preview);
+    }
+    return renderBlock(block, apiBase, !!form, !!input.preview);
+  };
+  const heroIndex = enabled.findIndex((block) => block.type === 'hero');
+  const split = heroIndex < 0 ? 0 : heroIndex + 1;
+  const footers = sticky ? enabled.filter((block) => block.type === 'footer') : [];
+  const ordinaryBlock = (block: LandingBlock) => block.type !== 'lead_form' && block.type !== 'footer';
+  const blocks = sticky ? `${enabled.slice(0, split).filter(ordinaryBlock).map(render).join('')}<div class="landing-body shell"><div class="landing-sections">${enabled.slice(split).filter(ordinaryBlock).map(render).join('')}</div>${renderLeadForm(form!, apiBase, !!input.preview, true)}</div>${footers.map(render).join('')}` : enabled.map(render).join('');
+  const navigation = (document.navigation ?? []).filter((item) => enabled.some((block) => block.id === item.blockId && block.type !== 'footer'));
   const heroTitle = document.blocks.find(
     (block) => block.enabled && block.type === 'hero',
   )?.data.title;
@@ -378,18 +440,40 @@ export function renderLandingHtml(input: {
     body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}.site-head{border-bottom:1px solid rgba(255,255,255,.12)}.header-cta,.button,.feature,.schedule-card,.faculty-card,.gallery-card{transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}.header-cta:hover,.button:hover{transform:translateY(-2px)}.hero{min-height:760px}.hero:after{content:"";position:absolute;z-index:1;right:-12vw;bottom:-32vw;width:64vw;height:64vw;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--accent) 22%,transparent),transparent 65%);pointer-events:none}.hero__image{filter:saturate(.88) contrast(1.04)}.hero__content h1{max-width:920px;text-wrap:balance}.hero__lead{line-height:1.45}.facts li{min-width:210px;border-radius:18px}.facts strong{font-size:16px}.section__head--split{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:60px;align-items:end;max-width:none}.section__head--split>p{margin:0;font-size:18px;color:#5f5865}.feature,.schedule-card{position:relative;overflow:hidden}.feature:after{content:"";position:absolute;inset:auto 0 0;height:4px;background:linear-gradient(90deg,var(--primary),var(--accent));transform:scaleX(.3);transform-origin:left;transition:transform .25s ease}.feature:hover,.schedule-card:hover{transform:translateY(-5px);border-color:color-mix(in srgb,var(--primary) 28%,var(--line));box-shadow:0 24px 60px rgba(55,20,75,.11)}.feature:hover:after{transform:scaleX(1)}.schedule-card{background:linear-gradient(145deg,#fff,var(--surface))}.faculty-section{color:#fff;background:radial-gradient(circle at 85% 5%,color-mix(in srgb,var(--accent) 22%,transparent),transparent 34%),linear-gradient(135deg,#0d0812,#24102f 58%,#421154)}.faculty-section .eyebrow{color:#efb9dc}.faculty-section .section__head--split>p{color:#d7cadc}.faculty-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.faculty-card{position:relative;min-height:390px;overflow:hidden;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:#1b1220}.faculty-card:hover{transform:translateY(-6px);box-shadow:0 28px 70px rgba(0,0,0,.3)}.faculty-card img{width:100%;height:100%;min-height:390px;object-fit:cover;object-position:center 18%;filter:saturate(.88) contrast(1.03)}.faculty-card__copy{position:absolute;inset:auto 0 0;padding:50px 20px 20px;background:linear-gradient(transparent,rgba(10,6,13,.96));color:#fff}.faculty-card__copy h3{margin:0;font-size:20px}.faculty-card__copy p{margin:4px 0 0;color:#d9cedd;font-size:14px}.section-note{margin:18px 0 0;color:#aa9daf;font-size:13px}.editorial-gallery{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);grid-template-rows:repeat(2,250px);gap:16px}.gallery-card{position:relative;overflow:hidden;margin:0;border-radius:26px;background:#1b1220}.gallery-card:first-child{grid-row:1/3}.gallery-card:hover{transform:translateY(-4px);box-shadow:0 24px 60px rgba(55,20,75,.16)}.gallery-card img{width:100%;height:100%;object-fit:cover;transition:transform .55s ease}.gallery-card:hover img{transform:scale(1.035)}.gallery-card figcaption{position:absolute;inset:auto 14px 14px;padding:10px 13px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(13,8,18,.7);color:#fff;font-size:13px;backdrop-filter:blur(10px)}
     @media(max-width:1000px){.section__head--split{grid-template-columns:1fr;gap:20px}.faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.editorial-gallery{grid-template-rows:repeat(2,220px)}}
     @media(max-width:760px){.shell{width:min(100% - 28px,var(--shell))}.site-head{height:68px}.site-logo{max-width:155px}.header-cta{font-size:13px;padding-inline:14px}.hero{min-height:680px}.hero__shade{background:linear-gradient(0deg,rgba(11,5,18,.98) 0%,rgba(20,8,31,.68) 72%,rgba(20,8,31,.35) 100%)}.hero__content{padding-block:120px 45px}.facts{display:grid;grid-template-columns:1fr}.facts li{min-width:0}.section{padding:70px 0}.feature-grid,.schedule-grid,.contact__grid{grid-template-columns:1fr}.contact__grid{gap:32px}.cta-panel{align-items:flex-start;flex-direction:column;padding:32px 24px}.faculty-card,.faculty-card img{min-height:300px}.editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:240px}.contact{padding:72px 0}}
+
+    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+    :root{--header-height:100px}html{scroll-padding-top:calc(var(--header-height) + 20px)}[id]{scroll-margin-top:0}
+    .site-head{height:var(--header-height);position:sticky;top:0;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);z-index:50}
+    .site-head .shell{width:min(1440px,calc(100% - 40px));gap:20px}.site-logo{width:var(--logo-width);max-width:100%;max-height:76px;object-fit:contain}.brand{flex-shrink:0;max-width:30%}.header-cta{background:var(--primary);color:#fff;border:0;white-space:nowrap}
+    .site-nav{display:flex;align-items:center;gap:18px}.site-nav a{font-size:14px;text-decoration:none;font-weight:700}.site-nav a:hover,.site-nav a[aria-current]{color:var(--primary)}.nav-toggle{display:none;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
+    .hero{background:var(--hero-bg,#0022cc);min-height:580px}.hero:after{display:none}.hero__content{padding-block:80px 56px}.hero h1{font-size:clamp(38px,5.4vw,70px)}.hero__shade{background:linear-gradient(90deg,var(--hero-bg) 4%,color-mix(in srgb,var(--hero-bg) 85%,transparent) 42%,color-mix(in srgb,var(--hero-bg) 25%,transparent) 80%),linear-gradient(0deg,var(--hero-bg),transparent 40%)}
+    .hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.65}.hero__pause{position:absolute;right:24px;bottom:20px;z-index:3;color:#fff;background:rgba(0,0,0,.35);border:1px solid #fff;border-radius:8px;padding:8px;cursor:pointer}.hero__pause[hidden]{display:none}.hero .facts{margin-top:24px}.hero .facts li{min-width:160px}
+    .section{padding:52px 0}.section__head{margin-bottom:24px}.contact{padding:56px 0}.section h2,.contact h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08}.feature,.schedule-card{padding:22px;border-radius:18px}.section__head--split{gap:24px}.cta-panel{padding:30px;gap:20px}
+    .faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.faculty-card{min-height:0;display:flex;flex-direction:column}.faculty-card img{width:100%;height:280px;min-height:0;object-fit:cover;object-position:center 18%}.faculty-card__copy{position:static;padding:20px;background:#1b1220;flex:1}.faculty-card__copy p{line-height:1.55}.faculty-link{display:inline-flex;margin-top:14px;color:#fff;text-underline-offset:4px;font-weight:700}
+    .curriculum-module{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:#fff}.curriculum-module summary{padding:18px;cursor:pointer;font-weight:700;list-style-position:inside}.curriculum-module summary span{display:inline-block;margin-right:12px;color:var(--primary)}.curriculum-module p{padding:0 20px;margin:0 0 20px;color:#5f5865}.final-project{padding:24px;border-radius:16px;background:var(--primary);color:#fff;margin-top:18px}.final-project h3{margin:0 0 10px;font-size:24px}.final-project p{margin:0}
+    .investment{padding-top:0}.investment-box{border:1px solid var(--line);border-radius:24px;padding:30px;background:var(--surface)}.investment-box h2{font-size:36px}.investment-amount{font-size:46px;font-weight:800;color:var(--primary);margin-top:20px}.investment-box p{max-width:720px}.investment-box .button{margin-top:10px}
+    .landing-body{width:min(1440px,calc(100% - 40px));display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:stretch}.landing-sections{min-width:0}.landing-sections>.section>.shell,.landing-sections>.contact>.shell{width:100%}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:24px;border-radius:24px;margin-block:16px}.landing-sections .section__head--split{display:block}.landing-sections .section__head--split>p{margin-top:18px}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr;grid-template-rows:repeat(2,190px)}
+    .lead-sidebar{padding-block:24px;min-width:0}.lead-panel{position:sticky;top:calc(var(--header-height) + 16px);max-height:calc(100dvh - var(--header-height) - 32px);overflow:auto;border-radius:20px;background:#b4b3ff;border:1px solid var(--line);overscroll-behavior:contain}.lead-panel .lead-frame{display:block;width:100%;height:1px;min-height:0;border-radius:0}.lead-close,.lead-toggle{display:none}.landing-body:has(+footer){margin-bottom:16px}
+    @media(min-width:1101px){.lead-panel{visibility:visible!important;transform:none!important}}
+    @media(max-width:1100px){:root{--header-height:90px}.site-logo{max-height:68px}.brand{max-width:50%}.nav-toggle{display:block;margin-left:auto}.site-nav{display:none;position:absolute;top:100%;left:0;right:0;padding:20px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}.site-nav.is-open{display:flex}.landing-body{display:block;width:min(1180px,calc(100% - 32px))}.lead-sidebar{padding:0}.lead-panel{position:fixed;left:auto;right:16px;bottom:88px;top:auto;width:min(420px,calc(100% - 32px));max-height:calc(100dvh - var(--header-height) - 100px);z-index:70;visibility:hidden;transform:translateY(20px);opacity:0;pointer-events:none}.lead-panel.is-open{visibility:visible;transform:none;opacity:1;pointer-events:auto}.lead-close{display:block;position:sticky;top:0;width:100%;border:0;background:#fff;padding:12px;text-align:right;font-weight:700;cursor:pointer;z-index:1}.lead-toggle{display:block;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:75;max-width:calc(100% - 32px);white-space:nowrap;background:var(--primary);color:#fff;border:0;border-radius:999px;padding:16px 24px;font-weight:700;cursor:pointer}.lead-toggle[hidden]{display:none}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:20px}}
+    @media(max-width:760px){:root{--header-height:84px}.site-head .shell{width:calc(100% - 24px);gap:10px}.site-logo{width:min(var(--logo-width),210px);max-height:62px}.brand{max-width:52%}.header-cta{display:none}.hero{min-height:0}.hero__content{padding-block:52px 40px}.hero__shade{background:linear-gradient(0deg,var(--hero-bg),color-mix(in srgb,var(--hero-bg) 72%,transparent))}.section{padding-block:36px}.contact{padding-block:36px}.section__head{margin-bottom:20px}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:16px}.faculty-grid{grid-template-columns:1fr 1fr;gap:12px}.faculty-card img{height:200px}.faculty-card__copy{padding:14px}.faculty-card__copy h3{font-size:18px}.faculty-card__copy p{font-size:13px}.landing-sections .editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:220px}.investment-box{padding:24px}.investment-box h2{font-size:30px}.investment-amount{font-size:40px}footer{padding-bottom:86px}}
+    @media(max-width:400px){.faculty-grid{grid-template-columns:1fr}.faculty-card img{height:280px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
   </style>
 </head>
-<body data-landing="${escapeHtml(input.slug)}">
+<body data-landing="${escapeHtml(input.slug)}" style="--logo-width:${document.logoWidth}px">
   ${gtmId ? `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${escapeHtml(gtmId)}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>` : ''}
   <header class="site-head"><div class="shell">
-    ${document.logoUrl ? `<img class="site-logo" src="${escapeHtml(document.logoUrl)}" alt="${escapeHtml(document.logoAlt)}">` : `<strong>${escapeHtml(document.logoAlt)}</strong>`}
-    <a class="button header-cta" href="#contacto" data-track="header-cta">${escapeHtml(document.headerCtaLabel)}</a>
+    <a class="brand" href="#inicio" aria-label="MALI Educación, inicio">${document.logoUrl ? `<img class="site-logo" src="${escapeHtml(document.logoUrl)}" alt="${escapeHtml(document.logoAlt)}">` : `<strong>${escapeHtml(document.logoAlt)}</strong>`}</a>
+    ${navigation.length ? `<button class="nav-toggle" type="button" aria-controls="landing-nav" aria-expanded="false">Menú ☰</button><nav class="site-nav" id="landing-nav" aria-label="Secciones de la landing">${navigation.map((item) => `<a href="#${escapeHtml(item.blockId)}">${escapeHtml(item.label)}</a>`).join('')}</nav>` : ''}
+    ${form ? `<a class="button header-cta" href="#contacto" data-track="header-cta">${escapeHtml(document.headerCtaLabel)}</a>` : ''}
   </div></header>
-  <main>${blocks}</main>
+  <main id="inicio">${blocks}</main>
+  ${sticky ? '<button class="lead-toggle" type="button" aria-controls="contacto" aria-expanded="false" hidden>Solicitar información</button>' : ''}
   <script>
   (function(){
     function track(event, detail){
+      if(${input.preview ? 'true' : 'false'})return;
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push(Object.assign({event:event,landing:${scriptJson(input.slug)}},detail||{}));
     }
@@ -403,6 +487,29 @@ export function renderLandingHtml(input: {
       });
     });
     track('view_program',{programa:${scriptJson(text(heroTitle, 300))}});
+
+    var menu=document.querySelector('.nav-toggle'),nav=document.getElementById('landing-nav');
+    function closeMenu(){if(menu&&nav){menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');}}
+    if(menu&&nav){menu.addEventListener('click',function(){var open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',closeMenu);});}
+    var video=document.querySelector('.hero__video'),pause=document.querySelector('.hero__pause');
+    if(video){
+      var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+      var loadVideo=function(){if(reduced.matches){video.pause();if(pause)pause.hidden=true;return;}if(!video.src)video.src=video.dataset.videoSrc;video.play().then(function(){if(pause)pause.hidden=false;}).catch(function(){if(pause)pause.hidden=true;});};
+      loadVideo();reduced.addEventListener('change',loadVideo);
+      if(pause)pause.addEventListener('click',function(){if(video.paused){video.play().catch(function(){});pause.textContent='Pausar video';pause.setAttribute('aria-pressed','false');}else{video.pause();pause.textContent='Reanudar video';pause.setAttribute('aria-pressed','true');}});
+    }
+    var panel=document.querySelector('.lead-panel'),toggle=document.querySelector('.lead-toggle'),close=document.querySelector('.lead-close');
+    var narrow=window.matchMedia('(max-width:1100px)');
+    var hero=document.querySelector('.hero'),footer=document.querySelector('footer');
+    function setPanel(open){if(!panel)return;panel.classList.toggle('is-open',open);panel.inert=narrow.matches&&!open;panel.setAttribute('aria-hidden',String(narrow.matches&&!open));if(toggle)toggle.setAttribute('aria-expanded',String(open));}
+    function syncPanel(){if(!panel)return;if(!narrow.matches){setPanel(false);if(toggle)toggle.hidden=true;return;}var pastHero=!hero||hero.getBoundingClientRect().bottom<=100;var beforeFooter=!footer||footer.getBoundingClientRect().top>window.innerHeight;if(toggle)toggle.hidden=(!pastHero||!beforeFooter)&&!panel.classList.contains('is-open');}
+    if(panel){
+      setPanel(false);syncPanel();narrow.addEventListener('change',function(){setPanel(false);syncPanel();});window.addEventListener('scroll',syncPanel,{passive:true});window.addEventListener('resize',syncPanel);
+      if(toggle)toggle.addEventListener('click',function(){setPanel(!panel.classList.contains('is-open'));syncPanel();if(panel.classList.contains('is-open')&&close)close.focus();});
+      if(close)close.addEventListener('click',function(){setPanel(false);syncPanel();if(toggle&&!toggle.hidden)toggle.focus();});
+      document.querySelectorAll('a[href="#contacto"]').forEach(function(a){a.addEventListener('click',function(e){if(narrow.matches){e.preventDefault();setPanel(true);syncPanel();if(close)close.focus();}});});
+    }
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();if(close&&narrow.matches&&panel.classList.contains('is-open'))close.click();}});
     var frame=document.getElementById('landingLeadFormFrame');
     if(!frame)return;
     var widgetOrigin=${scriptJson(apiBase ? new URL(apiBase).origin : '')};
@@ -426,7 +533,8 @@ export function renderLandingHtml(input: {
     setTimeout(sendLeadContext,250);
     window.addEventListener('message',function(event){
       if(event.origin!==widgetOrigin||event.source!==frame.contentWindow||!event.data)return;
-      if(event.data.type==='mali-lead-iframe-resize'&&event.data.height){frame.style.height=Math.max(420,Math.min(1400,Math.ceil(event.data.height)))+'px';return;}
+      if(event.data.type==='mali-lead-close'&&close&&narrow.matches){close.click();return;}
+      if(event.data.type==='mali-lead-iframe-resize'&&Number.isFinite(event.data.height)){frame.style.height=Math.max(${sticky ? 180 : 420},Math.min(1400,Math.ceil(event.data.height)))+'px';return;}
       if(event.data.type==='mali-lead-submitted'){track('generate_lead',{programa:event.data.courseTitle||'',capture_source:'landing'});return;}
       if(event.data.type==='mali-lead-open-whatsapp'&&event.data.url){track('click_whatsapp',{cta:'lead-form'});window.open(event.data.url,'_blank','noopener,noreferrer');}
     });

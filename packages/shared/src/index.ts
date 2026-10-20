@@ -1,3 +1,5 @@
+import { GESTION_CULTURAL_MODULES, GESTION_CULTURAL_FACULTY } from './gestion-cultural-content';
+
 export type UserRole = 'admin' | 'operator';
 
 export type AppModule =
@@ -1048,6 +1050,8 @@ export type LandingBlockType =
   | 'faculty'
   | 'gallery'
   | 'schedule'
+  | 'curriculum'
+  | 'investment'
   | 'faq'
   | 'cta'
   | 'lead_form'
@@ -1072,6 +1076,9 @@ export interface LandingDocument {
   logoUrl: string;
   logoAlt: string;
   headerCtaLabel: string;
+  logoWidth?: number;
+  navigation?: { blockId: string; label: string }[];
+  leadFormLayout?: 'inline' | 'sticky';
   theme: LandingTheme;
   blocks: LandingBlock[];
 }
@@ -1129,6 +1136,15 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
     'https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Educacion.png',
   logoAlt: 'MALI Educación',
   headerCtaLabel: 'Solicitar información',
+  logoWidth: 270,
+  leadFormLayout: 'sticky',
+  navigation: [
+    { blockId: 'programa', label: 'Programa' },
+    { blockId: 'malla', label: 'Plan de estudios' },
+    { blockId: 'docentes', label: 'Docentes' },
+    { blockId: 'modalidades', label: 'Modalidades' },
+    { blockId: 'inversion', label: 'Inversión' },
+  ],
   theme: {
     primary: '#5c1599',
     secondary: '#7f21c3',
@@ -1142,6 +1158,8 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
       type: 'hero',
       enabled: true,
       data: {
+        backgroundColor: '#0022cc',
+        videoUrl: '',
         eyebrow: 'Extensión Profesional',
         title: 'Programa de Especialización en Gestión Cultural',
         body:
@@ -1202,6 +1220,30 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
       },
     },
     {
+      id: 'perfil', type: 'feature_list', enabled: true,
+      data: {
+        eyebrow: 'Perfil del participante', title: '¿Dónde te ves hoy?',
+        intro: 'Conecta el programa con tu siguiente paso profesional.',
+        items: [
+          { title: 'Trabajo en cultura', description: 'Profesionaliza tu experiencia y estructura mejor proyectos, presupuestos, estrategias de públicos, comunicación y evaluación.' },
+          { title: 'Sector público', description: 'Fortalece tu capacidad para formular, articular y evaluar iniciativas culturales desde municipalidades, ministerios, instituciones y organismos públicos.' },
+          { title: 'Artista o creativo', description: 'Convierte una idea artística en un proyecto con públicos, aliados, presupuesto y estrategia de comunicación.' },
+          { title: 'Tengo un proyecto', description: 'Ordena tu propuesta, clarifica objetivos y construye una ruta de financiamiento.' },
+          { title: 'Quiero ingresar al sector', description: 'Conoce el ecosistema, su marco institucional y las herramientas clave para participar en proyectos y organizaciones culturales.' },
+        ],
+      },
+    },
+    {
+      id: 'malla', type: 'curriculum', enabled: true,
+      data: {
+        eyebrow: 'Plan de estudios', title: 'Una visión 360° del ecosistema cultural',
+        intro: 'Fundamentos, gestión, comunicación, liderazgo y desarrollo de proyectos.',
+        items: GESTION_CULTURAL_MODULES,
+        finalTitle: 'Proyecto Integrador Final',
+        finalDescription: 'Aplicación e integración de conceptos y herramientas aprendidas mediante el desarrollo y sustentación de una propuesta cultural.',
+      },
+    },
+    {
       id: 'metodologia',
       type: 'feature_list',
       enabled: true,
@@ -1245,36 +1287,7 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
         intro:
           'El programa cuenta con docentes de amplia experiencia nacional e internacional.',
         note: 'La participación de docentes puede variar según la edición del programa.',
-        items: [
-          {
-            name: '',
-            role: '',
-            imageUrl:
-              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_1.jpg',
-            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
-          },
-          {
-            name: '',
-            role: '',
-            imageUrl:
-              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_2.jpg',
-            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
-          },
-          {
-            name: '',
-            role: '',
-            imageUrl:
-              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_3.jpg',
-            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
-          },
-          {
-            name: '',
-            role: '',
-            imageUrl:
-              'https://educacion.mali.pe/wp-content/uploads/2026/10/docente_6.jpg',
-            imageAlt: 'Docente del programa de Gestión Cultural del MALI',
-          },
-        ],
+        items: GESTION_CULTURAL_FACULTY,
       },
     },
     {
@@ -1332,6 +1345,15 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
               'Martes y jueves de 7:00 a 10:10 p. m. (10 min de break)',
           },
         ],
+      },
+    },
+    {
+      id: 'inversion', type: 'investment', enabled: true,
+      data: {
+        eyebrow: 'Inversión referencial', title: 'Planifica tu siguiente paso',
+        currency: 'S/', enrollment: '490', installments: '10', installmentAmount: '630',
+        note: 'Inversión referencial. Consulta la tarifa, las condiciones y los beneficios vigentes de la edición.',
+        label: 'Consultar beneficios',
       },
     },
     {
@@ -1424,6 +1446,36 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
     },
   ],
 };
+
+/** Añade contenido aprobado faltante sin reemplazar textos, tarifas o perfiles ya editados. */
+export function upgradeGestionCulturalLanding(current: LandingDocument): LandingDocument {
+  const defaults = DEFAULT_GESTION_CULTURAL_LANDING_CONTENT;
+  const blocks = JSON.parse(JSON.stringify(current.blocks)) as LandingBlock[];
+  for (const id of ['perfil', 'malla', 'docentes', 'experiencia-mali', 'inversion']) {
+    const source = defaults.blocks.find((block) => block.id === id)!;
+    const existing = blocks.find((block) => block.id === id);
+    if (!existing) {
+      const defaultIndex = defaults.blocks.indexOf(source);
+      const preceding = defaults.blocks.slice(0, defaultIndex).reverse()
+        .map((block) => blocks.findIndex((item) => item.id === block.id)).find((index) => index >= 0);
+      blocks.splice(preceding === undefined ? blocks.length : preceding + 1, 0,
+        JSON.parse(JSON.stringify(source)) as LandingBlock);
+    } else if (id === 'docentes' && Array.isArray(existing.data.items) &&
+      existing.data.items.every((item) => !item.name && !item.description && !item.role && !item.linkedinUrl)) {
+      existing.data.items = JSON.parse(JSON.stringify(source.data.items));
+    }
+  }
+  for (const block of blocks) {
+    if (block.type === 'hero') block.data = { backgroundColor: '#0022cc', videoUrl: '', ...block.data };
+  }
+  return {
+    ...current,
+    logoWidth: current.logoWidth ?? defaults.logoWidth,
+    navigation: current.navigation ?? defaults.navigation?.map((item) => ({ ...item })),
+    leadFormLayout: current.leadFormLayout ?? 'sticky',
+    blocks,
+  };
+}
 
 export interface EmailCampaignDto {
   id: string;

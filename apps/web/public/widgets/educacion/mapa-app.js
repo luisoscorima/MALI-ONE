@@ -48,6 +48,11 @@
     districts.forEach(function (district) {
       var sedes = sedesByDistrict[district.id] || [];
       if (!sedes.length) return;
+      // Districts and sedes can share a slug; their DOM IDs must be distinct.
+      var districtId = 'district-' + district.id;
+      function detailId(sede) {
+        return 'details-' + sede.id;
+      }
 
       var group = document.createElement('li');
       group.className = 'district-group';
@@ -56,37 +61,52 @@
       districtBtn.className = 'district';
       districtBtn.textContent = ' ' + district.name;
       districtBtn.setAttribute('role', 'button');
+      districtBtn.setAttribute('aria-controls', districtId);
+      districtBtn.setAttribute('aria-expanded', 'false');
       districtBtn.tabIndex = 0;
       districtBtn.onclick = function () {
-        moveMarker(districtBtn, district.slug);
+        moveMarker(districtBtn, districtId);
+        if (ul.style.display === 'block' && sedes.length === 1) {
+          selectSchool(sedes[0].lat, sedes[0].lng, detailId(sedes[0]));
+        }
       };
       districtBtn.onkeydown = function (event) {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          moveMarker(districtBtn, district.slug);
+          districtBtn.click();
         }
       };
       group.appendChild(districtBtn);
 
       var ul = document.createElement('ul');
-      ul.id = district.slug;
+      ul.id = districtId;
       ul.className = 'addresses';
       ul.style.display = 'none';
 
       sedes.forEach(function (sede) {
         var schoolLi = document.createElement('li');
         schoolLi.className = 'school';
+        schoolLi.setAttribute('role', 'button');
+        schoolLi.setAttribute('aria-controls', detailId(sede));
+        schoolLi.setAttribute('aria-expanded', 'false');
+        schoolLi.tabIndex = 0;
         schoolLi.innerHTML =
           '<img class="dynamic-img" data-img="RECTANGULO" style="height: 20px" alt=""> ' +
           esc(sede.nombre);
         schoolLi.onclick = function (event) {
           event.stopPropagation();
-          selectSchool(sede.lat, sede.lng, sede.slug);
+          selectSchool(sede.lat, sede.lng, detailId(sede));
+        };
+        schoolLi.onkeydown = function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            schoolLi.click();
+          }
         };
         ul.appendChild(schoolLi);
 
         var details = document.createElement('li');
-        details.id = sede.slug;
+        details.id = detailId(sede);
         details.className = 'details';
         details.style.display = 'none';
         details.innerHTML =

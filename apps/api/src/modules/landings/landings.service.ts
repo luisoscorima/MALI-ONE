@@ -57,6 +57,18 @@ export class LandingsService {
       );
     }
     const normalized = normalizeLandingDocument(value);
+    const source = value as { blocks?: { data?: Record<string, unknown> }[] };
+    if (Array.isArray(source?.blocks) && source.blocks.length > 50) {
+      throw new BadRequestException('Solo se permiten 50 bloques por landing');
+    }
+    for (const block of Array.isArray(source?.blocks) ? source.blocks : []) {
+      for (const key of ['items', 'facts']) {
+        const entries = block?.data?.[key];
+        if (Array.isArray(entries) && entries.length > 50) {
+          throw new BadRequestException('Solo se permiten 50 elementos por bloque');
+        }
+      }
+    }
     if (normalized.blocks.length === 0) {
       throw new BadRequestException('La landing debe tener al menos un bloque');
     }
@@ -231,7 +243,7 @@ export class LandingsService {
         ogImageUrl: dto.ogImageUrl,
         canonicalUrl: `${this.publicBaseUrl}/vista-previa/`,
         apiBase: this.appUrl,
-        gtmId: this.gtmId,
+        preview: true,
       }),
     };
   }

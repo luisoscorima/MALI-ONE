@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -37,6 +37,8 @@ const BLOCK_LABELS: Record<LandingBlockType, string> = {
   faculty: 'Plana docente',
   gallery: 'Galería de imágenes',
   schedule: 'Modalidades y horarios',
+  curriculum: 'Plan de estudios',
+  investment: 'Inversión referencial',
   faq: 'Preguntas frecuentes',
   cta: 'Llamada a la acción',
   lead_form: 'Formulario de contacto',
@@ -47,31 +49,8 @@ function stringValue(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-function rows(value: unknown, keys: string[]): string {
-  if (!Array.isArray(value)) return '';
-  return value
-    .map((item) => {
-      const row = item && typeof item === 'object' ? item : {};
-      return keys
-        .map((key) => stringValue((row as Record<string, unknown>)[key]))
-        .join(' | ');
-    })
-    .join('\n');
-}
-
-function parseRows(value: string, keys: string[]) {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parts = line.split('|').map((part) => part.trim());
-      return Object.fromEntries(keys.map((key, index) => [key, parts[index] ?? '']));
-    });
-}
-
 function defaultBlock(type: LandingBlockType): LandingBlock {
-  const id = `${type}-${Date.now().toString(36)}`;
+  const id = `${type}-${crypto.randomUUID()}`;
   const common = { id, type, enabled: true };
   switch (type) {
     case 'hero':
@@ -81,6 +60,8 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
           eyebrow: 'Extensión Profesional',
           title: 'Título del programa',
           body: 'Presenta la propuesta principal del programa.',
+          backgroundColor: '#0022cc',
+          videoUrl: '',
           imageUrl: '',
           imageAlt: '',
           ctaLabel: 'Solicitar información',
@@ -128,6 +109,10 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
         ...common,
         data: { eyebrow: '', title: 'Preguntas frecuentes', items: [] },
       };
+    case 'curriculum':
+      return { ...common, data: { eyebrow: 'Plan de estudios', title: 'Plan de estudios', intro: '', items: [], finalTitle: 'Proyecto Integrador Final', finalDescription: '' } };
+    case 'investment':
+      return { ...common, data: { eyebrow: 'Inversión referencial', title: 'Planifica tu siguiente paso', currency: 'S/', enrollment: '', installments: '', installmentAmount: '', note: '', label: 'Consultar beneficios' } };
     case 'cta':
       return {
         ...common,
@@ -169,7 +154,7 @@ function DataField({
   multiline,
   placeholder,
 }: DataFieldProps) {
-  const id = `landing-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  const id = useId();
   return (
     <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
@@ -193,230 +178,48 @@ function DataField({
   );
 }
 
-function BlockFields({
-  block,
-  update,
-}: {
-  block: LandingBlock;
-  update: (key: string, value: unknown) => void;
-}) {
-  const field = (label: string, key: string, multiline = false) => (
-    <DataField
-      label={label}
-      value={block.data[key]}
-      onChange={(value) => update(key, value)}
-      multiline={multiline}
-    />
-  );
+type ItemField = { key: string; label: string; multiline?: boolean };
 
+function ItemsEditor({ value, fields, onChange, label }: {
+  value: unknown; fields: ItemField[]; onChange: (items: Record<string, unknown>[]) => void; label: string;
+}) {
+  const items = Array.isArray(value) ? value.map((item) => item && typeof item === 'object' ? item as Record<string, unknown> : {}) : [];
+  return <div className="space-y-3 md:col-span-2">
+    <p className="text-sm font-medium">{label} ({items.length}/50)</p>
+    {items.map((item, index) => <div key={index} className="space-y-3 rounded-lg border p-3">
+      <div className="flex items-center justify-between"><span className="text-sm font-medium">{index + 1}. {stringValue(item.title || item.name || item.label) || label}</span>
+        <Button type="button" variant="ghost" size="sm" onClick={() => onChange(items.filter((_, i) => i !== index))}>Eliminar</Button></div>
+      <div className="grid gap-3 md:grid-cols-2">{fields.map((field) => <div key={field.key} className={field.multiline ? 'md:col-span-2' : ''}>
+        <DataField label={field.label} value={item[field.key]} multiline={field.multiline} onChange={(next) => onChange(items.map((entry, i) => i === index ? { ...entry, [field.key]: next } : entry))} />
+      </div>)}</div>
+    </div>)}
+    <Button type="button" variant="outline" disabled={items.length >= 50} onClick={() => onChange([...items, {}])}><Plus className="mr-1 size-4" />Añadir elemento</Button>
+  </div>;
+}
+
+function BlockFields({ block, update }: { block: LandingBlock; update: (key: string, value: unknown) => void }) {
+  const field = (label: string, key: string, multiline = false) => <DataField label={label} value={block.data[key]} onChange={(value) => update(key, value)} multiline={multiline} />;
+  const itemFields = (label: string, fields: ItemField[], key = 'items') => <ItemsEditor value={block.data[key]} fields={fields} label={label} onChange={(items) => update(key, items)} />;
+  const heading = <>{field('Antetítulo', 'eyebrow')}{field('Título', 'title')}</>;
   switch (block.type) {
-    case 'hero':
-      return (
-        <div className="grid gap-3 md:grid-cols-2">
-          {field('Antetítulo', 'eyebrow')}
-          {field('CTA', 'ctaLabel')}
-          <div className="md:col-span-2">{field('Título', 'title')}</div>
-          <div className="md:col-span-2">{field('Descripción', 'body', true)}</div>
-          {field('URL de imagen', 'imageUrl')}
-          {field('Texto alternativo', 'imageAlt')}
-          <div className="space-y-1 md:col-span-2">
-            <Label>Datos destacados</Label>
-            <Textarea
-              value={rows(block.data.facts, ['label', 'value'])}
-              onChange={(event) =>
-                update('facts', parseRows(event.target.value, ['label', 'value']))
-              }
-              placeholder={'Etiqueta | Valor\nDuración | 9 meses'}
-              rows={4}
-            />
-          </div>
-        </div>
-      );
-    case 'text':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          {field('Contenido', 'body', true)}
-        </div>
-      );
-    case 'feature_list':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          {field('Introducción', 'intro', true)}
-          <div className="space-y-1">
-            <Label>Elementos</Label>
-            <Textarea
-              value={rows(block.data.items, ['title', 'description'])}
-              onChange={(event) =>
-                update(
-                  'items',
-                  parseRows(event.target.value, ['title', 'description']),
-                )
-              }
-              placeholder={'Título | Descripción\nCasos reales | Aprende con situaciones del sector'}
-              rows={7}
-            />
-          </div>
-        </div>
-      );
-    case 'faculty':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          {field('Introducción', 'intro', true)}
-          {field('Nota', 'note', true)}
-          <div className="space-y-1">
-            <Label>Docentes</Label>
-            <Textarea
-              value={rows(block.data.items, [
-                'name',
-                'role',
-                'imageUrl',
-                'imageAlt',
-              ])}
-              onChange={(event) =>
-                update(
-                  'items',
-                  parseRows(event.target.value, [
-                    'name',
-                    'role',
-                    'imageUrl',
-                    'imageAlt',
-                  ]),
-                )
-              }
-              placeholder="Nombre | Especialidad o cargo | URL de imagen | Texto alternativo"
-              rows={8}
-            />
-            <p className="text-xs text-muted-foreground">
-              El nombre y la especialidad son opcionales hasta que se validen.
-            </p>
-          </div>
-        </div>
-      );
-    case 'gallery':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          {field('Introducción', 'intro', true)}
-          <div className="space-y-1">
-            <Label>Imágenes</Label>
-            <Textarea
-              value={rows(block.data.items, [
-                'imageUrl',
-                'imageAlt',
-                'caption',
-              ])}
-              onChange={(event) =>
-                update(
-                  'items',
-                  parseRows(event.target.value, [
-                    'imageUrl',
-                    'imageAlt',
-                    'caption',
-                  ]),
-                )
-              }
-              placeholder="URL de imagen | Texto alternativo | Leyenda"
-              rows={7}
-            />
-          </div>
-        </div>
-      );
-    case 'schedule':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          <div className="space-y-1">
-            <Label>Modalidades</Label>
-            <Textarea
-              value={rows(block.data.items, [
-                'title',
-                'date',
-                'location',
-                'schedule',
-              ])}
-              onChange={(event) =>
-                update(
-                  'items',
-                  parseRows(event.target.value, [
-                    'title',
-                    'date',
-                    'location',
-                    'schedule',
-                  ]),
-                )
-              }
-              placeholder="Modalidad | Fecha | Lugar | Horario"
-              rows={6}
-            />
-          </div>
-        </div>
-      );
-    case 'faq':
-      return (
-        <div className="grid gap-3">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Título', 'title')}
-          <div className="space-y-1">
-            <Label>Preguntas</Label>
-            <Textarea
-              value={rows(block.data.items, ['question', 'answer'])}
-              onChange={(event) =>
-                update(
-                  'items',
-                  parseRows(event.target.value, ['question', 'answer']),
-                )
-              }
-              placeholder="Pregunta | Respuesta"
-              rows={8}
-            />
-          </div>
-        </div>
-      );
-    case 'cta':
-      return (
-        <div className="grid gap-3 md:grid-cols-2">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Texto del botón', 'label')}
-          <div className="md:col-span-2">{field('Título', 'title')}</div>
-          <div className="md:col-span-2">{field('Descripción', 'body', true)}</div>
-          <div className="md:col-span-2">{field('URL', 'url')}</div>
-        </div>
-      );
-    case 'lead_form':
-      return (
-        <div className="grid gap-3 md:grid-cols-2">
-          {field('Antetítulo', 'eyebrow')}
-          {field('Texto del botón', 'submitLabel')}
-          <div className="md:col-span-2">{field('Título', 'title')}</div>
-          <div className="md:col-span-2">{field('Descripción', 'body', true)}</div>
-          <div className="space-y-1">
-            <Label>Área CRM</Label>
-            <select
-              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              value={stringValue(block.data.area) || 'educacion_ep'}
-              onChange={(event) => update('area', event.target.value)}
-            >
-              <option value="educacion_ep">Educación EP</option>
-              <option value="educacion_ca">Educación CA</option>
-            </select>
-          </div>
-          {field('Slug del curso', 'courseSlug')}
-          {field('Nombre del curso', 'courseTitle')}
-          {field('Número de WhatsApp', 'whatsappPhone')}
-          {field('Color de fondo', 'backgroundColor')}
-          {field('URL de privacidad', 'privacyUrl')}
-        </div>
-      );
-    case 'footer':
-      return field('Texto', 'text');
+    case 'hero': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'ctaLabel')}{field('Color de fondo sólido', 'backgroundColor')}{field('URL del video MP4 (opcional)', 'videoUrl')}{field('Imagen alternativa del video', 'imageUrl')}{field('Texto alternativo', 'imageAlt')}
+      <p className="text-xs text-muted-foreground md:col-span-2">Sin URL de video se mostrará el fondo sólido. El video se fundirá con el fondo, sin audio y en bucle.</p>
+      {itemFields('Datos destacados', [{ key: 'label', label: 'Etiqueta' }, { key: 'value', label: 'Valor' }], 'facts')}</div>;
+    case 'text': return <div className="grid gap-3">{heading}{field('Contenido', 'body', true)}</div>;
+    case 'feature_list': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{itemFields('Elementos', [{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descripción', multiline: true }])}</div>;
+    case 'faculty': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{field('Nota', 'note', true)}{itemFields('Docentes', [
+      { key: 'name', label: 'Nombre' }, { key: 'role', label: 'Especialidad o cargo' }, { key: 'description', label: 'Descripción del docente', multiline: true }, { key: 'imageUrl', label: 'URL de la fotografía' }, { key: 'imageAlt', label: 'Texto alternativo' }, { key: 'linkedinUrl', label: 'URL de LinkedIn (opcional)' },
+    ])}<p className="text-xs text-muted-foreground md:col-span-2">El botón de LinkedIn aparecerá cuando añadas una URL válida.</p></div>;
+    case 'gallery': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{itemFields('Imágenes', [{ key: 'imageUrl', label: 'URL de imagen' }, { key: 'imageAlt', label: 'Texto alternativo' }, { key: 'caption', label: 'Leyenda' }])}</div>;
+    case 'schedule': return <div className="grid gap-3 md:grid-cols-2">{heading}{itemFields('Modalidades', [{ key: 'title', label: 'Modalidad' }, { key: 'date', label: 'Fecha' }, { key: 'location', label: 'Lugar o plataforma' }, { key: 'schedule', label: 'Horario' }])}</div>;
+    case 'curriculum': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{itemFields('Módulos', [{ key: 'title', label: 'Nombre del módulo' }, { key: 'description', label: 'Descripción del módulo', multiline: true }])}{field('Título del proyecto final', 'finalTitle')}{field('Descripción del proyecto final', 'finalDescription', true)}</div>;
+    case 'investment': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Moneda', 'currency')}{field('Matrícula', 'enrollment')}{field('Cantidad de cuotas', 'installments')}{field('Importe por cuota', 'installmentAmount')}{field('Condiciones y nota referencial', 'note', true)}{field('Texto del botón', 'label')}</div>;
+    case 'faq': return <div className="grid gap-3 md:grid-cols-2">{heading}{itemFields('Preguntas', [{ key: 'question', label: 'Pregunta' }, { key: 'answer', label: 'Respuesta', multiline: true }])}</div>;
+    case 'cta': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Texto del botón', 'label')}{field('URL', 'url')}{field('Descripción', 'body', true)}</div>;
+    case 'lead_form': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'submitLabel')}
+      <div className="space-y-1"><Label htmlFor={block.id + '-area'}>Área CRM</Label><select id={block.id + '-area'} className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={stringValue(block.data.area) || 'educacion_ep'} onChange={(event) => update('area', event.target.value)}><option value="educacion_ep">Educación EP</option><option value="educacion_ca">Educación CA</option></select></div>
+      {field('Slug del curso', 'courseSlug')}{field('Nombre del curso', 'courseTitle')}{field('Número de WhatsApp', 'whatsappPhone')}{field('Color de fondo', 'backgroundColor')}{field('URL de privacidad', 'privacyUrl')}</div>;
+    case 'footer': return field('Texto', 'text');
   }
 }
 
@@ -463,7 +266,7 @@ function SortableBlock({
             Visible
           </div>
           <Button type="button" size="icon" variant="ghost" onClick={onRemove}>
-            <Trash2 className="size-4" />
+            <Trash2 className="size-4" /><span className="sr-only">Eliminar bloque</span>
           </Button>
         </div>
       </div>
@@ -505,7 +308,7 @@ export function LandingEditor({
   }
 
   function addBlock() {
-    if (selectedType === 'lead_form' && hasLeadForm) return;
+    if (value.blocks.length >= 50 || (selectedType === 'lead_form' && hasLeadForm)) return;
     onChange({
       ...value,
       blocks: [...value.blocks, defaultBlock(selectedType)],
@@ -556,6 +359,15 @@ export function LandingEditor({
             </label>
           ))}
         </div>
+
+        <div className="space-y-1"><Label htmlFor="landing-logo-width">Ancho del logo (180–340 px)</Label><Input id="landing-logo-width" type="number" min={180} max={340} value={value.logoWidth ?? 270} onChange={(event) => onChange({ ...value, logoWidth: Number(event.target.value) })} /></div>
+        <div className="space-y-1"><Label htmlFor="landing-form-layout">Presentación del formulario</Label><select id="landing-form-layout" className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={value.leadFormLayout ?? 'inline'} onChange={(event) => onChange({ ...value, leadFormLayout: event.target.value as 'inline' | 'sticky' })}><option value="inline">Sección dentro de la página</option><option value="sticky">Lateral después del hero / desplegable en móvil</option></select></div>
+        <div className="space-y-3 md:col-span-2"><p className="text-sm font-medium">Navegación por secciones</p><p className="text-xs text-muted-foreground">Selecciona las secciones que aparecerán en la navbar y edita sus etiquetas. Las secciones ocultas no aparecerán en la página pública.</p>
+          {value.blocks.filter((block) => !['hero', 'footer', 'lead_form'].includes(block.type)).map((block) => {
+            const item = value.navigation?.find((entry) => entry.blockId === block.id);
+            return <div key={block.id} className="flex items-center gap-3"><Switch aria-label={'Mostrar ' + block.id + ' en navegación'} checked={!!item} onCheckedChange={(checked) => onChange({ ...value, navigation: checked ? [...(value.navigation ?? []), { blockId: block.id, label: stringValue(block.data.title).slice(0, 60) || BLOCK_LABELS[block.type] }] : value.navigation?.filter((entry) => entry.blockId !== block.id) })} /><span className="w-32 truncate text-xs text-muted-foreground">{block.id}</span><Input aria-label={'Etiqueta de navegación para ' + block.id} disabled={!item} maxLength={60} value={item?.label ?? ''} onChange={(event) => onChange({ ...value, navigation: value.navigation?.map((entry) => entry.blockId === block.id ? { ...entry, label: event.target.value } : entry) })} /></div>;
+          })}
+        </div>
       </section>
 
       <DndContext
@@ -601,7 +413,7 @@ export function LandingEditor({
             </option>
           ))}
         </select>
-        <Button type="button" variant="outline" onClick={addBlock}>
+        <Button type="button" variant="outline" disabled={value.blocks.length >= 50} onClick={addBlock}>
           <Plus className="mr-1 size-4" /> Añadir bloque
         </Button>
         {hasLeadForm ? (
