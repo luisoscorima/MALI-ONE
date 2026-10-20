@@ -21,10 +21,15 @@ Integrador Final, perfil del participante y ocho docentes. Las fotos se referenc
 desde WordPress (`docente_1.jpg` a `docente_8.jpg`, en ese orden); no se incluyen
 archivos de imagen en el repositorio. Los enlaces de LinkedIn quedan vacíos hasta
 completarlos y sus botones solo aparecen cuando hay una URL válida.
+Los docentes se presentan en un carrusel de tarjetas verticales, con fotografía
+completa en proporción de retrato y biografía debajo. Incluye flechas, contador,
+navegación con teclado y desplazamiento táctil; no avanza automáticamente.
 
 La matrícula inicial confirmada es S/ 490. Las diez cuotas de S/ 630 se conservan
 como referencia del HTML y deben revisarse antes de publicar. Matrícula, moneda,
 cantidad e importe de cuotas y condiciones se editan en el bloque `investment`.
+Cuando inversión y el CTA de WhatsApp están consecutivos, se muestran en dos
+columnas de igual altura; en móvil se apilan conservando el orden.
 No se incorporan el popup promocional ni los testimonios de ejemplo del HTML.
 El bloque `lead_form` reutiliza el widget oficial de Educación y
 su flujo MALI ONE → MALI WhatsApp; no envía datos a otros CRM.

@@ -57,7 +57,10 @@ const server = http.createServer(async (req, res) => {
       const request = route.request();
       if (!request.url().startsWith(base)) {
         // Las imágenes externas no se descargan ni se guardan en el repositorio.
-        if (request.resourceType() === 'image') return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="450"><rect width="600" height="450" fill="#ddd"/></svg>' });
+        if (request.resourceType() === 'image') {
+          const height = /docente_\d+\.jpg/.test(request.url()) ? 900 : 450;
+          return route.fulfill({ contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="${height}"><rect width="600" height="${height}" fill="#ddd"/></svg>` });
+        }
         return route.abort();
       }
       return route.continue();
@@ -65,6 +68,18 @@ const server = http.createServer(async (req, res) => {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    const logAlignment = async (width) => console.log('Alineación horizontal ' + width + 'px: ' + JSON.stringify(await page.evaluate(() => {
+      const selectors = {
+        hero: '.hero__content>.eyebrow', programa: '#programa .eyebrow', beneficios: '#beneficios .eyebrow',
+        malla: '#malla .eyebrow', docentes: '#docentes .eyebrow', modalidades: '#modalidades .eyebrow',
+        inversion: '#inversion .eyebrow', whatsapp: '#whatsapp .eyebrow', brochure: '#brochure .eyebrow', preguntas: '#preguntas .eyebrow',
+      };
+      return Object.fromEntries(Object.entries(selectors).map(([key, selector]) => [key, Math.round(document.querySelector(selector).getBoundingClientRect().left)]));
+    })));
+    await page.setViewportSize({ width: 1920, height: 1300 });
+    await page.goto(base + '/qa/landing');
+    await logAlignment(1920);
+    await page.screenshot({ path: path.join(output, 'desktop-alineacion.png') });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(base + '/qa/landing');
     assert.equal(await page.locator('.curriculum-module').count(), 13);
@@ -75,6 +90,8 @@ const server = http.createServer(async (req, res) => {
     let panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= hero.y + hero.height, 'El formulario debe empezar después del hero');
     await page.screenshot({ path: path.join(output, 'desktop-hero.png') });
+    await page.locator('#inversion').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 120));
+    await page.screenshot({ path: path.join(output, 'desktop-acciones.png') });
     await page.locator('#malla').scrollIntoViewIfNeeded();
     panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= 100 && panel.y < 150, 'Formulario sticky bajo la cabecera');
@@ -85,6 +102,23 @@ const server = http.createServer(async (req, res) => {
     await page.screenshot({ path: path.join(output, 'desktop-malla.png') });
     await page.locator('.curriculum-module').nth(1).locator('summary').click();
     assert.equal(await page.locator('.curriculum-module').nth(1).getAttribute('open'), '');
+    await page.locator('.site-nav').getByRole('link', { name: 'Docentes', exact: true }).click();
+    const carousel = page.locator('.faculty-carousel');
+    const previousTeacher = page.getByRole('button', { name: 'Ver docentes anteriores' });
+    const nextTeacher = page.getByRole('button', { name: 'Ver docentes siguientes' });
+    const photo = await page.locator('.faculty-card__photo').first().boundingBox();
+    assert.ok(photo.height > photo.width, 'Las fotografías deben tener formato vertical');
+    assert.equal(await page.locator('.faculty-card img').first().evaluate((el) => getComputedStyle(el).objectFit), 'contain', 'Conservar la fotografía completa');
+    assert.equal(await previousTeacher.isDisabled(), true);
+    await nextTeacher.click();
+    await page.waitForFunction(() => document.querySelector('.faculty-carousel').scrollLeft > 100);
+    await carousel.focus();
+    await carousel.press('End');
+    await page.waitForFunction(() => document.querySelector('[data-faculty-next]').disabled);
+    assert.match(await page.locator('.faculty-position').textContent(), /8 de 8$/);
+    await carousel.press('Home');
+    await page.waitForFunction(() => document.querySelector('[data-faculty-prev]').disabled);
+    await page.screenshot({ path: path.join(output, 'desktop-docentes.png') });
     await page.locator('footer').scrollIntoViewIfNeeded();
     panel = await page.locator('.lead-panel').boundingBox();
     const footer = await page.locator('footer').boundingBox();
@@ -92,6 +126,7 @@ const server = http.createServer(async (req, res) => {
     for (const width of [1100, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(base + '/qa/landing');
+      if (width === 390) await logAlignment(width);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Sin desbordamiento en ' + width);
       assert.equal(await page.locator('.lead-toggle').isVisible(), false);
       await page.locator('.nav-toggle').click();
@@ -112,6 +147,17 @@ const server = http.createServer(async (req, res) => {
       if (width === 390) await page.screenshot({ path: path.join(output, 'mobile-form.png') });
       await frame.getByLabel('Nombres', { exact: false }).press('Escape');
       await page.waitForFunction(() => document.querySelector('.lead-panel').getAttribute('aria-hidden') === 'true');
+      await page.locator('#docentes').scrollIntoViewIfNeeded();
+      const mobilePhoto = await page.locator('.faculty-card__photo').first().boundingBox();
+      assert.ok(mobilePhoto.height > mobilePhoto.width, 'Retratos verticales en ' + width);
+      await nextTeacher.click();
+      await page.waitForFunction(() => document.querySelector('.faculty-carousel').scrollLeft > 100);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'El carrusel no ensancha la página en ' + width);
+      if (width === 390) await page.screenshot({ path: path.join(output, 'mobile-docentes.png') });
+      if (width === 390) {
+        await page.locator('#inversion').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 104));
+        await page.screenshot({ path: path.join(output, 'mobile-acciones.png') });
+      }
     }
     console.log('PASS landing: hero, malla, formulario sticky, footer, menú y cuatro anchos móviles; cero leads');
 

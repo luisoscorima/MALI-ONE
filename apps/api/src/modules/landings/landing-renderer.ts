@@ -198,7 +198,7 @@ function renderFeatureList(block: LandingBlock): string {
 
 function renderFaculty(block: LandingBlock, apiBase: string): string {
   const data = block.data;
-  const items = array(data.items)
+  const faculty = array(data.items)
     .map(object)
     .map((item) => ({
       name: text(item.name, 160),
@@ -208,10 +208,11 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
       description: text(item.description, 1500),
       linkedinUrl: safeUrl(item.linkedinUrl),
     }))
-    .filter((item) => item.imageUrl || item.name)
+    .filter((item) => item.imageUrl || item.name);
+  const items = faculty
     .map(
       (item) => `<article class="faculty-card">
-        ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy">` : ''}
+        ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"></div>` : ''}
         <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p>${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span> ↗</a>` : ''}</div>
       </article>`,
     )
@@ -220,7 +221,14 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
   const note = text(data.note, 500);
   return `<section class="section faculty-section" id="${escapeHtml(block.id)}"><div class="shell">
     <div class="section__head section__head--split"><div>${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2></div>${intro ? `<p>${escapeHtml(intro)}</p>` : ''}</div>
-    <div class="faculty-grid">${items}</div>
+    <div class="faculty-slider" data-faculty-slider>
+      <div class="faculty-carousel" id="${escapeHtml(block.id)}-carrusel" tabindex="0" role="region" aria-roledescription="carrusel" aria-label="Docentes del programa">${items}</div>
+      <div class="faculty-controls" hidden>
+        <span class="faculty-position" role="status" aria-live="polite" aria-atomic="true"></span>
+        <button type="button" data-faculty-prev aria-label="Ver docentes anteriores" aria-controls="${escapeHtml(block.id)}-carrusel">←</button>
+        <button type="button" data-faculty-next aria-label="Ver docentes siguientes" aria-controls="${escapeHtml(block.id)}-carrusel">→</button>
+      </div>
+    </div>
     ${note ? `<p class="section-note">${escapeHtml(note)}</p>` : ''}
   </div></section>`;
 }
@@ -293,9 +301,18 @@ function renderCta(block: LandingBlock, hasForm: boolean): string {
     : /\.pdf(?:$|[?#])/i.test(href)
       ? 'brochure'
       : 'content-cta';
-  return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell cta-panel">
-    <div>${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><p>${escapeHtml(data.body)}</p></div>
-    <a class="button button--light" href="${escapeHtml(href)}"${href.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''} data-track="${tracking}">${escapeHtml(data.label)}</a>
+  const icon = tracking === 'whatsapp'
+    ? '<path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.4L3 21l1.7-5.2A8.5 8.5 0 1 1 21 11.5Z"/><path d="m8 7 2 3-1.2 1.2a8 8 0 0 0 4 4L14 14l3 2c-.4 1.2-1.4 2-2.6 1.7C10 16.8 7.2 14 6.3 9.6 6 8.4 6.8 7.4 8 7Z"/>'
+    : tracking === 'brochure'
+      ? '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M12 11v7m-3-3 3 3 3-3"/>'
+      : '<path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7.1-7.1l-1.7 1.7M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7.1 7.1l1.7-1.7"/>';
+  return `<section class="section cta-section" id="${escapeHtml(block.id)}"><div class="shell cta-panel">
+    <div class="cta-panel__copy">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><p>${escapeHtml(data.body)}</p></div>
+    <a class="button button--light cta-action cta-action--${tracking}" href="${escapeHtml(href)}"${href.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''} data-track="${tracking}">
+      <span class="cta-action__icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icon}</svg></span>
+      <span class="cta-action__label">${escapeHtml(data.label || (tracking === 'whatsapp' ? 'Conversar por WhatsApp' : tracking === 'brochure' ? 'Descargar brochure' : 'Ver más'))}</span>
+      <svg class="cta-action__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${href.startsWith('http') ? 'M7 17 17 7M7 7h10v10' : 'M5 12h14m-6-6 6 6-6 6'}"/></svg>
+    </a>
   </div></section>`;
 }
 
@@ -408,11 +425,26 @@ export function renderLandingHtml(input: {
     }
     return renderBlock(block, apiBase, !!form, !!input.preview);
   };
+  const renderFlow = (flow: LandingBlock[]) => {
+    const html: string[] = [];
+    for (let index = 0; index < flow.length; index++) {
+      const block = flow[index];
+      const next = flow[index + 1];
+      if (block.type === 'investment' && next?.type === 'cta' &&
+        /(?:wa\.me|whatsapp\.com)/i.test(String(next.data.url ?? ''))) {
+        html.push(`<div class="conversion-row">${render(block)}${render(next)}</div>`);
+        index++;
+      } else {
+        html.push(render(block));
+      }
+    }
+    return html.join('');
+  };
   const heroIndex = enabled.findIndex((block) => block.type === 'hero');
   const split = heroIndex < 0 ? 0 : heroIndex + 1;
   const footers = sticky ? enabled.filter((block) => block.type === 'footer') : [];
   const ordinaryBlock = (block: LandingBlock) => block.type !== 'lead_form' && block.type !== 'footer';
-  const blocks = sticky ? `${enabled.slice(0, split).filter(ordinaryBlock).map(render).join('')}<div class="landing-body shell"><div class="landing-sections">${enabled.slice(split).filter(ordinaryBlock).map(render).join('')}</div>${renderLeadForm(form!, apiBase, !!input.preview, true)}</div>${footers.map(render).join('')}` : enabled.map(render).join('');
+  const blocks = sticky ? `${renderFlow(enabled.slice(0, split).filter(ordinaryBlock))}<div class="landing-body shell"><div class="landing-sections">${renderFlow(enabled.slice(split).filter(ordinaryBlock))}</div>${renderLeadForm(form!, apiBase, !!input.preview, true)}</div>${footers.map(render).join('')}` : renderFlow(enabled);
   const navigation = (document.navigation ?? []).filter((item) => enabled.some((block) => block.id === item.blockId && block.type !== 'footer'));
   const heroTitle = document.blocks.find(
     (block) => block.enabled && block.type === 'hero',
@@ -442,7 +474,7 @@ export function renderLandingHtml(input: {
     @media(max-width:760px){.shell{width:min(100% - 28px,var(--shell))}.site-head{height:68px}.site-logo{max-width:155px}.header-cta{font-size:13px;padding-inline:14px}.hero{min-height:680px}.hero__shade{background:linear-gradient(0deg,rgba(11,5,18,.98) 0%,rgba(20,8,31,.68) 72%,rgba(20,8,31,.35) 100%)}.hero__content{padding-block:120px 45px}.facts{display:grid;grid-template-columns:1fr}.facts li{min-width:0}.section{padding:70px 0}.feature-grid,.schedule-grid,.contact__grid{grid-template-columns:1fr}.contact__grid{gap:32px}.cta-panel{align-items:flex-start;flex-direction:column;padding:32px 24px}.faculty-card,.faculty-card img{min-height:300px}.editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:240px}.contact{padding:72px 0}}
 
     .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-    :root{--header-height:100px}html{scroll-padding-top:calc(var(--header-height) + 20px)}[id]{scroll-margin-top:0}
+    :root{--header-height:100px;--page-width:1440px;--page-gutter:20px;--content-inset:32px}html{scroll-padding-top:calc(var(--header-height) + 20px)}[id]{scroll-margin-top:0}
     .site-head{height:var(--header-height);position:sticky;top:0;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);z-index:50}
     .site-head .shell{width:min(1440px,calc(100% - 40px));gap:20px}.site-logo{width:var(--logo-width);max-width:100%;max-height:76px;object-fit:contain}.brand{flex-shrink:0;max-width:30%}.header-cta{background:var(--primary);color:#fff;border:0;white-space:nowrap}
     .site-nav{display:flex;align-items:center;gap:18px}.site-nav a{font-size:14px;text-decoration:none;font-weight:700}.site-nav a:hover,.site-nav a[aria-current]{color:var(--primary)}.nav-toggle{display:none;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
@@ -451,13 +483,41 @@ export function renderLandingHtml(input: {
     .section{padding:52px 0}.section__head{margin-bottom:24px}.contact{padding:56px 0}.section h2,.contact h2{font-size:clamp(30px,3.6vw,48px);line-height:1.08}.feature,.schedule-card{padding:22px;border-radius:18px}.section__head--split{gap:24px}.cta-panel{padding:30px;gap:20px}
     .faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.faculty-card{min-height:0;display:flex;flex-direction:column}.faculty-card img{width:100%;height:280px;min-height:0;object-fit:cover;object-position:center 18%}.faculty-card__copy{position:static;padding:20px;background:#1b1220;flex:1}.faculty-card__copy p{line-height:1.55}.faculty-link{display:inline-flex;margin-top:14px;color:#fff;text-underline-offset:4px;font-weight:700}
     .curriculum-module{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:#fff}.curriculum-module summary{padding:18px;cursor:pointer;font-weight:700;list-style-position:inside}.curriculum-module summary span{display:inline-block;margin-right:12px;color:var(--primary)}.curriculum-module p{padding:0 20px;margin:0 0 20px;color:#5f5865}.final-project{padding:24px;border-radius:16px;background:var(--primary);color:#fff;margin-top:18px}.final-project h3{margin:0 0 10px;font-size:24px}.final-project p{margin:0}
-    .investment{padding-top:0}.investment-box{border:1px solid var(--line);border-radius:24px;padding:30px;background:var(--surface)}.investment-box h2{font-size:36px}.investment-amount{font-size:46px;font-weight:800;color:var(--primary);margin-top:20px}.investment-box p{max-width:720px}.investment-box .button{margin-top:10px}
+    .investment{padding-top:0}.section.investment{padding-bottom:12px}.section.cta-section{padding-block:12px}.landing-sections>.cta-section+.section--soft{margin-top:12px}.investment-box{border:1px solid var(--line);border-radius:24px;padding:30px;background:var(--surface)}.investment-box h2{font-size:36px}.investment-amount{font-size:46px;font-weight:800;color:var(--primary);margin-top:20px}.investment-box p{max-width:720px}.investment-box .button{margin-top:10px}
     .landing-body{width:min(1440px,calc(100% - 40px));display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:stretch}.landing-sections{min-width:0}.landing-sections>.section>.shell,.landing-sections>.contact>.shell{width:100%}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:24px;border-radius:24px;margin-block:16px}.landing-sections .section__head--split{display:block}.landing-sections .section__head--split>p{margin-top:18px}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr;grid-template-rows:repeat(2,190px)}
     .lead-sidebar{padding-block:24px;min-width:0}.lead-panel{position:sticky;top:calc(var(--header-height) + 16px);max-height:calc(100dvh - var(--header-height) - 32px);overflow:auto;border-radius:20px;background:#b4b3ff;border:1px solid var(--line);overscroll-behavior:contain}.lead-panel .lead-frame{display:block;width:100%;height:1px;min-height:0;border-radius:0}.lead-close,.lead-toggle{display:none}.landing-body:has(+footer){margin-bottom:16px}
     @media(min-width:1101px){.lead-panel{visibility:visible!important;transform:none!important}}
     @media(max-width:1100px){:root{--header-height:90px}.site-logo{max-height:68px}.brand{max-width:50%}.nav-toggle{display:block;margin-left:auto}.site-nav{display:none;position:absolute;top:100%;left:0;right:0;padding:20px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}.site-nav.is-open{display:flex}.landing-body{display:block;width:min(1180px,calc(100% - 32px))}.lead-sidebar{padding:0}.lead-panel{position:fixed;left:auto;right:16px;bottom:88px;top:auto;width:min(420px,calc(100% - 32px));max-height:calc(100dvh - var(--header-height) - 100px);z-index:70;visibility:hidden;transform:translateY(20px);opacity:0;pointer-events:none}.lead-panel.is-open{visibility:visible;transform:none;opacity:1;pointer-events:auto}.lead-close{display:block;position:sticky;top:0;width:100%;border:0;background:#fff;padding:12px;text-align:right;font-weight:700;cursor:pointer;z-index:1}.lead-toggle{display:block;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:75;max-width:calc(100% - 32px);white-space:nowrap;background:var(--primary);color:#fff;border:0;border-radius:999px;padding:16px 24px;font-weight:700;cursor:pointer}.lead-toggle[hidden]{display:none}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:20px}}
     @media(max-width:760px){:root{--header-height:84px}.site-head .shell{width:calc(100% - 24px);gap:10px}.site-logo{width:min(var(--logo-width),210px);max-height:62px}.brand{max-width:52%}.header-cta{display:none}.hero{min-height:0}.hero__content{padding-block:52px 40px}.hero__shade{background:linear-gradient(0deg,var(--hero-bg),color-mix(in srgb,var(--hero-bg) 72%,transparent))}.section{padding-block:36px}.contact{padding-block:36px}.section__head{margin-bottom:20px}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:16px}.faculty-grid{grid-template-columns:1fr 1fr;gap:12px}.faculty-card img{height:200px}.faculty-card__copy{padding:14px}.faculty-card__copy h3{font-size:18px}.faculty-card__copy p{font-size:13px}.landing-sections .editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:220px}.investment-box{padding:24px}.investment-box h2{font-size:30px}.investment-amount{font-size:40px}footer{padding-bottom:86px}}
     @media(max-width:400px){.faculty-grid{grid-template-columns:1fr}.faculty-card img{height:280px}}
+    .faculty-slider{min-width:0}.faculty-carousel{position:relative;display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:0;overscroll-behavior-x:contain;scrollbar-width:thin;padding:6px 0 14px}.faculty-carousel:focus-visible{outline:2px solid #fff;outline-offset:5px;border-radius:6px}
+    .faculty-carousel .faculty-card{flex:0 0 280px;min-width:0;min-height:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;transform:none}.faculty-card__photo{aspect-ratio:3/4;background:#130b1a;flex-shrink:0}.faculty-carousel .faculty-card img{display:block;width:100%;height:100%;min-height:0;object-fit:contain;object-position:center top;filter:none}.faculty-carousel .faculty-card__copy{position:static;padding:20px;flex:1;display:flex;flex-direction:column;background:#1b1220}.faculty-carousel .faculty-card__copy p{font-size:14px;line-height:1.55}.faculty-carousel .faculty-link{margin-top:auto;padding-top:16px}
+    .faculty-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:12px}.faculty-controls[hidden]{display:none}.faculty-position{margin-right:auto;font-size:13px;color:#d7cadc}.faculty-controls button{width:44px;height:44px;border:1px solid rgba(255,255,255,.4);border-radius:50%;background:transparent;color:#fff;font:inherit;font-size:22px;cursor:pointer}.faculty-controls button:disabled{opacity:.35;cursor:default}.faculty-controls button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+    @media(max-width:760px){.faculty-carousel{gap:14px}.faculty-carousel .faculty-card{flex-basis:85%;max-width:280px}.faculty-carousel .faculty-card__copy h3{font-size:20px}}
+    .section .cta-panel{display:grid;grid-template-columns:minmax(0,1fr) 248px;align-items:center;gap:28px}.cta-panel__copy{min-width:0}.cta-panel__copy h2{font-size:clamp(28px,3vw,40px);line-height:1.12}.cta-panel__copy>p:last-child{margin-bottom:0}.cta-panel .cta-action{--action-tone:var(--primary);display:flex;gap:12px;width:100%;min-height:76px;padding:14px 16px;border:1px solid rgba(255,255,255,.45);border-radius:18px;background:#fff;color:var(--primary);text-align:left;line-height:1.3;box-shadow:0 8px 24px rgba(0,0,0,.12)}.cta-panel .cta-action--whatsapp{--action-tone:#128c5e}.cta-action__icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;color:var(--action-tone);background:color-mix(in srgb,var(--action-tone) 10%,#fff)}.cta-action__label{flex:1;min-width:0;font-size:15px;overflow-wrap:anywhere}.cta-action__arrow{flex-shrink:0;opacity:.6}.cta-action:hover .cta-action__arrow{opacity:1}.cta-action:focus-visible{outline:3px solid #fff;outline-offset:5px}
+    @media(max-width:760px){.section .cta-panel{grid-template-columns:1fr;gap:22px}.cta-panel .cta-action{min-height:68px}.cta-action__label{font-size:16px}}
+    /* Un mismo contenedor y sangría para el hero y el contenido de cada bloque. */
+    .hero__content,.site-head .shell,.landing-body{width:min(var(--page-width),calc(100% - 2 * var(--page-gutter)))}
+    .hero__content,.site-head .shell{padding-inline:var(--content-inset)}
+    .site-logo{object-position:left center}
+    .landing-sections>.section{padding-inline:0}
+    .landing-sections>.section>.shell{width:100%;max-width:none;margin-inline:0;padding-inline:var(--content-inset)}
+    .landing-sections>.cta-section>.cta-panel{padding:30px var(--content-inset)}
+    .landing-sections>.investment>.shell{padding-inline:0}
+    .investment-box{padding-inline:calc(var(--content-inset) - 1px)}
+    .landing-sections .prose p,.landing-sections .faq details{max-width:900px}
+    @media(max-width:1100px){:root{--page-gutter:16px;--content-inset:24px}}
+    @media(max-width:760px){:root{--content-inset:20px}}
+    .conversion-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:stretch;width:min(var(--page-width),calc(100% - 2 * var(--page-gutter)));margin-inline:auto;padding-bottom:12px}
+    .landing-sections>.conversion-row{width:100%;margin-inline:0}
+    .conversion-row>.section{display:flex;min-width:0;padding:0}
+    .conversion-row>.investment>.shell{display:flex;width:100%;max-width:none;margin:0;padding:0}
+    .conversion-row .investment-box{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:29px calc(var(--content-inset) - 1px)}
+    .conversion-row>.cta-section>.cta-panel{display:flex;flex-direction:column;align-items:flex-start;gap:24px;width:100%;max-width:none;margin:0;padding:30px var(--content-inset)}
+    .conversion-row .section h2{font-size:32px;line-height:1.12}
+    .conversion-row .investment-box>.button,.conversion-row .cta-action{margin-top:auto}
+    .conversion-row .cta-action{width:100%}
+    @media(max-width:760px){.conversion-row{grid-template-columns:1fr}.conversion-row .section h2{font-size:28px}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
   </style>
 </head>
@@ -491,6 +551,40 @@ export function renderLandingHtml(input: {
     var menu=document.querySelector('.nav-toggle'),nav=document.getElementById('landing-nav');
     function closeMenu(){if(menu&&nav){menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');}}
     if(menu&&nav){menu.addEventListener('click',function(){var open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',closeMenu);});}
+    document.querySelectorAll('[data-faculty-slider]').forEach(function(slider){
+      var track=slider.querySelector('.faculty-carousel');
+      var cards=Array.from(track.querySelectorAll('.faculty-card'));
+      var controls=slider.querySelector('.faculty-controls');
+      var previous=slider.querySelector('[data-faculty-prev]');
+      var next=slider.querySelector('[data-faculty-next]');
+      var position=slider.querySelector('.faculty-position');
+      if(!cards.length)return;
+      function updateFaculty(){
+        controls.hidden=track.scrollWidth<=track.clientWidth+2;
+        previous.disabled=track.scrollLeft<=2;
+        next.disabled=track.scrollLeft+track.clientWidth>=track.scrollWidth-2;
+        var bounds=track.getBoundingClientRect();
+        var visible=cards.map(function(card,index){var rect=card.getBoundingClientRect();var overlap=Math.min(rect.right,bounds.right)-Math.max(rect.left,bounds.left);return overlap>Math.min(rect.width,bounds.width)/2?index:-1;}).filter(function(index){return index>=0;});
+        if(visible.length){var first=visible[0]+1,last=visible[visible.length-1]+1;position.textContent=(first===last?String(first):first+'–'+last)+' de '+cards.length;}
+      }
+      function moveFaculty(direction){
+        var closest=0;
+        cards.forEach(function(card,index){if(Math.abs(card.offsetLeft-track.scrollLeft)<Math.abs(cards[closest].offsetLeft-track.scrollLeft))closest=index;});
+        var target=cards[Math.max(0,Math.min(cards.length-1,closest+direction))];
+        track.scrollTo({left:target.offsetLeft,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+      }
+      previous.addEventListener('click',function(){moveFaculty(-1);});
+      next.addEventListener('click',function(){moveFaculty(1);});
+      track.addEventListener('scroll',updateFaculty,{passive:true});
+      track.addEventListener('keydown',function(event){
+        if(event.target!==track)return;
+        if(event.key==='ArrowRight'||event.key==='ArrowLeft'){event.preventDefault();moveFaculty(event.key==='ArrowRight'?1:-1);}
+        else if(event.key==='Home'||event.key==='End'){event.preventDefault();track.scrollTo({left:event.key==='Home'?0:track.scrollWidth,behavior:'instant'});}
+      });
+      if(window.ResizeObserver)new ResizeObserver(updateFaculty).observe(track);
+      else window.addEventListener('resize',updateFaculty);
+      updateFaculty();
+    });
     var video=document.querySelector('.hero__video'),pause=document.querySelector('.hero__pause');
     if(video){
       var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
