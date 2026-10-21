@@ -38,6 +38,7 @@ const server = http.createServer(async (req, res) => {
   if (route === '/qa/inline') { const doc = content(); doc.leadFormLayout = 'inline'; res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html(doc)); }
   if (route === '/qa/enhanced') {
     const doc = content();
+    doc.blocks.find((block) => block.type === 'faculty').data.items.forEach((item) => { item.linkedinUrl = ''; });
     const teacher = doc.blocks.find((block) => block.type === 'faculty').data.items[0];
     teacher.linkedinUrl = 'https://www.linkedin.com/in/docente/';
     teacher.role = 'Gestión cultural y políticas públicas';
@@ -99,13 +100,15 @@ const server = http.createServer(async (req, res) => {
     await page.goto(base + '/qa/landing');
     assert.equal(await page.locator('.curriculum-module').count(), 13);
     assert.equal(await page.locator('.faculty-card').count(), 8);
-    assert.equal(await page.locator('video').count(), 0);
+    assert.equal(await page.locator('video').count(), 1);
+    assert.equal(await page.locator('.site-logo').getAttribute('src'), 'https://educacion.mali.pe/wp-content/uploads/2025/02/logo.png');
+    assert.equal(await page.locator('.faculty-link').count(), 8);
     assert.equal(await page.locator('.overview__figure img').count(), 1, 'La primera sección de texto incorpora una fotografía de la galería');
     assert.equal(await page.locator('.program-facts').count(), 1, 'Ficha de datos clave');
     assert.equal(await page.locator('[data-track="investment-cta"]').count(), 0, 'La inversión no muestra Consultar beneficios');
     assert.ok(await page.locator('.investment-amount').evaluate((el) => parseFloat(getComputedStyle(el).fontSize)) >= 48, 'Matrícula en tamaño destacado');
     assert.equal(await page.locator('.reading-progress').getAttribute('aria-valuenow'), '0');
-    assert.equal(await page.locator('.hero').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 34, 204)');
+    assert.equal(await page.locator('.hero').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 60, 124)');
     let hero = await page.locator('.hero').boundingBox();
     let panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= hero.y + hero.height, 'El formulario debe empezar después del hero');
@@ -177,6 +180,11 @@ const server = http.createServer(async (req, res) => {
     panel = await page.locator('.lead-panel').boundingBox();
     const footer = await page.locator('footer').boundingBox();
     assert.ok(panel.y + panel.height <= footer.y + 1, 'El formulario se detiene antes del footer');
+    assert.equal(await page.locator('.footer-brand').textContent(), 'MALI EDUCACIÓN');
+    assert.equal(await page.locator('.footer-links a').count(), 5);
+    assert.equal(await page.locator('.footer-social a').count(), 4);
+    assert.equal(await page.locator('.footer-social').getByRole('link', { name: 'TikTok', exact: true }).getAttribute('href'), 'https://www.tiktok.com/@malieducacion');
+    await page.screenshot({ path: path.join(output, 'desktop-footer.png') });
     for (const width of [1100, 768, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(base + '/qa/landing');
@@ -217,6 +225,9 @@ const server = http.createServer(async (req, res) => {
         await page.locator('#inversion').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 104));
         await page.screenshot({ path: path.join(output, 'mobile-acciones.png') });
       }
+      await page.locator('footer').scrollIntoViewIfNeeded();
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Footer sin desbordamiento en ' + width);
+      if (width === 390) await page.screenshot({ path: path.join(output, 'mobile-footer.png') });
     }
     console.log('PASS landing: hero, malla, formulario sticky, footer, menú y cuatro anchos móviles; cero leads');
 
@@ -230,23 +241,30 @@ const server = http.createServer(async (req, res) => {
     await description.pressSequentially('más palabras');
     assert.equal(await description.inputValue(), text + 'más palabras');
     await page.getByLabel('Matrícula', { exact: true }).fill('725');
+    assert.equal(await page.getByLabel('Color de fondo sólido', { exact: true }).inputValue(), '#003C7C');
+    await page.getByLabel('Color de fondo sólido', { exact: true }).fill('#0022CC');
     await page.getByLabel('URL de fotografía de la sección', { exact: true }).fill('https://example.test/programa.jpg');
     await page.getByLabel('Texto alternativo de la fotografía', { exact: true }).fill('Comunidad del MALI');
     await page.getByLabel('Composición de la sección', { exact: true }).selectOption('left');
+    await page.getByLabel('Descripción institucional', { exact: true }).fill('Museo de Arte de Lima · Educación');
     await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
     await page.getByTitle('Editar', { exact: true }).waitFor();
     assert.equal(record.content.blocks.find((b) => b.type === 'investment').data.enrollment, '725');
     await page.getByTitle('Editar', { exact: true }).click();
     await page.getByLabel('Matrícula', { exact: true }).waitFor();
     assert.equal(await page.getByLabel('Matrícula', { exact: true }).inputValue(), '725');
+    assert.equal(await page.getByLabel('Color de fondo sólido', { exact: true }).inputValue(), '#0022CC', 'El color personalizado se conserva al reabrir');
     assert.equal(await page.getByLabel('URL de fotografía de la sección', { exact: true }).inputValue(), 'https://example.test/programa.jpg');
     assert.equal(await page.getByLabel('Composición de la sección', { exact: true }).inputValue(), 'left');
+    assert.equal(await page.getByLabel('Descripción institucional', { exact: true }).inputValue(), 'Museo de Arte de Lima · Educación');
     assert.equal(await page.getByLabel('Descripción del docente', { exact: true }).first().inputValue(), text + 'más palabras');
     await page.getByRole('button', { name: 'Vista previa', exact: true }).click();
     await page.locator('iframe[title="Vista previa de la landing"]').waitFor();
     const preview = page.frameLocator('iframe[title="Vista previa de la landing"]');
     assert.equal(await preview.locator('.curriculum-module').count(), 13);
+    assert.equal(await preview.locator('.hero').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 34, 204)', 'La vista previa respeta el tono elegido');
     assert.equal(await preview.locator('.overview--left img').getAttribute('src'), 'https://example.test/programa.jpg');
+    assert.equal(await preview.locator('.footer-subtitle').textContent(), 'Museo de Arte de Lima · Educación');
     assert.equal(errors.length, 0, 'Errores JS: ' + errors.join('; '));
     console.log('PASS editor: edición de biografías, matrícula, guardado, reapertura y vista previa');
 
@@ -371,15 +389,20 @@ const server = http.createServer(async (req, res) => {
       const facts = await videoPage.locator('.hero .facts').boundingBox();
       const heroBounds = await videoPage.locator('.hero').boundingBox();
       const videoBounds = await videoPage.locator('.hero__video').boundingBox();
-      assert.ok(Math.abs(videoBounds.width - heroBounds.width / 3) < 1, 'El video ocupa un tercio del ancho del hero');
-      assert.ok(Math.abs(videoBounds.x - (heroBounds.x + heroBounds.width * 2 / 3)) < 1, 'Los primeros dos tercios quedan con fondo sólido');
-      assert.notEqual(await videoPage.locator('.hero__video').evaluate((el) => getComputedStyle(el).maskImage), 'none', 'Fundido entre video y fondo');
       if (width > 760) {
+        assert.ok(Math.abs(videoBounds.width - heroBounds.width / 3) < 1, 'El video ocupa un tercio del ancho del hero en escritorio');
+        assert.ok(Math.abs(videoBounds.x - (heroBounds.x + heroBounds.width * 2 / 3)) < 1, 'Los primeros dos tercios quedan con fondo sólido');
+        assert.notEqual(await videoPage.locator('.hero__video').evaluate((el) => getComputedStyle(el).maskImage), 'none', 'Fundido entre video y fondo');
         const heading = await videoPage.locator('.hero h1').boundingBox();
         assert.ok(heading.x + heading.width <= videoBounds.x, 'El título queda dentro del área sólida');
         const factsBox = await videoPage.locator('.program-facts').boundingBox();
         assert.ok(Math.abs(controls.y + controls.height - factsBox.y - factsBox.height) < 1, 'Controles alineados con la base de la ficha');
         assert.ok(controls.x >= factsBox.x + factsBox.width, 'Los controles no se superponen a la ficha');
+      } else {
+        const shade = await videoPage.locator('.hero__shade').boundingBox();
+        assert.ok(Math.abs(videoBounds.width - heroBounds.width) < 1 && Math.abs(videoBounds.height - heroBounds.height) < 1, 'En móvil el video cubre todo el hero');
+        assert.ok(Math.abs(shade.width - heroBounds.width) < 1 && Math.abs(shade.x - heroBounds.x) < 1, 'La capa azul cubre todo el ancho');
+        assert.equal(await videoPage.locator('.hero__video').evaluate((el) => getComputedStyle(el).maskImage), 'none', 'Sin máscara lateral en móvil');
       }
       assert.ok(controls.x >= 0 && controls.x + controls.width <= width, 'Controles dentro del ancho disponible');
       if (width <= 760) assert.ok(controls.y >= facts.y + facts.height && controls.y + controls.height <= copy.y + copy.height, 'En móvil, controles debajo de la ficha');

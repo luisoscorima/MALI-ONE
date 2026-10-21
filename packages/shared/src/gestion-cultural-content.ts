@@ -61,7 +61,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Gestión cultural, planificación y ciencia política. Experiencia en organismos públicos de Colombia y Perú.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_1.jpg",
     "imageAlt": "Alejandra Muñoz",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Camilo Riveros",
@@ -69,7 +69,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Antropología aplicada a la gestión cultural, industrias creativas y propiedad intelectual.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_2.jpg",
     "imageAlt": "Camilo Riveros",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Carolina Cristen",
@@ -77,7 +77,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Gestión cultural, artes escénicas, industria audiovisual y comisariado de exposiciones.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_3.jpg",
     "imageAlt": "Carolina Cristen",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Daniel Vergaray",
@@ -85,7 +85,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Marketing digital, comunicación y desarrollo de comunidades en música y cultura.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_4.jpg",
     "imageAlt": "Daniel Vergaray",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Diana Guerra",
@@ -93,7 +93,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Historiadora y gestora cultural. Experiencia en políticas culturales y organismos internacionales.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_5.jpg",
     "imageAlt": "Diana Guerra",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Guillermo Cortés",
@@ -101,7 +101,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Gestión y políticas culturales, turismo y formulación de proyectos en el sector público.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_6.jpg",
     "imageAlt": "Guillermo Cortés",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Karla Miranda",
@@ -109,7 +109,7 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Derecho de la propiedad intelectual y derecho administrativo aplicado al sector cultural.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_7.jpg",
     "imageAlt": "Karla Miranda",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   },
   {
     "name": "Melissa Giorgio",
@@ -117,6 +117,6 @@ export const GESTION_CULTURAL_FACULTY = [
     "description": "Educación artística, gestión y mediación cultural, con experiencia en programas y públicos.",
     "imageUrl": "https://educacion.mali.pe/wp-content/uploads/2026/10/docente_8.jpg",
     "imageAlt": "Melissa Giorgio",
-    "linkedinUrl": ""
+    "linkedinUrl": "https://www.linkedin.com/"
   }
 ];

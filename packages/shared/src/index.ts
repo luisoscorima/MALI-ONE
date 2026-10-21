@@ -1134,9 +1134,25 @@ export interface LandingPreviewDto {
  * Gestión Cultural. El contenido comercial debe revisarse por edición antes
  * de publicarse.
  */
+export const DEFAULT_LANDING_FOOTER = {
+  title: 'MALI EDUCACIÓN',
+  subtitle: 'Museo de Arte de Lima',
+  links: [
+    { label: 'Cursos y Talleres', url: 'https://educacion.mali.pe/cursos-de-arte/' },
+    { label: 'Extensión Profesional', url: 'https://educacion.mali.pe/extension-profesional/' },
+    { label: 'Experiencias Educativas', url: 'https://educacion.mali.pe/experiencias-educativas/' },
+    { label: 'Arte Empresa', url: 'https://educacion.mali.pe/arte-empresa/' },
+    { label: 'Nosotros', url: 'https://educacion.mali.pe/nosotros/' },
+  ],
+  instagramUrl: 'https://www.instagram.com/malieducacion/',
+  tiktokUrl: 'https://www.tiktok.com/@malieducacion',
+  facebookUrl: 'https://www.facebook.com/cursosmali',
+  linkedinUrl: 'https://pe.linkedin.com/company/museodeartedelima',
+};
+
 export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
   logoUrl:
-    'https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Educacion.png',
+    'https://educacion.mali.pe/wp-content/uploads/2025/02/logo.png',
   logoAlt: 'MALI Educación',
   headerCtaLabel: 'Solicitar información',
   logoWidth: 270,
@@ -1161,8 +1177,8 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
       type: 'hero',
       enabled: true,
       data: {
-        backgroundColor: '#0022cc',
-        videoUrl: '',
+        backgroundColor: '#003C7C',
+        videoUrl: 'https://educacion.mali.pe/wp-content/uploads/2026/10/Adobe-Express-Testimonios_PEGC_25mb.mp4',
         eyebrow: 'Extensión Profesional',
         title: 'Programa de Especialización en Gestión Cultural',
         body:
@@ -1444,7 +1460,7 @@ export const DEFAULT_GESTION_CULTURAL_LANDING_CONTENT: LandingDocument = {
       type: 'footer',
       enabled: true,
       data: {
-        text: 'MALI Educación · Museo de Arte de Lima',
+        ...DEFAULT_LANDING_FOOTER,
       },
     },
   ],
@@ -1469,10 +1485,22 @@ export function upgradeGestionCulturalLanding(current: LandingDocument): Landing
     }
   }
   for (const block of blocks) {
-    if (block.type === 'hero') block.data = { backgroundColor: '#0022cc', videoUrl: '', ...block.data };
+    if (block.type === 'hero') {
+      block.data = { backgroundColor: '#003C7C', ...block.data };
+      if (typeof block.data.videoUrl !== 'string' || !block.data.videoUrl.trim()) {
+        block.data.videoUrl = defaults.blocks.find((item) => item.type === 'hero')!.data.videoUrl;
+      }
+    }
+    if (block.type === 'faculty' && Array.isArray(block.data.items)) {
+      block.data.items = block.data.items.map((item) => item && typeof item === 'object' &&
+        (typeof item.linkedinUrl !== 'string' || !item.linkedinUrl.trim())
+        ? { ...item, linkedinUrl: 'https://www.linkedin.com/' } : item);
+    }
   }
   return {
     ...current,
+    logoUrl: !current.logoUrl || current.logoUrl === 'https://mali-assets.s3.us-east-1.amazonaws.com/assets-web-mali/Logo_MALI_Educacion.png'
+      ? defaults.logoUrl : current.logoUrl,
     logoWidth: current.logoWidth ?? defaults.logoWidth,
     navigation: current.navigation ?? defaults.navigation?.map((item) => ({ ...item })),
     leadFormLayout: current.leadFormLayout ?? 'sticky',

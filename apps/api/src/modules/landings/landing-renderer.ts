@@ -3,6 +3,7 @@ import type {
   LandingBlockType,
   LandingDocument,
 } from '@mali-one/shared';
+import { DEFAULT_LANDING_FOOTER } from '@mali-one/shared';
 
 const BLOCK_TYPES = new Set<LandingBlockType>([
   'hero',
@@ -112,6 +113,9 @@ const ICON_PATHS = {
   pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
   sound: '<path d="m11 5-6 4H2v6h3l6 4V5Zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
   muted: '<path d="m11 5-6 4H2v6h3l6 4V5Zm6 4 5 6m0-6-5 6"/>',
+  instagram: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01" stroke-width="2.5"/>',
+  tiktok: '<path d="M14 3h3a5 5 0 0 0 5 5v3a8 8 0 0 1-5-1.8V16a6 6 0 1 1-6-6v3a3 3 0 1 0 3 3V3Z" fill="currentColor" stroke="none"/>',
+  facebook: '<path d="M14 22v-9h3l.5-4H14V7c0-1.2.4-2 2-2h2V1.5a24 24 0 0 0-3-.2c-3 0-5 1.8-5 5V9H7v4h3v9Z" fill="currentColor" stroke="none"/>',
   linkedin: '<rect x="2" y="2" width="20" height="20" rx="3" fill="currentColor" stroke="none"/><g stroke="var(--linkedin-ink,#1b1220)" stroke-width="2"><path d="M7 10v7m4 0v-7m0 3a3 3 0 0 1 6 0v4"/><path d="M7 7h.01" stroke-width="2.5"/></g>',
 } as const;
 
@@ -190,7 +194,7 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
   const data = block.data;
   const imageUrl = assetUrl(data.imageUrl, apiBase);
   const videoUrl = safeUrl(data.videoUrl);
-  const background = color(data.backgroundColor, '#0022cc');
+  const background = color(data.backgroundColor, '#003C7C');
   const facts = array(data.facts)
     .map(object)
     .map(
@@ -399,7 +403,27 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
 }
 
 function renderFooter(block: LandingBlock): string {
-  return `<footer><div class="shell">${escapeHtml(block.data.text)}</div></footer>`;
+  const data = block.data;
+  const defaults = DEFAULT_LANDING_FOOTER;
+  const title = text(data.title, 160) || defaults.title;
+  const subtitle = data.subtitle === undefined ? defaults.subtitle : text(data.subtitle, 240);
+  const links = (Array.isArray(data.links) ? array(data.links) : defaults.links).map(object)
+    .map((item) => ({ label: text(item.label, 100), url: safeUrl(item.url) })).filter((item) => item.label && item.url);
+  const platforms = [
+    ['instagramUrl', 'Instagram', 'instagram'], ['tiktokUrl', 'TikTok', 'tiktok'],
+    ['facebookUrl', 'Facebook', 'facebook'], ['linkedinUrl', 'LinkedIn', 'linkedin'],
+  ] as const;
+  const social = platforms.map(([key, label, name]) => {
+    const url = safeUrl(data[key] === undefined ? defaults[key] : data[key]);
+    return url ? `<a class="footer-social__link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${label}" title="${label}">${icon(name)}</a>` : '';
+  }).join('');
+  const note = text(data.text, 500);
+  return `<footer class="landing-footer"><div class="shell">
+    <h2 class="footer-brand">${escapeHtml(title)}</h2>${subtitle ? `<p class="footer-subtitle">${escapeHtml(subtitle)}</p>` : ''}
+    ${links.length ? `<nav aria-label="Enlaces de MALI Educación"><ul class="footer-links">${links.map((item, index) => `<li>${index ? '<span class="footer-separator" aria-hidden="true">|</span>' : ''}<a href="${escapeHtml(item.url)}">${escapeHtml(item.label)}</a></li>`).join('')}</ul></nav>` : ''}
+    ${social ? `<nav class="footer-social" aria-label="Redes sociales de MALI Educación">${social}</nav>` : ''}
+    ${note && note !== 'MALI Educación · Museo de Arte de Lima' ? `<p class="footer-note">${escapeHtml(note)}</p>` : ''}
+  </div></footer>`;
 }
 
 function renderCurriculum(block: LandingBlock): string {
@@ -540,7 +564,7 @@ export function renderLandingHtml(input: {
     .site-head{height:var(--header-height);position:sticky;top:0;background:#fff;color:var(--ink);border-bottom:1px solid var(--line);z-index:50}
     .site-head .shell{width:min(1440px,calc(100% - 40px));gap:20px}.site-logo{width:var(--logo-width);max-width:100%;max-height:76px;object-fit:contain}.brand{flex-shrink:0;max-width:30%}.header-cta{background:var(--primary);color:#fff;border:0;white-space:nowrap}
     .site-nav{display:flex;align-items:center;gap:18px}.site-nav a{font-size:var(--text-meta);text-decoration:none;font-weight:700}.site-nav a:hover,.site-nav a[aria-current]{color:var(--primary)}.nav-toggle{display:none;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
-    .hero{background:var(--hero-bg,#0022cc);min-height:580px}.hero:after{display:none}.hero__content{padding-block:80px 56px}.hero h1{font-size:var(--text-section)}.hero__shade{background:linear-gradient(90deg,var(--hero-bg) 4%,color-mix(in srgb,var(--hero-bg) 85%,transparent) 42%,color-mix(in srgb,var(--hero-bg) 25%,transparent) 80%),linear-gradient(0deg,var(--hero-bg),transparent 40%)}
+    .hero{background:var(--hero-bg,#003C7C);min-height:580px}.hero:after{display:none}.hero__content{padding-block:80px 56px}.hero h1{font-size:var(--text-section)}.hero__shade{background:linear-gradient(90deg,var(--hero-bg) 4%,color-mix(in srgb,var(--hero-bg) 85%,transparent) 42%,color-mix(in srgb,var(--hero-bg) 25%,transparent) 80%),linear-gradient(0deg,var(--hero-bg),transparent 40%)}
     .hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.65}.hero__media-controls{position:absolute;right:24px;bottom:20px;left:24px;z-index:3;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}.hero__media-controls button{min-height:44px;color:#fff;background:rgba(0,0,0,.55);border:1px solid #fff;border-radius:8px;padding:8px 12px;font-size:var(--text-meta);cursor:pointer}.hero__media-controls button:focus-visible{outline:3px solid #fff;outline-offset:3px}.hero:has(.hero__media-controls) .hero__content{padding-bottom:100px}.hero .facts{margin-top:24px}.hero .facts li{min-width:160px}
     .section{padding:52px 0}.section__head{margin-bottom:24px}.contact{padding:56px 0}.section h2,.contact h2{font-size:var(--text-section);line-height:1.08}.feature,.schedule-card{padding:22px;border-radius:18px}.section__head--split{gap:24px}.cta-panel{padding:30px;gap:20px}
     .faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.faculty-card{min-height:0;display:flex;flex-direction:column}.faculty-card img{width:100%;height:280px;min-height:0;object-fit:cover;object-position:center 18%}.faculty-card__copy{position:static;padding:20px;background:#1b1220;flex:1}.faculty-card__copy p{line-height:1.55}.faculty-link{display:inline-flex;margin-top:14px;color:#fff;text-underline-offset:4px;font-weight:700}
@@ -660,11 +684,23 @@ export function renderLandingHtml(input: {
     .hero__media-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%}
     .investment-amount{font-size:clamp(48px,5vw,64px);line-height:1.1;letter-spacing:-.035em}
     .investment-amount .landing-icon{width:32px;height:32px}
+    .landing-footer{--linkedin-ink:#08050b;padding:40px 0;color:#f3edf7}
+    .footer-brand{margin:0;font-size:var(--text-subtitle);font-weight:700;letter-spacing:.04em;line-height:1.3}
+    .footer-subtitle{margin:8px 0 0;font-size:var(--text-body);color:#d7cedb}
+    .footer-links{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;list-style:none;padding:0;margin:22px 0;gap:6px 0}
+    .footer-links li{display:flex;align-items:center}.footer-links a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-size:var(--text-meta)}
+    .footer-separator{margin-inline:14px;color:#82748c}.footer-links a:hover{text-decoration:underline;text-underline-offset:5px}
+    .footer-social{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px}
+    .footer-social__link{display:grid;place-items:center;width:44px;height:44px;border:1px solid #64576e;border-radius:50%;color:#fff;text-decoration:none;transition:background-color .2s,border-color .2s}
+    .footer-social__link .landing-icon{width:22px;height:22px}.footer-social__link:hover{background:var(--primary);border-color:var(--primary);--linkedin-ink:var(--primary)}
+    .footer-links a:focus-visible,.footer-social__link:focus-visible{outline:3px solid #f4a8d9;outline-offset:4px}
+    .footer-note{margin:20px 0 0;color:#b9aebf;font-size:var(--text-meta)}
+    @media(max-width:760px){.landing-footer{padding:32px 0}.footer-links{flex-direction:column;gap:0;margin:18px 0}.footer-separator{display:none}}
     /* Video limitado al tercio derecho; el fundido revela el color sólido debajo. */
     .hero__video{inset:0 0 0 auto;width:calc(100% / 3);height:100%;opacity:1;mask-image:linear-gradient(90deg,transparent,#000 28%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%)}
     .hero:has(.hero__video) .hero__shade{background:none;pointer-events:none}
     @media(min-width:761px){.hero:has(.hero__video) .hero__content>h1,.hero:has(.hero__video) .hero__lead,.hero:has(.hero__video) .program-facts{max-width:min(920px,calc(66.666667vw - max(var(--page-gutter),calc((100vw - var(--page-width)) / 2)) - var(--content-inset) - 24px))}.hero:has(.program-facts) .hero__media-controls{left:auto;bottom:100px}}
-    @media(max-width:760px){.hero:has(.hero__video) .hero__shade{inset:0 0 0 auto;width:calc(100% / 3);background:rgba(0,0,0,.28);mask-image:linear-gradient(90deg,transparent,#000 28%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%)}.hero:has(.hero__video) h1,.hero:has(.hero__video) .hero__lead{text-shadow:0 2px 8px rgba(0,0,0,.3)}.hero__media-controls{right:8px}}
+    @media(max-width:760px){.hero__video{inset:0;width:100%;mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) .hero__shade{inset:0;width:100%;background:linear-gradient(180deg,color-mix(in srgb,var(--hero-bg) 72%,transparent),color-mix(in srgb,var(--hero-bg) 60%,transparent) 45%);mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) h1,.hero:has(.hero__video) .hero__lead{text-shadow:0 2px 8px rgba(0,0,0,.3)}.hero__media-controls{right:8px}}
     @media(max-width:760px){.overview,.overview--left{grid-template-columns:1fr;gap:24px}.overview--left .overview__figure{order:0}.program-facts{padding:16px}.hero .program-facts .facts{grid-template-columns:1fr}.hero .program-facts .facts li{border:0;border-top:1px solid var(--line);padding:12px 0}.hero .program-facts .facts li:first-child{border-top:0;padding-top:4px}.faculty-carousel .faculty-card__copy{padding:18px}}
   </style>
 </head>

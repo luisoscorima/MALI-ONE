@@ -22,6 +22,7 @@ import type {
   LandingBlockType,
   LandingDocument,
 } from '@mali-one/shared';
+import { DEFAULT_LANDING_FOOTER } from '@mali-one/shared';
 import {
   Button,
   Input,
@@ -60,7 +61,7 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
           eyebrow: 'Extensión Profesional',
           title: 'Título del programa',
           body: 'Presenta la propuesta principal del programa.',
-          backgroundColor: '#0022cc',
+          backgroundColor: '#003C7C',
           videoUrl: '',
           imageUrl: '',
           imageAlt: '',
@@ -135,7 +136,7 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
         },
       };
     case 'footer':
-      return { ...common, data: { text: 'MALI Educación · Museo de Arte de Lima' } };
+      return { ...common, data: { ...DEFAULT_LANDING_FOOTER, links: DEFAULT_LANDING_FOOTER.links.map((item) => ({ ...item })) } };
   }
 }
 
@@ -202,7 +203,9 @@ function BlockFields({ block, update }: { block: LandingBlock; update: (key: str
   const itemFields = (label: string, fields: ItemField[], key = 'items') => <ItemsEditor value={block.data[key]} fields={fields} label={label} onChange={(items) => update(key, items)} />;
   const heading = <>{field('Antetítulo', 'eyebrow')}{field('Título', 'title')}</>;
   switch (block.type) {
-    case 'hero': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'ctaLabel')}{field('Color de fondo sólido', 'backgroundColor')}{field('URL del video MP4 (opcional)', 'videoUrl')}{field('Imagen alternativa del video', 'imageUrl')}{field('Texto alternativo', 'imageAlt')}
+    case 'hero': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'ctaLabel')}
+      <div className="space-y-2"><div className="flex items-end gap-3"><div className="flex-1">{field('Color de fondo sólido', 'backgroundColor')}</div><input type="color" className="h-9 w-12 cursor-pointer rounded border border-input bg-transparent" aria-label="Elegir color del hero" value={/^#[0-9a-f]{6}$/i.test(stringValue(block.data.backgroundColor)) ? stringValue(block.data.backgroundColor) : '#003C7C'} onChange={(event) => update('backgroundColor', event.target.value)} /></div><p className="text-xs text-muted-foreground">Color editable. Puedes volver al tono anterior con #0022CC.</p></div>
+      {field('URL del video MP4 (opcional)', 'videoUrl')}{field('Imagen alternativa del video', 'imageUrl')}{field('Texto alternativo', 'imageAlt')}
       <p className="text-xs text-muted-foreground md:col-span-2">Sin URL de video se mostrará el fondo sólido. El video intentará iniciar con sonido; si el navegador lo bloquea, comenzará silenciado con un botón para activarlo.</p>
       {itemFields('Datos destacados', [{ key: 'label', label: 'Etiqueta' }, { key: 'value', label: 'Valor' }], 'facts')}</div>;
     case 'text': return <div className="grid gap-3 md:grid-cols-2">{heading}<div className="md:col-span-2">{field('Contenido', 'body', true)}</div>
@@ -222,7 +225,14 @@ function BlockFields({ block, update }: { block: LandingBlock; update: (key: str
     case 'lead_form': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'submitLabel')}
       <div className="space-y-1"><Label htmlFor={block.id + '-area'}>Área CRM</Label><select id={block.id + '-area'} className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={stringValue(block.data.area) || 'educacion_ep'} onChange={(event) => update('area', event.target.value)}><option value="educacion_ep">Educación EP</option><option value="educacion_ca">Educación CA</option></select></div>
       {field('Slug del curso', 'courseSlug')}{field('Nombre del curso', 'courseTitle')}{field('Número de WhatsApp', 'whatsappPhone')}{field('Color de fondo', 'backgroundColor')}{field('URL de privacidad', 'privacyUrl')}</div>;
-    case 'footer': return field('Texto', 'text');
+    case 'footer': return <div className="grid gap-3 md:grid-cols-2">
+      <DataField label="Nombre institucional" value={block.data.title ?? DEFAULT_LANDING_FOOTER.title} onChange={(value) => update('title', value)} />
+      <DataField label="Descripción institucional" value={block.data.subtitle ?? DEFAULT_LANDING_FOOTER.subtitle} onChange={(value) => update('subtitle', value)} />
+      <ItemsEditor label="Enlaces del pie de página" value={block.data.links ?? DEFAULT_LANDING_FOOTER.links} fields={[{ key: 'label', label: 'Etiqueta del enlace' }, { key: 'url', label: 'URL del enlace' }]} onChange={(items) => update('links', items)} />
+      {(['instagramUrl', 'tiktokUrl', 'facebookUrl', 'linkedinUrl'] as const).map((key) => <DataField key={key} label={{ instagramUrl: 'Instagram del footer', tiktokUrl: 'TikTok del footer', facebookUrl: 'Facebook del footer', linkedinUrl: 'LinkedIn del footer' }[key]} value={block.data[key] ?? DEFAULT_LANDING_FOOTER[key]} onChange={(value) => update(key, value)} />)}
+      {field('Texto adicional (opcional)', 'text')}
+      <p className="text-xs text-muted-foreground md:col-span-2">Deja vacía la URL de una red social para ocultar su icono.</p>
+    </div>;
   }
 }
 

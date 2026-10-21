@@ -27,7 +27,7 @@ function loadSource(relative, overrides = {}) {
 
 const academic = loadSource('packages/shared/src/gestion-cultural-content.ts');
 const shared = loadSource('packages/shared/src/index.ts', { './gestion-cultural-content': academic });
-const renderer = loadSource('apps/api/src/modules/landings/landing-renderer.ts');
+const renderer = loadSource('apps/api/src/modules/landings/landing-renderer.ts', { '@mali-one/shared': shared });
 const { LandingsService } = loadSource('apps/api/src/modules/landings/landings.service.ts', { './landing-renderer': renderer });
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const content = () => clone(shared.DEFAULT_GESTION_CULTURAL_LANDING_CONTENT);

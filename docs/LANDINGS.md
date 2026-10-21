@@ -19,8 +19,11 @@ La plantilla inicial `gestion-cultural` incorpora el contenido académico aproba
 del HTML `mali_gestion_cultural_landing_v7_sin_banner.html`: 13 módulos, Proyecto
 Integrador Final, perfil del participante y ocho docentes. Las fotos se referencian
 desde WordPress (`docente_1.jpg` a `docente_8.jpg`, en ese orden); no se incluyen
-archivos de imagen en el repositorio. Los enlaces de LinkedIn quedan vacíos hasta
-completarlos y sus botones solo aparecen cuando hay una URL válida.
+archivos de imagen en el repositorio. Los ocho docentes parten con el enlace
+`https://www.linkedin.com/`, reemplazable por la URL de cada perfil; vaciarlo oculta
+su botón. El logo inicial usa `https://educacion.mali.pe/wp-content/uploads/2025/02/logo.png`
+y el hero referencia el video externo
+`https://educacion.mali.pe/wp-content/uploads/2026/10/Adobe-Express-Testimonios_PEGC_25mb.mp4`.
 Los docentes se presentan en un carrusel de tarjetas verticales, con un marco de
 foto uniforme 3:4 y biografía debajo. La imagen cubre ese marco sin deformarse,
 con el encuadre centrado arriba. Incluye flechas, contador, navegación con teclado
@@ -82,11 +85,16 @@ campos individuales para conservar espacios y saltos de línea. El máximo es de
 50 bloques por landing y 50 elementos por lista; superar el límite devuelve un
 error y no descarta contenido silenciosamente.
 
-El hero tiene fondo sólido `#0022cc` y una URL opcional de video. Sin URL no se
-crea un reproductor. El video ocupa el tercio derecho del hero, con un fundido
-en su borde izquierdo hacia los otros dos tercios de color sólido. En escritorio
-el título y los datos se limitan al área sólida; en móvil el texto conserva su
-ancho y se refuerza el contraste sobre el tercio de video.
+El hero tiene fondo sólido inicial `#003C7C`, editable desde su bloque mediante
+campo hexadecimal o selector de color. El tono anterior `#0022CC` se puede volver
+a aplicar en cualquier momento. Las landings guardadas conservan el color que
+tengan configurado; cambiar el valor inicial no sustituye sus ediciones.
+El hero admite una URL opcional de video. Sin URL no se
+crea un reproductor. En escritorio, el video ocupa el tercio derecho del hero,
+con un fundido hacia los otros dos tercios de color sólido; el título y los datos
+se limitan al área sólida. En móvil (hasta 760 px), el video cubre todo el hero
+con una capa del color configurado al 60 %, reforzada al 72 % en la parte superior
+para facilitar la lectura del título.
 En escritorio, los controles de sonido y reproducción se alinean con la base de
 la ficha de datos; en móvil permanecen debajo para evitar superposiciones.
 Intenta comenzar en bucle con sonido; si el navegador bloquea ese inicio, vuelve
@@ -165,13 +173,22 @@ en las fichas de cursos y en el resto del sitio WordPress.
 
 El seed crea `gestion-cultural` como borrador. Si ya existe, añade los bloques
 faltantes de perfil, malla, docentes, galería e inversión y completa las opciones
-nuevas cuando aún no existen. Solo sustituye la lista antigua de docentes si no
+nuevas cuando aún no existen. Actualiza el antiguo logo predeterminado, completa
+el video del hero y los enlaces de LinkedIn vacíos con los valores iniciales.
+Conserva URLs personalizadas. Solo sustituye la lista antigua de docentes si no
 tiene nombres, cargos, biografías ni LinkedIn editados. Conserva los demás textos,
 tarifas y perfiles. Nunca publica. La misma mejora se puede incorporar desde el
 botón **Incorporar mejoras de Gestión Cultural** del editor; luego hay que revisar
 y guardar o publicar explícitamente. Ejecutar el seed nuevamente es idempotente.
 
 ## Verificación local
+
+El pie de página presenta MALI EDUCACIÓN, Museo de Arte de Lima, los enlaces a
+Cursos y Talleres, Extensión Profesional, Experiencias Educativas, Arte Empresa
+y Nosotros, y los iconos de Instagram, TikTok, Facebook y LinkedIn. Todo se edita
+en el bloque Pie de página; vaciar una URL social oculta su icono. Los bloques
+antiguos sin estos campos usan el mismo pie institucional, conservando cualquier
+texto adicional personalizado. Las redes abren en otra pestaña con `noopener`.
 
 ```bash
 node --test scripts/landings.test.cjs
