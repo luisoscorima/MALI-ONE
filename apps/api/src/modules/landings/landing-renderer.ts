@@ -108,6 +108,10 @@ const ICON_PATHS = {
   arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
   chevron: '<path d="m6 9 6 6 6-6"/>',
   external: '<path d="M7 17 17 7M7 7h10v10"/>',
+  play: '<path d="m8 5 11 7-11 7V5Z" fill="currentColor" stroke="none"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/>',
+  sound: '<path d="m11 5-6 4H2v6h3l6 4V5Zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  muted: '<path d="m11 5-6 4H2v6h3l6 4V5Zm6 4 5 6m0-6-5 6"/>',
   linkedin: '<rect x="2" y="2" width="20" height="20" rx="3" fill="currentColor" stroke="none"/><g stroke="var(--linkedin-ink,#1b1220)" stroke-width="2"><path d="M7 10v7m4 0v-7m0 3a3 3 0 0 1 6 0v4"/><path d="M7 7h.01" stroke-width="2.5"/></g>',
 } as const;
 
@@ -195,7 +199,7 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
     )
     .join('');
   return `<section class="hero" id="${escapeHtml(block.id)}" style="--hero-bg:${background}">
-    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><div class="hero__media-controls" role="group" aria-label="Controles del video"><button class="hero__sound" type="button" aria-pressed="false">Activar sonido</button><button class="hero__pause" type="button">Reproducir video</button></div>` : ''}
+    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><div class="hero__media-controls" role="group" aria-label="Controles del video"><button class="hero__sound" type="button" aria-pressed="false" aria-label="Activar sonido" title="Activar sonido" data-control-icon="muted">${icon('muted')}</button><button class="hero__pause" type="button" aria-label="Reproducir video" title="Reproducir video" data-control-icon="play">${icon('play')}</button></div>` : ''}
     <div class="hero__shade"></div>
     <div class="shell hero__content">
       ${eyebrow(data)}
@@ -250,7 +254,7 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
   const items = faculty
     .map(
       (item, index) => `<article class="faculty-card" id="${escapeHtml(block.id)}-docente-${index + 1}">
-        ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"><span class="faculty-card__index" aria-hidden="true">${String(index + 1).padStart(2, '0')} / ${String(faculty.length).padStart(2, '0')}</span></div>` : ''}
+        ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"></div>` : ''}
         <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p class="faculty-role">${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p class="faculty-description" id="${escapeHtml(block.id)}-bio-${index + 1}">${escapeHtml(item.description)}</p>` : ''}<div class="faculty-card__actions">${item.description ? `<button class="faculty-bio-toggle" type="button" aria-expanded="false" aria-controls="${escapeHtml(block.id)}-bio-${index + 1}" hidden>Leer más<span class="sr-only"> sobre ${escapeHtml(item.name)}</span></button>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">${icon('linkedin')}<span>Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span></span>${icon('external', 'button-arrow')}</a>` : ''}</div></div>
       </article>`,
     )
@@ -265,12 +269,12 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
         <button class="faculty-arrow faculty-arrow--prev" type="button" data-faculty-prev aria-label="Ver docentes anteriores" aria-controls="${escapeHtml(block.id)}-carrusel" hidden>←</button>
         <button class="faculty-arrow faculty-arrow--next" type="button" data-faculty-next aria-label="Ver docentes siguientes" aria-controls="${escapeHtml(block.id)}-carrusel" hidden>→</button>
       </div>
-      <div class="faculty-pagination" role="group" aria-label="Elegir docente" hidden>
-        ${faculty.map((item, index) => `<button class="faculty-dot" type="button" data-faculty-index="${index}" aria-label="Ver a ${escapeHtml(item.name || `docente ${index + 1}`)}" aria-controls="${escapeHtml(block.id)}-docente-${index + 1}" aria-current="${index === 0 ? 'true' : 'false'}"></button>`).join('')}
-      </div>
       <div class="faculty-controls" hidden>
-        <span class="faculty-position" role="status" aria-live="polite" aria-atomic="true"></span>
-        <button class="faculty-autoplay" type="button" data-faculty-autoplay aria-label="Pausar carrusel">Pausar</button>
+        <span class="faculty-position sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
+        <div class="faculty-pagination" role="group" aria-label="Elegir docente" hidden>
+        ${faculty.map((item, index) => `<button class="faculty-dot" type="button" data-faculty-index="${index}" aria-label="Ver a ${escapeHtml(item.name || `docente ${index + 1}`)}" aria-controls="${escapeHtml(block.id)}-docente-${index + 1}" aria-current="${index === 0 ? 'true' : 'false'}"></button>`).join('')}
+        </div>
+        <button class="faculty-autoplay" type="button" data-faculty-autoplay aria-label="Pausar carrusel" title="Pausar carrusel" data-control-icon="pause">${icon('pause')}</button>
       </div>
     </div>
     ${note ? `<p class="section-note">${escapeHtml(note)}</p>` : ''}
@@ -551,9 +555,10 @@ export function renderLandingHtml(input: {
     .faculty-slider{min-width:0}.faculty-carousel{position:relative;display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:0;overscroll-behavior-x:contain;padding:6px 0 14px}.faculty-carousel:focus-visible{outline:2px solid #fff;outline-offset:5px;border-radius:6px}
     .faculty-carousel,.lead-panel{scrollbar-width:none;-ms-overflow-style:none}.faculty-carousel::-webkit-scrollbar,.lead-panel::-webkit-scrollbar{display:none;width:0;height:0}
     .faculty-carousel .faculty-card{flex:0 0 280px;min-width:0;min-height:0;scroll-snap-align:start;scroll-snap-stop:always;display:flex;flex-direction:column;transform:none}.faculty-card__photo{position:relative;width:100%;aspect-ratio:3/4;overflow:hidden;background:#130b1a;flex-shrink:0}.faculty-carousel .faculty-card img{position:absolute;inset:0;display:block;width:100%;height:100%;min-height:0;object-fit:cover;object-position:center top;filter:none}.faculty-carousel .faculty-card__copy{position:static;padding:20px;flex:1;display:flex;flex-direction:column;background:#1b1220}.faculty-carousel .faculty-card__copy p{font-size:var(--text-meta);line-height:1.55}.faculty-carousel .faculty-link{margin-top:auto;padding-top:16px}
-    .faculty-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:12px}.faculty-controls[hidden]{display:none}.faculty-position{margin-right:auto;font-size:var(--text-meta);color:#d7cadc}.faculty-controls button{width:44px;height:44px;border:1px solid rgba(255,255,255,.4);border-radius:50%;background:transparent;color:#fff;font:inherit;font-size:var(--text-subtitle);cursor:pointer}.faculty-controls button:disabled{opacity:.35;cursor:default}.faculty-controls button:focus-visible{outline:2px solid #fff;outline-offset:3px}
-    .faculty-controls .faculty-autoplay{width:auto;padding-inline:14px;border-radius:999px;font-size:var(--text-meta)}
-    .faculty-pagination{display:flex;justify-content:center;flex-wrap:wrap;gap:4px;margin-top:12px}.faculty-pagination[hidden]{display:none}.faculty-dot{display:grid;place-items:center;width:24px;height:32px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}.faculty-dot:before{content:"";width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s,transform .2s}.faculty-dot[aria-current="true"]:before{background:var(--accent);transform:scale(1.4)}.faculty-dot:focus-visible{outline:2px solid #fff;outline-offset:2px}.faculty-carousel .faculty-card.is-current{border-color:var(--accent)}
+    .faculty-controls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px}.faculty-controls[hidden]{display:none}.faculty-position{font-size:var(--text-meta);color:#d7cadc}.faculty-controls>.faculty-autoplay{flex-shrink:0;width:44px;height:44px;border:1px solid rgba(255,255,255,.4);border-radius:50%;background:transparent;color:#fff;font:inherit;font-size:var(--text-subtitle);cursor:pointer}.faculty-controls>.faculty-autoplay:focus-visible{outline:2px solid #fff;outline-offset:3px}
+    .faculty-controls .faculty-autoplay{display:grid;place-items:center;width:44px;padding:0;border-radius:50%}.faculty-controls .faculty-autoplay[hidden]{display:none}
+    .faculty-pagination{display:flex;justify-content:center;flex-wrap:wrap;gap:4px;min-width:0;max-width:calc(100% - 56px)}.faculty-pagination[hidden]{display:none}.faculty-dot{display:grid;place-items:center;flex-shrink:0;width:24px;height:32px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer}.faculty-dot:before{content:"";width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);transition:background .2s,transform .2s}.faculty-dot[aria-current="true"]:before{background:var(--accent);transform:scale(1.4)}.faculty-dot:focus-visible{outline:2px solid #fff;outline-offset:2px}.faculty-carousel .faculty-card.is-current{border-color:var(--accent)}
+    @media(max-width:400px){.faculty-pagination{gap:2px}.faculty-dot{width:20px}}
     @media(max-width:760px){.faculty-carousel{gap:14px}.faculty-carousel .faculty-card{flex-basis:85%;max-width:280px}.faculty-carousel .faculty-card__copy h3{font-size:var(--text-subtitle)}}
     .section .cta-panel{display:grid;grid-template-columns:minmax(0,1fr) 248px;align-items:center;gap:28px}.cta-panel__copy{min-width:0}.cta-panel__copy h2{font-size:var(--text-section);line-height:1.12}.cta-panel__copy>p:last-child{margin-bottom:0}.cta-panel .cta-action{--action-tone:var(--primary);display:flex;gap:12px;width:100%;min-height:76px;padding:14px 16px;border:1px solid rgba(255,255,255,.45);border-radius:18px;background:#fff;color:var(--primary);text-align:left;line-height:1.3;box-shadow:0 8px 24px rgba(0,0,0,.12)}.cta-panel .cta-action--whatsapp{--action-tone:#128c5e}.cta-action__icon{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:13px;color:var(--action-tone);background:color-mix(in srgb,var(--action-tone) 10%,#fff)}.cta-action__label{flex:1;min-width:0;font-size:var(--text-body);overflow-wrap:anywhere}.cta-action__arrow{flex-shrink:0;opacity:.6}.cta-action:hover .cta-action__arrow{opacity:1}.cta-action:focus-visible{outline:3px solid #fff;outline-offset:5px}
     @media(max-width:760px){.section .cta-panel{grid-template-columns:1fr;gap:22px}.cta-panel .cta-action{min-height:68px}.cta-action__label{font-size:var(--text-body)}}
@@ -647,12 +652,12 @@ export function renderLandingHtml(input: {
     .faculty-carousel .faculty-card__actions .faculty-link{padding:0;margin:0;min-height:44px}
     .faculty-bio-toggle{min-height:44px;padding:0;border:0;background:transparent;color:#f3b8dd;font:inherit;font-size:var(--text-meta);font-weight:700;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
     .faculty-bio-toggle:focus-visible{outline:2px solid #fff;outline-offset:3px}.faculty-bio-toggle[hidden]{display:none}
-    .faculty-card__index{position:absolute;right:12px;top:12px;padding:5px 9px;border-radius:999px;background:rgba(15,8,20,.72);color:#fff;font-size:var(--text-meta);font-weight:700;z-index:1}
-    .faculty-carousel .faculty-card.is-current{box-shadow:inset 0 0 0 1px var(--accent)}.faculty-card.is-current .faculty-card__index{background:var(--primary)}
+    .faculty-carousel .faculty-card.is-current{box-shadow:inset 0 0 0 1px var(--accent)}
     .site-nav a{position:relative;padding-block:8px}.site-nav a:after{content:"";position:absolute;bottom:0;left:0;width:100%;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .2s ease}
     .site-nav a[aria-current="location"]:after{transform:scaleX(1)}
     .reading-progress{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--surface);pointer-events:none}.reading-progress[hidden]{display:none}
     .reading-progress>span{display:block;width:100%;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
+    .hero__media-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%}
     @media(max-width:760px){.overview,.overview--left{grid-template-columns:1fr;gap:24px}.overview--left .overview__figure{order:0}.program-facts{padding:16px}.hero .program-facts .facts{grid-template-columns:1fr}.hero .program-facts .facts li{border:0;border-top:1px solid var(--line);padding:12px 0}.hero .program-facts .facts li:first-child{border-top:0;padding-top:4px}.faculty-carousel .faculty-card__copy{padding:18px}}
   </style>
 </head>
@@ -667,6 +672,8 @@ export function renderLandingHtml(input: {
   ${sticky ? `<button class="lead-toggle" type="button" aria-controls="contacto" aria-expanded="false" hidden>${icon('info')}Solicitar información</button>` : ''}
   <script>
   (function(){
+    var controlIcons=${scriptJson({ play: icon('play'), pause: icon('pause'), sound: icon('sound'), muted: icon('muted') })};
+    function setIconControl(button,name,label){if(!button)return;if(button.dataset.controlIcon!==name){button.innerHTML=controlIcons[name];button.dataset.controlIcon=name;}button.setAttribute('aria-label',label);button.title=label;}
     function track(event, detail){
       if(${input.preview ? 'true' : 'false'})return;
       window.dataLayer = window.dataLayer || [];
@@ -745,15 +752,14 @@ export function renderLandingHtml(input: {
       function scheduleFaculty(){
         clearTimeout(timer);
         playback.hidden=motion.matches;
-        playback.textContent=userPaused?'Reanudar':'Pausar';
-        playback.setAttribute('aria-label',userPaused?'Reanudar carrusel':'Pausar carrusel');
+        setIconControl(playback,userPaused?'play':'pause',userPaused?'Reanudar carrusel':'Pausar carrusel');
         var keyboardReading=track.matches(':focus-visible')||!!track.querySelector(':focus-visible')||!!track.querySelector('.faculty-description.is-expanded');
         position.setAttribute('aria-live',userPaused||motion.matches||keyboardReading?'polite':'off');
         if(userPaused||motion.matches||touching||document.hidden||!inView||keyboardReading||track.scrollWidth<=track.clientWidth+2)return;
         timer=setTimeout(function(){
           selectFaculty((activeIndex+1)%cards.length);
           scheduleFaculty();
-        },5000);
+        },3000);
       }
       function updateFaculty(){
         controls.hidden=track.scrollWidth<=track.clientWidth+2;
@@ -811,7 +817,7 @@ export function renderLandingHtml(input: {
     if(video){
       var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
       var attemptedAutoplay=false;
-      var syncVideoControls=function(){if(pause)pause.textContent=video.paused?'Reproducir video':'Pausar video';if(sound){var audible=!video.muted&&video.volume>0;sound.textContent=audible?'Silenciar video':'Activar sonido';sound.setAttribute('aria-pressed',String(audible));}};
+      var syncVideoControls=function(){setIconControl(pause,video.paused?'play':'pause',video.paused?'Reproducir video':'Pausar video');if(sound){var audible=!video.muted&&video.volume>0;setIconControl(sound,audible?'sound':'muted',audible?'Silenciar video':'Activar sonido');sound.setAttribute('aria-pressed',String(audible));}};
       var playVideo=function(){if(!video.src)video.src=video.dataset.videoSrc;return video.play();};
       ['play','pause','volumechange','ended'].forEach(function(event){video.addEventListener(event,syncVideoControls);});
       var loadVideo=function(){if(reduced.matches){video.pause();syncVideoControls();return;}if(!attemptedAutoplay){attemptedAutoplay=true;video.muted=false;}playVideo().then(syncVideoControls).catch(function(){if(reduced.matches){syncVideoControls();return;}video.muted=true;playVideo().then(syncVideoControls).catch(syncVideoControls);});};

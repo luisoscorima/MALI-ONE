@@ -25,14 +25,20 @@ Los docentes se presentan en un carrusel de tarjetas verticales, con un marco de
 foto uniforme 3:4 y biografía debajo. La imagen cubre ese marco sin deformarse,
 con el encuadre centrado arriba. Incluye flechas, contador, navegación con teclado
 y desplazamiento táctil, con las flechas a ambos lados de las tarjetas. Avanza
-cada cinco segundos mientras está visible y vuelve al inicio al llegar al final.
+cada tres segundos mientras está visible y vuelve al inicio al llegar al final.
 El cursor encima y los clics de navegación no detienen el avance. Se pausa al
 leer las tarjetas con el foco del teclado o durante un gesto táctil; también
 ofrece pausa manual. El movimiento reducido desactiva el avance
 automático. Las barras del carrusel y del panel del formulario se ocultan sin
 deshabilitar su desplazamiento.
+Los controles de reproducción del carrusel y del video usan iconos de reproducir,
+pausar, sonido y silencio. Cada botón conserva una etiqueta accesible y un título
+descriptivo que cambian junto con el icono según el estado.
 Cada docente tiene un punto de navegación seleccionable. El punto y la tarjeta
 activos se resaltan al avanzar automáticamente, usar las flechas o deslizar.
+Los puntos y el icono de pausa/reproducción comparten una sola fila centrada.
+No se muestran contadores numéricos sobre las fotos ni debajo del carrusel;
+el rango visible se anuncia únicamente a lectores de pantalla.
 Los enlaces de perfil incluyen el icono de LinkedIn y su etiqueta; ambos aparecen
 solo cuando el docente tiene una URL válida, y abren en una pestaña nueva.
 
