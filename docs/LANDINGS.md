@@ -24,9 +24,11 @@ completarlos y sus botones solo aparecen cuando hay una URL válida.
 Los docentes se presentan en un carrusel de tarjetas verticales, con un marco de
 foto uniforme 3:4 y biografía debajo. La imagen cubre ese marco sin deformarse,
 con el encuadre centrado arriba. Incluye flechas, contador, navegación con teclado
-y desplazamiento táctil. Avanza cada cinco segundos mientras está visible y vuelve
-al inicio al llegar al final. Se pausa al pasar el mouse, enfocar o tocar el
-carrusel; también ofrece pausa manual. El movimiento reducido desactiva el avance
+y desplazamiento táctil, con las flechas a ambos lados de las tarjetas. Avanza
+cada cinco segundos mientras está visible y vuelve al inicio al llegar al final.
+El cursor encima y los clics de navegación no detienen el avance. Se pausa al
+leer las tarjetas con el foco del teclado o durante un gesto táctil; también
+ofrece pausa manual. El movimiento reducido desactiva el avance
 automático. Las barras del carrusel y del panel del formulario se ocultan sin
 deshabilitar su desplazamiento.
 Cada docente tiene un punto de navegación seleccionable. El punto y la tarjeta
@@ -50,8 +52,11 @@ campos individuales para conservar espacios y saltos de línea. El máximo es de
 error y no descarta contenido silenciosamente.
 
 El hero tiene fondo sólido `#0022cc` y una URL opcional de video. Sin URL no se
-crea un reproductor. Con video, se funde con el fondo, se reproduce sin audio y
-en bucle y permite pausarlo; se respeta la preferencia de movimiento reducido.
+crea un reproductor. Con video, usa un fundido azul suave y conserva la opacidad
+del archivo. Intenta comenzar en bucle con sonido; si el navegador bloquea ese
+inicio, vuelve a intentarlo silenciado. Incluye botones para activar o silenciar
+el sonido y pausar o reproducir. El archivo debe incluir audio. Con movimiento reducido no se reproduce
+automáticamente, pero los controles permiten iniciarlo de forma manual.
 El tamaño del logo y los enlaces de navegación por sección son editables.
 Las secciones ocultas no aparecen en la navbar.
 Los bloques de contenido alternan fondos blanco y lavanda, derivados del color

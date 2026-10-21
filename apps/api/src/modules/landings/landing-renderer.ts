@@ -159,7 +159,7 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
     )
     .join('');
   return `<section class="hero" id="${escapeHtml(block.id)}" style="--hero-bg:${background}">
-    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><button class="hero__pause" type="button" aria-pressed="false">Pausar video</button>` : ''}
+    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><div class="hero__media-controls" role="group" aria-label="Controles del video"><button class="hero__sound" type="button" aria-pressed="false">Activar sonido</button><button class="hero__pause" type="button">Reproducir video</button></div>` : ''}
     <div class="hero__shade"></div>
     <div class="shell hero__content">
       ${eyebrow(data)}
@@ -222,15 +222,17 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
   return `<section class="section faculty-section" id="${escapeHtml(block.id)}"><div class="shell">
     <div class="section__head section__head--split"><div>${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2></div>${intro ? `<p>${escapeHtml(intro)}</p>` : ''}</div>
     <div class="faculty-slider" data-faculty-slider>
+      <div class="faculty-stage">
       <div class="faculty-carousel" id="${escapeHtml(block.id)}-carrusel" tabindex="0" role="region" aria-roledescription="carrusel" aria-label="Docentes del programa">${items}</div>
+        <button class="faculty-arrow faculty-arrow--prev" type="button" data-faculty-prev aria-label="Ver docentes anteriores" aria-controls="${escapeHtml(block.id)}-carrusel" hidden>←</button>
+        <button class="faculty-arrow faculty-arrow--next" type="button" data-faculty-next aria-label="Ver docentes siguientes" aria-controls="${escapeHtml(block.id)}-carrusel" hidden>→</button>
+      </div>
       <div class="faculty-pagination" role="group" aria-label="Elegir docente" hidden>
         ${faculty.map((item, index) => `<button class="faculty-dot" type="button" data-faculty-index="${index}" aria-label="Ver a ${escapeHtml(item.name || `docente ${index + 1}`)}" aria-controls="${escapeHtml(block.id)}-docente-${index + 1}" aria-current="${index === 0 ? 'true' : 'false'}"></button>`).join('')}
       </div>
       <div class="faculty-controls" hidden>
         <span class="faculty-position" role="status" aria-live="polite" aria-atomic="true"></span>
         <button class="faculty-autoplay" type="button" data-faculty-autoplay aria-label="Pausar carrusel">Pausar</button>
-        <button type="button" data-faculty-prev aria-label="Ver docentes anteriores" aria-controls="${escapeHtml(block.id)}-carrusel">←</button>
-        <button type="button" data-faculty-next aria-label="Ver docentes siguientes" aria-controls="${escapeHtml(block.id)}-carrusel">→</button>
       </div>
     </div>
     ${note ? `<p class="section-note">${escapeHtml(note)}</p>` : ''}
@@ -488,7 +490,7 @@ export function renderLandingHtml(input: {
     .site-head .shell{width:min(1440px,calc(100% - 40px));gap:20px}.site-logo{width:var(--logo-width);max-width:100%;max-height:76px;object-fit:contain}.brand{flex-shrink:0;max-width:30%}.header-cta{background:var(--primary);color:#fff;border:0;white-space:nowrap}
     .site-nav{display:flex;align-items:center;gap:18px}.site-nav a{font-size:var(--text-meta);text-decoration:none;font-weight:700}.site-nav a:hover,.site-nav a[aria-current]{color:var(--primary)}.nav-toggle{display:none;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
     .hero{background:var(--hero-bg,#0022cc);min-height:580px}.hero:after{display:none}.hero__content{padding-block:80px 56px}.hero h1{font-size:var(--text-section)}.hero__shade{background:linear-gradient(90deg,var(--hero-bg) 4%,color-mix(in srgb,var(--hero-bg) 85%,transparent) 42%,color-mix(in srgb,var(--hero-bg) 25%,transparent) 80%),linear-gradient(0deg,var(--hero-bg),transparent 40%)}
-    .hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.65}.hero__pause{position:absolute;right:24px;bottom:20px;z-index:3;color:#fff;background:rgba(0,0,0,.35);border:1px solid #fff;border-radius:8px;padding:8px;cursor:pointer}.hero__pause[hidden]{display:none}.hero .facts{margin-top:24px}.hero .facts li{min-width:160px}
+    .hero__video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.65}.hero__media-controls{position:absolute;right:24px;bottom:20px;left:24px;z-index:3;display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px}.hero__media-controls button{min-height:44px;color:#fff;background:rgba(0,0,0,.55);border:1px solid #fff;border-radius:8px;padding:8px 12px;font-size:var(--text-meta);cursor:pointer}.hero__media-controls button:focus-visible{outline:3px solid #fff;outline-offset:3px}.hero:has(.hero__media-controls) .hero__content{padding-bottom:100px}.hero .facts{margin-top:24px}.hero .facts li{min-width:160px}
     .section{padding:52px 0}.section__head{margin-bottom:24px}.contact{padding:56px 0}.section h2,.contact h2{font-size:var(--text-section);line-height:1.08}.feature,.schedule-card{padding:22px;border-radius:18px}.section__head--split{gap:24px}.cta-panel{padding:30px;gap:20px}
     .faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.faculty-card{min-height:0;display:flex;flex-direction:column}.faculty-card img{width:100%;height:280px;min-height:0;object-fit:cover;object-position:center 18%}.faculty-card__copy{position:static;padding:20px;background:#1b1220;flex:1}.faculty-card__copy p{line-height:1.55}.faculty-link{display:inline-flex;margin-top:14px;color:#fff;text-underline-offset:4px;font-weight:700}
     .curriculum-module{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:#fff}.curriculum-module summary{padding:18px;cursor:pointer;font-weight:700;list-style-position:inside}.curriculum-module summary span{display:inline-block;margin-right:12px;color:var(--primary)}.curriculum-module p{padding:0 20px;margin:0 0 20px;color:#5f5865}.final-project{padding:24px;border-radius:16px;background:var(--primary);color:#fff;margin-top:18px}.final-project h3{margin:0 0 10px;font-size:var(--text-subtitle)}.final-project p{margin:0}
@@ -518,6 +520,12 @@ export function renderLandingHtml(input: {
     .landing-sections>.investment>.shell{padding-inline:0}
     .investment-box{padding-inline:calc(var(--content-inset) - 1px)}
     .landing-sections .prose p,.landing-sections .faq details{max-width:900px}
+    .hero__video{opacity:1}
+    .hero:has(.hero__video) .hero__shade{background:linear-gradient(90deg,color-mix(in srgb,var(--hero-bg) 60%,transparent),color-mix(in srgb,var(--hero-bg) 30%,transparent) 48%,color-mix(in srgb,var(--hero-bg) 4%,transparent)),linear-gradient(0deg,color-mix(in srgb,var(--hero-bg) 55%,transparent),transparent 45%)}
+    .faculty-stage{position:relative}
+    .faculty-arrow{position:absolute;top:50%;z-index:2;display:grid;place-items:center;transform:translateY(-50%);width:44px;height:44px;border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--primary);box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:24px;cursor:pointer}
+    .faculty-arrow[hidden]{display:none}.faculty-arrow--prev{left:-22px}.faculty-arrow--next{right:-22px}.faculty-arrow:disabled{opacity:.45;cursor:default}.faculty-arrow:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    @media(max-width:760px){.faculty-arrow--prev{left:-16px}.faculty-arrow--next{right:-16px}.hero:has(.hero__video) .hero__shade{background:linear-gradient(0deg,color-mix(in srgb,var(--hero-bg) 65%,transparent),color-mix(in srgb,var(--hero-bg) 30%,transparent))}}
     /* Alternar los fondos según el orden de los bloques visibles. */
     .section[data-section-tone="light"]{background:var(--white)}
     .section[data-section-tone="soft"]{background:color-mix(in srgb,var(--primary) 8%,var(--white))}
@@ -588,7 +596,7 @@ export function renderLandingHtml(input: {
       var pagination=slider.querySelector('.faculty-pagination');
       var dots=Array.from(slider.querySelectorAll('.faculty-dot'));
       var motion=window.matchMedia('(prefers-reduced-motion: reduce)');
-      var timer=null,userPaused=false,hovered=false,touching=false,inView=false;
+      var timer=null,userPaused=false,touching=false,inView=false;
       var activeIndex=0,selectedByControl=false;
       if(!cards.length)return;
       function scheduleFaculty(){
@@ -596,8 +604,9 @@ export function renderLandingHtml(input: {
         playback.hidden=motion.matches;
         playback.textContent=userPaused?'Reanudar':'Pausar';
         playback.setAttribute('aria-label',userPaused?'Reanudar carrusel':'Pausar carrusel');
-        position.setAttribute('aria-live',userPaused||motion.matches||hovered||slider.contains(document.activeElement)?'polite':'off');
-        if(userPaused||motion.matches||hovered||touching||document.hidden||!inView||slider.contains(document.activeElement)||track.scrollWidth<=track.clientWidth+2)return;
+        var keyboardReading=track.matches(':focus-visible')||!!track.querySelector(':focus-visible');
+        position.setAttribute('aria-live',userPaused||motion.matches||keyboardReading?'polite':'off');
+        if(userPaused||motion.matches||touching||document.hidden||!inView||keyboardReading||track.scrollWidth<=track.clientWidth+2)return;
         timer=setTimeout(function(){
           selectFaculty((activeIndex+1)%cards.length);
           scheduleFaculty();
@@ -605,6 +614,7 @@ export function renderLandingHtml(input: {
       }
       function updateFaculty(){
         controls.hidden=track.scrollWidth<=track.clientWidth+2;
+        previous.hidden=next.hidden=controls.hidden;
         pagination.hidden=cards.length<2;
         if(!selectedByControl)activeIndex=closestFaculty();
         previous.disabled=activeIndex===0;
@@ -633,8 +643,6 @@ export function renderLandingHtml(input: {
       previous.addEventListener('click',function(){moveFaculty(-1);scheduleFaculty();});
       next.addEventListener('click',function(){moveFaculty(1);scheduleFaculty();});
       playback.addEventListener('click',function(){userPaused=!userPaused;scheduleFaculty();});
-      slider.addEventListener('pointerenter',function(event){if(event.pointerType==='mouse'){hovered=true;scheduleFaculty();}});
-      slider.addEventListener('pointerleave',function(event){if(event.pointerType==='mouse'){hovered=false;scheduleFaculty();}});
       slider.addEventListener('pointerdown',function(event){if(event.pointerType==='touch'){touching=true;scheduleFaculty();}},{passive:true});
       window.addEventListener('pointerup',function(){if(touching){touching=false;scheduleFaculty();}},{passive:true});
       window.addEventListener('pointercancel',function(){if(touching){touching=false;scheduleFaculty();}},{passive:true});
@@ -643,7 +651,7 @@ export function renderLandingHtml(input: {
       track.addEventListener('wheel',function(){selectedByControl=false;scheduleFaculty();},{passive:true});
       document.addEventListener('visibilitychange',scheduleFaculty);
       motion.addEventListener('change',scheduleFaculty);
-      if(window.IntersectionObserver)new IntersectionObserver(function(entries){inView=entries[0].isIntersecting&&entries[0].intersectionRatio>=.25;scheduleFaculty();},{threshold:.25}).observe(slider);
+      if(window.IntersectionObserver)new IntersectionObserver(function(entries){inView=entries[0].isIntersecting&&entries[0].intersectionRatio>=.1;scheduleFaculty();},{threshold:.1}).observe(track);
       else{inView=true;scheduleFaculty();}
       track.addEventListener('scroll',updateFaculty,{passive:true});
       track.addEventListener('keydown',function(event){
@@ -655,12 +663,17 @@ export function renderLandingHtml(input: {
       else window.addEventListener('resize',updateFaculty);
       updateFaculty();
     });
-    var video=document.querySelector('.hero__video'),pause=document.querySelector('.hero__pause');
+    var video=document.querySelector('.hero__video'),pause=document.querySelector('.hero__pause'),sound=document.querySelector('.hero__sound');
     if(video){
       var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
-      var loadVideo=function(){if(reduced.matches){video.pause();if(pause)pause.hidden=true;return;}if(!video.src)video.src=video.dataset.videoSrc;video.play().then(function(){if(pause)pause.hidden=false;}).catch(function(){if(pause)pause.hidden=true;});};
+      var attemptedAutoplay=false;
+      var syncVideoControls=function(){if(pause)pause.textContent=video.paused?'Reproducir video':'Pausar video';if(sound){var audible=!video.muted&&video.volume>0;sound.textContent=audible?'Silenciar video':'Activar sonido';sound.setAttribute('aria-pressed',String(audible));}};
+      var playVideo=function(){if(!video.src)video.src=video.dataset.videoSrc;return video.play();};
+      ['play','pause','volumechange','ended'].forEach(function(event){video.addEventListener(event,syncVideoControls);});
+      var loadVideo=function(){if(reduced.matches){video.pause();syncVideoControls();return;}if(!attemptedAutoplay){attemptedAutoplay=true;video.muted=false;}playVideo().then(syncVideoControls).catch(function(){if(reduced.matches){syncVideoControls();return;}video.muted=true;playVideo().then(syncVideoControls).catch(syncVideoControls);});};
       loadVideo();reduced.addEventListener('change',loadVideo);
-      if(pause)pause.addEventListener('click',function(){if(video.paused){video.play().catch(function(){});pause.textContent='Pausar video';pause.setAttribute('aria-pressed','false');}else{video.pause();pause.textContent='Reanudar video';pause.setAttribute('aria-pressed','true');}});
+      if(pause)pause.addEventListener('click',function(){attemptedAutoplay=true;if(video.paused)playVideo().then(syncVideoControls).catch(syncVideoControls);else video.pause();});
+      if(sound)sound.addEventListener('click',function(){attemptedAutoplay=true;if(!video.muted&&video.volume>0){video.muted=true;}else{video.muted=false;video.volume=1;if(video.paused)playVideo().then(syncVideoControls).catch(function(){video.muted=true;syncVideoControls();});}syncVideoControls();});
     }
     var panel=document.querySelector('.lead-panel'),toggle=document.querySelector('.lead-toggle'),close=document.querySelector('.lead-close');
     var narrow=window.matchMedia('(max-width:1100px)');

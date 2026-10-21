@@ -35,6 +35,11 @@ const server = http.createServer(async (req, res) => {
     return json(res, {});
   }
   if (route === '/qa/landing') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html()); }
+  if (route === '/qa/video') {
+    const doc = content();
+    doc.blocks.find((block) => block.type === 'hero').data.videoUrl = base + '/qa/hero.webm';
+    res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html(doc));
+  }
   if (route === '/qa/published') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html(content(), false)); }
   const publicRoot = path.join(root, 'apps/web', route.startsWith('/widgets/') ? 'public' : 'dist');
   let file = path.resolve(publicRoot, '.' + route);
@@ -233,12 +238,61 @@ const server = http.createServer(async (req, res) => {
     assert.equal(lastLeadPayload.whatsappArea, 'educacion_ep');
     await page.waitForFunction(() => document.getElementById('landingLeadFormFrame').getBoundingClientRect().height < 400);
     console.log('PASS captura pública simulada: un envío local con UTMs, origen landing y evento generate_lead');
+    const videoPage = await context.newPage();
+    // Simular reproducción sin descargar archivos ni emitir sonido durante QA.
+    await videoPage.addInitScript(() => {
+      const playing = new WeakSet();
+      Object.defineProperty(HTMLMediaElement.prototype, 'paused', { get() { return !playing.has(this); } });
+      HTMLMediaElement.prototype.play = function () {
+        if (window.rejectVideoPlay || (location.search.includes('block-audio') && !this.muted)) return Promise.reject(new DOMException('Reproducción bloqueada', 'NotAllowedError'));
+        playing.add(this); this.dispatchEvent(new Event('play')); return Promise.resolve();
+      };
+      HTMLMediaElement.prototype.pause = function () { playing.delete(this); this.dispatchEvent(new Event('pause')); };
+    });
+    await videoPage.route('**/qa/hero.webm', (route) => route.abort());
+    await videoPage.goto(base + '/qa/video');
+    assert.equal(await videoPage.locator('video').evaluate((el) => el.paused && el.muted), true, 'Movimiento reducido impide el inicio automático');
+    await videoPage.getByRole('button', { name: 'Activar sonido', exact: true }).click();
+    assert.equal(await videoPage.locator('video').evaluate((el) => !el.paused && !el.muted && el.volume === 1), true);
+    assert.equal(await videoPage.locator('.hero__sound').getAttribute('aria-pressed'), 'true');
+    await videoPage.getByRole('button', { name: 'Silenciar video', exact: true }).click();
+    assert.equal(await videoPage.locator('video').evaluate((el) => el.muted), true);
+    await videoPage.getByRole('button', { name: 'Pausar video', exact: true }).click();
+    await videoPage.evaluate(() => { window.rejectVideoPlay = true; });
+    await videoPage.getByRole('button', { name: 'Activar sonido', exact: true }).click();
+    await videoPage.waitForFunction(() => document.querySelector('.hero__sound').getAttribute('aria-pressed') === 'false');
+    assert.equal(await videoPage.getByRole('button', { name: 'Reproducir video', exact: true }).count(), 1, 'Se puede reintentar si el navegador bloquea el inicio');
+    await videoPage.evaluate(() => { window.rejectVideoPlay = false; });
+    await videoPage.emulateMedia({ reducedMotion: 'no-preference' });
+    await videoPage.waitForFunction(() => !document.querySelector('video').paused);
+    assert.equal(await videoPage.locator('video').evaluate((el) => el.muted), true, 'Se conserva la elección manual de silencio');
+    await videoPage.goto(base + '/qa/video');
+    assert.equal(await videoPage.locator('video').evaluate((el) => !el.paused && !el.muted), true, 'Inicio con sonido cuando el navegador lo permite');
+    await videoPage.goto(base + '/qa/video?block-audio');
+    await videoPage.waitForFunction(() => { const el = document.querySelector('video'); return !el.paused && el.muted; });
+    assert.equal(await videoPage.getByRole('button', { name: 'Activar sonido', exact: true }).count(), 1, 'Si se bloquea el audio, reproduce silenciado');
+    assert.equal(await videoPage.locator('video').evaluate((el) => getComputedStyle(el).opacity), '1', 'El video no pierde opacidad');
+    for (const width of [1440, 320]) {
+      await videoPage.setViewportSize({ width, height: 1000 });
+      const controls = await videoPage.locator('.hero__media-controls').boundingBox();
+      const copy = await videoPage.locator('.hero__content').boundingBox();
+      const facts = await videoPage.locator('.hero .facts').boundingBox();
+      assert.ok(controls.x >= 0 && controls.x + controls.width <= width, 'Controles dentro del ancho disponible');
+      assert.ok(controls.y >= facts.y + facts.height && controls.y + controls.height <= copy.y + copy.height, 'Controles separados del texto');
+      await videoPage.screenshot({ path: path.join(output, width === 320 ? 'mobile-video.png' : 'desktop-video.png') });
+    }
+    await videoPage.close();
+    console.log('PASS video: activar/silenciar, pausa, inicio bloqueado, movimiento reducido y controles adaptables (reproducción simulada)');
     const autoPage = await context.newPage();
     await autoPage.emulateMedia({ reducedMotion: 'no-preference' });
     await autoPage.goto(base + '/qa/landing');
     await autoPage.locator('#docentes').scrollIntoViewIfNeeded();
+    await autoPage.locator('.faculty-card').first().hover();
     await autoPage.waitForFunction(() => document.querySelector('.faculty-carousel').scrollLeft > 100, null, { timeout: 10000 });
     assert.equal(await autoPage.locator('.faculty-dot').nth(1).getAttribute('aria-current'), 'true', 'El avance automático actualiza el punto activo');
+    await autoPage.locator('.faculty-dot').first().click();
+    await autoPage.waitForFunction(() => document.querySelector('.faculty-dot').getAttribute('aria-current') === 'false', null, { timeout: 10000 });
+    assert.equal(await autoPage.locator('.faculty-dot').nth(1).getAttribute('aria-current'), 'true', 'Continúa automáticamente después de pulsar un punto');
     await autoPage.getByRole('button', { name: 'Pausar carrusel', exact: true }).click();
     await autoPage.locator('.brand').focus();
     await autoPage.mouse.move(0, 0);
