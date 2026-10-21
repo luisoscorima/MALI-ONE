@@ -36,7 +36,8 @@ automático. Las barras del carrusel y del panel del formulario se ocultan sin
 deshabilitar su desplazamiento.
 Los controles de reproducción del carrusel y del video usan iconos de reproducir,
 pausar, sonido y silencio. Cada botón conserva una etiqueta accesible y un título
-descriptivo que cambian junto con el icono según el estado.
+descriptivo que cambian junto con el icono según el estado. Mientras el video está
+silenciado, su botón muestra también «Activar sonido»; al activar el audio queda solo el icono.
 Cada docente tiene un punto de navegación seleccionable. El punto y la tarjeta
 activos se resaltan al avanzar automáticamente, usar las flechas o deslizar.
 Los puntos y el icono de pausa/reproducción comparten una sola fila centrada.
@@ -96,9 +97,12 @@ se limitan al área sólida. En móvil (hasta 760 px), el video cubre todo el he
 con una capa del color configurado al 60 %, reforzada al 72 % en la parte superior
 para facilitar la lectura del título.
 En escritorio, los controles de sonido y reproducción se alinean con la base de
-la ficha de datos; en móvil permanecen debajo para evitar superposiciones.
-Intenta comenzar en bucle con sonido; si el navegador bloquea ese inicio, vuelve
-a intentarlo silenciado. Incluye botones para activar o silenciar
+la ficha de datos; en móvil se sitúan en la esquina superior derecha del video,
+con espacio reservado antes del texto para evitar superposiciones.
+Primero intenta reproducirse silenciado y, una vez iniciado, intenta activar el
+audio. Si se rechaza ese intento o el navegador pausa el video al activar el
+sonido, vuelve a silenciarlo y reanuda la reproducción. La pausa y la elección de
+sonido manuales cancelan el intento automático pendiente. Incluye botones para activar o silenciar
 el sonido y pausar o reproducir. El archivo debe incluir audio. Con movimiento reducido no se reproduce
 automáticamente, pero los controles permiten iniciarlo de forma manual.
 El tamaño del logo y los enlaces de navegación por sección son editables.

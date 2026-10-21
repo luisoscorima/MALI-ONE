@@ -346,10 +346,14 @@ const server = http.createServer(async (req, res) => {
     // Simular reproducción sin descargar archivos ni emitir sonido durante QA.
     await videoPage.addInitScript(() => {
       const playing = new WeakSet();
+      window.videoPlayAttempts = [];
       Object.defineProperty(HTMLMediaElement.prototype, 'paused', { get() { return !playing.has(this); } });
       HTMLMediaElement.prototype.play = function () {
+        window.videoPlayAttempts.push(this.muted);
         if (window.rejectVideoPlay || (location.search.includes('block-audio') && !this.muted)) return Promise.reject(new DOMException('Reproducción bloqueada', 'NotAllowedError'));
-        playing.add(this); this.dispatchEvent(new Event('play')); return Promise.resolve();
+        playing.add(this); this.dispatchEvent(new Event('play'));
+        if (location.search.includes('pause-on-unmute') && !this.muted) setTimeout(() => { playing.delete(this); this.dispatchEvent(new Event('pause')); }, 0);
+        return Promise.resolve();
       };
       HTMLMediaElement.prototype.pause = function () { playing.delete(this); this.dispatchEvent(new Event('pause')); };
     });
@@ -358,11 +362,12 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await videoPage.locator('video').evaluate((el) => el.paused && el.muted), true, 'Movimiento reducido impide el inicio automático');
     assert.equal(await videoPage.locator('.hero__pause [data-icon="play"]').count(), 1);
     assert.equal(await videoPage.locator('.hero__sound [data-icon="muted"]').count(), 1);
-    assert.equal(await videoPage.locator('.hero__sound').textContent(), '', 'Control sin texto visible');
+    assert.equal(await videoPage.locator('.hero__sound').textContent(), 'Activar sonido', 'El video silenciado muestra cómo activar el sonido');
     await videoPage.getByRole('button', { name: 'Activar sonido', exact: true }).click();
     assert.equal(await videoPage.locator('video').evaluate((el) => !el.paused && !el.muted && el.volume === 1), true);
     assert.equal(await videoPage.locator('.hero__sound').getAttribute('aria-pressed'), 'true');
     assert.equal(await videoPage.locator('.hero__sound [data-icon="sound"]').count(), 1);
+    assert.equal(await videoPage.locator('.hero__sound').textContent(), '', 'Con audio activo queda solo el icono');
     assert.equal(await videoPage.locator('.hero__sound').getAttribute('title'), 'Silenciar video');
     assert.equal(await videoPage.locator('.hero__pause [data-icon="pause"]').count(), 1);
     await videoPage.getByRole('button', { name: 'Silenciar video', exact: true }).click();
@@ -377,16 +382,23 @@ const server = http.createServer(async (req, res) => {
     await videoPage.waitForFunction(() => !document.querySelector('video').paused);
     assert.equal(await videoPage.locator('video').evaluate((el) => el.muted), true, 'Se conserva la elección manual de silencio');
     await videoPage.goto(base + '/qa/video');
-    assert.equal(await videoPage.locator('video').evaluate((el) => !el.paused && !el.muted), true, 'Inicio con sonido cuando el navegador lo permite');
+    await videoPage.waitForFunction(() => !document.querySelector('video').paused && !document.querySelector('video').muted);
+    assert.deepEqual(await videoPage.evaluate(() => window.videoPlayAttempts.slice(0, 2)), [true, false], 'Primero reproduce silenciado y después intenta audio');
     await videoPage.goto(base + '/qa/video?block-audio');
     await videoPage.waitForFunction(() => { const el = document.querySelector('video'); return !el.paused && el.muted; });
     assert.equal(await videoPage.getByRole('button', { name: 'Activar sonido', exact: true }).count(), 1, 'Si se bloquea el audio, reproduce silenciado');
+    assert.deepEqual(await videoPage.evaluate(() => window.videoPlayAttempts.slice(0, 3)), [true, false, true], 'Audio bloqueado vuelve a reproducción silenciada');
+    await videoPage.goto(base + '/qa/video?pause-on-unmute');
+    await videoPage.waitForFunction(() => window.videoPlayAttempts.length >= 3 && !document.querySelector('video').paused && document.querySelector('video').muted);
+    assert.deepEqual(await videoPage.evaluate(() => window.videoPlayAttempts.slice(0, 3)), [true, false, true], 'Reanuda silenciado si el navegador pausa al activar audio');
+    await videoPage.getByRole('button', { name: 'Pausar video', exact: true }).click();
+    await videoPage.waitForTimeout(700);
+    assert.equal(await videoPage.locator('video').evaluate((el) => el.paused), true, 'La recuperación automática respeta la pausa manual');
+    await videoPage.getByRole('button', { name: 'Reproducir video', exact: true }).click();
     assert.equal(await videoPage.locator('video').evaluate((el) => getComputedStyle(el).opacity), '1', 'El video no pierde opacidad');
     for (const width of [1440, 320]) {
       await videoPage.setViewportSize({ width, height: 1000 });
       const controls = await videoPage.locator('.hero__media-controls').boundingBox();
-      const copy = await videoPage.locator('.hero__content').boundingBox();
-      const facts = await videoPage.locator('.hero .facts').boundingBox();
       const heroBounds = await videoPage.locator('.hero').boundingBox();
       const videoBounds = await videoPage.locator('.hero__video').boundingBox();
       if (width > 760) {
@@ -405,7 +417,13 @@ const server = http.createServer(async (req, res) => {
         assert.equal(await videoPage.locator('.hero__video').evaluate((el) => getComputedStyle(el).maskImage), 'none', 'Sin máscara lateral en móvil');
       }
       assert.ok(controls.x >= 0 && controls.x + controls.width <= width, 'Controles dentro del ancho disponible');
-      if (width <= 760) assert.ok(controls.y >= facts.y + facts.height && controls.y + controls.height <= copy.y + copy.height, 'En móvil, controles debajo de la ficha');
+      if (width <= 760) {
+        const eyebrow = await videoPage.locator('.hero .eyebrow').boundingBox();
+        assert.ok(Math.abs(controls.y - heroBounds.y - 16) < 1, 'En móvil, controles en la parte superior del video');
+        assert.ok(Math.abs(controls.x + controls.width - heroBounds.x - heroBounds.width + 16) < 1, 'En móvil, controles alineados a la derecha');
+        assert.ok(controls.y + controls.height <= eyebrow.y, 'Los controles no tapan el texto del hero');
+        assert.equal(await videoPage.locator('.hero__sound').textContent(), 'Activar sonido', 'El mensaje también aparece en móvil');
+      }
       await videoPage.screenshot({ path: path.join(output, width === 320 ? 'mobile-video.png' : 'desktop-video.png') });
     }
     await videoPage.close();

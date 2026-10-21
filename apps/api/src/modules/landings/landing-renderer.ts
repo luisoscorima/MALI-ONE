@@ -203,7 +203,7 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
     )
     .join('');
   return `<section class="hero" id="${escapeHtml(block.id)}" style="--hero-bg:${background}">
-    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><div class="hero__media-controls" role="group" aria-label="Controles del video"><button class="hero__sound" type="button" aria-pressed="false" aria-label="Activar sonido" title="Activar sonido" data-control-icon="muted">${icon('muted')}</button><button class="hero__pause" type="button" aria-label="Reproducir video" title="Reproducir video" data-control-icon="play">${icon('play')}</button></div>` : ''}
+    ${videoUrl ? `<video class="hero__video" muted loop playsinline preload="none" aria-hidden="true"${imageUrl ? ` poster="${escapeHtml(imageUrl)}"` : ''} data-video-src="${escapeHtml(videoUrl)}"></video><div class="hero__media-controls" role="group" aria-label="Controles del video"><button class="hero__sound" type="button" aria-pressed="false" aria-label="Activar sonido" title="Activar sonido" data-muted-prompt data-control-icon="muted">${icon('muted')}<span>Activar sonido</span></button><button class="hero__pause" type="button" aria-label="Reproducir video" title="Reproducir video" data-control-icon="play">${icon('play')}</button></div>` : ''}
     <div class="hero__shade"></div>
     <div class="shell hero__content">
       ${eyebrow(data)}
@@ -681,7 +681,7 @@ export function renderLandingHtml(input: {
     .site-nav a[aria-current="location"]:after{transform:scaleX(1)}
     .reading-progress{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--surface);pointer-events:none}.reading-progress[hidden]{display:none}
     .reading-progress>span{display:block;width:100%;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
-    .hero__media-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%}
+    .hero__media-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%}.hero__media-controls .hero__sound[aria-pressed="false"]{display:flex;align-items:center;justify-content:center;gap:8px;width:auto;padding-inline:14px;border-radius:24px;white-space:nowrap}
     .investment-amount{font-size:clamp(48px,5vw,64px);line-height:1.1;letter-spacing:-.035em}
     .investment-amount .landing-icon{width:32px;height:32px}
     .landing-footer{--linkedin-ink:#08050b;padding:40px 0;color:#f3edf7}
@@ -700,7 +700,7 @@ export function renderLandingHtml(input: {
     .hero__video{inset:0 0 0 auto;width:calc(100% / 3);height:100%;opacity:1;mask-image:linear-gradient(90deg,transparent,#000 28%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%)}
     .hero:has(.hero__video) .hero__shade{background:none;pointer-events:none}
     @media(min-width:761px){.hero:has(.hero__video) .hero__content>h1,.hero:has(.hero__video) .hero__lead,.hero:has(.hero__video) .program-facts{max-width:min(920px,calc(66.666667vw - max(var(--page-gutter),calc((100vw - var(--page-width)) / 2)) - var(--content-inset) - 24px))}.hero:has(.program-facts) .hero__media-controls{left:auto;bottom:100px}}
-    @media(max-width:760px){.hero__video{inset:0;width:100%;mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) .hero__shade{inset:0;width:100%;background:linear-gradient(180deg,color-mix(in srgb,var(--hero-bg) 72%,transparent),color-mix(in srgb,var(--hero-bg) 60%,transparent) 45%);mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) h1,.hero:has(.hero__video) .hero__lead{text-shadow:0 2px 8px rgba(0,0,0,.3)}.hero__media-controls{right:8px}}
+    @media(max-width:760px){.hero__video{inset:0;width:100%;mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) .hero__shade{inset:0;width:100%;background:linear-gradient(180deg,color-mix(in srgb,var(--hero-bg) 72%,transparent),color-mix(in srgb,var(--hero-bg) 60%,transparent) 45%);mask-image:none;-webkit-mask-image:none}.hero:has(.hero__video) h1,.hero:has(.hero__video) .hero__lead{text-shadow:0 2px 8px rgba(0,0,0,.3)}.hero__media-controls{top:16px;right:16px;bottom:auto;left:auto;flex-wrap:nowrap}.hero:has(.hero__media-controls) .hero__content{padding-top:84px;padding-bottom:40px}}
     @media(max-width:760px){.overview,.overview--left{grid-template-columns:1fr;gap:24px}.overview--left .overview__figure{order:0}.program-facts{padding:16px}.hero .program-facts .facts{grid-template-columns:1fr}.hero .program-facts .facts li{border:0;border-top:1px solid var(--line);padding:12px 0}.hero .program-facts .facts li:first-child{border-top:0;padding-top:4px}.faculty-carousel .faculty-card__copy{padding:18px}}
   </style>
 </head>
@@ -716,7 +716,7 @@ export function renderLandingHtml(input: {
   <script>
   (function(){
     var controlIcons=${scriptJson({ play: icon('play'), pause: icon('pause'), sound: icon('sound'), muted: icon('muted') })};
-    function setIconControl(button,name,label){if(!button)return;if(button.dataset.controlIcon!==name){button.innerHTML=controlIcons[name];button.dataset.controlIcon=name;}button.setAttribute('aria-label',label);button.title=label;}
+    function setIconControl(button,name,label){if(!button)return;if(button.dataset.controlIcon!==name){button.innerHTML=controlIcons[name]+(button.hasAttribute('data-muted-prompt')&&name==='muted'?'<span>Activar sonido</span>':'');button.dataset.controlIcon=name;}button.setAttribute('aria-label',label);button.title=label;}
     function track(event, detail){
       if(${input.preview ? 'true' : 'false'})return;
       window.dataLayer = window.dataLayer || [];
@@ -860,13 +860,32 @@ export function renderLandingHtml(input: {
     if(video){
       var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
       var attemptedAutoplay=false;
+      var videoAction=0,autoAudioPending=false,autoAudioTimer=null;
       var syncVideoControls=function(){setIconControl(pause,video.paused?'play':'pause',video.paused?'Reproducir video':'Pausar video');if(sound){var audible=!video.muted&&video.volume>0;setIconControl(sound,audible?'sound':'muted',audible?'Silenciar video':'Activar sonido');sound.setAttribute('aria-pressed',String(audible));}};
       var playVideo=function(){if(!video.src)video.src=video.dataset.videoSrc;return video.play();};
       ['play','pause','volumechange','ended'].forEach(function(event){video.addEventListener(event,syncVideoControls);});
-      var loadVideo=function(){if(reduced.matches){video.pause();syncVideoControls();return;}if(!attemptedAutoplay){attemptedAutoplay=true;video.muted=false;}playVideo().then(syncVideoControls).catch(function(){if(reduced.matches){syncVideoControls();return;}video.muted=true;playVideo().then(syncVideoControls).catch(syncVideoControls);});};
+      function cancelAutoAudio(){autoAudioPending=false;clearTimeout(autoAudioTimer);}
+      function restoreSilentPlayback(action,manual){if(action!==videoAction||(!manual&&reduced.matches))return;cancelAutoAudio();video.muted=true;playVideo().then(syncVideoControls).catch(syncVideoControls);}
+      function tryAutoAudio(action){
+        if(action!==videoAction||reduced.matches)return;
+        autoAudioPending=true;video.muted=false;
+        playVideo().then(function(){
+          if(action!==videoAction||!autoAudioPending)return;
+          if(video.paused){restoreSilentPlayback(action);return;}
+          autoAudioTimer=setTimeout(function(){if(action!==videoAction||!autoAudioPending)return;if(video.paused)restoreSilentPlayback(action);else cancelAutoAudio();syncVideoControls();},600);
+        }).catch(function(){if(autoAudioPending)restoreSilentPlayback(action);});
+      }
+      // Algunos navegadores pausan al desactivar muted aunque play() ya se haya resuelto.
+      video.addEventListener('pause',function(){if(autoAudioPending)restoreSilentPlayback(videoAction);});
+      var loadVideo=function(){
+        var action=++videoAction;cancelAutoAudio();
+        if(reduced.matches){video.pause();syncVideoControls();return;}
+        var first=!attemptedAutoplay;attemptedAutoplay=true;if(first)video.muted=true;
+        playVideo().then(function(){if(action!==videoAction||reduced.matches)return;syncVideoControls();if(first)tryAutoAudio(action);}).catch(syncVideoControls);
+      };
       loadVideo();reduced.addEventListener('change',loadVideo);
-      if(pause)pause.addEventListener('click',function(){attemptedAutoplay=true;if(video.paused)playVideo().then(syncVideoControls).catch(syncVideoControls);else video.pause();});
-      if(sound)sound.addEventListener('click',function(){attemptedAutoplay=true;if(!video.muted&&video.volume>0){video.muted=true;}else{video.muted=false;video.volume=1;if(video.paused)playVideo().then(syncVideoControls).catch(function(){video.muted=true;syncVideoControls();});}syncVideoControls();});
+      if(pause)pause.addEventListener('click',function(){videoAction++;cancelAutoAudio();attemptedAutoplay=true;if(video.paused)playVideo().then(syncVideoControls).catch(syncVideoControls);else video.pause();});
+      if(sound)sound.addEventListener('click',function(){var action=++videoAction;cancelAutoAudio();attemptedAutoplay=true;if(!video.muted&&video.volume>0){video.muted=true;}else{video.muted=false;video.volume=1;playVideo().then(syncVideoControls).catch(function(){restoreSilentPlayback(action,true);syncVideoControls();});}syncVideoControls();});
     }
     var panel=document.querySelector('.lead-panel'),toggle=document.querySelector('.lead-toggle'),close=document.querySelector('.lead-close');
     var narrow=window.matchMedia('(max-width:1100px)');
