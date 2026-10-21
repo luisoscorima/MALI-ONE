@@ -93,6 +93,42 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
+const ICON_PATHS = {
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18m-13 5h2m4 0h2"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/><circle cx="9" cy="7" r="4"/>',
+  award: '<circle cx="12" cy="8" r="5"/><path d="m8 12-1 9 5-3 5 3-1-9"/>',
+  book: '<path d="M12 5C9 3 5 3 2 4v16c3-1 7-1 10 1m0-16c3-2 7-2 10-1v16c-3-1-7-1-10 1V5Z"/>',
+  briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 12a24 24 0 0 0 20 0m-10 0v4"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  wallet: '<path d="M20 8V5a2 2 0 0 0-2-2L4 6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2H4m18 5h-5v4h5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
+  arrow: '<path d="M5 12h14m-6-6 6 6-6 6"/>',
+  chevron: '<path d="m6 9 6 6 6-6"/>',
+  external: '<path d="M7 17 17 7M7 7h10v10"/>',
+  linkedin: '<rect x="2" y="2" width="20" height="20" rx="3" fill="currentColor" stroke="none"/><g stroke="var(--linkedin-ink,#1b1220)" stroke-width="2"><path d="M7 10v7m4 0v-7m0 3a3 3 0 0 1 6 0v4"/><path d="M7 7h.01" stroke-width="2.5"/></g>',
+} as const;
+
+function icon(name: keyof typeof ICON_PATHS, className = ''): string {
+  return `<svg class="landing-icon ${className}" data-icon="${name}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON_PATHS[name]}</svg>`;
+}
+
+function contentIcon(label: unknown): keyof typeof ICON_PATHS {
+  const value = text(label).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/virtual|digital|tecnolog/.test(value)) return 'monitor';
+  if (/presencial|sede|museo|ubicacion/.test(value)) return 'pin';
+  if (/duracion|horario|meses/.test(value)) return 'clock';
+  if (/inicio|fecha/.test(value)) return 'calendar';
+  if (/red |comunidad|contactos|publicos/.test(value)) return 'users';
+  if (/docen|experiencia|certif/.test(value)) return 'award';
+  if (/financ|inversion|cuota|matricula/.test(value)) return 'wallet';
+  if (/lider|gestion|proyecto|profesional/.test(value)) return 'briefcase';
+  if (/objetiv|estrateg/.test(value)) return 'target';
+  return 'book';
+}
+
 export function normalizeLandingDocument(value: unknown): LandingDocument {
   const source = object(value);
   const theme = object(source.theme);
@@ -155,7 +191,7 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
     .map(object)
     .map(
       (item) =>
-        `<li><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong></li>`,
+        `<li>${icon(contentIcon(item.label))}<div><small>${escapeHtml(item.label)}</small><strong>${escapeHtml(item.value)}</strong></div></li>`,
     )
     .join('');
   return `<section class="hero" id="${escapeHtml(block.id)}" style="--hero-bg:${background}">
@@ -165,16 +201,18 @@ function renderHero(block: LandingBlock, hasForm: boolean, apiBase: string): str
       ${eyebrow(data)}
       <h1>${escapeHtml(data.title)}</h1>
       <p class="hero__lead">${escapeHtml(data.body)}</p>
-      ${hasForm ? `<a class="button button--primary" href="#contacto" data-track="hero-cta">${escapeHtml(data.ctaLabel || 'Solicitar información')}</a>` : ''}
-      ${facts ? `<ul class="facts">${facts}</ul>` : ''}
+      ${hasForm ? `<a class="button button--primary" href="#contacto" data-track="hero-cta">${icon('info')}${escapeHtml(data.ctaLabel || 'Solicitar información')}${icon('arrow', 'button-arrow')}</a>` : ''}
+      ${facts ? `<div class="program-facts" role="group" aria-label="Datos clave del programa"><p class="program-facts__label">El programa en un vistazo</p><ul class="facts">${facts}</ul></div>` : ''}
     </div>
   </section>`;
 }
 
-function renderText(block: LandingBlock): string {
+function renderText(block: LandingBlock, apiBase: string): string {
   const data = block.data;
-  return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell prose">
-    ${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.body)}
+  const imageUrl = data.imageLayout === 'none' ? '' : assetUrl(data.imageUrl, apiBase);
+  return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell prose${imageUrl ? ` overview overview--${data.imageLayout === 'left' ? 'left' : 'right'}` : ''}">
+    <div class="overview__copy">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.body)}</div>
+    ${imageUrl ? `<figure class="overview__figure"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(data.imageAlt)}" width="800" height="600" loading="lazy">${data.imageCaption ? `<figcaption>${escapeHtml(data.imageCaption)}</figcaption>` : ''}</figure>` : ''}
   </div></section>`;
 }
 
@@ -183,8 +221,8 @@ function renderFeatureList(block: LandingBlock): string {
   const items = array(data.items)
     .map(object)
     .map(
-      (item, index) => `<article class="feature">
-        <span>${String(index + 1).padStart(2, '0')}</span>
+      (item) => `<article class="feature">
+        <span class="feature-icon">${icon(contentIcon(item.title))}</span>
         <h3>${escapeHtml(item.title)}</h3>
         <p>${escapeHtml(item.description)}</p>
       </article>`,
@@ -212,8 +250,8 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
   const items = faculty
     .map(
       (item, index) => `<article class="faculty-card" id="${escapeHtml(block.id)}-docente-${index + 1}">
-        ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"></div>` : ''}
-        <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p>${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span> ↗</a>` : ''}</div>
+        ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"><span class="faculty-card__index" aria-hidden="true">${String(index + 1).padStart(2, '0')} / ${String(faculty.length).padStart(2, '0')}</span></div>` : ''}
+        <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p class="faculty-role">${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p class="faculty-description" id="${escapeHtml(block.id)}-bio-${index + 1}">${escapeHtml(item.description)}</p>` : ''}<div class="faculty-card__actions">${item.description ? `<button class="faculty-bio-toggle" type="button" aria-expanded="false" aria-controls="${escapeHtml(block.id)}-bio-${index + 1}" hidden>Leer más<span class="sr-only"> sobre ${escapeHtml(item.name)}</span></button>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">${icon('linkedin')}<span>Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span></span>${icon('external', 'button-arrow')}</a>` : ''}</div></div>
       </article>`,
     )
     .join('');
@@ -269,10 +307,10 @@ function renderSchedule(block: LandingBlock): string {
     .map(object)
     .map(
       (item) => `<article class="schedule-card">
-        <h3>${escapeHtml(item.title)}</h3>
-        <p><strong>${escapeHtml(item.date)}</strong></p>
-        <p>${escapeHtml(item.location)}</p>
-        <p>${escapeHtml(item.schedule)}</p>
+        <h3 class="icon-heading"><span class="feature-icon">${icon(contentIcon(item.title))}</span>${escapeHtml(item.title)}</h3>
+        ${item.date ? `<p class="icon-line">${icon('calendar')}<strong>${escapeHtml(item.date)}</strong></p>` : ''}
+        ${item.location ? `<p class="icon-line">${icon('pin')}<span>${escapeHtml(item.location)}</span></p>` : ''}
+        ${item.schedule ? `<p class="icon-line">${icon('clock')}<span>${escapeHtml(item.schedule)}</span></p>` : ''}
       </article>`,
     )
     .join('');
@@ -287,8 +325,8 @@ function renderFaq(block: LandingBlock): string {
   const items = array(data.items)
     .map(object)
     .map(
-      (item, index) => `<details${index === 0 ? ' open' : ''}>
-        <summary>${escapeHtml(item.question)}</summary>
+      (item, index) => `<details name="faq-${escapeHtml(block.id)}"${index === 0 ? ' open' : ''}>
+        <summary><span class="accordion-title">${escapeHtml(item.question)}</span>${icon('chevron', 'accordion-chevron')}</summary>
         <p>${escapeHtml(item.answer)}</p>
       </details>`,
     )
@@ -333,6 +371,7 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
     titulo: text(data.courseTitle, 300),
     submit: text(data.submitLabel, 80) || 'Enviar información',
     captureSource: 'landing',
+    compact: '1',
     formTitle: text(data.title, 200),
     formDescription: text(data.body, 500),
   });
@@ -340,10 +379,10 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
   if (privacyUrl) params.set('privacy', privacyUrl);
   const whatsappPhone = text(data.whatsappPhone, 30).replace(/\D/g, '');
   if (whatsappPhone) params.set('wa', whatsappPhone);
-  const backgroundColor = color(data.backgroundColor, '');
+  const configuredColor = color(data.backgroundColor, '');
+  const backgroundColor = sticky && (!configuredColor || configuredColor.toLowerCase() === '#b4b3ff') ? '#f8f6fb' : configuredColor;
   if (backgroundColor) params.set('bg', backgroundColor);
   if (preview) params.set('preview', '1');
-  if (sticky) params.set('compact', '1');
   const widgetUrl = `${apiBase}/widgets/educacion/lead-form.html?${params.toString()}`;
   if (sticky) return `<aside class="lead-sidebar" aria-label="Solicitar información"><div class="lead-panel" id="contacto" tabindex="-1">
     <button class="lead-close" type="button" aria-label="Cerrar formulario">Cerrar ×</button>
@@ -361,13 +400,13 @@ function renderFooter(block: LandingBlock): string {
 
 function renderCurriculum(block: LandingBlock): string {
   const data = block.data;
-  const items = array(data.items).map(object).map((item, index) => `<details class="curriculum-module" name="curriculum-${escapeHtml(block.id)}"${index === 0 ? ' open' : ''}><summary><span>${String(index + 1).padStart(2, '0')}</span>${escapeHtml(item.title)}</summary>${paragraphs(item.description)}</details>`).join('');
+  const items = array(data.items).map(object).map((item, index) => `<details class="curriculum-module" name="curriculum-${escapeHtml(block.id)}"${index === 0 ? ' open' : ''}><summary><span class="accordion-index">${String(index + 1).padStart(2, '0')}</span><span class="accordion-title">${escapeHtml(item.title)}</span>${icon('chevron', 'accordion-chevron')}</summary>${paragraphs(item.description)}</details>`).join('');
   return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell"><div class="section__head">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.intro)}</div>${items}${data.finalTitle ? `<article class="final-project"><h3>${escapeHtml(data.finalTitle)}</h3>${paragraphs(data.finalDescription)}</article>` : ''}</div></section>`;
 }
 
 function renderInvestment(block: LandingBlock, hasForm: boolean): string {
   const data = block.data;
-  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}${hasForm ? `<a class="button button--primary" href="#contacto" data-track="investment-cta">${escapeHtml(data.label || 'Consultar beneficios')}</a>` : ''}</div></div></section>`;
+  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}${hasForm ? `<a class="button button--primary" href="#contacto" data-track="investment-cta">${escapeHtml(data.label || 'Consultar beneficios')}${icon('arrow', 'button-arrow')}</a>` : ''}</div></div></section>`;
 }
 
 function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, preview: boolean): string {
@@ -375,7 +414,7 @@ function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, pre
     case 'hero':
       return renderHero(block, hasForm, apiBase);
     case 'text':
-      return renderText(block);
+      return renderText(block, apiBase);
     case 'feature_list':
       return renderFeatureList(block);
     case 'faculty':
@@ -424,10 +463,18 @@ export function renderLandingHtml(input: {
   const form = enabled.find((block) => block.type === 'lead_form');
   const sticky = !!form && document.leadFormLayout === 'sticky';
   const targets = new Set(enabled.map((block) => block.id));
+  const overview = enabled.find((block) => block.type === 'text');
+  const galleryPhoto = enabled.filter((block) => block.type === 'gallery')
+    .flatMap((block) => array(block.data.items).map(object)).find((item) => assetUrl(item.imageUrl, apiBase));
   const neutralTypes = new Set<LandingBlockType>(['text', 'feature_list', 'gallery', 'schedule', 'curriculum', 'faq']);
   const sectionTones = new Map(enabled.filter((block) => neutralTypes.has(block.type))
     .map((block, index) => [block.id, index % 2 === 0 ? 'light' : 'soft']));
   const render = (block: LandingBlock) => {
+    if (block === overview && galleryPhoto && !text(block.data.imageUrl)) {
+      block = { ...block, data: { ...block.data, imageUrl: galleryPhoto.imageUrl,
+        imageAlt: text(block.data.imageAlt) || galleryPhoto.imageAlt,
+        imageCaption: text(block.data.imageCaption) || galleryPhoto.caption } };
+    }
     if (block.type === 'cta' && typeof block.data.url === 'string' &&
       block.data.url.startsWith('#') && !targets.has(block.data.url.slice(1))) {
       return renderBlock({ ...block, data: { ...block.data, url: '' } }, apiBase, !!form, !!input.preview);
@@ -553,6 +600,60 @@ export function renderLandingHtml(input: {
     .section p:not(.eyebrow):not(.section-note),.faculty-carousel .faculty-card__copy p{font-size:var(--text-body);line-height:1.6}
     .eyebrow,.section-note,.faculty-position,.facts small{font-size:var(--text-meta);line-height:1.5}
     @media(max-width:760px){:root{--text-section:28px}}
+    /* Iconos comunes y estados de interacción. */
+    .landing-icon{display:inline-block;flex:0 0 auto;vertical-align:middle;width:24px;height:24px}
+    .button{gap:10px}.button .landing-icon{width:20px;height:20px}.button-arrow,.cta-action__arrow{transition:transform .2s ease}
+    .button:focus-visible,.faculty-link:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+    .button:active{transform:translateY(0)}
+    .facts li{grid-template-columns:24px minmax(0,1fr);align-items:center;gap:12px}.facts li>div{min-width:0;display:grid;gap:3px}.facts .landing-icon{color:#f1e7ff}
+    .feature-icon{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--primary) 9%,#fff);color:var(--primary)}
+    .icon-heading{display:flex;align-items:center;gap:12px}.icon-heading .feature-icon{flex-shrink:0}
+    .icon-line{display:flex;align-items:flex-start;gap:10px}.icon-line .landing-icon{width:20px;height:20px;margin-top:3px;color:var(--primary)}
+    .investment-amount{display:flex;align-items:center;gap:12px}.investment-amount .landing-icon{width:28px;height:28px}
+    .lead-toggle:not([hidden]){display:flex;align-items:center;justify-content:center;gap:10px}.lead-toggle .landing-icon{width:20px;height:20px}
+    .faculty-carousel .faculty-link{align-items:center;gap:8px;align-self:flex-start;min-height:44px;text-decoration:none;font-size:var(--text-meta)}
+    .faculty-link .button-arrow{width:18px;height:18px}.faculty-link:hover{text-decoration:underline;text-underline-offset:5px}
+    .faculty-section .section__head>p:last-child:not(.eyebrow){color:#d7cadc}
+    .curriculum-module,.faq details{transition:border-color .2s ease,background-color .2s ease}
+    .faq details{padding:0;margin-bottom:10px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    .curriculum-module summary,.faq summary{display:flex;align-items:center;gap:12px;list-style:none;line-height:1.5;border-radius:14px}
+    .faq summary{padding:18px}.curriculum-module summary::-webkit-details-marker,.faq summary::-webkit-details-marker{display:none}
+    .curriculum-module summary:focus-visible,.faq summary:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    .curriculum-module .accordion-title,.faq .accordion-title{flex:1;min-width:0;display:block;margin:0;color:inherit}
+    .curriculum-module .accordion-index{display:grid;place-items:center;flex:0 0 32px;height:32px;margin:0;border-radius:8px;background:color-mix(in srgb,var(--primary) 9%,#fff);font-size:var(--text-meta)}
+    .accordion-chevron{width:20px;height:20px;color:var(--primary);transition:transform .2s ease}
+    details[open]>summary .accordion-chevron{transform:rotate(180deg)}
+    .curriculum-module[open],.faq details[open]{border-color:color-mix(in srgb,var(--primary) 45%,var(--line));background:color-mix(in srgb,var(--primary) 3%,#fff)}
+    .faq details p{margin:0;padding:0 18px 20px}
+    @media(hover:hover){.button:hover .button-arrow{transform:translateX(3px)}.cta-action:hover .cta-action__arrow,.faculty-link:hover .button-arrow{transform:translate(2px,-2px)}.curriculum-module summary:hover,.faq summary:hover{background:color-mix(in srgb,var(--primary) 5%,#fff)}}
+    /* Composiciones editoriales y ficha de consulta rápida. */
+    .overview{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:32px;align-items:center;max-width:var(--page-width)}
+    .overview__copy{min-width:0}.overview__copy>p:last-child{margin-bottom:0}
+    .overview__figure{min-width:0;margin:0}.overview__figure img{width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:20px}
+    .overview__figure figcaption{margin-top:10px;color:#625b67;font-size:var(--text-meta);line-height:1.5}
+    .overview--left{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}.overview--left .overview__figure{order:-1}
+    .program-facts{max-width:1040px;margin-top:28px;padding:18px 20px;border:1px solid rgba(255,255,255,.6);border-radius:20px;background:rgba(255,255,255,.97);color:var(--ink)}
+    .program-facts__label{margin:0;color:var(--primary);font-size:var(--text-meta);font-weight:700}
+    .hero .program-facts .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));margin:10px 0 0;gap:0;list-style:none}
+    .hero .program-facts .facts li{min-width:0;padding:8px 18px;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;backdrop-filter:none;align-items:start}
+    .hero .program-facts .facts li:first-child{border-left:0;padding-left:0}.program-facts .facts small{color:#625b67;letter-spacing:.06em}
+    .program-facts .facts strong{font-size:var(--text-body);line-height:1.5}.program-facts .facts .landing-icon{color:var(--primary);margin-top:3px}
+    .lead-panel{background:#f8f6fb;border:1px solid #e3ddec;box-shadow:0 8px 28px rgba(45,23,65,.07)}
+    .faculty-carousel .faculty-card__copy{padding:22px;gap:0}.faculty-carousel .faculty-card__copy h3{min-height:2.6em;margin:0 0 8px;line-height:1.3}
+    .faculty-carousel .faculty-card__copy p.faculty-role{font-size:var(--text-meta);font-weight:700;color:#dcc5ef;margin:0 0 10px}
+    .faculty-carousel .faculty-card__copy .faculty-description{margin:0;color:#e2d9e7;line-height:1.6}
+    .faculty-description.is-collapsible:not(.is-expanded){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}
+    .faculty-card__actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-top:auto;padding-top:14px}
+    .faculty-carousel .faculty-card__actions .faculty-link{padding:0;margin:0;min-height:44px}
+    .faculty-bio-toggle{min-height:44px;padding:0;border:0;background:transparent;color:#f3b8dd;font:inherit;font-size:var(--text-meta);font-weight:700;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+    .faculty-bio-toggle:focus-visible{outline:2px solid #fff;outline-offset:3px}.faculty-bio-toggle[hidden]{display:none}
+    .faculty-card__index{position:absolute;right:12px;top:12px;padding:5px 9px;border-radius:999px;background:rgba(15,8,20,.72);color:#fff;font-size:var(--text-meta);font-weight:700;z-index:1}
+    .faculty-carousel .faculty-card.is-current{box-shadow:inset 0 0 0 1px var(--accent)}.faculty-card.is-current .faculty-card__index{background:var(--primary)}
+    .site-nav a{position:relative;padding-block:8px}.site-nav a:after{content:"";position:absolute;bottom:0;left:0;width:100%;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .2s ease}
+    .site-nav a[aria-current="location"]:after{transform:scaleX(1)}
+    .reading-progress{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--surface);pointer-events:none}.reading-progress[hidden]{display:none}
+    .reading-progress>span{display:block;width:100%;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
+    @media(max-width:760px){.overview,.overview--left{grid-template-columns:1fr;gap:24px}.overview--left .overview__figure{order:0}.program-facts{padding:16px}.hero .program-facts .facts{grid-template-columns:1fr}.hero .program-facts .facts li{border:0;border-top:1px solid var(--line);padding:12px 0}.hero .program-facts .facts li:first-child{border-top:0;padding-top:4px}.faculty-carousel .faculty-card__copy{padding:18px}}
   </style>
 </head>
 <body data-landing="${escapeHtml(input.slug)}" style="--logo-width:${document.logoWidth}px">
@@ -560,10 +661,10 @@ export function renderLandingHtml(input: {
   <header class="site-head"><div class="shell">
     <a class="brand" href="#inicio" aria-label="MALI Educación, inicio">${document.logoUrl ? `<img class="site-logo" src="${escapeHtml(document.logoUrl)}" alt="${escapeHtml(document.logoAlt)}">` : `<strong>${escapeHtml(document.logoAlt)}</strong>`}</a>
     ${navigation.length ? `<button class="nav-toggle" type="button" aria-controls="landing-nav" aria-expanded="false">Menú ☰</button><nav class="site-nav" id="landing-nav" aria-label="Secciones de la landing">${navigation.map((item) => `<a href="#${escapeHtml(item.blockId)}">${escapeHtml(item.label)}</a>`).join('')}</nav>` : ''}
-    ${form ? `<a class="button header-cta" href="#contacto" data-track="header-cta">${escapeHtml(document.headerCtaLabel)}</a>` : ''}
-  </div></header>
+    ${form ? `<a class="button header-cta" href="#contacto" data-track="header-cta">${escapeHtml(document.headerCtaLabel)}${icon('arrow', 'button-arrow')}</a>` : ''}
+  </div><div class="reading-progress" role="progressbar" aria-label="Progreso de lectura" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span></span></div></header>
   <main id="inicio">${blocks}</main>
-  ${sticky ? '<button class="lead-toggle" type="button" aria-controls="contacto" aria-expanded="false" hidden>Solicitar información</button>' : ''}
+  ${sticky ? `<button class="lead-toggle" type="button" aria-controls="contacto" aria-expanded="false" hidden>${icon('info')}Solicitar información</button>` : ''}
   <script>
   (function(){
     function track(event, detail){
@@ -585,6 +686,48 @@ export function renderLandingHtml(input: {
     var menu=document.querySelector('.nav-toggle'),nav=document.getElementById('landing-nav');
     function closeMenu(){if(menu&&nav){menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');}}
     if(menu&&nav){menu.addEventListener('click',function(){var open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});nav.querySelectorAll('a').forEach(function(a){a.addEventListener('click',closeMenu);});}
+    var readingProgress=document.querySelector('.reading-progress'),readingBar=readingProgress&&readingProgress.querySelector('span');
+    var navigationTargets=nav?Array.from(nav.querySelectorAll('a')).map(function(link){return {link:link,target:document.getElementById(link.getAttribute('href').slice(1))};}).filter(function(item){return item.target;}):[];
+    var readingFrame=null;
+    function syncReading(){
+      readingFrame=null;
+      var header=document.querySelector('.site-head'),marker=header.getBoundingClientRect().bottom+80;
+      var ordered=navigationTargets.slice().sort(function(a,b){return a.target.getBoundingClientRect().top-b.target.getBoundingClientRect().top;});
+      var active=null;ordered.forEach(function(item){if(item.target.getBoundingClientRect().top<=marker)active=item;});
+      navigationTargets.forEach(function(item){if(item===active)item.link.setAttribute('aria-current','location');else item.link.removeAttribute('aria-current');});
+      if(readingProgress){var distance=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);var percent=distance?Math.max(0,Math.min(1,window.scrollY/distance)):0;readingProgress.hidden=false;readingProgress.setAttribute('aria-valuenow',String(Math.round(percent*100)));readingBar.style.transform='scaleX('+percent+')';}
+    }
+    function scheduleReading(){if(readingFrame===null)readingFrame=requestAnimationFrame(syncReading);}
+    window.addEventListener('scroll',scheduleReading,{passive:true});window.addEventListener('resize',scheduleReading);
+    if(window.ResizeObserver)new ResizeObserver(scheduleReading).observe(document.querySelector('main'));
+    syncReading();
+    // El contenido permanece visible aunque JavaScript o las animaciones no estén disponibles.
+    var revealMotion=window.matchMedia('(prefers-reduced-motion: reduce)');
+    var revealTargets=Array.from(document.querySelectorAll('.section__head,.prose,.feature,.schedule-card,.cta-panel,.investment-box,.final-project,.faq h2'));
+    var revealObserver;
+    function syncReveals(){
+      if(revealObserver)revealObserver.disconnect();
+      revealTargets.forEach(function(el){if(el.getAnimations)el.getAnimations().forEach(function(animation){if(animation.id==='landing-reveal')animation.cancel();});});
+      if(revealMotion.matches||!window.IntersectionObserver||!Element.prototype.animate)return;
+      revealObserver=new IntersectionObserver(function(entries){entries.forEach(function(entry){
+        if(!entry.isIntersecting)return;
+        var el=entry.target;revealObserver.unobserve(el);
+        if(el.dataset.revealed)return;
+        el.dataset.revealed='true';
+        var order=el.matches('.feature,.schedule-card')?Array.from(el.parentElement.children).indexOf(el)%2:0;
+        var animation=el.animate([{opacity:0,transform:'translateY(12px)'},{opacity:1,transform:'translateY(0)'}],{duration:320,delay:order*60,easing:'cubic-bezier(.2,.7,.3,1)',fill:'backwards'});
+        animation.id='landing-reveal';
+      });},{threshold:.08,rootMargin:'0px 0px -24px 0px'});
+      revealTargets.forEach(function(el){if(!el.dataset.revealed)revealObserver.observe(el);});
+    }
+    syncReveals();revealMotion.addEventListener('change',syncReveals);
+    document.querySelectorAll('.faculty-description').forEach(function(description){
+      var card=description.closest('.faculty-card'),button=card.querySelector('.faculty-bio-toggle');
+      if(!button)return;
+      function syncBiography(){description.classList.add('is-collapsible');var limit=parseFloat(getComputedStyle(description).lineHeight)*4;var long=description.scrollHeight>limit+2;button.hidden=!long;if(!long){description.classList.remove('is-collapsible','is-expanded');button.setAttribute('aria-expanded','false');button.firstChild.nodeValue='Leer más';}}
+      button.addEventListener('click',function(){var expanded=button.getAttribute('aria-expanded')!=='true';description.classList.toggle('is-expanded',expanded);button.setAttribute('aria-expanded',String(expanded));button.firstChild.nodeValue=expanded?'Leer menos':'Leer más';card.closest('[data-faculty-slider]').dispatchEvent(new Event('faculty-bio-change'));});
+      syncBiography();window.addEventListener('resize',syncBiography);if(document.fonts)document.fonts.ready.then(syncBiography);
+    });
     document.querySelectorAll('[data-faculty-slider]').forEach(function(slider){
       var track=slider.querySelector('.faculty-carousel');
       var cards=Array.from(track.querySelectorAll('.faculty-card'));
@@ -604,7 +747,7 @@ export function renderLandingHtml(input: {
         playback.hidden=motion.matches;
         playback.textContent=userPaused?'Reanudar':'Pausar';
         playback.setAttribute('aria-label',userPaused?'Reanudar carrusel':'Pausar carrusel');
-        var keyboardReading=track.matches(':focus-visible')||!!track.querySelector(':focus-visible');
+        var keyboardReading=track.matches(':focus-visible')||!!track.querySelector(':focus-visible')||!!track.querySelector('.faculty-description.is-expanded');
         position.setAttribute('aria-live',userPaused||motion.matches||keyboardReading?'polite':'off');
         if(userPaused||motion.matches||touching||document.hidden||!inView||keyboardReading||track.scrollWidth<=track.clientWidth+2)return;
         timer=setTimeout(function(){
@@ -643,6 +786,7 @@ export function renderLandingHtml(input: {
       previous.addEventListener('click',function(){moveFaculty(-1);scheduleFaculty();});
       next.addEventListener('click',function(){moveFaculty(1);scheduleFaculty();});
       playback.addEventListener('click',function(){userPaused=!userPaused;scheduleFaculty();});
+      slider.addEventListener('faculty-bio-change',scheduleFaculty);
       slider.addEventListener('pointerdown',function(event){if(event.pointerType==='touch'){touching=true;scheduleFaculty();}},{passive:true});
       window.addEventListener('pointerup',function(){if(touching){touching=false;scheduleFaculty();}},{passive:true});
       window.addEventListener('pointercancel',function(){if(touching){touching=false;scheduleFaculty();}},{passive:true});

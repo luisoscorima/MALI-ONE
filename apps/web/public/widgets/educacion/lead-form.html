@@ -273,6 +273,21 @@
     .lead-compact .lead-form__prefix-option,
     .lead-compact .lead-form__submit,
     .lead-compact .lead-form__wa a { font-size: var(--text-body); }
+    .lead-compact .lead-form { padding: 22px 20px; border-top: 3px solid #5c1599; }
+    .lead-compact .lead-form__title, .lead-compact .lead-form__subtitle { text-align: left; }
+    .lead-compact .lead-form__subtitle { color: #625b67; }
+    .lead-compact .lead-form__field input:not([type="hidden"]),
+    .lead-compact .lead-form__field select,
+    .lead-compact .lead-form__prefix-btn { min-height: 44px; padding: 9px 12px; border: 1px solid #ded8e6; border-radius: 10px; transition: border-color .2s, box-shadow .2s; }
+    .lead-compact .lead-form__field input:focus,
+    .lead-compact .lead-form__field select:focus,
+    .lead-compact .lead-form__prefix-btn:focus-visible { border-color: #5c1599; outline: 2px solid #5c1599; outline-offset: 2px; }
+    .lead-compact .lead-form__check input { accent-color: #0022cc; }
+    .lead-compact .lead-form__submit { min-height: 48px; border-radius: 12px; transition: background-color .2s; }
+    .lead-compact .lead-form__submit:hover { background: #001baa; }
+    .lead-compact .lead-form__submit:focus-visible { outline: 3px solid #5c1599; outline-offset: 3px; }
+    .lead-compact .lead-form__prefix-list { border: 1px solid #ded8e6; border-radius: 10px; }
+    @media(prefers-reduced-motion: reduce) { .lead-compact * { transition: none !important; } }
     .lead-preview .lead-form__wa { display: none !important; }
   </style>
 </head>
@@ -400,6 +415,7 @@
     area = 'educacion_ep';
   }
   var bg = params.get('bg') || params.get('color') || '';
+  if (params.get('compact') === '1' && (!bg || bg.toLowerCase() === '#b4b3ff')) bg = '#f8f6fb';
   var privacy = params.get('privacy') || '';
   var waPhone = String(params.get('wa') || '').replace(/\D/g, '');
 

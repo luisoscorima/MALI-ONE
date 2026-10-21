@@ -130,7 +130,7 @@ function defaultBlock(type: LandingBlockType): LandingBlock {
           courseSlug: '',
           courseTitle: '',
           whatsappPhone: '',
-          backgroundColor: '#b4b3ff',
+          backgroundColor: '#f8f6fb',
           privacyUrl: '',
         },
       };
@@ -203,9 +203,12 @@ function BlockFields({ block, update }: { block: LandingBlock; update: (key: str
   const heading = <>{field('Antetítulo', 'eyebrow')}{field('Título', 'title')}</>;
   switch (block.type) {
     case 'hero': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Descripción', 'body', true)}{field('Texto del botón', 'ctaLabel')}{field('Color de fondo sólido', 'backgroundColor')}{field('URL del video MP4 (opcional)', 'videoUrl')}{field('Imagen alternativa del video', 'imageUrl')}{field('Texto alternativo', 'imageAlt')}
-      <p className="text-xs text-muted-foreground md:col-span-2">Sin URL de video se mostrará el fondo sólido. El video se fundirá con el fondo, sin audio y en bucle.</p>
+      <p className="text-xs text-muted-foreground md:col-span-2">Sin URL de video se mostrará el fondo sólido. El video intentará iniciar con sonido; si el navegador lo bloquea, comenzará silenciado con un botón para activarlo.</p>
       {itemFields('Datos destacados', [{ key: 'label', label: 'Etiqueta' }, { key: 'value', label: 'Valor' }], 'facts')}</div>;
-    case 'text': return <div className="grid gap-3">{heading}{field('Contenido', 'body', true)}</div>;
+    case 'text': return <div className="grid gap-3 md:grid-cols-2">{heading}<div className="md:col-span-2">{field('Contenido', 'body', true)}</div>
+      {field('URL de fotografía de la sección', 'imageUrl')}{field('Texto alternativo de la fotografía', 'imageAlt')}{field('Leyenda de la fotografía', 'imageCaption')}
+      <div className="space-y-1"><Label htmlFor={block.id + '-image-layout'}>Composición de la sección</Label><select id={block.id + '-image-layout'} className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={stringValue(block.data.imageLayout) || 'right'} onChange={(event) => update('imageLayout', event.target.value)}><option value="right">Texto y fotografía a la derecha</option><option value="left">Fotografía a la izquierda y texto</option><option value="none">Solo texto</option></select></div>
+      <p className="text-xs text-muted-foreground md:col-span-2">Usa una URL externa. En el primer bloque de texto, si no indicas una fotografía, se reutiliza la primera imagen de la galería. Elige Solo texto para ocultarla.</p></div>;
     case 'feature_list': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{itemFields('Elementos', [{ key: 'title', label: 'Título' }, { key: 'description', label: 'Descripción', multiline: true }])}</div>;
     case 'faculty': return <div className="grid gap-3 md:grid-cols-2">{heading}{field('Introducción', 'intro', true)}{field('Nota', 'note', true)}{itemFields('Docentes', [
       { key: 'name', label: 'Nombre' }, { key: 'role', label: 'Especialidad o cargo' }, { key: 'description', label: 'Descripción del docente', multiline: true }, { key: 'imageUrl', label: 'URL de la fotografía' }, { key: 'imageAlt', label: 'Texto alternativo' }, { key: 'linkedinUrl', label: 'URL de LinkedIn (opcional)' },

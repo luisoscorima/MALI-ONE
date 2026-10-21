@@ -19,6 +19,7 @@ test('contenido aprobado: 13 módulos, proyecto final, ocho docentes e inversió
 test('normalización y guardado conservan precios, biografías, navbar y opciones', async () => {
   const doc = content();
   doc.logoWidth = 310;
+  Object.assign(doc.blocks.find((b) => b.type === 'text').data, { imageUrl: 'https://example.test/museo.jpg', imageAlt: 'Museo', imageCaption: 'Comunidad MALI', imageLayout: 'left' });
   doc.blocks.find((b) => b.type === 'investment').data.enrollment = '550';
   doc.blocks.find((b) => b.type === 'faculty').data.items[0].description = 'Dos palabras\n\nOtra línea | completa';
   let saved;
@@ -64,18 +65,21 @@ test('contenido y URLs maliciosos no se convierten en HTML ejecutable', () => {
   faculty.description = '<script>alert(1)</script>';
   faculty.linkedinUrl = 'javascript:alert(1)';
   doc.blocks.find((b) => b.type === 'hero').data.videoUrl = 'javascript:alert(1)';
+  doc.blocks.find((b) => b.type === 'text').data.imageUrl = 'javascript:alert(1)';
   const html = render(doc);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.doesNotMatch(html, /href="javascript:|data-video-src="javascript:/);
+  assert.doesNotMatch(html, /(?:href|src)="javascript:|data-video-src="javascript:/);
   for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 });
 
 test('LinkedIn es opcional; las ocho fotografías usan WordPress en el orden aprobado', () => {
   assert.doesNotMatch(render(), /class="faculty-link"/);
+  assert.doesNotMatch(render(), /data-icon="linkedin"/);
   const doc = content();
   doc.blocks.find((b) => b.type === 'faculty').data.items[0].linkedinUrl = 'https://www.linkedin.com/in/docente/';
   const html = render(doc, { apiBase: 'https://one.example' });
   assert.match(html, /href="https:\/\/www.linkedin.com\/in\/docente\/"/);
+  assert.equal((html.match(/data-icon="linkedin"/g) || []).length, 1);
   const photos = doc.blocks.find((b) => b.type === 'faculty').data.items.map((item) => item.imageUrl);
   assert.deepEqual(photos, Array.from({ length: 8 }, (_, index) => `https://educacion.mali.pe/wp-content/uploads/2026/10/docente_${index + 1}.jpg`));
 });

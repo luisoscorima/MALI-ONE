@@ -35,6 +35,15 @@ const server = http.createServer(async (req, res) => {
     return json(res, {});
   }
   if (route === '/qa/landing') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html()); }
+  if (route === '/qa/inline') { const doc = content(); doc.leadFormLayout = 'inline'; res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html(doc)); }
+  if (route === '/qa/enhanced') {
+    const doc = content();
+    const teacher = doc.blocks.find((block) => block.type === 'faculty').data.items[0];
+    teacher.linkedinUrl = 'https://www.linkedin.com/in/docente/';
+    teacher.role = 'Gestión cultural y políticas públicas';
+    teacher.description = 'Experiencia en proyectos culturales, formación de públicos, investigación y colaboración con instituciones del sector. '.repeat(7);
+    res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(html(doc));
+  }
   if (route === '/qa/video') {
     const doc = content();
     doc.blocks.find((block) => block.type === 'hero').data.videoUrl = base + '/qa/hero.webm';
@@ -91,12 +100,17 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await page.locator('.curriculum-module').count(), 13);
     assert.equal(await page.locator('.faculty-card').count(), 8);
     assert.equal(await page.locator('video').count(), 0);
+    assert.equal(await page.locator('.overview__figure img').count(), 1, 'La primera sección de texto incorpora una fotografía de la galería');
+    assert.equal(await page.locator('.program-facts').count(), 1, 'Ficha de datos clave');
+    assert.equal(await page.locator('.reading-progress').getAttribute('aria-valuenow'), '0');
     assert.equal(await page.locator('.hero').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 34, 204)');
     let hero = await page.locator('.hero').boundingBox();
     let panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= hero.y + hero.height, 'El formulario debe empezar después del hero');
     await page.screenshot({ path: path.join(output, 'desktop-hero.png') });
     await page.locator('#programa').evaluate((el) => window.scrollTo(0, el.getBoundingClientRect().top + scrollY - 120));
+    await page.waitForFunction(() => document.querySelector('.site-nav a[href="#programa"]').getAttribute('aria-current') === 'location');
+    assert.ok(Number(await page.locator('.reading-progress').getAttribute('aria-valuenow')) > 0);
     await page.screenshot({ path: path.join(output, 'desktop-tipografia.png') });
     const typeGroups = await page.evaluate(() => {
       const groups = {
@@ -115,12 +129,15 @@ const server = http.createServer(async (req, res) => {
     panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.y >= 100 && panel.y < 150, 'Formulario sticky bajo la cabecera');
     await page.waitForFunction(() => document.getElementById('landingLeadFormFrame').getBoundingClientRect().height > 400);
+    assert.equal(await page.frameLocator('#landingLeadFormFrame').locator('.lead-form').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(248, 246, 251)', 'Formulario compacto de fondo suave');
     panel = await page.locator('.lead-panel').boundingBox();
     assert.ok(panel.height < 700, 'Sin espacio vacío innecesario bajo el formulario');
     assert.ok(panel.y + panel.height <= 1000, 'Formulario accesible dentro del viewport');
     await page.screenshot({ path: path.join(output, 'desktop-malla.png') });
     await page.locator('.curriculum-module').nth(1).locator('summary').click();
     assert.equal(await page.locator('.curriculum-module').nth(1).getAttribute('open'), '');
+    assert.equal(await page.locator('.curriculum-module[open]').count(), 1, 'Un solo módulo abierto');
+    assert.equal(await page.locator('.curriculum-module[open] .accordion-chevron').count(), 1);
     await page.locator('.site-nav').getByRole('link', { name: 'Docentes', exact: true }).click();
     const carousel = page.locator('.faculty-carousel');
     const teacherDots = page.locator('.faculty-dot');
@@ -153,6 +170,8 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await teacherDots.first().getAttribute('aria-current'), 'true');
     await page.screenshot({ path: path.join(output, 'desktop-docentes.png') });
     await page.locator('footer').scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForFunction(() => document.querySelector('.reading-progress').getAttribute('aria-valuenow') === '100');
     panel = await page.locator('.lead-panel').boundingBox();
     const footer = await page.locator('footer').boundingBox();
     assert.ok(panel.y + panel.height <= footer.y + 1, 'El formulario se detiene antes del footer');
@@ -209,17 +228,23 @@ const server = http.createServer(async (req, res) => {
     await description.pressSequentially('más palabras');
     assert.equal(await description.inputValue(), text + 'más palabras');
     await page.getByLabel('Matrícula', { exact: true }).fill('725');
+    await page.getByLabel('URL de fotografía de la sección', { exact: true }).fill('https://example.test/programa.jpg');
+    await page.getByLabel('Texto alternativo de la fotografía', { exact: true }).fill('Comunidad del MALI');
+    await page.getByLabel('Composición de la sección', { exact: true }).selectOption('left');
     await page.getByRole('button', { name: 'Guardar borrador', exact: true }).click();
     await page.getByTitle('Editar', { exact: true }).waitFor();
     assert.equal(record.content.blocks.find((b) => b.type === 'investment').data.enrollment, '725');
     await page.getByTitle('Editar', { exact: true }).click();
     await page.getByLabel('Matrícula', { exact: true }).waitFor();
     assert.equal(await page.getByLabel('Matrícula', { exact: true }).inputValue(), '725');
+    assert.equal(await page.getByLabel('URL de fotografía de la sección', { exact: true }).inputValue(), 'https://example.test/programa.jpg');
+    assert.equal(await page.getByLabel('Composición de la sección', { exact: true }).inputValue(), 'left');
     assert.equal(await page.getByLabel('Descripción del docente', { exact: true }).first().inputValue(), text + 'más palabras');
     await page.getByRole('button', { name: 'Vista previa', exact: true }).click();
     await page.locator('iframe[title="Vista previa de la landing"]').waitFor();
     const preview = page.frameLocator('iframe[title="Vista previa de la landing"]');
     assert.equal(await preview.locator('.curriculum-module').count(), 13);
+    assert.equal(await preview.locator('.overview--left img').getAttribute('src'), 'https://example.test/programa.jpg');
     assert.equal(errors.length, 0, 'Errores JS: ' + errors.join('; '));
     console.log('PASS editor: edición de biografías, matrícula, guardado, reapertura y vista previa');
 
@@ -238,6 +263,65 @@ const server = http.createServer(async (req, res) => {
     assert.equal(lastLeadPayload.whatsappArea, 'educacion_ep');
     await page.waitForFunction(() => document.getElementById('landingLeadFormFrame').getBoundingClientRect().height < 400);
     console.log('PASS captura pública simulada: un envío local con UTMs, origen landing y evento generate_lead');
+    const enhancedPage = await context.newPage();
+    await enhancedPage.addInitScript(() => {
+      window.revealCounts = new WeakMap();
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        window.revealCounts.set(this, (window.revealCounts.get(this) || 0) + 1);
+        return animate.apply(this, args);
+      };
+    });
+    await enhancedPage.goto(base + '/qa/enhanced');
+    assert.equal(await enhancedPage.locator('.faculty-link').count(), 1, 'Solo el docente con URL muestra LinkedIn');
+    assert.equal(await enhancedPage.locator('.faculty-link [data-icon="linkedin"]').count(), 1);
+    assert.match(await enhancedPage.locator('.faculty-link').getAttribute('rel'), /noopener/);
+    const biography = enhancedPage.locator('.faculty-description').first();
+    const biographyButton = enhancedPage.locator('.faculty-bio-toggle').first();
+    await biographyButton.waitFor({ state: 'visible' });
+    const collapsedBiography = await biography.evaluate((el) => el.clientHeight);
+    await biographyButton.click();
+    assert.equal(await biographyButton.getAttribute('aria-expanded'), 'true');
+    assert.ok(await biography.evaluate((el) => el.clientHeight) > collapsedBiography, 'Leer más muestra toda la biografía');
+    await biographyButton.click();
+    assert.equal(await biographyButton.getAttribute('aria-expanded'), 'false');
+    assert.equal(await enhancedPage.locator('.facts [data-icon]').count(), 3);
+    assert.equal(await enhancedPage.locator('.feature').count(), await enhancedPage.locator('.feature-icon>svg').count() - await enhancedPage.locator('.schedule-card .feature-icon').count());
+    await enhancedPage.locator('#beneficios').scrollIntoViewIfNeeded();
+    assert.equal(await enhancedPage.locator('#beneficios .feature').first().evaluate((el) => getComputedStyle(el).opacity), '1', 'Contenido visible con movimiento reducido');
+    assert.equal(await enhancedPage.locator('[data-revealed]').count(), 0, 'Sin animaciones de entrada con movimiento reducido');
+    await enhancedPage.emulateMedia({ reducedMotion: 'no-preference' });
+    await enhancedPage.waitForFunction(() => document.querySelector('#beneficios .feature').dataset.revealed === 'true');
+    await enhancedPage.waitForFunction(() => document.querySelector('#beneficios .feature').getAnimations().length === 0);
+    assert.equal(await enhancedPage.locator('#beneficios .feature').first().evaluate((el) => window.revealCounts.get(el)), 1);
+    await enhancedPage.locator('#preguntas').scrollIntoViewIfNeeded();
+    await enhancedPage.locator('#beneficios').scrollIntoViewIfNeeded();
+    assert.equal(await enhancedPage.locator('#beneficios .feature').first().evaluate((el) => window.revealCounts.get(el)), 1, 'La entrada se anima una sola vez');
+    await enhancedPage.emulateMedia({ reducedMotion: 'reduce' });
+    await enhancedPage.locator('#docentes').scrollIntoViewIfNeeded();
+    await enhancedPage.screenshot({ path: path.join(output, 'desktop-linkedin.png') });
+    await enhancedPage.setViewportSize({ width: 320, height: 844 });
+    await enhancedPage.locator('#modalidades').scrollIntoViewIfNeeded();
+    assert.ok(await enhancedPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Los iconos no desbordan en móvil');
+    await enhancedPage.screenshot({ path: path.join(output, 'mobile-iconos.png') });
+    await enhancedPage.close();
+    const noJsContext = await browser.newContext({ javaScriptEnabled: false });
+    await noJsContext.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
+    const noJsPage = await noJsContext.newPage();
+    await noJsPage.goto(base + '/qa/enhanced');
+    assert.equal(await noJsPage.locator('#beneficios .feature').first().evaluate((el) => getComputedStyle(el).opacity), '1', 'El contenido sigue visible sin JavaScript');
+    await noJsPage.locator('.curriculum-module').nth(1).locator('summary').click();
+    assert.equal(await noJsPage.locator('.curriculum-module[open]').count(), 1, 'El acordeón funciona sin JavaScript');
+    await noJsContext.close();
+    const inlinePage = await context.newPage();
+    await inlinePage.goto(base + '/qa/inline');
+    await inlinePage.locator('#contacto').scrollIntoViewIfNeeded();
+    assert.equal(await inlinePage.frameLocator('#landingLeadFormFrame').locator('.lead-form').evaluate((el) => getComputedStyle(el).color), 'rgb(16, 16, 24)', 'Contraste correcto también con formulario inline');
+    await inlinePage.goto(base + '/widgets/educacion/lead-form.html');
+    assert.equal(await inlinePage.locator('.lead-form').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(180, 179, 255)', 'El widget tradicional conserva su fondo');
+    assert.equal(await inlinePage.locator('.lead-form__field input').first().evaluate((el) => getComputedStyle(el).borderRadius), '2px', 'Los campos tradicionales no cambian');
+    await inlinePage.close();
+    console.log('PASS mejoras visuales: fotografía editable, datos clave, formulario suave, biografías completas, navegación activa, progreso, iconos y animaciones accesibles');
     const videoPage = await context.newPage();
     // Simular reproducción sin descargar archivos ni emitir sonido durante QA.
     await videoPage.addInitScript(() => {

@@ -33,6 +33,29 @@ automático. Las barras del carrusel y del panel del formulario se ocultan sin
 deshabilitar su desplazamiento.
 Cada docente tiene un punto de navegación seleccionable. El punto y la tarjeta
 activos se resaltan al avanzar automáticamente, usar las flechas o deslizar.
+Los enlaces de perfil incluyen el icono de LinkedIn y su etiqueta; ambos aparecen
+solo cuando el docente tiene una URL válida, y abren en una pestaña nueva.
+
+La plantilla incorpora iconos SVG de trazo común en los datos del hero, beneficios,
+modalidades y acciones; no descarga imágenes ni añade dependencias de iconos.
+Los beneficios reemplazan los números decorativos por iconos según su título.
+Los acordeones mantienen la apertura exclusiva, muestran una flecha que gira y
+resaltan el bloque abierto. Los botones incluyen estados de foco, hover y pulsación.
+Encabezados, tarjetas y llamadas a la acción aparecen con un fundido y un recorrido
+vertical de 12 px durante 320 ms, una sola vez al entrar en pantalla. Se respeta
+el movimiento reducido y el contenido permanece visible sin JavaScript.
+
+Los bloques de texto admiten fotografía externa, texto alternativo, leyenda y
+composición a izquierda/derecha o solo texto, editables desde MALI ONE. En el primer
+bloque, sin URL propia se reutiliza la primera fotografía de una galería visible;
+la opción Solo texto desactiva esta composición. En móvil se muestra texto seguido
+de fotografía. Los datos del hero se agrupan en una ficha de consulta rápida.
+Las tarjetas de docentes alinean nombres, especialidad y acciones. Las biografías
+de más de cuatro líneas ofrecen Leer más/Leer menos sin perder contenido; al
+expandirlas se pausa el avance para permitir su lectura. Sin JavaScript se muestra
+la biografía completa. La navbar subraya la sección activa según el orden real de
+la página e incorpora una barra de progreso que se actualiza al desplazar o cambiar
+el tamaño del contenido.
 
 La matrícula inicial confirmada es S/ 490. Las diez cuotas de S/ 630 se conservan
 como referencia del HTML y deben revisarse antes de publicar. Matrícula, moneda,
@@ -73,7 +96,12 @@ del footer. En pantallas de hasta 1100 px se usa un botón desplegable después 
 hero; cerrar y abrir conserva los datos. El modo `inline` mantiene la sección
 tradicional. Solo se monta una instancia del widget en ambos casos. Los cambios
 de presentación del widget se activan con `compact=1` y no afectan los embeds
-habituales de WordPress.
+habituales de WordPress. Las dos presentaciones de la landing usan `compact=1`
+para conservar la misma tipografía, contraste y estilo de campos.
+El formulario compacto usa un fondo lavanda suave, campos redondeados y estados
+de foco. El antiguo tono `#b4b3ff` se actualiza visualmente a `#f8f6fb` en este modo;
+los colores personalizados se conservan. Los embeds sin `compact=1` mantienen su
+presentación habitual.
 
 La vista previa omite GTM y eventos comerciales y transmite `preview=1` al widget.
 El botón de envío muestra un mensaje de prueba sin enviar datos ni abrir WhatsApp.
