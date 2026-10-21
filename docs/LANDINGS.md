@@ -68,6 +68,8 @@ como referencia del HTML y deben revisarse antes de publicar. Matrícula, moneda
 cantidad e importe de cuotas y condiciones se editan en el bloque `investment`.
 Cuando inversión y el CTA de WhatsApp están consecutivos, se muestran en dos
 columnas de igual altura; en móvil se apilan conservando el orden.
+La matrícula se presenta en tamaño destacado (48–64 px). El bloque de inversión
+no incluye el antiguo botón Consultar beneficios.
 No se incorporan el popup promocional ni los testimonios de ejemplo del HTML.
 El bloque `lead_form` reutiliza el widget oficial de Educación y
 su flujo MALI ONE → MALI WhatsApp; no envía datos a otros CRM.
@@ -81,9 +83,14 @@ campos individuales para conservar espacios y saltos de línea. El máximo es de
 error y no descarta contenido silenciosamente.
 
 El hero tiene fondo sólido `#0022cc` y una URL opcional de video. Sin URL no se
-crea un reproductor. Con video, usa un fundido azul suave y conserva la opacidad
-del archivo. Intenta comenzar en bucle con sonido; si el navegador bloquea ese
-inicio, vuelve a intentarlo silenciado. Incluye botones para activar o silenciar
+crea un reproductor. El video ocupa el tercio derecho del hero, con un fundido
+en su borde izquierdo hacia los otros dos tercios de color sólido. En escritorio
+el título y los datos se limitan al área sólida; en móvil el texto conserva su
+ancho y se refuerza el contraste sobre el tercio de video.
+En escritorio, los controles de sonido y reproducción se alinean con la base de
+la ficha de datos; en móvil permanecen debajo para evitar superposiciones.
+Intenta comenzar en bucle con sonido; si el navegador bloquea ese inicio, vuelve
+a intentarlo silenciado. Incluye botones para activar o silenciar
 el sonido y pausar o reproducir. El archivo debe incluir audio. Con movimiento reducido no se reproduce
 automáticamente, pero los controles permiten iniciarlo de forma manual.
 El tamaño del logo y los enlaces de navegación por sección son editables.

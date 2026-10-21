@@ -102,6 +102,8 @@ const server = http.createServer(async (req, res) => {
     assert.equal(await page.locator('video').count(), 0);
     assert.equal(await page.locator('.overview__figure img').count(), 1, 'La primera sección de texto incorpora una fotografía de la galería');
     assert.equal(await page.locator('.program-facts').count(), 1, 'Ficha de datos clave');
+    assert.equal(await page.locator('[data-track="investment-cta"]').count(), 0, 'La inversión no muestra Consultar beneficios');
+    assert.ok(await page.locator('.investment-amount').evaluate((el) => parseFloat(getComputedStyle(el).fontSize)) >= 48, 'Matrícula en tamaño destacado');
     assert.equal(await page.locator('.reading-progress').getAttribute('aria-valuenow'), '0');
     assert.equal(await page.locator('.hero').evaluate((el) => getComputedStyle(el).backgroundColor), 'rgb(0, 34, 204)');
     let hero = await page.locator('.hero').boundingBox();
@@ -367,8 +369,20 @@ const server = http.createServer(async (req, res) => {
       const controls = await videoPage.locator('.hero__media-controls').boundingBox();
       const copy = await videoPage.locator('.hero__content').boundingBox();
       const facts = await videoPage.locator('.hero .facts').boundingBox();
+      const heroBounds = await videoPage.locator('.hero').boundingBox();
+      const videoBounds = await videoPage.locator('.hero__video').boundingBox();
+      assert.ok(Math.abs(videoBounds.width - heroBounds.width / 3) < 1, 'El video ocupa un tercio del ancho del hero');
+      assert.ok(Math.abs(videoBounds.x - (heroBounds.x + heroBounds.width * 2 / 3)) < 1, 'Los primeros dos tercios quedan con fondo sólido');
+      assert.notEqual(await videoPage.locator('.hero__video').evaluate((el) => getComputedStyle(el).maskImage), 'none', 'Fundido entre video y fondo');
+      if (width > 760) {
+        const heading = await videoPage.locator('.hero h1').boundingBox();
+        assert.ok(heading.x + heading.width <= videoBounds.x, 'El título queda dentro del área sólida');
+        const factsBox = await videoPage.locator('.program-facts').boundingBox();
+        assert.ok(Math.abs(controls.y + controls.height - factsBox.y - factsBox.height) < 1, 'Controles alineados con la base de la ficha');
+        assert.ok(controls.x >= factsBox.x + factsBox.width, 'Los controles no se superponen a la ficha');
+      }
       assert.ok(controls.x >= 0 && controls.x + controls.width <= width, 'Controles dentro del ancho disponible');
-      assert.ok(controls.y >= facts.y + facts.height && controls.y + controls.height <= copy.y + copy.height, 'Controles separados del texto');
+      if (width <= 760) assert.ok(controls.y >= facts.y + facts.height && controls.y + controls.height <= copy.y + copy.height, 'En móvil, controles debajo de la ficha');
       await videoPage.screenshot({ path: path.join(output, width === 320 ? 'mobile-video.png' : 'desktop-video.png') });
     }
     await videoPage.close();

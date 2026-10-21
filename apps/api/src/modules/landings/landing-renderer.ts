@@ -408,9 +408,9 @@ function renderCurriculum(block: LandingBlock): string {
   return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell"><div class="section__head">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.intro)}</div>${items}${data.finalTitle ? `<article class="final-project"><h3>${escapeHtml(data.finalTitle)}</h3>${paragraphs(data.finalDescription)}</article>` : ''}</div></section>`;
 }
 
-function renderInvestment(block: LandingBlock, hasForm: boolean): string {
+function renderInvestment(block: LandingBlock): string {
   const data = block.data;
-  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}${hasForm ? `<a class="button button--primary" href="#contacto" data-track="investment-cta">${escapeHtml(data.label || 'Consultar beneficios')}${icon('arrow', 'button-arrow')}</a>` : ''}</div></div></section>`;
+  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}</div></div></section>`;
 }
 
 function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, preview: boolean): string {
@@ -430,7 +430,7 @@ function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, pre
     case 'curriculum':
       return renderCurriculum(block);
     case 'investment':
-      return renderInvestment(block, hasForm);
+      return renderInvestment(block);
     case 'faq':
       return renderFaq(block);
     case 'cta':
@@ -658,6 +658,13 @@ export function renderLandingHtml(input: {
     .reading-progress{position:absolute;bottom:0;left:0;width:100%;height:3px;background:var(--surface);pointer-events:none}.reading-progress[hidden]{display:none}
     .reading-progress>span{display:block;width:100%;height:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
     .hero__media-controls button{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%}
+    .investment-amount{font-size:clamp(48px,5vw,64px);line-height:1.1;letter-spacing:-.035em}
+    .investment-amount .landing-icon{width:32px;height:32px}
+    /* Video limitado al tercio derecho; el fundido revela el color sólido debajo. */
+    .hero__video{inset:0 0 0 auto;width:calc(100% / 3);height:100%;opacity:1;mask-image:linear-gradient(90deg,transparent,#000 28%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%)}
+    .hero:has(.hero__video) .hero__shade{background:none;pointer-events:none}
+    @media(min-width:761px){.hero:has(.hero__video) .hero__content>h1,.hero:has(.hero__video) .hero__lead,.hero:has(.hero__video) .program-facts{max-width:min(920px,calc(66.666667vw - max(var(--page-gutter),calc((100vw - var(--page-width)) / 2)) - var(--content-inset) - 24px))}.hero:has(.program-facts) .hero__media-controls{left:auto;bottom:100px}}
+    @media(max-width:760px){.hero:has(.hero__video) .hero__shade{inset:0 0 0 auto;width:calc(100% / 3);background:rgba(0,0,0,.28);mask-image:linear-gradient(90deg,transparent,#000 28%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%)}.hero:has(.hero__video) h1,.hero:has(.hero__video) .hero__lead{text-shadow:0 2px 8px rgba(0,0,0,.3)}.hero__media-controls{right:8px}}
     @media(max-width:760px){.overview,.overview--left{grid-template-columns:1fr;gap:24px}.overview--left .overview__figure{order:0}.program-facts{padding:16px}.hero .program-facts .facts{grid-template-columns:1fr}.hero .program-facts .facts li{border:0;border-top:1px solid var(--line);padding:12px 0}.hero .program-facts .facts li:first-child{border-top:0;padding-top:4px}.faculty-carousel .faculty-card__copy{padding:18px}}
   </style>
 </head>
