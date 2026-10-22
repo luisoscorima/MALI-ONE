@@ -305,7 +305,10 @@ export const api = {
   },
 
   createWorkspaceUser: (body: import('@mali-one/shared').CreateWorkspaceUserDto) =>
-    request('/api/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+    request<import('@mali-one/shared').GoogleWorkspaceUser>('/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   generateWorkspacePassword: () =>
     request<{ password: string }>('/api/admin/users/generate-password'),
@@ -317,10 +320,13 @@ export const api = {
     email: string,
     body: import('@mali-one/shared').UpdateWorkspaceUserDto,
   ) =>
-    request(`/api/admin/users/${encodeURIComponent(email)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
+    request<import('@mali-one/shared').GoogleWorkspaceUser>(
+      `/api/admin/users/${encodeURIComponent(email)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      },
+    ),
 
   resetWorkspacePassword: (
     email: string,

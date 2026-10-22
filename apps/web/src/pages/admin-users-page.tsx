@@ -1,5 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { KeyRound, LogOut, Pencil, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2,
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  LogOut,
+  Pencil,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { GoogleAdminIcon, IconActionButton } from '@/components/icon-action-button';
 import { api } from '@/lib/api';
@@ -33,7 +43,26 @@ import {
   TableRow,
 } from '@/components/ui';
 
-const TEMP_PASSWORD_TTL_MS = 90_000;
+const WORKSPACE_DOMAIN = 'mali.pe';
+const TEMP_ACCESS_TTL_MS = 90_000;
+const TEMP_ACCESS_TTL_SECONDS = TEMP_ACCESS_TTL_MS / 1000;
+
+function toWorkspaceEmail(username: string) {
+  const value = username.trim();
+  const suffix = `@${WORKSPACE_DOMAIN}`;
+
+  return value.toLowerCase().endsWith(suffix)
+    ? value
+    : `${value}${suffix}`;
+}
+
+function toWorkspaceUsername(email: string) {
+  const suffix = `@${WORKSPACE_DOMAIN}`;
+
+  return email.toLowerCase().endsWith(suffix)
+    ? email.slice(0, -suffix.length)
+    : email;
+}
 
 export function AdminUsersPage() {
   const toast = useToast();
@@ -55,11 +84,17 @@ export function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<GoogleWorkspaceUser | null>(
     null,
   );
-  const [tempPassword, setTempPassword] = useState<{
+  const [tempAccess, setTempAccess] = useState<{
+    title: string;
     email: string;
-    password: string;
-    forceChange: boolean;
+    password?: string;
+    forceChange?: boolean;
+    note?: string;
   } | null>(null);
+  const [remainingAccessSeconds, setRemainingAccessSeconds] = useState(
+    TEMP_ACCESS_TTL_SECONDS,
+  );
+  const [showAccessPassword, setShowAccessPassword] = useState(false);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
   const [resetForceChange, setResetForceChange] = useState(true);
   const [resetSignOut, setResetSignOut] = useState(false);
@@ -123,19 +158,36 @@ export function AdminUsersPage() {
   }, []);
 
   useEffect(() => {
-    if (!tempPassword) return;
-    const timer = setTimeout(() => setTempPassword(null), TEMP_PASSWORD_TTL_MS);
-    return () => clearTimeout(timer);
-  }, [tempPassword]);
+    if (!tempAccess) return;
+    const expiresAt = Date.now() + TEMP_ACCESS_TTL_MS;
+    setRemainingAccessSeconds(TEMP_ACCESS_TTL_SECONDS);
+    setShowAccessPassword(false);
+
+    const timer = setInterval(() => {
+      const seconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+      setRemainingAccessSeconds(seconds);
+      if (seconds === 0) setTempAccess(null);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [tempAccess]);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError('');
     try {
-      await api.createWorkspaceUser({
+      const primaryEmail = toWorkspaceEmail(form.primaryEmail);
+      const createdUser = await api.createWorkspaceUser({
         ...form,
+        primaryEmail,
         forceChangePassword: createForceChange,
+      });
+      setTempAccess({
+        title: 'Usuario creado',
+        email: createdUser.primaryEmail,
+        password: form.password,
+        forceChange: createForceChange,
       });
       setShowCreate(false);
       setCreateForceChange(true);
@@ -177,7 +229,8 @@ export function AdminUsersPage() {
         forceChangePassword: resetForceChange,
         signOutAfterReset: resetSignOut,
       });
-      setTempPassword({
+      setTempAccess({
+        title: 'Contraseña restablecida',
         email: resetTarget,
         password: result.temporaryPassword,
         forceChange: result.forceChangePassword,
@@ -193,16 +246,27 @@ export function AdminUsersPage() {
     }
   }
 
-  async function copyPassword() {
-    if (!tempPassword) return;
+  async function copyAccess() {
+    if (!tempAccess) return;
     try {
       const text = [
         'https://accounts.google.com/',
-        tempPassword.email,
-        tempPassword.password,
-      ].join('\n');
+        tempAccess.email,
+        tempAccess.password,
+      ]
+        .filter((value): value is string => Boolean(value))
+        .join('\n');
       await navigator.clipboard.writeText(text);
       toast.success('Acceso copiado al portapapeles');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  }
+
+  async function copyAccessValue(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copiado al portapapeles`);
     } catch {
       toast.error('No se pudo copiar');
     }
@@ -225,7 +289,7 @@ export function AdminUsersPage() {
     setShowCreate(false);
     setEditingUser(user);
     setEditForm({
-      primaryEmail: user.primaryEmail,
+      primaryEmail: toWorkspaceUsername(user.primaryEmail),
       givenName: user.name.givenName,
       familyName: user.name.familyName,
       orgUnitPath: user.orgUnitPath,
@@ -240,12 +304,12 @@ export function AdminUsersPage() {
     e.preventDefault();
     if (!editingUser) return;
 
-    const emailChanged =
-      editForm.primaryEmail.trim() !== editingUser.primaryEmail;
+    const primaryEmail = toWorkspaceEmail(editForm.primaryEmail);
+    const emailChanged = primaryEmail !== editingUser.primaryEmail;
     if (emailChanged) {
       const ok = await confirm({
         title: '¿Renombrar cuenta de correo?',
-        description: `¿Renombrar ${editingUser.primaryEmail} a ${editForm.primaryEmail}? El correo anterior quedará como alias. El cambio puede tardar varios minutos.`,
+        description: `¿Renombrar ${editingUser.primaryEmail} a ${primaryEmail}? El correo anterior quedará como alias. El cambio puede tardar varios minutos.`,
         confirmLabel: 'Renombrar',
       });
       if (!ok) return;
@@ -254,11 +318,16 @@ export function AdminUsersPage() {
     setSubmitting(true);
     setError('');
     try {
-      await api.updateWorkspaceUser(editingUser.primaryEmail, {
-        primaryEmail: emailChanged ? editForm.primaryEmail.trim() : undefined,
+      const updatedUser = await api.updateWorkspaceUser(editingUser.primaryEmail, {
+        primaryEmail: emailChanged ? primaryEmail : undefined,
         givenName: editForm.givenName.trim(),
         familyName: editForm.familyName.trim(),
         orgUnitPath: editForm.orgUnitPath.trim(),
+      });
+      setTempAccess({
+        title: 'Usuario actualizado',
+        email: updatedUser.primaryEmail,
+        note: 'Datos del usuario actualizados.',
       });
       setEditingUser(null);
       toast.success(
@@ -374,29 +443,137 @@ export function AdminUsersPage() {
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
 
-      {tempPassword && (
-        <AlertBanner variant="success" onDismiss={() => setTempPassword(null)}>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-0 space-y-1">
-              <p className="font-mono text-sm break-all">
-                https://accounts.google.com/
-                <br />
-                {tempPassword.email}
-                <br />
-                <strong>{tempPassword.password}</strong>
-              </p>
-              <p className="text-sm">
-                {tempPassword.forceChange
-                  ? 'Deberá cambiarla al iniciar sesión.'
-                  : 'Lista para usar tal cual.'}
-                {' · Se ocultará sola en 90 s.'}
+      {tempAccess && (
+        <Card className="relative mb-6 overflow-hidden border-emerald-500/40 bg-emerald-500/5 p-0">
+          <div className="flex items-center gap-3 border-b border-emerald-500/20 px-4 py-3">
+            <CheckCircle2 className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold">{tempAccess.title}</h3>
+              <p className="text-xs text-muted-foreground">
+                Credenciales listas para compartir
               </p>
             </div>
-            <Button variant="outline" onClick={() => void copyPassword()}>
-              Copiar acceso
+            <Badge variant="secondary" aria-live="polite">
+              Se oculta en {remainingAccessSeconds} s
+            </Badge>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Cerrar credenciales"
+              onClick={() => setTempAccess(null)}
+            >
+              <X />
             </Button>
           </div>
-        </AlertBanner>
+
+          <div className="divide-y divide-border/60 px-4">
+            <div className="grid min-h-12 grid-cols-[5rem_minmax(0,1fr)_auto] items-center gap-3 py-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                URL
+              </span>
+              <a
+                href="https://accounts.google.com/"
+                target="_blank"
+                rel="noreferrer"
+                className="min-w-0 truncate text-sm font-medium text-primary hover:underline"
+              >
+                accounts.google.com
+              </a>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void copyAccessValue(
+                    'https://accounts.google.com/',
+                    'URL',
+                  )
+                }
+              >
+                <Copy /> Copiar
+              </Button>
+            </div>
+
+            <div className="grid min-h-12 grid-cols-[5rem_minmax(0,1fr)_auto] items-center gap-3 py-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Correo
+              </span>
+              <span className="min-w-0 truncate font-mono text-sm font-medium">
+                {tempAccess.email}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  void copyAccessValue(tempAccess.email, 'Correo')
+                }
+              >
+                <Copy /> Copiar
+              </Button>
+            </div>
+
+            {tempAccess.password && (
+              <div className="grid min-h-12 grid-cols-[5rem_minmax(0,1fr)_auto] items-center gap-3 py-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Clave
+                </span>
+                <span className="min-w-0 truncate font-mono text-sm font-semibold">
+                  {showAccessPassword ? tempAccess.password : '••••••••••••'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={
+                      showAccessPassword
+                        ? 'Ocultar contraseña'
+                        : 'Mostrar contraseña'
+                    }
+                    onClick={() => setShowAccessPassword((visible) => !visible)}
+                  >
+                    {showAccessPassword ? <EyeOff /> : <Eye />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      void copyAccessValue(tempAccess.password!, 'Contraseña')
+                    }
+                  >
+                    <Copy /> Copiar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-emerald-500/20 bg-background/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              {tempAccess.note ??
+                (tempAccess.forceChange
+                  ? 'El usuario deberá cambiar la clave al iniciar sesión.'
+                  : 'La clave está lista para usar tal cual.')}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void copyAccess()}
+            >
+              <Copy /> Copiar todo
+            </Button>
+          </div>
+
+          <div
+            className="absolute inset-x-0 bottom-0 h-1 origin-left bg-emerald-500 transition-[width] duration-1000 ease-linear"
+            style={{
+              width: `${(remainingAccessSeconds / TEMP_ACCESS_TTL_SECONDS) * 100}%`,
+            }}
+          />
+        </Card>
       )}
 
       <AlertDialog
@@ -477,14 +654,24 @@ export function AdminUsersPage() {
             Cuenta actual: <strong>{editingUser.primaryEmail}</strong>
           </p>
           <form className="grid gap-3 md:grid-cols-2" onSubmit={handleUpdate}>
-            <Input
-              placeholder="email@mali.pe"
-              value={editForm.primaryEmail}
-              onChange={(e) =>
-                setEditForm({ ...editForm, primaryEmail: e.target.value })
-              }
-              required
-            />
+            <div className="flex">
+              <Input
+                placeholder="correo"
+                aria-label="Usuario del correo"
+                value={editForm.primaryEmail}
+                onChange={(e) =>
+                  setEditForm({
+                    ...editForm,
+                    primaryEmail: toWorkspaceUsername(e.target.value),
+                  })
+                }
+                className="rounded-r-none"
+                required
+              />
+              <span className="flex h-8 shrink-0 items-center rounded-r-lg border border-l-0 border-input bg-muted/50 px-2.5 text-sm text-muted-foreground">
+                @mali.pe
+              </span>
+            </div>
             <Input
               placeholder="Unidad organizativa (ej. /)"
               value={editForm.orgUnitPath}
@@ -531,14 +718,24 @@ export function AdminUsersPage() {
         <Card className="mb-6">
           <h3 className="mb-4 font-semibold">Nuevo usuario</h3>
           <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreate}>
-            <Input
-              placeholder="email@mali.pe"
-              value={form.primaryEmail}
-              onChange={(e) =>
-                setForm({ ...form, primaryEmail: e.target.value })
-              }
-              required
-            />
+            <div className="flex">
+              <Input
+                placeholder="correo"
+                aria-label="Usuario del correo"
+                value={form.primaryEmail}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    primaryEmail: toWorkspaceUsername(e.target.value),
+                  })
+                }
+                className="rounded-r-none"
+                required
+              />
+              <span className="flex h-8 shrink-0 items-center rounded-r-lg border border-l-0 border-input bg-muted/50 px-2.5 text-sm text-muted-foreground">
+                @mali.pe
+              </span>
+            </div>
             <Input
               placeholder="Unidad organizativa (ej. /)"
               value={form.orgUnitPath}
