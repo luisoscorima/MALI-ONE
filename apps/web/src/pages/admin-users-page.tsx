@@ -249,13 +249,29 @@ export function AdminUsersPage() {
   async function copyAccess() {
     if (!tempAccess) return;
     try {
-      const text = [
-        'https://accounts.google.com/',
+      const lines = [
+        '━━━━━━━━━━━━━━',
+        'ACCESO WORKSPACE MALI 🏛️',
+        '━━━━━━━━━━━━━━',
+        '🌐 https://accounts.google.com/',
+        '',
+        '✉️ CORREO',
         tempAccess.email,
-        tempAccess.password,
-      ]
-        .filter((value): value is string => Boolean(value))
-        .join('\n');
+      ];
+
+      if (tempAccess.password) {
+        lines.push('');
+        lines.push('🔑 CLAVE');
+        lines.push(tempAccess.password);
+        if (tempAccess.forceChange) {
+          lines.push('');
+          lines.push('⚠️ Cambio de clave obligatorio');
+        }
+      }
+
+      lines.push('━━━━━━━━━━━━━━');
+
+      const text = lines.join('\n');
       await navigator.clipboard.writeText(text);
       toast.success('Acceso copiado al portapapeles');
     } catch {
