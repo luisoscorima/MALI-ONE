@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -10,6 +11,66 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+
+export const EDUCACION_CRM_AREAS = [
+  'educacion',
+  'educacion_ca',
+  'educacion_ep',
+] as const;
+
+export class CreateEducacionLeadStatusDto {
+  @IsIn(EDUCACION_CRM_AREAS)
+  area!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  slug!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  label!: string;
+
+  @IsOptional()
+  @IsInt()
+  sort_order?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_default?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  is_terminal?: boolean;
+}
+
+export class UpdateEducacionLeadStatusDto {
+  @IsIn(EDUCACION_CRM_AREAS)
+  area!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  label?: string;
+
+  @IsOptional()
+  @IsInt()
+  sort_order?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_default?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  is_terminal?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
 
 export class UpsertEducacionOfertaDto {
   @IsString()

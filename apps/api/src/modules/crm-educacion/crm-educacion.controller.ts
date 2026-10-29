@@ -28,10 +28,20 @@ class ListLeadsQuery {
   @IsOptional() @IsString() limit?: string;
 }
 
+class ListCyclesQuery {
+  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsString() @MaxLength(32) channel?: string;
+  @IsOptional() @IsString() @MaxLength(120) q?: string;
+  @IsOptional() @IsIn(['open', 'closed', 'review', 'unassigned']) view?: string;
+  @IsOptional() @IsString() page?: string;
+  @IsOptional() @IsString() limit?: string;
+}
+
 class ManagementBody {
   @IsIn(AREAS.slice(1)) area!: string;
   @IsOptional() @IsInt() @Min(1) assigned_user_id?: number | null;
   @IsOptional() @IsInt() @Min(1) lead_status_id?: number | null;
+  @IsOptional() @IsInt() @Min(1) lead_id?: number;
 }
 
 class DistributeBody {
@@ -112,6 +122,11 @@ export class CrmEducacionController {
   @Get('leads')
   leads(@Query() query: ListLeadsQuery) {
     return this.crm.leads(query);
+  }
+
+  @Get('cycles')
+  cycles(@Query() query: ListCyclesQuery) {
+    return this.crm.cycles(query);
   }
 
   @Get('management-catalogs')

@@ -1,14 +1,15 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Power, RotateCcw, Trash2 } from 'lucide-react';
 import { MaterialIconPicker } from '@/components/material-icon-picker';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
-import { api } from '@/lib/api';
+import { api, type EducationArea, type EducationLeadStatusDefinition } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState, Spinner } from '@/components/feedback';
 import {
   Button,
+  Badge,
   Card,
   Checkbox,
   Dialog,
@@ -62,6 +63,7 @@ type Area = {
 };
 
 const WHATSAPP_AREA_LABEL: Record<string, string> = {
+  educacion: 'Educación',
   educacion_ca: 'Educación CA',
   educacion_ep: 'Educación EP',
 };
@@ -230,7 +232,7 @@ export function CatalogEducacionPage() {
     <div>
       <PageHeader
         title="Catálogo Educación"
-        description="Áreas, líneas, cursos, programas, sedes y distritos. El mapa y el selector muestran estas sedes."
+        description="Áreas, oferta, sedes y estados comerciales de Educación."
       />
       <Tabs defaultValue="cursos">
         <TabsList>
@@ -239,6 +241,7 @@ export function CatalogEducacionPage() {
           <TabsTrigger value="areas">Áreas</TabsTrigger>
           <TabsTrigger value="sedes">Sedes</TabsTrigger>
           <TabsTrigger value="distritos">Distritos</TabsTrigger>
+          <TabsTrigger value="estados-lead">Estados de lead</TabsTrigger>
         </TabsList>
         <TabsContent value="cursos">
           <OfertaPanel
@@ -362,6 +365,9 @@ export function CatalogEducacionPage() {
             )}
           </Card>
         </TabsContent>
+        <TabsContent value="estados-lead">
+          <LeadStatusesPanel />
+        </TabsContent>
       </Tabs>
 
       <OfertaDialog
@@ -389,6 +395,291 @@ export function CatalogEducacionPage() {
         onSaved={() => void load()}
       />
     </div>
+  );
+}
+
+function statusSlug(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 50);
+}
+
+function LeadStatusesPanel() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const [statuses, setStatuses] = useState<EducationLeadStatusDefinition[]>([]);
+  const [area, setArea] = useState<EducationArea>('educacion_ep');
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<EducationLeadStatusDefinition | null | undefined>(undefined);
+
+  const loadStatuses = useCallback(async () => {
+    setLoading(true);
+    try {
+      setStatuses(await api.listEducacionLeadStatuses());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los estados');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { void loadStatuses(); }, [loadStatuses]);
+
+  const rows = statuses
+    .filter((status) => status.area === area)
+    .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+  const nextOrder = rows.length ? Math.max(...rows.map((status) => status.sort_order)) + 10 : 0;
+
+  async function toggleActive(status: EducationLeadStatusDefinition) {
+    if (status.active) {
+      if (status.is_default) {
+        toast.error('Define otro estado inicial antes de desactivar este estado');
+        return;
+      }
+      const ok = await confirm({
+        title: `¿Desactivar “${status.label}”?`,
+        description: 'Dejará de aparecer en los selectores, pero se conservará en el historial de oportunidades.',
+        confirmLabel: 'Desactivar',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
+    try {
+      await api.updateEducacionLeadStatus(status.id, {
+        area: status.area,
+        active: !status.active,
+      });
+      toast.success(status.active ? 'Estado desactivado' : 'Estado reactivado');
+      await loadStatuses();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el estado');
+    }
+  }
+
+  return (
+    <>
+      <Card className="mt-4 overflow-hidden p-0">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Número de Educación</label>
+            <Select value={area} onValueChange={(value) => setArea(value as EducationArea)}>
+              <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.keys(WHATSAPP_AREA_LABEL) as EducationArea[]).map((value) => (
+                  <SelectItem key={value} value={value}>{WHATSAPP_AREA_LABEL[value]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button type="button" onClick={() => setEditing(null)}>
+            <Plus className="size-4" /> Nuevo estado
+          </Button>
+        </div>
+        <p className="border-b border-border px-4 py-3 text-sm text-muted-foreground">
+          El estado inicial se asigna a las oportunidades nuevas. Los estados terminales cierran el ciclo.
+          Desactivar conserva el historial y oculta la opción para nuevas asignaciones.
+        </p>
+        {loading ? (
+          <div className="flex justify-center py-10"><Spinner /></div>
+        ) : rows.length === 0 ? (
+          <EmptyState title="Sin estados" description="Agrega el primer estado para este número." />
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="p-4">Orden</TableHead>
+                <TableHead className="p-4">Estado</TableHead>
+                <TableHead className="p-4">Identificador</TableHead>
+                <TableHead className="p-4">Comportamiento</TableHead>
+                <TableHead className="p-4">Disponibilidad</TableHead>
+                <TableHead className="p-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((status) => (
+                <TableRow key={status.id} className={!status.active ? 'opacity-60' : undefined}>
+                  <TableCell className="p-4 tabular-nums">{status.sort_order}</TableCell>
+                  <TableCell className="p-4 font-medium">{status.label}</TableCell>
+                  <TableCell className="p-4 font-mono text-xs text-muted-foreground">{status.slug}</TableCell>
+                  <TableCell className="p-4">
+                    <div className="flex flex-wrap gap-1">
+                      {status.is_default ? <Badge>Inicial</Badge> : null}
+                      {status.is_terminal ? <Badge variant="secondary">Cierra ciclo</Badge> : null}
+                      {!status.is_default && !status.is_terminal ? <span className="text-sm text-muted-foreground">En curso</span> : null}
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-4">{status.active ? 'Activo' : 'Inactivo'}</TableCell>
+                  <TableCell className="p-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(status)}>
+                        <Pencil className="size-4" /> Editar
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={status.active && status.is_default}
+                        onClick={() => void toggleActive(status)}
+                      >
+                        {status.active ? <Power className="size-4" /> : <RotateCcw className="size-4" />}
+                        {status.active ? 'Desactivar' : 'Reactivar'}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+      <LeadStatusDialog
+        state={editing}
+        area={area}
+        defaultOrder={nextOrder}
+        onClose={() => setEditing(undefined)}
+        onSaved={() => void loadStatuses()}
+      />
+    </>
+  );
+}
+
+function LeadStatusDialog({
+  state,
+  area,
+  defaultOrder,
+  onClose,
+  onSaved,
+}: {
+  state: EducationLeadStatusDefinition | null | undefined;
+  area: EducationArea;
+  defaultOrder: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const toast = useToast();
+  const [label, setLabel] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [sortOrder, setSortOrder] = useState('0');
+  const [isDefault, setIsDefault] = useState(false);
+  const [isTerminal, setIsTerminal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const open = state !== undefined;
+
+  useEffect(() => {
+    setLabel(state?.label ?? '');
+    setSlug(state?.slug ?? '');
+    setSlugTouched(Boolean(state));
+    setSortOrder(String(state?.sort_order ?? defaultOrder));
+    setIsDefault(state?.is_default ?? false);
+    setIsTerminal(state?.is_terminal ?? false);
+  }, [state, defaultOrder]);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      if (state) {
+        await api.updateEducacionLeadStatus(state.id, {
+          area: state.area,
+          label,
+          sort_order: Number(sortOrder),
+          is_default: isDefault,
+          is_terminal: isTerminal,
+        });
+      } else {
+        await api.createEducacionLeadStatus({
+          area,
+          slug,
+          label,
+          sort_order: Number(sortOrder),
+          is_default: isDefault,
+          is_terminal: isTerminal,
+        });
+      }
+      toast.success(state ? 'Estado actualizado' : 'Estado creado');
+      onClose();
+      onSaved();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el estado');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{state ? 'Editar estado de lead' : 'Nuevo estado de lead'}</DialogTitle>
+          <DialogDescription>
+            {WHATSAPP_AREA_LABEL[state?.area ?? area]}. El identificador no puede cambiarse después de crear el estado.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" onSubmit={(event) => void save(event)}>
+          <label className="grid gap-2 text-sm">
+            Etiqueta
+            <Input
+              value={label}
+              maxLength={120}
+              required
+              onChange={(event) => {
+                const value = event.target.value;
+                setLabel(value);
+                if (!state && !slugTouched) setSlug(statusSlug(value));
+              }}
+            />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Identificador
+            <Input
+              value={slug}
+              maxLength={50}
+              required
+              disabled={Boolean(state)}
+              onChange={(event) => {
+                setSlug(statusSlug(event.target.value));
+                setSlugTouched(true);
+              }}
+            />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Orden
+            <Input type="number" value={sortOrder} required onChange={(event) => setSortOrder(event.target.value)} />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+            <span>
+              <span className="block font-medium">Estado inicial</span>
+              <span className="text-muted-foreground">Se asigna automáticamente a ciclos nuevos.</span>
+            </span>
+            <Switch
+              checked={isDefault}
+              disabled={Boolean(state?.is_default || (state && !state.active))}
+              onCheckedChange={(value) => setIsDefault(value === true)}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+            <span>
+              <span className="block font-medium">Estado terminal</span>
+              <span className="text-muted-foreground">Al seleccionarlo, el ciclo se cierra.</span>
+            </span>
+            <Switch checked={isTerminal} onCheckedChange={(value) => setIsTerminal(value === true)} />
+          </label>
+          {state?.is_default ? (
+            <p className="text-xs text-muted-foreground">
+              Para reemplazar el estado inicial, edita otro estado y actívalo como inicial.
+            </p>
+          ) : null}
+          <Button type="submit" className="justify-self-end" disabled={saving}>
+            {saving ? 'Guardando…' : 'Guardar'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

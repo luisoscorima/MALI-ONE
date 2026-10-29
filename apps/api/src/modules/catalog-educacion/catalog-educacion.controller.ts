@@ -4,13 +4,17 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
 } from '@nestjs/common';
 import { AppModule } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { CatalogEducacionService } from './catalog-educacion.service';
+import { WhatsappCrmClientService } from '../crm/whatsapp-crm-client.service';
 import {
+  CreateEducacionLeadStatusDto,
+  UpdateEducacionLeadStatusDto,
   UpsertEducacionAreaDto,
   UpsertEducacionDistrictDto,
   UpsertEducacionOfertaDto,
@@ -20,7 +24,10 @@ import {
 @Controller('educacion-catalog')
 @RequireModule(AppModule.catalog_educacion)
 export class CatalogEducacionController {
-  constructor(private readonly catalog: CatalogEducacionService) {}
+  constructor(
+    private readonly catalog: CatalogEducacionService,
+    private readonly whatsappCrm: WhatsappCrmClientService,
+  ) {}
 
   @Get('options')
   options() {
@@ -131,5 +138,23 @@ export class CatalogEducacionController {
   @Delete('sedes/:id')
   deleteSede(@Param('id') id: string) {
     return this.catalog.deleteSede(id);
+  }
+
+  @Get('estados-lead')
+  estadosLead() {
+    return this.whatsappCrm.fetchEducationStatuses();
+  }
+
+  @Post('estados-lead')
+  createEstadoLead(@Body() body: CreateEducacionLeadStatusDto) {
+    return this.whatsappCrm.createEducationStatus(body);
+  }
+
+  @Patch('estados-lead/:id')
+  updateEstadoLead(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateEducacionLeadStatusDto,
+  ) {
+    return this.whatsappCrm.updateEducationStatus(id, body);
   }
 }

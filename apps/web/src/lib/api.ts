@@ -1,6 +1,18 @@
 import type { AppModule, AppUserDto, AuthUser } from '@mali-one/shared';
 
 export type EducationArea = 'educacion' | 'educacion_ca' | 'educacion_ep';
+export type EducationLeadStatusDefinition = {
+  id: number;
+  area: EducationArea;
+  slug: string;
+  label: string;
+  sort_order: number;
+  is_default: boolean;
+  is_terminal: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 export type ProspectiaMatch = 'exists' | 'missing' | 'unverified';
 export type EducationContact = {
   contact_id: number;
@@ -65,6 +77,47 @@ export type EducationLead = {
 export type EducationLeadCounts = {
   recent: number; new_number: number; duplicate: number; reassignable: number; conflict: number;
   in_progress: number; unassigned: number; eligible: number;
+};
+export type EducationCycleView = 'open' | 'closed' | 'review' | 'unassigned';
+export type EducationCycle = {
+  id: number;
+  area: EducationArea;
+  contact_id: number;
+  person_id: number;
+  categoria: string | null;
+  categoria_label: string | null;
+  curso_interes: string;
+  channel: string | null;
+  source_label: string | null;
+  assignment_rule: EducationLead['assignment_rule'] | null;
+  classification: EducationLead['classification'] | null;
+  latest_capture_at: string | null;
+  started_at: string;
+  last_interaction_at: string;
+  closed_at: string | null;
+  assigned_user_id: number | null;
+  assigned_user_label: string | null;
+  lead_status_id: number | null;
+  lead_status: { id: number; label: string; slug: string } | null;
+  lead_score: number | null;
+  requires_review: boolean;
+  conversation_id: number | null;
+  contacts: {
+    id: number;
+    person_id: number;
+    name: string;
+    last_name: string;
+    phone: string | null;
+    email: string | null;
+    whatsapp_user_id: string | null;
+    wa_username: string | null;
+  };
+};
+export type EducationCycleCounts = {
+  open: number;
+  closed: number;
+  review: number;
+  unassigned: number;
 };
 export type EducationManagementCatalog = {
   advisors: Array<{ id: number; label: string; areas: EducationArea[] }>;
@@ -270,10 +323,24 @@ export const api = {
       `/api/crm-educacion/leads?${qs}`,
     );
   },
+  listCrmEducationCycles: (params: {
+    area?: EducationArea | 'all'; channel?: string; q?: string;
+    view?: EducationCycleView; page?: number; limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<{ items: EducationCycle[]; counts: EducationCycleCounts;
+      total: number; page: number; limit: number; pages: number }>(
+      `/api/crm-educacion/cycles?${qs}`,
+    );
+  },
   getCrmEducationManagementCatalogs: () =>
     request<EducationManagementCatalog>('/api/crm-educacion/management-catalogs'),
   patchCrmEducationManagement: (id: number, body: {
     area: EducationArea; assigned_user_id?: number | null; lead_status_id?: number | null;
+    lead_id?: number;
   }) => request(`/api/crm-educacion/contacts/${id}/management`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
@@ -434,6 +501,20 @@ export const api = {
     request<EducacionCatalogSedeDto>(`/api/educacion-catalog/sedes/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteEducacionCatalogSede: (id: string) =>
     request(`/api/educacion-catalog/sedes/${id}`, { method: 'DELETE' }),
+  listEducacionLeadStatuses: () =>
+    request<EducationLeadStatusDefinition[]>('/api/educacion-catalog/estados-lead'),
+  createEducacionLeadStatus: (body: {
+    area: EducationArea; slug: string; label: string; sort_order?: number;
+    is_default?: boolean; is_terminal?: boolean;
+  }) => request<EducationLeadStatusDefinition>('/api/educacion-catalog/estados-lead', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  updateEducacionLeadStatus: (id: number, body: {
+    area: EducationArea; label?: string; sort_order?: number;
+    is_default?: boolean; is_terminal?: boolean; active?: boolean;
+  }) => request<EducationLeadStatusDefinition>(`/api/educacion-catalog/estados-lead/${id}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
 
   uploadFile: (file: File, customSlug?: string, tags?: string[]) => {
     const form = new FormData();

@@ -92,6 +92,19 @@ export type CrmContactRow = {
   lead_status_label?: string | null;
 };
 
+export type EducationLeadStatusDefinition = {
+  id: number;
+  area: 'educacion' | 'educacion_ca' | 'educacion_ep';
+  slug: string;
+  label: string;
+  sort_order: number;
+  is_default: boolean;
+  is_terminal: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 @Injectable()
 export class WhatsappCrmClientService {
   private readonly logger = new Logger(WhatsappCrmClientService.name);
@@ -687,6 +700,23 @@ export class WhatsappCrmClientService {
     return this.request('GET', `/api/crm/education/leads?${qs}`);
   }
 
+  async fetchEducationCycles(params: {
+    area?: string;
+    channel?: string;
+    q?: string;
+    view?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const qs = new URLSearchParams({ area: params.area ?? 'all' });
+    if (params.channel) qs.set('channel', params.channel);
+    if (params.q) qs.set('q', params.q);
+    if (params.view) qs.set('view', params.view);
+    if (params.page) qs.set('page', String(params.page));
+    if (params.limit) qs.set('limit', String(params.limit));
+    return this.request('GET', `/api/crm/education/cycles?${qs}`);
+  }
+
   checkEducationProspectia(subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) {
     return this.request<{ enabled: boolean; matches: Record<string, 'exists' | 'missing' | 'unverified'> }>(
       'POST', '/api/crm/education/prospectia/check', { subjects },
@@ -710,8 +740,30 @@ export class WhatsappCrmClientService {
     }>('GET', '/api/crm/education/management-catalogs');
   }
 
+  fetchEducationStatuses() {
+    return this.request<EducationLeadStatusDefinition[]>(
+      'GET', '/api/crm/education/statuses');
+  }
+
+  createEducationStatus(body: {
+    area: string; slug: string; label: string; sort_order?: number;
+    is_default?: boolean; is_terminal?: boolean;
+  }) {
+    return this.request<EducationLeadStatusDefinition>(
+      'POST', '/api/crm/education/statuses', body);
+  }
+
+  updateEducationStatus(id: number, body: {
+    area: string; label?: string; sort_order?: number;
+    is_default?: boolean; is_terminal?: boolean; active?: boolean;
+  }) {
+    return this.request<EducationLeadStatusDefinition>(
+      'PATCH', `/api/crm/education/statuses/${id}`, body);
+  }
+
   patchEducationManagement(contactId: number, area: string, changes: {
-    assigned_user_id?: number | null; lead_status_id?: number | null; actor_email?: string;
+    assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number;
+    actor_email?: string;
   }) {
     return this.request('PATCH',
       `/api/crm/education/contacts/${contactId}/management?${new URLSearchParams({ area })}`,

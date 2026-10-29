@@ -4,6 +4,8 @@ El asesor elige **una** etapa. Cada paso del camino significa más cerca de la i
 
 Catálogo en WhatsApp (`lead_status_definitions`), por número: `educacion`, `educacion_ca`, `educacion_ep`. El selector está en **CRM Educación** de MALI ONE (Contactos y Leads), agrupado en Inscripción e Intento o cierre.
 
+La administración del catálogo está en **MALI ONE → Catálogo Educación → Estados de lead**. Desde allí se crean, renombran y ordenan estados, se define el inicial o terminal y se desactivan/reactivan. WhatsApp continúa siendo la fuente de verdad. Desactivar reemplaza a eliminar para conservar los ciclos históricos.
+
 Definición: `EDUCATION_LEAD_STATUSES` en mali-whatsapp (`api/src/leads/leads.types.ts`). PAM, TI y Patronato no usan este catálogo.
 
 ## Camino de inscripción

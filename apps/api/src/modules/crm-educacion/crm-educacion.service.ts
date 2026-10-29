@@ -74,6 +74,16 @@ export class CrmEducacionService {
     });
   }
 
+  cycles(query: { area?: string; channel?: string; q?: string; view?: string;
+    page?: string; limit?: string }) {
+    this.ensureConfigured();
+    return this.crm.fetchEducationCycles({
+      ...query,
+      page: pageNumber(query.page, 1, 1000000),
+      limit: pageNumber(query.limit, 50, 200),
+    });
+  }
+
   managementCatalogs() {
     this.ensureConfigured();
     return this.crm.fetchEducationManagementCatalogs();
@@ -104,6 +114,7 @@ export class CrmEducacionService {
 
   management(id: number, body: {
     area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
+    lead_id?: number;
   }, actorEmail: string) {
     this.ensureConfigured();
     if (!AREAS.includes(body.area as (typeof AREAS)[number])) {

@@ -18,6 +18,17 @@ el texto visible del mensaje.
 
 Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md).
 
+## Operación en CRM Educación
+
+La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp, no sobre captaciones sueltas:
+
+- **Abiertas**: cartera activa.
+- **Cerradas**: ciclos finalizados por un estado terminal.
+- **Requieren revisión**: separa asesores retenidos por confirmar y conflictos comerciales de reingreso.
+- **Sin asignar**: ciclos abiertos sin asesor responsable.
+
+Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor retenido y cambiar la etapa comercial. Seleccionar un estado terminal cierra el ciclo. El curso o interés y el origen reciente se leen de la última captación asociada. La conversación continúa operándose en el inbox de MALI WhatsApp.
+
 ## Checklist go-live
 
 1. **Migración**

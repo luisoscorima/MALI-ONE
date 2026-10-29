@@ -6,7 +6,8 @@ import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api, type EducationArea, type EducationCatalog, type EducationContact,
-  type EducationLead, type EducationLeadCounts, type EducationManagementCatalog } from '@/lib/api';
+  type EducationCycle, type EducationCycleCounts, type EducationCycleView,
+  type EducationLead, type EducationManagementCatalog } from '@/lib/api';
 import {
   Badge, Button, DataTable, DropdownMenu, DropdownMenuCheckboxItem,
   DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
@@ -132,20 +133,23 @@ export function CrmEducacionPage() {
   const [draft, setDraft] = useState<DraftContact | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [leads, setLeads] = useState<EducationLead[]>([]);
-  const [leadTotal, setLeadTotal] = useState(0);
-  const [leadPage, setLeadPage] = useState(1);
-  const [leadLoading, setLeadLoading] = useState(true);
-  const [leadError, setLeadError] = useState('');
-  const [leadQ, setLeadQ] = useState('');
-  const [debouncedLeadQ, setDebouncedLeadQ] = useState('');
+  const [cycles, setCycles] = useState<EducationCycle[]>([]);
+  const [cycleTotal, setCycleTotal] = useState(0);
+  const [cyclePage, setCyclePage] = useState(1);
+  const [cycleLoading, setCycleLoading] = useState(true);
+  const [cycleError, setCycleError] = useState('');
+  const [opportunityQ, setOpportunityQ] = useState('');
+  const [debouncedOpportunityQ, setDebouncedOpportunityQ] = useState('');
   const [channel, setChannel] = useState('');
-  const [leadView, setLeadView] = useState<'recent' | 'new_number' | 'duplicate' | 'reassignable' | 'conflict' | 'in_progress' | 'all'>('recent');
-  const [unassigned, setUnassigned] = useState(false);
-  const [leadCounts, setLeadCounts] = useState<EducationLeadCounts>({
-    recent: 0, new_number: 0, duplicate: 0, reassignable: 0,
-    conflict: 0, in_progress: 0, unassigned: 0, eligible: 0,
+  const [opportunityView, setOpportunityView] = useState<EducationCycleView>('open');
+  const [cycleCounts, setCycleCounts] = useState<EducationCycleCounts>({
+    open: 0, closed: 0, review: 0, unassigned: 0,
   });
+  const [reviewEntries, setReviewEntries] = useState<EducationLead[]>([]);
+  const [reviewEntryTotal, setReviewEntryTotal] = useState(0);
+  const [reviewEntryPage, setReviewEntryPage] = useState(1);
+  const [reviewEntryLoading, setReviewEntryLoading] = useState(false);
+  const [reviewEntryError, setReviewEntryError] = useState('');
   const [managementCatalog, setManagementCatalog] = useState<EducationManagementCatalog>({ advisors: [], statuses: [] });
   const [managementSaving, setManagementSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
@@ -176,9 +180,9 @@ export function CrmEducacionPage() {
     return () => window.clearTimeout(timer);
   }, [attrValue]);
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedLeadQ(leadQ.trim()), 300);
+    const timer = window.setTimeout(() => setDebouncedOpportunityQ(opportunityQ.trim()), 300);
     return () => window.clearTimeout(timer);
-  }, [leadQ]);
+  }, [opportunityQ]);
 
   const contactParams = useMemo(() => ({
     area, q: debouncedContactQ, segment, attr_key: attrKey,
@@ -203,45 +207,61 @@ export function CrmEducacionPage() {
     }
   }, [contactParams]);
   useEffect(() => { void loadContacts(); }, [loadContacts]);
-  const leadParams = useMemo(() => ({
-    area, channel, q: debouncedLeadQ, view: leadView, unassigned,
-    page: leadPage, limit: PAGE_SIZE,
-  }), [area, channel, debouncedLeadQ, leadView, unassigned, leadPage]);
-  const loadLeads = useCallback(async () => {
-    setLeadLoading(true);
-    setLeadError('');
+  const cycleParams = useMemo(() => ({
+    area, channel, q: debouncedOpportunityQ, view: opportunityView,
+    page: cyclePage, limit: PAGE_SIZE,
+  }), [area, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
+  const loadCycles = useCallback(async () => {
+    setCycleLoading(true);
+    setCycleError('');
     try {
-      const data = await api.listCrmEducationLeads(leadParams);
-      setLeads(data.items);
-      setLeadTotal(data.total);
-      setLeadCounts(data.counts);
+      const data = await api.listCrmEducationCycles(cycleParams);
+      setCycles(data.items);
+      setCycleTotal(data.total);
+      setCycleCounts(data.counts);
     } catch (error) {
-      setLeadError(error instanceof Error ? error.message : 'No se pudieron cargar los leads');
-    } finally { setLeadLoading(false); }
-  }, [leadParams]);
-  useEffect(() => { void loadLeads(); }, [loadLeads]);
+      setCycleError(error instanceof Error ? error.message : 'No se pudieron cargar las oportunidades');
+    } finally { setCycleLoading(false); }
+  }, [cycleParams]);
+  useEffect(() => { void loadCycles(); }, [loadCycles]);
+
+  const loadReviewEntries = useCallback(async () => {
+    setReviewEntryLoading(true);
+    setReviewEntryError('');
+    try {
+      const data = await api.listCrmEducationLeads({
+        area, channel, q: debouncedOpportunityQ, view: 'conflict',
+        page: reviewEntryPage, limit: PAGE_SIZE,
+      });
+      setReviewEntries(data.items);
+      setReviewEntryTotal(data.total);
+    } catch (error) {
+      setReviewEntryError(error instanceof Error ? error.message : 'No se pudieron cargar los conflictos comerciales');
+    } finally { setReviewEntryLoading(false); }
+  }, [area, channel, debouncedOpportunityQ, reviewEntryPage]);
+  useEffect(() => { void loadReviewEntries(); }, [loadReviewEntries]);
 
   const updateManagement = useCallback(async (contactId: number, contactArea: EducationArea,
-    changes: { assigned_user_id?: number | null; lead_status_id?: number | null }) => {
+    changes: { assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number }) => {
     setManagementSaving(true);
     try {
       await api.patchCrmEducationManagement(contactId, { area: contactArea, ...changes });
       toast.success('Lead actualizado');
-      await Promise.all([loadContacts(), loadLeads()]);
+      await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el lead'); }
     finally { setManagementSaving(false); }
-  }, [loadContacts, loadLeads, toast]);
+  }, [loadContacts, loadCycles, loadReviewEntries, toast]);
   const reviewLead = useCallback(async (lead: EducationLead,
     action: 'open_new' | 'keep_existing' | 'dismiss') => {
     try {
       await api.reviewCrmEducationLead(lead.id, { area: lead.area, action });
       toast.success('Conflicto resuelto');
-      await Promise.all([loadContacts(), loadLeads()]);
+      await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo revisar el conflicto'); }
-  }, [loadContacts, loadLeads, toast]);
+  }, [loadContacts, loadCycles, loadReviewEntries, toast]);
 
-  const reloadAfterProspectia = useRef({ loadContacts, loadLeads });
-  reloadAfterProspectia.current = { loadContacts, loadLeads };
+  const reloadAfterProspectia = useRef({ loadContacts, loadCycles });
+  reloadAfterProspectia.current = { loadContacts, loadCycles };
   useEffect(() => {
     let cancel = false;
     let timer = 0;
@@ -259,7 +279,7 @@ export function CrmEducacionPage() {
           prospectiaWasRunning.current = false;
           toast.success('Prospectia sincronizado');
           const reload = reloadAfterProspectia.current;
-          await Promise.all([reload.loadContacts(), reload.loadLeads()]);
+          await Promise.all([reload.loadContacts(), reload.loadCycles()]);
         }
         setSyncingProspectia(false);
       } catch (error) {
@@ -287,9 +307,9 @@ export function CrmEducacionPage() {
   async function distributeLeads() {
     setDistributing(true);
     try {
-      const result = await api.distributeCrmEducation({ area, channel, q: debouncedLeadQ });
+      const result = await api.distributeCrmEducation({ area, channel, q: debouncedOpportunityQ });
       toast.success(`${result.assigned} leads asignados`);
-      await Promise.all([loadContacts(), loadLeads()]);
+      await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudieron asignar los leads'); }
     finally { setDistributing(false); }
   }
@@ -338,92 +358,106 @@ export function CrmEducacionPage() {
     return cols;
   }, [visible, areaAttributes, catalog.segments]);
 
-  const leadColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
+  const cycleColumns = useMemo<ColumnDef<EducationCycle>[]>(() => [
     { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
     {
       id: 'person', header: 'Contacto', cell: ({ row }) => {
-        const lead = row.original;
-        const name = [lead.contacts?.name, lead.contacts?.last_name].filter(Boolean).join(' ');
-        const username = waUsername(lead.wa_username || lead.contacts?.wa_username || null);
-        const bsuid = lead.whatsapp_user_id || lead.contacts?.whatsapp_user_id;
+        const cycle = row.original;
+        const name = [cycle.contacts.name, cycle.contacts.last_name].filter(Boolean).join(' ');
+        const username = waUsername(cycle.contacts.wa_username);
+        const bsuid = cycle.contacts.whatsapp_user_id;
         return <div><div>{name || '—'}</div>
-          <div className="text-xs text-muted-foreground">{[lead.contacts?.phone || lead.phone,
+          <div className="text-xs text-muted-foreground">{[cycle.contacts.phone,
             username, !username && bsuid ? bsuid : null,
-            lead.contacts?.email || lead.email].filter(Boolean).join(' · ') || '—'}</div>
+            cycle.contacts.email].filter(Boolean).join(' · ') || '—'}</div>
         </div>;
       }
     },
-    { id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.prospectia_match) },
-    { id: 'channel', header: 'Canal', cell: ({ row }) => CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
-    { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || row.original.source_key || '—' },
+    { id: 'interest', header: 'Curso o interés', cell: ({ row }) =>
+      row.original.curso_interes || row.original.categoria_label || row.original.categoria || '—' },
+    { id: 'source', header: 'Origen reciente', cell: ({ row }) => <div>
+      <div>{row.original.channel ? CHANNEL_LABELS[row.original.channel] ?? row.original.channel : '—'}</div>
+      <div className="text-xs text-muted-foreground">{row.original.source_label || '—'}</div>
+    </div> },
     { id: 'kind', header: 'Regla', cell: ({ row }) => {
-      const lead = row.original;
-      return <div className="space-y-1"><Badge variant={lead.classification === 'conflict' ? 'destructive' : 'outline'}>
-        {lead.assignment_rule === 'new_number' ? 'Número nuevo'
-          : lead.assignment_rule === 'same_advisor' ? 'Mismo asesor'
-            : lead.assignment_rule === 'reassignable' ? 'Puede reasignarse' : 'Conflicto'}
-      </Badge>{lead.conflict_reason && <div className="text-xs text-muted-foreground">
-        {lead.conflict_reason === 'estado_convertido' ? 'Estado convertido o venta exitosa'
-          : lead.conflict_reason === 'no_interesado_reciente' ? 'No interesado en los últimos 60 días'
-          : lead.conflict_reason}
-      </div>}</div>;
-    } },
-    { id: 'previous', header: 'Historial anterior', cell: ({ row }) => {
-      const lead = row.original;
-      return <div className="min-w-44 text-xs">
-        <div>Asesor: {lead.previous_advisor_label || '—'}</div>
-        <div>Estado: {lead.previous_status_label || '—'}</div>
-        <div>Último contacto: {lead.previous_interaction_at ? formatDate(lead.previous_interaction_at) : '—'}</div>
-      </div>;
+      const rule = row.original.assignment_rule;
+      return rule ? <Badge variant={rule === 'conflict' ? 'destructive' : 'outline'}>
+        {rule === 'new_number' ? 'Número nuevo'
+          : rule === 'same_advisor' ? 'Mismo asesor'
+            : rule === 'reassignable' ? 'Puede reasignarse' : 'Conflicto'}
+      </Badge> : '—';
     } },
     { id: 'advisor', header: 'Asesor', cell: ({ row }) => {
-      const lead = row.original;
-      return <Select value={lead.assigned_user_id ? String(lead.assigned_user_id) : '__none__'}
-        disabled={!lead.is_current_cycle || managementSaving}
-        onValueChange={(value) => void updateManagement(lead.contact_id!, lead.area,
-          { assigned_user_id: Number(value) })}>
+      const cycle = row.original;
+      return <Select value={cycle.assigned_user_id ? String(cycle.assigned_user_id) : '__none__'}
+        disabled={Boolean(cycle.closed_at) || managementSaving}
+        onValueChange={(value) => void updateManagement(cycle.contact_id, cycle.area,
+          { assigned_user_id: Number(value), lead_id: cycle.id })}>
         <SelectTrigger className="min-w-40"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__" disabled>Sin asignar</SelectItem>
-          {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(lead.area))
+          {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(cycle.area))
             .map((advisor) => <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
         </SelectContent>
       </Select>;
     } },
     { id: 'status', header: 'Estado del lead', cell: ({ row }) => {
-      const lead = row.original;
+      const cycle = row.original;
       return <LeadStatusSelect
-        area={lead.area}
+        area={cycle.area}
         className="min-w-40"
-        value={lead.lead_status_id ? String(lead.lead_status_id) : '__none__'}
-        disabled={!lead.is_current_cycle || managementSaving}
+        value={cycle.lead_status_id ? String(cycle.lead_status_id) : '__none__'}
+        disabled={Boolean(cycle.closed_at) || managementSaving}
         statuses={managementCatalog.statuses}
-        onChange={(value) => void updateManagement(lead.contact_id!, lead.area,
-          { lead_status_id: value === '__none__' ? null : Number(value) })}
+        onChange={(value) => void updateManagement(cycle.contact_id, cycle.area,
+          { lead_status_id: value === '__none__' ? null : Number(value), lead_id: cycle.id })}
       />;
     } },
-    { id: 'first', header: 'Primera captación', cell: ({ row }) => formatDate(row.original.first_seen_at) },
-    { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_seen_at) },
+    { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
     { id: 'actions', header: 'Revisión', cell: ({ row }) => {
-      const lead = row.original;
-      if (lead.classification === 'conflict') return <div className="flex gap-1">
-        <Button size="sm" variant="outline" onClick={() => void reviewLead(lead, 'open_new')}>Nuevo ciclo</Button>
-        <Button size="sm" variant="outline" onClick={() => void reviewLead(lead, 'keep_existing')}>Mantener</Button>
-        <Button size="sm" variant="outline" onClick={() => void reviewLead(lead, 'dismiss')}>Descartar</Button>
-      </div>;
-      return lead.assignment_rule === 'reassignable' && lead.is_current_cycle &&
-        lead.requires_review && lead.assigned_user_id
+      const cycle = row.original;
+      return cycle.requires_review && cycle.assigned_user_id && !cycle.closed_at
         ? <Button size="sm" variant="outline" disabled={managementSaving}
-          onClick={() => void updateManagement(lead.contact_id!, lead.area,
-            { assigned_user_id: lead.assigned_user_id! })}>Confirmar asesor</Button>
+          onClick={() => void updateManagement(cycle.contact_id, cycle.area,
+            { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
         : '—';
     } },
-  ], [managementCatalog, managementSaving, updateManagement, reviewLead]);
+  ], [managementCatalog, managementSaving, updateManagement]);
+
+  const reviewEntryColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
+    { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
+    { id: 'person', header: 'Contacto', cell: ({ row }) => {
+      const lead = row.original;
+      const name = [lead.contacts?.name, lead.contacts?.last_name].filter(Boolean).join(' ');
+      return <div><div>{name || '—'}</div><div className="text-xs text-muted-foreground">
+        {[lead.contacts?.phone || lead.phone, waUsername(lead.wa_username || lead.contacts?.wa_username || null),
+          lead.contacts?.email || lead.email].filter(Boolean).join(' · ') || '—'}
+      </div></div>;
+    } },
+    { id: 'source', header: 'Captación', cell: ({ row }) => <div>
+      <div>{CHANNEL_LABELS[row.original.channel] ?? row.original.channel}</div>
+      <div className="text-xs text-muted-foreground">{row.original.source_label || row.original.source_key || '—'}</div>
+    </div> },
+    { id: 'reason', header: 'Motivo', cell: ({ row }) =>
+      row.original.conflict_reason === 'estado_convertido' ? 'Estado convertido o venta exitosa'
+        : row.original.conflict_reason === 'no_interesado_reciente' ? 'No interesado en los últimos 60 días'
+          : row.original.conflict_reason || 'Conflicto comercial' },
+    { id: 'previous', header: 'Ciclo anterior', cell: ({ row }) => <div className="min-w-44 text-xs">
+      <div>Asesor: {row.original.previous_advisor_label || '—'}</div>
+      <div>Estado: {row.original.previous_status_label || '—'}</div>
+      <div>Último contacto: {row.original.previous_interaction_at ? formatDate(row.original.previous_interaction_at) : '—'}</div>
+    </div> },
+    { id: 'date', header: 'Fecha', cell: ({ row }) => formatDate(row.original.last_seen_at) },
+    { id: 'actions', header: 'Resolver', cell: ({ row }) => <div className="flex gap-1">
+      <Button size="sm" variant="outline" onClick={() => void reviewLead(row.original, 'open_new')}>Nuevo ciclo</Button>
+      <Button size="sm" variant="outline" onClick={() => void reviewLead(row.original, 'keep_existing')}>Mantener</Button>
+      <Button size="sm" variant="outline" onClick={() => void reviewLead(row.original, 'dismiss')}>Descartar</Button>
+    </div> },
+  ], [reviewLead]);
 
   function changeArea(value: string) {
     setArea(value as EducationArea | 'all');
-    setContactPage(1); setLeadPage(1);
+    setContactPage(1); setCyclePage(1); setReviewEntryPage(1);
     setSegment(''); setAttrKey(''); setAttrValue('');
     setExpandedId(null);
   }
@@ -600,7 +634,7 @@ export function CrmEducacionPage() {
   return <div className="space-y-6">
     <PageHeader
       title="CRM Educación"
-      description="Contactos y captaciones de los tres números de Educación."
+      description="Contactos y oportunidades comerciales de los tres números de Educación."
     />
     <div className="w-56 space-y-1">
       <Label>Número</Label>
@@ -617,7 +651,7 @@ export function CrmEducacionPage() {
     <Tabs value={tab} onValueChange={setTab}>
       <TabsList>
         <TabsTrigger value="contacts">Contactos</TabsTrigger>
-        <TabsTrigger value="leads">Leads</TabsTrigger>
+        <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
         <TabsTrigger value="payments">Pagos</TabsTrigger>
         <TabsTrigger value="campaigns">Campañas</TabsTrigger>
       </TabsList>
@@ -716,46 +750,36 @@ export function CrmEducacionPage() {
             onClick={() => setContactPage((page) => page + 1)}>Siguiente</Button>
         </div>
       </TabsContent>
-      <TabsContent value="leads" className="space-y-4">
-        {leadError && <AlertBanner variant="error">{leadError}</AlertBanner>}
+      <TabsContent value="opportunities" className="space-y-4">
+        {cycleError && <AlertBanner variant="error">{cycleError}</AlertBanner>}
         <div className="flex flex-wrap items-center gap-2">
           {([
-            ['recent', 'Nuevos', leadCounts.recent],
-            ['new_number', 'Números nuevos', leadCounts.new_number],
-            ['duplicate', 'Duplicados', leadCounts.duplicate],
-            ['reassignable', 'Puede reasignarse', leadCounts.reassignable],
-            ['conflict', 'Conflictos', leadCounts.conflict],
-            ['in_progress', 'En curso', leadCounts.in_progress],
-            ['all', 'Historial', null],
+            ['open', 'Abiertas', cycleCounts.open],
+            ['closed', 'Cerradas', cycleCounts.closed],
+            ['review', 'Requieren revisión', cycleCounts.review + reviewEntryTotal],
+            ['unassigned', 'Sin asignar', cycleCounts.unassigned],
           ] as const).map(([key, label, count]) => <Button key={key}
-            size="sm" variant={leadView === key ? 'default' : 'outline'}
-            onClick={() => { setLeadView(key); setLeadPage(1); }}>
-            {label}{count !== null && <Badge variant={count > 0 ? 'destructive' : 'secondary'}
-              className="ml-2">{count}</Badge>}
+            size="sm" variant={opportunityView === key ? 'default' : 'outline'}
+            onClick={() => { setOpportunityView(key); setCyclePage(1); setReviewEntryPage(1); }}>
+            {label}<Badge variant={(key === 'review' || key === 'unassigned') && count > 0 ? 'destructive' : 'secondary'}
+              className="ml-2">{count}</Badge>
           </Button>)}
-          <Button size="sm" variant={unassigned ? 'default' : 'outline'}
-            onClick={() => { setUnassigned((value) => !value); setLeadPage(1); }}>
-            Sin asignar <Badge variant={leadCounts.unassigned > 0 ? 'destructive' : 'secondary'}
-              className="ml-2">{leadCounts.unassigned}</Badge>
-          </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Nuevos reúne todas las captaciones de los últimos 60 días, incluidos duplicados y casos en curso.
-          La asignación automática solo incluye números sin historial en este número de Educación;
-          los regresos de más de 60 días conservan al asesor anterior hasta que se confirme o cambie.
-          Los contadores de los filtros pueden superponerse.
+          Cada fila representa un ciclo comercial. Las captaciones alimentan el origen reciente;
+          los conflictos de reingreso se resuelven por separado dentro de Requieren revisión.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1">
             <Label>Buscar</Label>
-            <Input value={leadQ} placeholder="Contacto, @usuario, BSUID, fuente…" className="w-72"
-              onChange={(event) => { setLeadQ(event.target.value); setLeadPage(1); }} />
+            <Input value={opportunityQ} placeholder="Contacto, @usuario, teléfono, fuente…" className="w-72"
+              onChange={(event) => { setOpportunityQ(event.target.value); setCyclePage(1); setReviewEntryPage(1); }} />
           </div>
           <div className="space-y-1">
             <Label>Canal</Label>
             <Select value={channel || '__all__'} onValueChange={(value) => {
               setChannel(value === '__all__' ? '' : value);
-              setLeadPage(1);
+              setCyclePage(1); setReviewEntryPage(1);
             }}>
               <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -765,10 +789,10 @@ export function CrmEducacionPage() {
               </SelectContent>
             </Select>
           </div>
-          {leadView === 'recent' && <Button disabled={distributing || leadCounts.eligible === 0}
+          {(opportunityView === 'open' || opportunityView === 'unassigned') && <Button disabled={distributing}
             onClick={() => void distributeLeads()}>
             <UsersRound className="mr-1 size-4" />
-            {distributing ? 'Asignando…' : `Asignar automáticamente (${leadCounts.eligible})`}
+            {distributing ? 'Asignando…' : 'Asignar automáticamente'}
           </Button>}
           <Button variant="outline" disabled={syncingProspectia || prospectiaSync.running}
             onClick={() => void syncProspectia()}>
@@ -783,19 +807,46 @@ export function CrmEducacionPage() {
               Última sincronización: {formatDate(prospectiaSync.finished_at)}
             </span>
           )}
-          <span className="text-sm text-muted-foreground">{leadTotal} captaciones</span>
+          <span className="text-sm text-muted-foreground">{cycleTotal} oportunidades</span>
         </div>
-        {leadLoading ? <TableSkeleton rows={8} cols={7} /> : leads.length === 0 ?
-          <EmptyState title="Sin leads" description="No hay captaciones para estos filtros." /> :
-          <DataTable columns={leadColumns} data={leads}
-            getRowId={(lead) => String(lead.id)} tableClassName="min-w-full" />}
+        {opportunityView === 'review' && <div className="space-y-2">
+          <h3 className="text-sm font-semibold">Asesor por confirmar</h3>
+          {cycleLoading ? <TableSkeleton rows={5} cols={7} /> : cycles.length === 0 ?
+            <EmptyState title="Sin asesores por confirmar" description="No hay ciclos pendientes de confirmación." /> :
+            <DataTable columns={cycleColumns} data={cycles}
+              getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />}
+        </div>}
+        {opportunityView !== 'review' && (cycleLoading ? <TableSkeleton rows={8} cols={7} /> : cycles.length === 0 ?
+          <EmptyState title="Sin oportunidades" description="No hay ciclos comerciales para estos filtros." /> :
+          <DataTable columns={cycleColumns} data={cycles}
+            getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />)}
         <div className="flex items-center justify-end gap-3 text-sm">
-          <span>Página {leadPage} de {Math.max(1, Math.ceil(leadTotal / PAGE_SIZE))}</span>
-          <Button variant="outline" disabled={leadPage <= 1}
-            onClick={() => setLeadPage((page) => page - 1)}>Anterior</Button>
-          <Button variant="outline" disabled={leadPage * PAGE_SIZE >= leadTotal}
-            onClick={() => setLeadPage((page) => page + 1)}>Siguiente</Button>
+          <span>Página {cyclePage} de {Math.max(1, Math.ceil(cycleTotal / PAGE_SIZE))}</span>
+          <Button variant="outline" disabled={cyclePage <= 1}
+            onClick={() => setCyclePage((page) => page - 1)}>Anterior</Button>
+          <Button variant="outline" disabled={cyclePage * PAGE_SIZE >= cycleTotal}
+            onClick={() => setCyclePage((page) => page + 1)}>Siguiente</Button>
         </div>
+        {opportunityView === 'review' && <div className="space-y-3 border-t pt-4">
+          <div>
+            <h3 className="text-sm font-semibold">Conflictos comerciales</h3>
+            <p className="text-xs text-muted-foreground">
+              Reingresos que requieren decidir si abren un ciclo nuevo o conservan el anterior.
+            </p>
+          </div>
+          {reviewEntryError && <AlertBanner variant="error">{reviewEntryError}</AlertBanner>}
+          {reviewEntryLoading ? <TableSkeleton rows={5} cols={6} /> : reviewEntries.length === 0 ?
+            <EmptyState title="Sin conflictos comerciales" description="No hay captaciones pendientes de decisión." /> :
+            <DataTable columns={reviewEntryColumns} data={reviewEntries}
+              getRowId={(lead) => String(lead.id)} tableClassName="min-w-full" />}
+          <div className="flex items-center justify-end gap-3 text-sm">
+            <span>Página {reviewEntryPage} de {Math.max(1, Math.ceil(reviewEntryTotal / PAGE_SIZE))}</span>
+            <Button variant="outline" disabled={reviewEntryPage <= 1}
+              onClick={() => setReviewEntryPage((page) => page - 1)}>Anterior</Button>
+            <Button variant="outline" disabled={reviewEntryPage * PAGE_SIZE >= reviewEntryTotal}
+              onClick={() => setReviewEntryPage((page) => page + 1)}>Siguiente</Button>
+          </div>
+        </div>}
       </TabsContent>
       <TabsContent value="payments">
         <EmptyState title="Pagos próximamente" description="Esta sección estará disponible más adelante." />
