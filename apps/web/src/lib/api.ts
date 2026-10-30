@@ -28,6 +28,8 @@ export type EducationContact = {
   opt_in_email: boolean;
   segment_slugs: string[];
   attributes: Record<string, string>;
+  lead_id?: number | null;
+  categoria?: string | null;
   assigned_user_id?: number | null;
   assigned_user_label?: string | null;
   requires_review?: boolean;

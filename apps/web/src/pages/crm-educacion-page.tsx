@@ -21,6 +21,17 @@ const AREA_LABELS: Record<EducationArea, string> = {
   educacion_ep: 'Educación EP',
 };
 const AREAS = Object.keys(AREA_LABELS) as EducationArea[];
+
+/** Alcance de catálogos/mutaciones: CA/EP canónico se gestiona como educacion_ca/ep. */
+function managementAreaOf(area: string, categoria?: string | null): EducationArea {
+  const program = String(categoria ?? '').trim().toLowerCase();
+  if (program === 'ca') return 'educacion_ca';
+  if (program === 'ep') return 'educacion_ep';
+  if (area === 'educacion_ca' || area === 'educacion_ep' || area === 'educacion') {
+    return area;
+  }
+  return 'educacion';
+}
 const CHANNEL_LABELS: Record<string, string> = {
   meta_lead_form: 'Formulario Meta', meta_ctwa: 'Anuncio a WhatsApp',
   widget: 'Widget web', tiktok: 'TikTok', import: 'Importación',
@@ -122,6 +133,8 @@ export function CrmEducacionPage() {
   const [contactLoading, setContactLoading] = useState(true);
   const [contactError, setContactError] = useState('');
   const contactRequestId = useRef(0);
+  const cycleRequestId = useRef(0);
+  const reviewEntryRequestId = useRef(0);
   const [contactQ, setContactQ] = useState('');
   const [debouncedContactQ, setDebouncedContactQ] = useState('');
   const [segment, setSegment] = useState('');
@@ -212,20 +225,26 @@ export function CrmEducacionPage() {
     page: cyclePage, limit: PAGE_SIZE,
   }), [area, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
   const loadCycles = useCallback(async () => {
+    const requestId = ++cycleRequestId.current;
     setCycleLoading(true);
     setCycleError('');
     try {
       const data = await api.listCrmEducationCycles(cycleParams);
+      if (requestId !== cycleRequestId.current) return;
       setCycles(data.items);
       setCycleTotal(data.total);
       setCycleCounts(data.counts);
     } catch (error) {
+      if (requestId !== cycleRequestId.current) return;
       setCycleError(error instanceof Error ? error.message : 'No se pudieron cargar las oportunidades');
-    } finally { setCycleLoading(false); }
+    } finally {
+      if (requestId === cycleRequestId.current) setCycleLoading(false);
+    }
   }, [cycleParams]);
   useEffect(() => { void loadCycles(); }, [loadCycles]);
 
   const loadReviewEntries = useCallback(async () => {
+    const requestId = ++reviewEntryRequestId.current;
     setReviewEntryLoading(true);
     setReviewEntryError('');
     try {
@@ -233,11 +252,15 @@ export function CrmEducacionPage() {
         area, channel, q: debouncedOpportunityQ, view: 'conflict',
         page: reviewEntryPage, limit: PAGE_SIZE,
       });
+      if (requestId !== reviewEntryRequestId.current) return;
       setReviewEntries(data.items);
       setReviewEntryTotal(data.total);
     } catch (error) {
+      if (requestId !== reviewEntryRequestId.current) return;
       setReviewEntryError(error instanceof Error ? error.message : 'No se pudieron cargar los conflictos comerciales');
-    } finally { setReviewEntryLoading(false); }
+    } finally {
+      if (requestId === reviewEntryRequestId.current) setReviewEntryLoading(false);
+    }
   }, [area, channel, debouncedOpportunityQ, reviewEntryPage]);
   useEffect(() => { void loadReviewEntries(); }, [loadReviewEntries]);
 
@@ -389,36 +412,39 @@ export function CrmEducacionPage() {
     } },
     { id: 'advisor', header: 'Asesor', cell: ({ row }) => {
       const cycle = row.original;
+      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return <Select value={cycle.assigned_user_id ? String(cycle.assigned_user_id) : '__none__'}
         disabled={Boolean(cycle.closed_at) || managementSaving}
-        onValueChange={(value) => void updateManagement(cycle.contact_id, cycle.area,
+        onValueChange={(value) => void updateManagement(cycle.contact_id, scope,
           { assigned_user_id: Number(value), lead_id: cycle.id })}>
         <SelectTrigger className="min-w-40"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__" disabled>Sin asignar</SelectItem>
-          {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(cycle.area))
+          {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(scope))
             .map((advisor) => <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
         </SelectContent>
       </Select>;
     } },
     { id: 'status', header: 'Estado del lead', cell: ({ row }) => {
       const cycle = row.original;
+      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return <LeadStatusSelect
-        area={cycle.area}
+        area={scope}
         className="min-w-40"
         value={cycle.lead_status_id ? String(cycle.lead_status_id) : '__none__'}
         disabled={Boolean(cycle.closed_at) || managementSaving}
         statuses={managementCatalog.statuses}
-        onChange={(value) => void updateManagement(cycle.contact_id, cycle.area,
+        onChange={(value) => void updateManagement(cycle.contact_id, scope,
           { lead_status_id: value === '__none__' ? null : Number(value), lead_id: cycle.id })}
       />;
     } },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
     { id: 'actions', header: 'Revisión', cell: ({ row }) => {
       const cycle = row.original;
+      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return cycle.requires_review && cycle.assigned_user_id && !cycle.closed_at
         ? <Button size="sm" variant="outline" disabled={managementSaving}
-          onClick={() => void updateManagement(cycle.contact_id, cycle.area,
+          onClick={() => void updateManagement(cycle.contact_id, scope,
             { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
         : '—';
     } },
@@ -524,6 +550,7 @@ export function CrmEducacionPage() {
 
   function renderContactEditor(contact: EducationContact) {
     if (!draft) return null;
+    const scope = managementAreaOf(contact.area, contact.categoria);
     const areaSegments = catalog.segments.filter((item) => item.area === contact.area);
     const segmentSlugs = [...new Set([
       ...areaSegments.map((item) => item.slug),
@@ -591,31 +618,33 @@ export function CrmEducacionPage() {
             <Label>Asesor responsable</Label>
             <Select value={contact.assigned_user_id ? String(contact.assigned_user_id) : '__none__'}
               disabled={managementSaving}
-              onValueChange={(value) => void updateManagement(contact.contact_id, contact.area,
-                { assigned_user_id: Number(value) })}>
+              onValueChange={(value) => void updateManagement(contact.contact_id, scope,
+                { assigned_user_id: Number(value), ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__" disabled>Sin asignar</SelectItem>
-                {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(contact.area))
+                {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(scope))
                   .map((advisor) => <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
               </SelectContent>
             </Select>
             {contact.requires_review && contact.assigned_user_id &&
               <Button size="sm" variant="outline" disabled={managementSaving}
-                onClick={() => void updateManagement(contact.contact_id, contact.area,
-                  { assigned_user_id: contact.assigned_user_id! })}>
+                onClick={() => void updateManagement(contact.contact_id, scope,
+                  { assigned_user_id: contact.assigned_user_id!,
+                    ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}>
                 Confirmar asesor
               </Button>}
           </div>
           <div className="space-y-1">
             <Label>Estado del lead</Label>
             <LeadStatusSelect
-              area={contact.area}
+              area={scope}
               value={contact.lead_status_id ? String(contact.lead_status_id) : '__none__'}
               disabled={managementSaving}
               statuses={managementCatalog.statuses}
-              onChange={(value) => void updateManagement(contact.contact_id, contact.area,
-                { lead_status_id: value === '__none__' ? null : Number(value) })}
+              onChange={(value) => void updateManagement(contact.contact_id, scope,
+                { lead_status_id: value === '__none__' ? null : Number(value),
+                  ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}
             />
           </div>
         </div>
