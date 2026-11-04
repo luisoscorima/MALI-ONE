@@ -62,5 +62,6 @@ Migración: `20260928120000_education_lead_statuses` en mali-whatsapp. Al abrir 
 - Las ocho etiquetas existen en los tres números de Educación y se asignan desde CRM Educación.
 - Por contactar es el estado por defecto de un contacto nuevo.
 - No contesta no cierra el ciclo. No interesado, Perdido y Venta exitosa sí (`is_terminal`).
+- **RQ0017:** no se puede pasar a Venta exitosa (ni legacy Convertido) sin nombre usable, DNI, email, teléfono o identidad WhatsApp, y categoría CA/EP del ciclo. Si faltan datos, el ciclo se queda en el estado anterior; en CRM Educación aparece un diálogo para completar y reintentar.
 
 Todavía no están solas la fecha de Promesa, el motivo de Perdido, ni las marcas Nuevo, Duplicado, Retorno y Prometió antes. Mientras tanto, un reingreso se clasifica con la regla de 60 días que ya corre en WhatsApp: Venta exitosa va a revisión; No interesado dentro de la ventana también; el resto, dentro de la ventana, sigue en el mismo ciclo.

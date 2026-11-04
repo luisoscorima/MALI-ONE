@@ -20,6 +20,8 @@ Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-
 
 Backlog de requerimientos (Sheet → CRM, fases y RQs): [EDUCACION-REQUERIMIENTOS-LEADS.md](./EDUCACION-REQUERIMIENTOS-LEADS.md).
 
+SLA 1.ª respuesta (promedio / % / por asesor): CRM Educación → pestaña **Oportunidades** (datos desde WhatsApp `GET /api/crm/education/sla`).
+
 ## Operación en CRM Educación
 
 La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp, no sobre captaciones sueltas:

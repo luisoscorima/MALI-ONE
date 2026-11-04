@@ -1,5 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { WhatsappCrmClientService } from '../crm/whatsapp-crm-client.service';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  WhatsAppCrmClientError,
+  WhatsappCrmClientService,
+} from '../crm/whatsapp-crm-client.service';
 
 const AREAS = ['educacion', 'educacion_ca', 'educacion_ep'] as const;
 
@@ -84,6 +87,11 @@ export class CrmEducacionService {
     });
   }
 
+  sla(query: { area?: string; from?: string; to?: string }) {
+    this.ensureConfigured();
+    return this.crm.fetchEducationSla(query);
+  }
+
   managementCatalogs() {
     this.ensureConfigured();
     return this.crm.fetchEducationManagementCatalogs();
@@ -112,7 +120,7 @@ export class CrmEducacionService {
     return this.crm.educationProspectiaSyncStatus();
   }
 
-  management(id: number, body: {
+  async management(id: number, body: {
     area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
     lead_id?: number;
   }, actorEmail: string) {
@@ -121,7 +129,54 @@ export class CrmEducacionService {
       throw new BadRequestException('Área de educación inválida');
     }
     const { area, ...changes } = body;
-    return this.crm.patchEducationManagement(id, area, { ...changes, actor_email: actorEmail });
+    try {
+      return await this.crm.patchEducationManagement(id, area, {
+        ...changes, actor_email: actorEmail,
+      });
+    } catch (error) {
+      if (error instanceof WhatsAppCrmClientError && error.code === 'missing_fields') {
+        throw new HttpException({
+          code: 'missing_fields',
+          message: error.message,
+          missing_fields: error.missing_fields ?? [],
+        }, HttpStatus.BAD_REQUEST);
+      }
+      throw error;
+    }
+  }
+
+  async createManualLead(body: {
+    source_key: string;
+    categoria: string;
+    name: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+    dni?: string;
+    curso?: string;
+  }, actorEmail: string) {
+    this.ensureConfigured();
+    try {
+      return await this.crm.createManualEducationLead({
+        ...body,
+        actor_email: actorEmail,
+      });
+    } catch (error) {
+      if (error instanceof WhatsAppCrmClientError && error.code === 'already_exists') {
+        throw new HttpException({
+          code: 'already_exists',
+          message: error.message,
+          contact_id: error.contact_id,
+          cycle_id: error.cycle_id ?? null,
+          assigned_user_label: error.assigned_user_label ?? null,
+          lead_status_label: error.lead_status_label ?? null,
+        }, HttpStatus.CONFLICT);
+      }
+      if (error instanceof WhatsAppCrmClientError && error.status >= 400 && error.status < 500) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   distribute(params: { area: string; channel?: string; q?: string }, actorEmail: string) {

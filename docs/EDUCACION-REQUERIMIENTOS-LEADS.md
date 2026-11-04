@@ -83,9 +83,9 @@ Comentario de negocio (“esto es lo que se hace manual… no tiene nada que ver
 | Asignación | Ciclo + distribute + revisión | Reclamo formal con constancia; notificación 3 días sin gestión; reasignación manual supervisada |
 | Contactabilidad WA | Canal + Solo contacto / con chat | Filtros/listas para “atacar por llamada”; claridad Meta sin viaje a chat |
 | SLA 10 min | Timestamps (`first_human_reply_at`, etc.) | Motor SLA + alertas + horario de atención + reporte cumplimiento |
-| Alta manual asesor | Ingreso con validación de identidad | Popup “ya existe”, merge de teléfono, no forzar falso nuevo |
+| Alta manual asesor | Formulario ONE → `POST .../leads/manual` + 409 `already_exists` | Merge fuerte A+B sigue en Admin conflictos; editar teléfono en ficha |
 | Carga masiva | Canal `import` | Plantilla + reporte aceptados/duplicados/errores con mismas reglas |
-| Venta / Caja | Etapa `venta_exitosa` | Campos obligatorios, flujo OBS, boleteado, permisos Caja |
+| Venta / Caja | Candado RQ0017 a `venta_exitosa` (nombre, DNI, email, tel/WA, categoría) | Flujo OBS / boleteado (RQ0018), permisos Caja |
 | Correos / KPIs / comisiones / roles | Parcial o nulo | Ver §4 |
 
 ---
@@ -135,14 +135,14 @@ Comentario de negocio (“esto es lo que se hace manual… no tiene nada que ver
 
 #### RQ0015 — Consistencia cartera ↔ consolidado + falso duplicado + fusión
 
-- **Objetivo:** La suma de carteras de asesores coincide con el consolidado validado; la alimentación es mutua. Evitar duplicados forzados.
-- **Regla:**
-  1. Alta orgánica del asesor pasa el mismo filtro que el bruto.
-  2. Si no pasa: alerta a asesor y supervisor.
-  3. Intento de “falso duplicado” (cambiar un dígito, un apellido, etc.): el sistema trata el **contacto**; popup “ya existe” e indica el camino correcto (no crear nuevo lead).
-  4. Si el cliente cambió de número: opción de **fusionar contactos** eligiendo el teléfono principal.
-- **App:** Ambos.
-- **Fase:** 1 · **Prioridad efectiva:** Alta (vencida) · **Estado:** Registrado.
+- **Objetivo:** Una sola persona/cartera; alta de históricos / solo-llamada / orgánico sin chat desde el panel, sin doble ficha.
+- **Regla (implementada):**
+  1. Alta manual **solo en MALI ONE** (`Registrar lead`) → WhatsApp `POST /api/crm/education/leads/manual`.
+  2. Canal `other` + `source_key` `manual_call` | `manual_historical` | `manual_organic`; categoría CA/EP.
+  3. Si ya hay ficha Educación por teléfono/DNI/email → `409 already_exists` + datos del existente; **no** crea otro lead.
+  4. Inbox WhatsApp **no** crea leads. Merge fuerte A+B sigue en Admin conflictos; cambio de número en ficha + merge complementario automático si aplica.
+- **App:** ONE (formulario) + WhatsApp (motor).
+- **Fase:** 1 · **Prioridad efectiva:** Alta · **Estado:** Implementado (núcleo). Pendiente: fusión UI explícita y alertas supervisor en reintentos.
 
 ---
 
@@ -196,14 +196,14 @@ Comentario de negocio (“esto es lo que se hace manual… no tiene nada que ver
 - **Objetivo:** Meta de **10 minutos** de primera respuesta; detectar desatendidos a tiempo.
 - **Regla:** Solo dentro de horario: L–V 08:30–20:00; sáb 08:30–18:00; dom 09:00–18:00. Si se supera: alerta a asesor y supervisor. Reporte de cumplimiento por asesor y por área (CA, EP).
 - **App:** Ambos (métrica en WhatsApp; alertas/reportes en ONE o Hub).
-- **Fase:** (sin fase en sheet; tratar con F1 por criticidad) · **Prioridad efectiva:** Alta · **Estado:** Registrado.
+- **Fase:** (sin fase en sheet; tratar con F1 por criticidad) · **Prioridad efectiva:** Alta · **Estado:** Motor + alertas en WhatsApp; KPI en CRM Educación (MALI ONE).
 
 #### RQ0021 — Reportería unificada de chats por área
 
 - **Objetivo:** Un solo reporte (Educación / CA / EP) para no bajar tres veces y alimentar el SLA.
-- **Regla:** Filtro por área y rango de fechas; campos necesarios para cálculo de SLA. Conexión automática a Sheets/Looker es opcional; **prioridad es el reporte en producto**, no volver al Excel como fuente de verdad.
+- **Regla:** Filtro por categoría y rango de fechas; promedio de 1.ª respuesta, % ≤ 10 min, por asesor. Sheets/Looker fuera. Vitrina principal: **MALI ONE → CRM Educación → Oportunidades**. Espejo operativo en WhatsApp Reportería.
 - **App:** Ambos.
-- **Fase:** 1 · **Prioridad efectiva:** Alta (vencida) · **Estado:** Registrado.
+- **Fase:** 1 · **Prioridad efectiva:** Alta (vencida) · **Estado:** Implementado (motor WA + bloque SLA en ONE).
 
 ---
 
@@ -230,9 +230,9 @@ Dos filas del sheet, un solo requerimiento de producto:
 #### RQ0017 — Controles para pasar a VENTA EXITOSA
 
 - **Objetivo:** No cerrar ventas con datos incompletos; CRM actualizado.
-- **Regla:** Lead de cualquier fuente editable para actualizar CRM. En WhatsApp, datos prellenados. Un lead en proceso **no** pasa a `venta_exitosa` sin datos personales obligatorios. Vista de factura solo Caja o coordinador.
+- **Regla (implementada):** Candado en `updateManagement` solo al pasar a `venta_exitosa` / `convertido`. Obligatorios: nombre usable, DNI, email, teléfono o identidad WA, categoría del ciclo. Si falta algo → `400 missing_fields`; el estado **no** cambia. En ONE: diálogo para completar y reintentar, o cancelar y quedarse. Factura / Caja fuera de este RQ (RQ0018).
 - **App:** Ambos.
-- **Fase:** 1 · **Prioridad efectiva:** Alta (vencida) · **Estado:** Registrado.
+- **Fase:** 1 · **Prioridad efectiva:** Alta · **Estado:** Implementado.
 
 #### RQ0018 — Observaciones de Caja: PROCESO-OBS → BOLETEADO
 
@@ -316,8 +316,8 @@ Regla operativa acordada: **fecha de fase vencida → tratar el bloque como Alta
 
 | RQ | Tema | Prioridad negocio | Notas |
 |----|------|-------------------|-------|
-| RQ0015 | Falso duplicado / consistencia / fusión | Alta | Primero: integridad de base |
-| RQ0017 | Controles → venta exitosa | Alta | Calidad de cierre |
+| RQ0015 | Alta manual ONE + already_exists | Alta | Núcleo implementado |
+| RQ0017 | Controles → venta exitosa | Alta | Implementado |
 | RQ0021 | Reportería unificada chats / SLA | Alta | Alimenta RQ0020 |
 | RQ0028 | Carga masiva con reglas | Media | Misma validación que alta unitaria |
 | RQ0019a | Correos a agentes | Baja (F1) | Horizonte 30/11 si se respeta Baja |
@@ -370,14 +370,14 @@ RQ0001–0004 (legacy Sheets). RQ0005 → §7.
 | RQ0012 | Asignación asesores | §4.4 | En desarrollo |
 | RQ0013 | Reclamar propiedad | §4.4 | Registrado (review parcial) |
 | RQ0014 | — | — | *No vino en el sheet* |
-| RQ0015 | Falso duplicado / fusión | §4.2 | Registrado · F1 |
+| RQ0015 | Alta manual + already_exists | §4.2 | Implementado (núcleo) · F1 |
 | RQ0016 | Reasignación 3 días | §4.4 | Registrado · F2 |
-| RQ0017 | Controles venta exitosa | §4.7 | Registrado · F1 |
+| RQ0017 | Controles venta exitosa | §4.7 | Implementado · F1 |
 | RQ0018 | Flujo Caja OBS | §4.7 | Registrado · F2 |
 | RQ0019a | Correos agentes | §4.8 | Registrado · F1 |
 | RQ0019b | Correos prospectos | §4.8 | Registrado · F2 |
-| RQ0020 | SLA 10 min | §4.5 | Registrado |
-| RQ0021 | Reportería unificada | §4.5 | Registrado · F1 |
+| RQ0020 | SLA 10 min | §4.5 | Motor + alertas WA; KPI en ONE |
+| RQ0021 | Reportería unificada / SLA | §4.5 | Implementado (ONE Oportunidades + WA Reportería) · F1 |
 | RQ0022 | REMARKETING | §4.3 | Registrado · F2 |
 | RQ0023 | — | — | *No vino en el sheet* |
 | RQ0024 | Dashboard KPIs | §4.9 | Registrado · F3 |

@@ -121,6 +121,26 @@ export type EducationCycleCounts = {
   review: number;
   unassigned: number;
 };
+export type EducationSlaReport = {
+  summary: {
+    answered_count: number;
+    met_count: number;
+    sla_met_pct: number;
+    avg_first_response_minutes: number;
+    unanswered_open_count: number;
+    sla_minutes: number;
+  };
+  by_advisor: Array<{
+    assigned_user_id: number | null;
+    advisor_label: string;
+    answered_count: number;
+    met_count: number;
+    sla_met_pct: number;
+    avg_first_response_minutes: number;
+  }>;
+  filters: { from: string; to: string; category: string[] | null };
+  note: string;
+};
 export type EducationManagementCatalog = {
   advisors: Array<{ id: number; label: string; areas: EducationArea[] }>;
   statuses: Array<{ id: number; area: EducationArea; slug: string; label: string; is_default: boolean }>;
@@ -136,6 +156,36 @@ export type EducationCatalog = {
 };
 
 const API_BASE = '';
+
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly missing_fields?: string[];
+  readonly contact_id?: number;
+  readonly cycle_id?: number | null;
+  readonly assigned_user_label?: string | null;
+  readonly lead_status_label?: string | null;
+
+  constructor(message: string, opts: {
+    status: number;
+    code?: string;
+    missing_fields?: string[];
+    contact_id?: number;
+    cycle_id?: number | null;
+    assigned_user_label?: string | null;
+    lead_status_label?: string | null;
+  }) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = opts.status;
+    this.code = opts.code;
+    this.missing_fields = opts.missing_fields;
+    this.contact_id = opts.contact_id;
+    this.cycle_id = opts.cycle_id;
+    this.assigned_user_label = opts.assigned_user_label;
+    this.lead_status_label = opts.lead_status_label;
+  }
+}
 
 async function request<T>(
   path: string,
@@ -158,14 +208,39 @@ async function request<T>(
         'La solicitud tardó demasiado (timeout del proxy). Si es Kardex, espera unos segundos y vuelve a intentar: el servidor puede seguir procesando en segundo plano.',
       );
     }
-    const error = await res.json().catch(() => ({ message: res.statusText }));
-    const message = error.message;
-    const text = Array.isArray(message)
-      ? message.join(', ')
-      : typeof message === 'string'
-        ? message
-        : res.statusText;
-    throw new Error(text || `Error de solicitud (${res.status})`);
+    const error = await res.json().catch(() => ({ message: res.statusText })) as {
+      message?: string | {
+        code?: string;
+        message?: string;
+        missing_fields?: string[];
+        contact_id?: number;
+        cycle_id?: number | null;
+        assigned_user_label?: string | null;
+        lead_status_label?: string | null;
+      };
+      code?: string;
+      missing_fields?: string[];
+      contact_id?: number;
+      cycle_id?: number | null;
+      assigned_user_label?: string | null;
+      lead_status_label?: string | null;
+    };
+    const nested = typeof error.message === 'object' && error.message ? error.message : null;
+    const code = nested?.code ?? error.code;
+    const missing = nested?.missing_fields ?? error.missing_fields;
+    const message = nested?.message
+      ?? (Array.isArray(error.message) ? error.message.join(', ') : null)
+      ?? (typeof error.message === 'string' ? error.message : null)
+      ?? res.statusText;
+    throw new ApiRequestError(message || `Error de solicitud (${res.status})`, {
+      status: res.status,
+      code,
+      missing_fields: Array.isArray(missing) ? missing : undefined,
+      contact_id: nested?.contact_id ?? error.contact_id,
+      cycle_id: nested?.cycle_id ?? error.cycle_id,
+      assigned_user_label: nested?.assigned_user_label ?? error.assigned_user_label,
+      lead_status_label: nested?.lead_status_label ?? error.lead_status_label,
+    });
   }
 
   if (res.status === 204) {
@@ -346,6 +421,15 @@ export const api = {
       `/api/crm-educacion/cycles?${qs}`,
     );
   },
+  getCrmEducationSla: (params: {
+    area?: EducationArea | 'all'; from?: string; to?: string;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<EducationSlaReport>(`/api/crm-educacion/sla?${qs}`);
+  },
   getCrmEducationManagementCatalogs: () =>
     request<EducationManagementCatalog>('/api/crm-educacion/management-catalogs'),
   patchCrmEducationManagement: (id: number, body: {
@@ -362,6 +446,23 @@ export const api = {
     request(`/api/crm-educacion/leads/${id}/review`, {
       method: 'PATCH', body: JSON.stringify(body),
     }),
+  createCrmEducationManualLead: (body: {
+    source_key: 'manual_call' | 'manual_historical' | 'manual_organic';
+    categoria: 'ca' | 'ep';
+    name: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+    dni?: string;
+    curso?: string;
+  }) => request<{
+    contact_id: number;
+    origin_id: number;
+    cycle_id: number | null;
+    created: true;
+  }>('/api/crm-educacion/leads/manual', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
   getMe: () => request<AuthUser>('/api/auth/me'),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   googleLoginUrl: () => '/api/auth/google',

@@ -37,6 +37,12 @@ class ListCyclesQuery {
   @IsOptional() @IsString() limit?: string;
 }
 
+class SlaQuery {
+  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsString() @MaxLength(10) from?: string;
+  @IsOptional() @IsString() @MaxLength(10) to?: string;
+}
+
 class ManagementBody {
   @IsIn(AREAS.slice(1)) area!: string;
   @IsOptional() @IsInt() @Min(1) assigned_user_id?: number | null;
@@ -77,6 +83,17 @@ class ProspectiaSubjectBody {
 class ProspectiaCheckBody {
   @IsArray() @ValidateNested({ each: true }) @Type(() => ProspectiaSubjectBody)
   subjects!: ProspectiaSubjectBody[];
+}
+
+class ManualLeadBody {
+  @IsIn(['manual_call', 'manual_historical', 'manual_organic']) source_key!: string;
+  @IsIn(['ca', 'ep', 'educacion_ca', 'educacion_ep']) categoria!: string;
+  @IsString() @MaxLength(150) name!: string;
+  @IsOptional() @IsString() @MaxLength(150) last_name?: string;
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
+  @IsOptional() @IsString() @MaxLength(255) email?: string;
+  @IsOptional() @IsString() @MaxLength(32) dni?: string;
+  @IsOptional() @IsString() @MaxLength(200) curso?: string;
 }
 
 @Controller('crm-educacion')
@@ -129,6 +146,11 @@ export class CrmEducacionController {
     return this.crm.cycles(query);
   }
 
+  @Get('sla')
+  sla(@Query() query: SlaQuery) {
+    return this.crm.sla(query);
+  }
+
   @Get('management-catalogs')
   managementCatalogs() {
     return this.crm.managementCatalogs();
@@ -147,5 +169,10 @@ export class CrmEducacionController {
   @Patch('leads/:id/review')
   review(@Param('id', ParseIntPipe) id: number, @Body() body: ReviewBody, @Req() req: Request) {
     return this.crm.review(id, body, (req.user as User).email);
+  }
+
+  @Post('leads/manual')
+  createManualLead(@Body() body: ManualLeadBody, @Req() req: Request) {
+    return this.crm.createManualLead(body, (req.user as User).email);
   }
 }

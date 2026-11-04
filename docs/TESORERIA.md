@@ -4,9 +4,29 @@
 
 La implementación actual incluye extracción API de los 77 comercios, login con credenciales de Vaultwarden, persistencia, renovación de sesión, ejecución manual desde MALI ONE y cron cada dos horas desactivado por defecto. Ver [configuración y prueba de despliegue](NIUBIZ-DESPLIEGUE.md). No se ha desplegado a producción. El login automático desde ese servidor debe probarse con la clave regenerada, especialmente por reCAPTCHA. Los apartados posteriores conservan el historial de las verificaciones parciales.
 
+### Interfaz: jerarquía fuente → registros → inventario
+
+En **Finanzas → Verificación de pagos** (`/treasury`) el orden de la pantalla es:
+
+1. **Fuentes** — selector visible. Cada fuente es un acceso a un portal (Niubiz · Comercio, BCP, etc.). Al cargar se prioriza una fuente Niubiz activa si existe.
+2. **Registros** — vista operativa de la fuente seleccionada. Solo `niubiz_sales` muestra sincronización, buscador, filtros y tabla; el resto indica que la sincronización aún no está disponible.
+3. **Inventario de la fuente** — comercios o cuentas de esa misma fuente. No es un bloque hermano de «Niubiz»: Niubiz es una fuente; sus registros cuelgan de ella.
+
+La sincronización Niubiz sigue usando la lista canónica de 77 comercios del conector (`niubiz-merchants.json`); el inventario editable todavía no modifica esa lista.
+
+### Buscador de pagos
+
+`GET /api/treasury/payments` acepta `q` (texto) además de comercio, estado, fechas y página. La búsqueda es en servidor, case-insensitive y parcial, sobre número de pedido, código de transacción y nombre del cliente. Escapa comodines SQL (`%`, `_`, `\`). Se combina con el resto de filtros. La UI envía `q` al pulsar Buscar (no en cada tecla) y resetea a página 1. Validación local: `scripts/validate-niubiz-search.cjs`.
+
+### Secretos y plataformas futuras
+
+- **En `.env` (infraestructura, una vez):** URL, API key y clave maestra de la cuenta de servicio de Vaultwarden, más el flag de cron. Son el acceso a la bóveda, no las contraseñas de cada portal.
+- **Hoy el UUID del elemento Niubiz** también va en `.env` como `FINANCE_VAULT_NIUBIZ_ITEM_ID` (piloto). Cómo obtenerlo: [NIUBIZ-DESPLIEGUE.md — UUID del elemento](NIUBIZ-DESPLIEGUE.md#uuid-del-elemento-niubiz-comercio).
+- **Decisión para más plataformas:** no añadir un env por cada portal. El UUID del ítem de Vaultwarden (puntero, no el secreto) debe vivir en la fuente (`TreasurySource`, p. ej. `vaultItemId`). Usuario y contraseña de Niubiz/BCP/etc. permanecen solo en Vaultwarden; la API los lee en memoria con `bw get item <id>`. No crear una segunda bóveda en PostgreSQL.
+
 ### Validación previa de persistencia local
 
-Implementados `TreasuryPayment` y `TreasuryPaymentImport`, importación autenticada `POST /api/treasury/payments/import-niubiz` (multipart `file`, XLSX de hasta 5 MB/5000 filas) y consulta `GET /api/treasury/payments` con comercio, estado, fechas de Lima y paginación de 50 operaciones. Ambos endpoints heredan el permiso `treasury` y la autenticación global de la aplicación.
+Implementados `TreasuryPayment` y `TreasuryPaymentImport`, importación autenticada `POST /api/treasury/payments/import-niubiz` (multipart `file`, XLSX de hasta 5 MB/5000 filas) y consulta `GET /api/treasury/payments` con comercio, estado, fechas de Lima, búsqueda `q` y paginación de 50 operaciones. Ambos endpoints heredan el permiso `treasury` y la autenticación global de la aplicación.
 
 La importación conserva importe decimal, moneda, estado original, fecha, pedido, cliente y referencias de comercio/transacción. No importa PAN, correo, tokens ni el resto del archivo. Identidad única: proveedor + comercio + transacción. Valida todo el archivo antes de escribir, serializa importaciones con un bloqueo transaccional PostgreSQL y registra auditoría, checksum y conteos de altas/cambios. Una reimportación conserva las operaciones y aplica el estado del archivo; el operador debe usar una exportación actualizada para evitar sobrescribir estados con una versión antigua. La última importación no representa una consulta en vivo a Niubiz.
 

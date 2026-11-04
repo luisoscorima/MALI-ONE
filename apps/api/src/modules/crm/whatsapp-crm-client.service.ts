@@ -4,6 +4,37 @@ import type { EducacionLead, PamRegistration } from '@prisma/client';
 import { planToPamSegmentSlug } from '@mali-one/shared';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
+/** Error tipado del CRM WhatsApp (p. ej. RQ0017 missing_fields). */
+export class WhatsAppCrmClientError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly missing_fields?: string[];
+  readonly contact_id?: number;
+  readonly cycle_id?: number | null;
+  readonly assigned_user_label?: string | null;
+  readonly lead_status_label?: string | null;
+
+  constructor(message: string, opts: {
+    status: number;
+    code?: string;
+    missing_fields?: string[];
+    contact_id?: number;
+    cycle_id?: number | null;
+    assigned_user_label?: string | null;
+    lead_status_label?: string | null;
+  }) {
+    super(message);
+    this.name = 'WhatsAppCrmClientError';
+    this.status = opts.status;
+    this.code = opts.code;
+    this.missing_fields = opts.missing_fields;
+    this.contact_id = opts.contact_id;
+    this.cycle_id = opts.cycle_id;
+    this.assigned_user_label = opts.assigned_user_label;
+    this.lead_status_label = opts.lead_status_label;
+  }
+}
+
 /** Defs de área que el widget/ledger deben tener en WhatsApp (idempotente). */
 const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
   slug: string;
@@ -717,6 +748,33 @@ export class WhatsappCrmClientService {
     return this.request('GET', `/api/crm/education/cycles?${qs}`);
   }
 
+  fetchEducationSla(params: { area?: string; from?: string; to?: string }) {
+    const qs = new URLSearchParams({ area: params.area ?? 'all' });
+    if (params.from) qs.set('from', params.from);
+    if (params.to) qs.set('to', params.to);
+    return this.request<{
+      summary: {
+        answered_count: number;
+        met_count: number;
+        sla_met_pct: number;
+        avg_first_response_minutes: number;
+        unanswered_open_count: number;
+        sla_minutes: number;
+      };
+      by_advisor: Array<{
+        assigned_user_id: number | null;
+        advisor_label: string;
+        answered_count: number;
+        met_count: number;
+        sla_met_pct: number;
+        avg_first_response_minutes: number;
+      }>;
+      area_label: string;
+      filters: { from: string; to: string; category: string[] | null };
+      note: string;
+    }>('GET', `/api/crm/education/sla?${qs}`);
+  }
+
   checkEducationProspectia(subjects: Array<{ key: string; phone?: string | null; username?: string | null; whatsapp_user_id?: string | null }>) {
     return this.request<{ enabled: boolean; matches: Record<string, 'exists' | 'missing' | 'unverified'> }>(
       'POST', '/api/crm/education/prospectia/check', { subjects },
@@ -770,6 +828,25 @@ export class WhatsappCrmClientService {
       changes);
   }
 
+  createManualEducationLead(body: {
+    source_key: string;
+    categoria: string;
+    name: string;
+    last_name?: string;
+    phone?: string;
+    email?: string;
+    dni?: string;
+    curso?: string;
+    actor_email?: string;
+  }) {
+    return this.request<{
+      contact_id: number;
+      origin_id: number;
+      cycle_id: number | null;
+      created: true;
+    }>('POST', '/api/crm/education/leads/manual', body);
+  }
+
   distributeEducation(params: { area: string; channel?: string; q?: string; actor_email?: string }) {
     return this.request<{ assigned: number; by_area: Array<{ area: string; assigned: number }> }>(
       'POST', '/api/crm/education/distribute', params);
@@ -805,13 +882,41 @@ export class WhatsappCrmClientService {
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean;
       data?: T;
-      message?: string;
+      message?: string | {
+        code?: string;
+        message?: string;
+        missing_fields?: string[];
+        contact_id?: number;
+        cycle_id?: number | null;
+        assigned_user_label?: string | null;
+        lead_status_label?: string | null;
+      };
+      code?: string;
+      missing_fields?: string[];
+      contact_id?: number;
+      cycle_id?: number | null;
+      assigned_user_label?: string | null;
+      lead_status_label?: string | null;
     };
 
     if (!res.ok || json.ok === false) {
-      throw new Error(
-        json.message || `CRM HTTP ${res.status} en ${method} ${path}`,
-      );
+      const nested = typeof json.message === 'object' && json.message
+        ? json.message
+        : null;
+      const code = nested?.code ?? json.code;
+      const missing = nested?.missing_fields ?? json.missing_fields;
+      const message = nested?.message
+        ?? (typeof json.message === 'string' ? json.message : null)
+        ?? `CRM HTTP ${res.status} en ${method} ${path}`;
+      throw new WhatsAppCrmClientError(message, {
+        status: res.status,
+        code,
+        missing_fields: Array.isArray(missing) ? missing : undefined,
+        contact_id: nested?.contact_id ?? json.contact_id,
+        cycle_id: nested?.cycle_id ?? json.cycle_id,
+        assigned_user_label: nested?.assigned_user_label ?? json.assigned_user_label,
+        lead_status_label: nested?.lead_status_label ?? json.lead_status_label,
+      });
     }
 
     return (json.data ?? json) as T;

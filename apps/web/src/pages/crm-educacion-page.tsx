@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Columns3, Download, Save, UsersRound } from 'lucide-react';
+import { Columns3, Download, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
-import { api, type EducationArea, type EducationCatalog, type EducationContact,
-  type EducationCycle, type EducationCycleCounts, type EducationCycleView,
-  type EducationLead, type EducationManagementCatalog } from '@/lib/api';
 import {
-  Badge, Button, DataTable, DropdownMenu, DropdownMenuCheckboxItem,
+  api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationContact,
+  type EducationCycle, type EducationCycleCounts, type EducationCycleView,
+  type EducationLead, type EducationManagementCatalog, type EducationSlaReport,
+} from '@/lib/api';
+import {
+  Badge, Button, DataTable, Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DropdownMenu, DropdownMenuCheckboxItem,
   DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
   Tabs, TabsContent, TabsList, TabsTrigger,
@@ -37,6 +40,47 @@ const CHANNEL_LABELS: Record<string, string> = {
   widget: 'Widget web', tiktok: 'TikTok', import: 'Importación',
   manual: 'Manual', organic_wa: 'WhatsApp orgánico',
   mali_one_link: 'Enlace / QR MALI ONE', other: 'Otro',
+};
+const SALE_MISSING_LABELS: Record<string, string> = {
+  nombre: 'Nombre',
+  dni: 'DNI',
+  email: 'Email',
+  telefono: 'Teléfono o WhatsApp',
+  categoria: 'Categoría CA/EP',
+};
+
+type SaleReadyPrompt = {
+  contactId: number;
+  area: EducationArea;
+  leadId?: number;
+  leadStatusId: number;
+  missing: string[];
+  name: string;
+  last_name: string;
+  email: string;
+  dni: string;
+};
+
+type ManualLeadDraft = {
+  source_key: 'manual_call' | 'manual_historical' | 'manual_organic';
+  categoria: 'ca' | 'ep';
+  name: string;
+  last_name: string;
+  phone: string;
+  email: string;
+  dni: string;
+  curso: string;
+};
+
+const EMPTY_MANUAL_LEAD: ManualLeadDraft = {
+  source_key: 'manual_call',
+  categoria: 'ep',
+  name: '',
+  last_name: '',
+  phone: '',
+  email: '',
+  dni: '',
+  curso: '',
 };
 const FIXED_COLUMNS = [
   ['name', 'Nombre'], ['area', 'Número'], ['last_name', 'Apellido'],
@@ -146,6 +190,17 @@ export function CrmEducacionPage() {
   const [draft, setDraft] = useState<DraftContact | null>(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [saleReadyPrompt, setSaleReadyPrompt] = useState<SaleReadyPrompt | null>(null);
+  const [saleReadySaving, setSaleReadySaving] = useState(false);
+  const [manualLeadOpen, setManualLeadOpen] = useState(false);
+  const [manualLeadDraft, setManualLeadDraft] = useState<ManualLeadDraft>(EMPTY_MANUAL_LEAD);
+  const [manualLeadSaving, setManualLeadSaving] = useState(false);
+  const [manualLeadExists, setManualLeadExists] = useState<{
+    contact_id: number;
+    cycle_id: number | null;
+    assigned_user_label: string | null;
+    lead_status_label: string | null;
+  } | null>(null);
   const [cycles, setCycles] = useState<EducationCycle[]>([]);
   const [cycleTotal, setCycleTotal] = useState(0);
   const [cyclePage, setCyclePage] = useState(1);
@@ -155,6 +210,9 @@ export function CrmEducacionPage() {
   const [debouncedOpportunityQ, setDebouncedOpportunityQ] = useState('');
   const [channel, setChannel] = useState('');
   const [opportunityView, setOpportunityView] = useState<EducationCycleView>('open');
+  const [sla, setSla] = useState<EducationSlaReport | null>(null);
+  const [slaError, setSlaError] = useState('');
+  const slaRequestId = useRef(0);
   const [cycleCounts, setCycleCounts] = useState<EducationCycleCounts>({
     open: 0, closed: 0, review: 0, unassigned: 0,
   });
@@ -243,6 +301,21 @@ export function CrmEducacionPage() {
   }, [cycleParams]);
   useEffect(() => { void loadCycles(); }, [loadCycles]);
 
+  const loadSla = useCallback(async () => {
+    const requestId = ++slaRequestId.current;
+    setSlaError('');
+    try {
+      const data = await api.getCrmEducationSla({ area });
+      if (requestId !== slaRequestId.current) return;
+      setSla(data);
+    } catch (error) {
+      if (requestId !== slaRequestId.current) return;
+      setSla(null);
+      setSlaError(error instanceof Error ? error.message : 'No se pudo cargar el SLA');
+    }
+  }, [area]);
+  useEffect(() => { void loadSla(); }, [loadSla]);
+
   const loadReviewEntries = useCallback(async () => {
     const requestId = ++reviewEntryRequestId.current;
     setReviewEntryLoading(true);
@@ -264,16 +337,134 @@ export function CrmEducacionPage() {
   }, [area, channel, debouncedOpportunityQ, reviewEntryPage]);
   useEffect(() => { void loadReviewEntries(); }, [loadReviewEntries]);
 
+  const seedSaleReadyPrompt = useCallback((
+    contactId: number,
+    contactArea: EducationArea,
+    leadStatusId: number,
+    leadId: number | undefined,
+    missing: string[],
+  ): SaleReadyPrompt => {
+    const fromContact = contacts.find((item) => item.contact_id === contactId);
+    const fromCycle = cycles.find((item) => item.contact_id === contactId
+      && (leadId == null || item.id === leadId));
+    return {
+      contactId,
+      area: contactArea,
+      leadId,
+      leadStatusId,
+      missing,
+      name: fromContact?.name ?? fromCycle?.contacts.name ?? '',
+      last_name: fromContact?.last_name ?? fromCycle?.contacts.last_name ?? '',
+      email: fromContact?.email ?? fromCycle?.contacts.email ?? '',
+      dni: fromContact?.dni ?? '',
+    };
+  }, [contacts, cycles]);
+
   const updateManagement = useCallback(async (contactId: number, contactArea: EducationArea,
     changes: { assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number }) => {
     setManagementSaving(true);
     try {
       await api.patchCrmEducationManagement(contactId, { area: contactArea, ...changes });
       toast.success('Lead actualizado');
+      setSaleReadyPrompt(null);
       await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el lead'); }
+    } catch (error) {
+      if (
+        error instanceof ApiRequestError
+        && error.code === 'missing_fields'
+        && typeof changes.lead_status_id === 'number'
+      ) {
+        setSaleReadyPrompt(seedSaleReadyPrompt(
+          contactId,
+          contactArea,
+          changes.lead_status_id,
+          changes.lead_id,
+          error.missing_fields ?? [],
+        ));
+        toast.error(error.message);
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : 'No se pudo actualizar el lead');
+    }
     finally { setManagementSaving(false); }
-  }, [loadContacts, loadCycles, loadReviewEntries, toast]);
+  }, [loadContacts, loadCycles, loadReviewEntries, seedSaleReadyPrompt, toast]);
+
+  async function submitManualLead() {
+    if (!manualLeadDraft.name.trim()) {
+      toast.error('Nombre requerido');
+      return;
+    }
+    if (!manualLeadDraft.phone.trim() && !manualLeadDraft.email.trim() && !manualLeadDraft.dni.trim()) {
+      toast.error('Indica teléfono, DNI o email');
+      return;
+    }
+    setManualLeadSaving(true);
+    setManualLeadExists(null);
+    try {
+      const created = await api.createCrmEducationManualLead({
+        source_key: manualLeadDraft.source_key,
+        categoria: manualLeadDraft.categoria,
+        name: manualLeadDraft.name.trim(),
+        last_name: manualLeadDraft.last_name.trim() || undefined,
+        phone: manualLeadDraft.phone.trim() || undefined,
+        email: manualLeadDraft.email.trim() || undefined,
+        dni: manualLeadDraft.dni.trim() || undefined,
+        curso: manualLeadDraft.curso.trim() || undefined,
+      });
+      toast.success(`Lead registrado (#${created.contact_id})`);
+      setManualLeadOpen(false);
+      setManualLeadDraft(EMPTY_MANUAL_LEAD);
+      setTab('opportunities');
+      await Promise.all([loadContacts(), loadCycles()]);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === 'already_exists' && error.contact_id) {
+        setManualLeadExists({
+          contact_id: error.contact_id,
+          cycle_id: error.cycle_id ?? null,
+          assigned_user_label: error.assigned_user_label ?? null,
+          lead_status_label: error.lead_status_label ?? null,
+        });
+        toast.error(error.message);
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : 'No se pudo registrar el lead');
+    } finally {
+      setManualLeadSaving(false);
+    }
+  }
+
+  async function completeSaleReadyAndRetry() {
+    if (!saleReadyPrompt) return;
+    setSaleReadySaving(true);
+    try {
+      await api.patchCrmEducationContact(saleReadyPrompt.contactId, {
+        area: saleReadyPrompt.area,
+        name: saleReadyPrompt.name,
+        last_name: saleReadyPrompt.last_name,
+        email: saleReadyPrompt.email || null,
+        dni: saleReadyPrompt.dni || null,
+      });
+      await api.patchCrmEducationManagement(saleReadyPrompt.contactId, {
+        area: saleReadyPrompt.area,
+        lead_status_id: saleReadyPrompt.leadStatusId,
+        ...(saleReadyPrompt.leadId ? { lead_id: saleReadyPrompt.leadId } : {}),
+      });
+      toast.success('Venta exitosa registrada');
+      setSaleReadyPrompt(null);
+      await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.code === 'missing_fields') {
+        setSaleReadyPrompt((current) => current
+          ? { ...current, missing: error.missing_fields ?? current.missing }
+          : current);
+        toast.error(error.message);
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : 'No se pudo completar la venta');
+    } finally {
+      setSaleReadySaving(false);
+    }
+  }
   const reviewLead = useCallback(async (lead: EducationLead,
     action: 'open_new' | 'keep_existing' | 'dismiss') => {
     try {
@@ -661,21 +852,181 @@ export function CrmEducacionPage() {
   }
 
   return <div className="space-y-6">
+    <Dialog open={Boolean(saleReadyPrompt)} onOpenChange={(open) => {
+      if (!open && !saleReadySaving) setSaleReadyPrompt(null);
+    }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Completar datos para venta exitosa</DialogTitle>
+          <DialogDescription>
+            El estado no cambió. Completa lo faltante o cancela y sigue en el estado anterior.
+          </DialogDescription>
+        </DialogHeader>
+        {saleReadyPrompt && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Falta:{' '}
+              {saleReadyPrompt.missing
+                .map((field) => SALE_MISSING_LABELS[field] ?? field)
+                .join(', ')}
+            </p>
+            {saleReadyPrompt.missing.includes('categoria') && (
+              <p className="text-sm text-muted-foreground">
+                La categoría CA/EP del ciclo debe existir en la oportunidad; no se edita aquí.
+              </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                ['name', 'Nombre'],
+                ['last_name', 'Apellido'],
+                ['email', 'Email'],
+                ['dni', 'DNI'],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <Label>{label}</Label>
+                  <Input
+                    value={saleReadyPrompt[key]}
+                    disabled={saleReadySaving}
+                    onChange={(event) => setSaleReadyPrompt({
+                      ...saleReadyPrompt,
+                      [key]: event.target.value,
+                    })}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <DialogFooter>
+          <Button
+            variant="outline"
+            disabled={saleReadySaving}
+            onClick={() => setSaleReadyPrompt(null)}
+          >
+            Cancelar
+          </Button>
+          <Button disabled={saleReadySaving} onClick={() => void completeSaleReadyAndRetry()}>
+            Guardar y marcar venta
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={manualLeadOpen} onOpenChange={(open) => {
+      if (manualLeadSaving) return;
+      setManualLeadOpen(open);
+      if (!open) {
+        setManualLeadDraft(EMPTY_MANUAL_LEAD);
+        setManualLeadExists(null);
+      }
+    }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Registrar lead</DialogTitle>
+          <DialogDescription>
+            Históricos, solo llamada u orgánicos sin chat de WhatsApp. Si ya existe, no se crea otro.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Tipo</Label>
+            <Select
+              value={manualLeadDraft.source_key}
+              onValueChange={(value) => setManualLeadDraft({
+                ...manualLeadDraft,
+                source_key: value as ManualLeadDraft['source_key'],
+              })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual_call">Llamada</SelectItem>
+                <SelectItem value="manual_historical">Histórico</SelectItem>
+                <SelectItem value="manual_organic">Orgánico</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Categoría</Label>
+            <Select
+              value={manualLeadDraft.categoria}
+              onValueChange={(value) => setManualLeadDraft({
+                ...manualLeadDraft,
+                categoria: value as 'ca' | 'ep',
+              })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ep">Educación EP</SelectItem>
+                <SelectItem value="ca">Educación CA</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {([
+            ['name', 'Nombre'],
+            ['last_name', 'Apellido'],
+            ['phone', 'Teléfono'],
+            ['email', 'Email'],
+            ['dni', 'DNI'],
+            ['curso', 'Curso / interés'],
+          ] as const).map(([key, label]) => (
+            <div key={key} className="space-y-1">
+              <Label>{label}</Label>
+              <Input
+                value={manualLeadDraft[key]}
+                disabled={manualLeadSaving}
+                onChange={(event) => setManualLeadDraft({
+                  ...manualLeadDraft,
+                  [key]: event.target.value,
+                })}
+              />
+            </div>
+          ))}
+        </div>
+        {manualLeadExists && (
+          <p className="text-sm text-muted-foreground">
+            Ya existe el contacto #{manualLeadExists.contact_id}
+            {manualLeadExists.lead_status_label ? ` · ${manualLeadExists.lead_status_label}` : ''}
+            {manualLeadExists.assigned_user_label ? ` · ${manualLeadExists.assigned_user_label}` : ''}.
+            Ábrelo en Contactos u Oportunidades; no se creó un lead nuevo.
+          </p>
+        )}
+        <DialogFooter>
+          <Button
+            variant="outline"
+            disabled={manualLeadSaving}
+            onClick={() => setManualLeadOpen(false)}
+          >
+            Cancelar
+          </Button>
+          <Button disabled={manualLeadSaving} onClick={() => void submitManualLead()}>
+            Registrar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     <PageHeader
       title="CRM Educación"
       description="Contactos y oportunidades comerciales de los tres números de Educación."
     />
-    <div className="w-56 space-y-1">
-      <Label>Número</Label>
-      <Select value={area} onValueChange={changeArea}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos los números</SelectItem>
-          {AREAS.map((item) => <SelectItem key={item} value={item}>
-            {AREA_LABELS[item]}
-          </SelectItem>)}
-        </SelectContent>
-      </Select>
+    <div className="flex flex-wrap items-end gap-3">
+      <div className="w-56 space-y-1">
+        <Label>Número</Label>
+        <Select value={area} onValueChange={changeArea}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los números</SelectItem>
+            {AREAS.map((item) => <SelectItem key={item} value={item}>
+              {AREA_LABELS[item]}
+            </SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button variant="outline" onClick={() => {
+        setManualLeadExists(null);
+        setManualLeadDraft(EMPTY_MANUAL_LEAD);
+        setManualLeadOpen(true);
+      }}>
+        <Plus className="mr-1 size-4" />Registrar lead
+      </Button>
     </div>
     <Tabs value={tab} onValueChange={setTab}>
       <TabsList>
@@ -781,6 +1132,30 @@ export function CrmEducacionPage() {
       </TabsContent>
       <TabsContent value="opportunities" className="space-y-4">
         {cycleError && <AlertBanner variant="error">{cycleError}</AlertBanner>}
+        {slaError ? (
+          <p className="text-xs text-muted-foreground">SLA: {slaError}</p>
+        ) : sla ? (
+          <p className="text-sm text-muted-foreground">
+            SLA 1.ª respuesta (≤{sla.summary.sla_minutes} min, {sla.filters.from} → {sla.filters.to}):
+            {' '}promedio <strong>{sla.summary.avg_first_response_minutes} min</strong>
+            {' · '}{sla.summary.sla_met_pct}% dentro de SLA
+            {' · '}respondidos {sla.summary.answered_count}
+            {' · '}sin respuesta {sla.summary.unanswered_open_count}
+            {sla.by_advisor.length > 0 ? (
+              <>
+                <br />
+                <span className="text-xs">
+                  Por asesor:{' '}
+                  {sla.by_advisor
+                    .map((row) =>
+                      `${row.advisor_label} ${row.avg_first_response_minutes} min (${row.sla_met_pct}%)`,
+                    )
+                    .join(' · ')}
+                </span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {([
             ['open', 'Abiertas', cycleCounts.open],
