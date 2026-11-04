@@ -15,6 +15,7 @@ type IconActionButtonProps = {
   disabled?: boolean;
   children: ReactNode;
   className?: string;
+  id?: string;
 };
 
 export function IconActionButton({
@@ -25,11 +26,13 @@ export function IconActionButton({
   disabled,
   children,
   className,
+  id,
 }: IconActionButtonProps) {
   const buttonClass = cn('size-8 shrink-0', className);
 
   const content = href ? (
     <Button
+      id={id}
       variant={variant}
       size="icon"
       className={buttonClass}
@@ -42,6 +45,7 @@ export function IconActionButton({
     </Button>
   ) : (
     <Button
+      id={id}
       type="button"
       variant={variant}
       size="icon"

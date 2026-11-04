@@ -10,3 +10,13 @@ coverage
 apps/api/prisma/*.db
 secrets/
 google-sa.json
+
+# UI/UX Pro Max (heavy CSV/scripts) — install locally:
+# npx ui-ux-pro-max-cli@latest init --ai cursor
+.cursor/skills/ui-ux-pro-max/
+.cursor/skills/design-system/
+.cursor/skills/design/
+.cursor/skills/brand/
+.cursor/skills/banner-design/
+.cursor/skills/slides/
+.cursor/skills/ui-styling/

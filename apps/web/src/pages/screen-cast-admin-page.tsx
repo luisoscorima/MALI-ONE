@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+  ArrowLeft,
   Cast,
   Copy,
   CopyPlus,
@@ -48,6 +49,10 @@ import {
   ScreenCastSchedulePanel,
 } from '@/components/screen-cast-schedule-panel';
 import { api } from '@/lib/api';
+import {
+  isFloatingLayerBlockingDismiss,
+  withNativeFilePickerGuard,
+} from '@/lib/floating-layer';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { cn } from '@/lib/utils';
@@ -119,6 +124,20 @@ function emptyItem(): ItemDraft {
     durationMs: 10_000,
     activo: true,
   };
+}
+
+function itemDraftEquals(a: ItemDraft, b: ItemDraft): boolean {
+  return (
+    a.id === b.id &&
+    a.mediaUrl === b.mediaUrl &&
+    a.mediaType === b.mediaType &&
+    a.durationMs === b.durationMs &&
+    a.activo === b.activo
+  );
+}
+
+function cloneItemDraft(draft: ItemDraft): ItemDraft {
+  return { ...draft };
 }
 
 function emptyMonitorDraft(): MonitorDraft {
@@ -433,6 +452,7 @@ function SortablePlaylistItemCard({
       </div>
       <div className="absolute inset-x-0 top-0 z-10 flex justify-end gap-1 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <IconActionButton
+          id={`sc-item-edit-${item.id}`}
           variant="secondary"
           className="size-7 shadow-sm"
           label="Editar"
@@ -487,12 +507,10 @@ export function ScreenCastAdminPage() {
   const [savingMeta, setSavingMeta] = useState(false);
   const [reordering, setReordering] = useState(false);
 
-  const [itemDialogOpen, setItemDialogOpen] = useState(false);
   const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
   const [savingItem, setSavingItem] = useState(false);
-  /** Avoid closing playlist dialog when nested item dialog dismisses (Radix). */
-  const itemDialogOpenRef = useRef(false);
-  const suppressPlaylistCloseRef = useRef(false);
+  const itemBaselineRef = useRef<ItemDraft | null>(null);
+  const itemFocusReturnRef = useRef<string | null>(null);
 
   const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [monitorDraft, setMonitorDraft] = useState<MonitorDraft | null>(null);
@@ -562,6 +580,15 @@ export function ScreenCastAdminPage() {
     }
   }, [playlistDialogOpen, editingPlaylistId, loadPlaylistDetail]);
 
+  const itemPanelKey = itemDraft ? (itemDraft.id ?? 'new') : null;
+  useEffect(() => {
+    if (!itemPanelKey || !playlistDialogOpen) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('sc-item-media-url')?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [itemPanelKey, playlistDialogOpen]);
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       void Promise.all([
@@ -604,10 +631,9 @@ export function ScreenCastAdminPage() {
   function openPlaylistEditor(id: string) {
     setEditingPlaylistId(id);
     setLoadingPlaylist(true);
-    itemDialogOpenRef.current = false;
-    suppressPlaylistCloseRef.current = false;
+    itemBaselineRef.current = null;
+    itemFocusReturnRef.current = null;
     setItemDraft(null);
-    setItemDialogOpen(false);
     setPlaylistDialogOpen(true);
   }
 
@@ -618,19 +644,17 @@ export function ScreenCastAdminPage() {
     setPlaylistKenBurns(false);
     setItems([]);
     setLoadingPlaylist(false);
-    itemDialogOpenRef.current = false;
-    suppressPlaylistCloseRef.current = false;
+    itemBaselineRef.current = null;
+    itemFocusReturnRef.current = null;
     setItemDraft(null);
-    setItemDialogOpen(false);
     setPlaylistDialogOpen(true);
   }
 
   function closePlaylistEditor() {
     setPlaylistDialogOpen(false);
     setEditingPlaylistId(null);
-    itemDialogOpenRef.current = false;
-    suppressPlaylistCloseRef.current = false;
-    setItemDialogOpen(false);
+    itemBaselineRef.current = null;
+    itemFocusReturnRef.current = null;
     setItemDraft(null);
     setItems([]);
     setPlaylistCrossfade(false);
@@ -780,35 +804,62 @@ export function ScreenCastAdminPage() {
     }
   }
 
+  function restoreItemFocus() {
+    const target = itemFocusReturnRef.current;
+    itemFocusReturnRef.current = null;
+    window.setTimeout(() => {
+      const el = document.getElementById(
+        target === 'create' || !target
+          ? 'sc-playlist-add-item'
+          : `sc-item-edit-${target}`,
+      );
+      el?.focus();
+    }, 0);
+  }
+
+  function closeItemPanel() {
+    setItemDraft(null);
+    itemBaselineRef.current = null;
+    restoreItemFocus();
+  }
+
+  async function requestLeaveItemPanel() {
+    if (!itemDraft) return;
+    const baseline = itemBaselineRef.current;
+    const dirty = !baseline || !itemDraftEquals(itemDraft, baseline);
+    if (dirty) {
+      const ok = await confirm({
+        title: '¿Descartar cambios del ítem?',
+        description: 'Se perderán los cambios no guardados.',
+        confirmLabel: 'Descartar',
+        cancelLabel: 'Seguir editando',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
+    closeItemPanel();
+  }
+
   async function openItemCreate() {
     const playlistId = await ensurePlaylistSaved();
     if (!playlistId) return;
-    itemDialogOpenRef.current = true;
-    setItemDraft(emptyItem());
-    setItemDialogOpen(true);
+    const draft = emptyItem();
+    itemFocusReturnRef.current = 'create';
+    itemBaselineRef.current = cloneItemDraft(draft);
+    setItemDraft(draft);
   }
 
   function openItemEdit(item: ScreenCastPlaylistItemDto) {
-    itemDialogOpenRef.current = true;
-    setItemDraft({
+    const draft: ItemDraft = {
       id: item.id,
       mediaUrl: item.mediaUrl,
       mediaType: item.mediaType,
       durationMs: item.durationMs,
       activo: item.activo,
-    });
-    setItemDialogOpen(true);
-  }
-
-  function closeItemDialog() {
-    // Nested Dialog close can bubble and close the playlist dialog; suppress briefly.
-    suppressPlaylistCloseRef.current = true;
-    itemDialogOpenRef.current = false;
-    setItemDialogOpen(false);
-    setItemDraft(null);
-    window.setTimeout(() => {
-      suppressPlaylistCloseRef.current = false;
-    }, 100);
+    };
+    itemFocusReturnRef.current = item.id;
+    itemBaselineRef.current = cloneItemDraft(draft);
+    setItemDraft(draft);
   }
 
   async function persistItem() {
@@ -833,7 +884,7 @@ export function ScreenCastAdminPage() {
         await api.createScreenCastPlaylistItem(editingPlaylistId, payload);
         toast.success('Ítem creado');
       }
-      closeItemDialog();
+      closeItemPanel();
       await loadLists();
       await loadPlaylistDetail(editingPlaylistId);
     } catch (e) {
@@ -1543,7 +1594,9 @@ export function ScreenCastAdminPage() {
         open={playlistDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            if (itemDialogOpenRef.current || suppressPlaylistCloseRef.current) {
+            if (isFloatingLayerBlockingDismiss()) return;
+            if (itemDraft) {
+              void requestLeaveItemPanel();
               return;
             }
             closePlaylistEditor();
@@ -1555,290 +1608,352 @@ export function ScreenCastAdminPage() {
         <DialogContent
           className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
           onPointerDownOutside={(e) => {
-            if (itemDialogOpenRef.current) e.preventDefault();
+            if (isFloatingLayerBlockingDismiss()) {
+              e.preventDefault();
+              return;
+            }
+            if (itemDraft) {
+              e.preventDefault();
+              void requestLeaveItemPanel();
+            }
           }}
           onFocusOutside={(e) => {
-            if (itemDialogOpenRef.current) e.preventDefault();
+            if (isFloatingLayerBlockingDismiss() || itemDraft) {
+              e.preventDefault();
+            }
           }}
           onInteractOutside={(e) => {
-            if (itemDialogOpenRef.current) e.preventDefault();
+            if (isFloatingLayerBlockingDismiss()) {
+              e.preventDefault();
+              return;
+            }
+            if (itemDraft) {
+              e.preventDefault();
+              void requestLeaveItemPanel();
+            }
+          }}
+          onEscapeKeyDown={(e) => {
+            if (isFloatingLayerBlockingDismiss()) {
+              e.preventDefault();
+              return;
+            }
+            if (itemDraft) {
+              e.preventDefault();
+              void requestLeaveItemPanel();
+            }
           }}
         >
-          <DialogHeader className="shrink-0 border-b px-6 py-4">
-            <DialogTitle>
-              {editingPlaylistId ? 'Editar playlist' : 'Nueva playlist'}
-            </DialogTitle>
-            <DialogDescription>
-              JPG, PNG, GIF, MP4 o MOV (iPhone → MP4). Pega una URL o elige desde
-              S3. Arrastra las celdas para reordenar.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4">
-            {loadingPlaylist ? (
-              <p className="text-sm text-muted">Cargando playlist…</p>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="pl-detail-name">Nombre</Label>
-                  <Input
-                    id="pl-detail-name"
-                    autoFocus={!editingPlaylistId}
-                    value={playlistName}
-                    placeholder="Ej. Lobby principal"
-                    onChange={(e) => setPlaylistName(e.target.value)}
-                  />
-                </div>
-
-                <SettingSwitchInline
-                  label="Animación entre imágenes (crossfade)"
-                  checked={playlistCrossfade}
-                  onCheckedChange={setPlaylistCrossfade}
-                  activeLabel="Activa"
-                  inactiveLabel="Inactiva"
-                />
-
-                <SettingSwitchInline
-                  label="Movimiento suave en cada imagen (Ken Burns)"
-                  checked={playlistKenBurns}
-                  onCheckedChange={setPlaylistKenBurns}
-                  activeLabel="Activa"
-                  inactiveLabel="Inactiva"
-                />
-
-                <div className="border-t pt-4">
-                  <h4 className="mb-3 font-medium">Ítems ({items.length})</h4>
-                  <DndContext
-                    sensors={itemSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={(event) => void handleItemDragEnd(event)}
-                  >
-                    <SortableContext
-                      items={items.map((item) => item.id)}
-                      strategy={rectSortingStrategy}
-                    >
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        {items.map((item) => (
-                          <SortablePlaylistItemCard
-                            key={item.id}
-                            item={item}
-                            disabled={reordering}
-                            onEdit={() => openItemEdit(item)}
-                            onDuplicate={() => void duplicateItem(item)}
-                            onRemove={() => void removeItem(item)}
-                          />
-                        ))}
-                        <button
-                          type="button"
-                          className="flex aspect-video items-center justify-center rounded-md border border-dashed text-muted transition-colors hover:border-foreground/40 hover:text-foreground"
-                          onClick={() => void openItemCreate()}
-                        >
-                          <Plus size={28} />
-                          <span className="sr-only">Añadir ítem</span>
-                        </button>
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                </div>
-              </>
-            )}
-          </div>
-
-          <DialogFooter className="shrink-0 border-t px-6 py-4">
-            <Button type="button" variant="outline" onClick={closePlaylistEditor}>
-              Cerrar
-            </Button>
-            <Button
-              type="button"
-              disabled={savingMeta || loadingPlaylist}
-              onClick={() => void savePlaylistMeta()}
-            >
-              {savingMeta
-                ? 'Guardando…'
-                : editingPlaylistId
-                  ? 'Guardar playlist'
-                  : 'Crear playlist'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={itemDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) closeItemDialog();
-          else setItemDialogOpen(true);
-        }}
-      >
-        <DialogContent className="max-h-[min(90vh,900px)] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {itemDraft?.id ? 'Editar ítem' : 'Nuevo ítem'}
-            </DialogTitle>
-            <DialogDescription>
-              Duración en segundos para imagen/GIF. El video avanza al terminar.
-            </DialogDescription>
-          </DialogHeader>
-
           {itemDraft ? (
-            <div className="space-y-4">
-              {itemDraft.mediaUrl.trim() ? (
-                <div className="overflow-hidden rounded-md border bg-muted">
-                  {itemDraft.mediaType === 'video' ? (
-                    <div className="flex aspect-video flex-col items-center justify-center gap-2 text-muted-foreground">
-                      <Film size={40} />
-                      <span className="text-sm font-semibold tracking-wide">
-                        MP4
-                      </span>
-                    </div>
-                  ) : (
-                    <img
-                      src={itemDraft.mediaUrl}
-                      alt=""
-                      className="mx-auto max-h-56 w-full object-contain"
-                    />
-                  )}
-                </div>
-              ) : null}
+            <>
+              <DialogHeader className="shrink-0 border-b px-6 py-4">
+                <button
+                  type="button"
+                  className="mb-2 inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  onClick={() => void requestLeaveItemPanel()}
+                >
+                  <ArrowLeft size={14} aria-hidden />
+                  Volver a la playlist
+                </button>
+                <DialogTitle>
+                  {itemDraft.id ? 'Editar ítem' : 'Nuevo ítem'}
+                </DialogTitle>
+                <DialogDescription>
+                  Duración en segundos para imagen/GIF. El video avanza al
+                  terminar.
+                  {playlistName.trim()
+                    ? ` · Playlist: ${playlistName.trim()}`
+                    : ''}
+                </DialogDescription>
+              </DialogHeader>
 
-              <div className="space-y-2">
-                <Label>URL del medio</Label>
-                <ScreenCastMediaUrlField
-                  value={itemDraft.mediaUrl}
-                  hasPortraitMonitors={
-                    playlistMonitorOrients.hasPortraitMonitors
-                  }
-                  hasLandscapeMonitors={
-                    playlistMonitorOrients.hasLandscapeMonitors
-                  }
-                  onChange={(url, type, meta) =>
-                    setItemDraft({
-                      ...itemDraft,
-                      mediaUrl: url,
-                      ...(type ? { mediaType: type } : {}),
-                      ...(type === 'video' &&
-                      meta?.durationMs &&
-                      meta.durationMs > 0
-                        ? { durationMs: meta.durationMs }
-                        : {}),
-                    })
-                  }
-                />
-              </div>
+              <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+                {itemDraft.mediaUrl.trim() ? (
+                  <div className="overflow-hidden rounded-md border bg-muted">
+                    {itemDraft.mediaType === 'video' ? (
+                      <div className="flex aspect-video flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <Film size={40} />
+                        <span className="text-sm font-semibold tracking-wide">
+                          MP4
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={itemDraft.mediaUrl}
+                        alt=""
+                        className="mx-auto max-h-56 w-full object-contain"
+                      />
+                    )}
+                  </div>
+                ) : null}
 
-              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Select
-                    value={itemDraft.mediaType}
-                    onValueChange={(v) =>
+                  <Label htmlFor="sc-item-media-url">URL del medio</Label>
+                  <ScreenCastMediaUrlField
+                    id="sc-item-media-url"
+                    value={itemDraft.mediaUrl}
+                    hasPortraitMonitors={
+                      playlistMonitorOrients.hasPortraitMonitors
+                    }
+                    hasLandscapeMonitors={
+                      playlistMonitorOrients.hasLandscapeMonitors
+                    }
+                    onChange={(url, type, meta) =>
                       setItemDraft({
                         ...itemDraft,
-                        mediaType: v as ScreenCastMediaType,
+                        mediaUrl: url,
+                        ...(type ? { mediaType: type } : {}),
+                        ...(type === 'video' &&
+                        meta?.durationMs &&
+                        meta.durationMs > 0
+                          ? { durationMs: meta.durationMs }
+                          : {}),
                       })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="image">Imagen (JPG/PNG)</SelectItem>
-                      <SelectItem value="gif">GIF</SelectItem>
-                      <SelectItem value="video">Video (MP4)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="dur-sec">Duración (segundos)</Label>
-                  <Input
-                    id="dur-sec"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={itemDurationSec}
-                    disabled={itemDraft.mediaType === 'video'}
-                    onChange={(e) => {
-                      const sec = Math.max(1, Number(e.target.value) || 1);
-                      setItemDraft({
-                        ...itemDraft,
-                        durationMs: sec * 1000,
-                      });
-                    }}
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {DURATION_PRESETS_SEC.map((sec) => (
-                      <Button
-                        key={sec}
-                        type="button"
-                        size="sm"
-                        variant={
-                          itemDraft.mediaType !== 'video' &&
-                          itemDurationSec === sec
-                            ? 'default'
-                            : 'outline'
-                        }
-                        disabled={itemDraft.mediaType === 'video'}
-                        onClick={() =>
-                          setItemDraft({
-                            ...itemDraft,
-                            durationMs: sec * 1000,
-                          })
-                        }
-                      >
-                        {sec}s
-                      </Button>
-                    ))}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={itemDraft.mediaType}
+                      onValueChange={(v) =>
+                        setItemDraft({
+                          ...itemDraft,
+                          mediaType: v as ScreenCastMediaType,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="image">Imagen (JPG/PNG)</SelectItem>
+                        <SelectItem value="gif">GIF</SelectItem>
+                        <SelectItem value="video">Video (MP4)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {itemDraft.mediaType === 'video' ? (
-                    <p className="text-xs text-muted">
-                      El video avanza al terminar (onEnded).
-                    </p>
-                  ) : null}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dur-sec">Duración (segundos)</Label>
+                    <Input
+                      id="dur-sec"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={itemDurationSec}
+                      disabled={itemDraft.mediaType === 'video'}
+                      onChange={(e) => {
+                        const sec = Math.max(1, Number(e.target.value) || 1);
+                        setItemDraft({
+                          ...itemDraft,
+                          durationMs: sec * 1000,
+                        });
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {DURATION_PRESETS_SEC.map((sec) => (
+                        <Button
+                          key={sec}
+                          type="button"
+                          size="sm"
+                          variant={
+                            itemDraft.mediaType !== 'video' &&
+                            itemDurationSec === sec
+                              ? 'default'
+                              : 'outline'
+                          }
+                          disabled={itemDraft.mediaType === 'video'}
+                          onClick={() =>
+                            setItemDraft({
+                              ...itemDraft,
+                              durationMs: sec * 1000,
+                            })
+                          }
+                        >
+                          {sec}s
+                        </Button>
+                      ))}
+                    </div>
+                    {itemDraft.mediaType === 'video' ? (
+                      <p className="text-xs text-muted">
+                        El video avanza al terminar (onEnded).
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
+
+                <SettingSwitchInline
+                  label="Activo"
+                  checked={itemDraft.activo}
+                  onCheckedChange={(v) =>
+                    setItemDraft({ ...itemDraft, activo: v })
+                  }
+                />
               </div>
 
-              <SettingSwitchInline
-                label="Activo"
-                checked={itemDraft.activo}
-                onCheckedChange={(v) =>
-                  setItemDraft({ ...itemDraft, activo: v })
-                }
-              />
-            </div>
-          ) : null}
+              <DialogFooter className="shrink-0 border-t px-6 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void requestLeaveItemPanel()}
+                >
+                  Descartar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={savingItem}
+                  onClick={() => void persistItem()}
+                >
+                  Guardar ítem
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader className="shrink-0 border-b px-6 py-4">
+                <DialogTitle>
+                  {editingPlaylistId ? 'Editar playlist' : 'Nueva playlist'}
+                </DialogTitle>
+                <DialogDescription>
+                  JPG, PNG, GIF, MP4 o MOV (iPhone → MP4). Pega una URL o elige
+                  desde S3. Arrastra las celdas para reordenar.
+                </DialogDescription>
+              </DialogHeader>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={closeItemDialog}>
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              disabled={savingItem || !itemDraft}
-              onClick={() => void persistItem()}
-            >
-              Guardar ítem
-            </Button>
-          </DialogFooter>
+              <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4">
+                {loadingPlaylist ? (
+                  <p className="text-sm text-muted">Cargando playlist…</p>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="pl-detail-name">Nombre</Label>
+                      <Input
+                        id="pl-detail-name"
+                        autoFocus={!editingPlaylistId}
+                        value={playlistName}
+                        placeholder="Ej. Lobby principal"
+                        onChange={(e) => setPlaylistName(e.target.value)}
+                      />
+                    </div>
+
+                    <SettingSwitchInline
+                      label="Animación entre imágenes (crossfade)"
+                      checked={playlistCrossfade}
+                      onCheckedChange={setPlaylistCrossfade}
+                      activeLabel="Activa"
+                      inactiveLabel="Inactiva"
+                    />
+
+                    <SettingSwitchInline
+                      label="Movimiento suave en cada imagen (Ken Burns)"
+                      checked={playlistKenBurns}
+                      onCheckedChange={setPlaylistKenBurns}
+                      activeLabel="Activa"
+                      inactiveLabel="Inactiva"
+                    />
+
+                    <div className="border-t pt-4">
+                      <h4 className="mb-3 font-medium">
+                        Ítems ({items.length})
+                      </h4>
+                      <DndContext
+                        sensors={itemSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={(event) => void handleItemDragEnd(event)}
+                      >
+                        <SortableContext
+                          items={items.map((item) => item.id)}
+                          strategy={rectSortingStrategy}
+                        >
+                          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            {items.map((item) => (
+                              <SortablePlaylistItemCard
+                                key={item.id}
+                                item={item}
+                                disabled={reordering}
+                                onEdit={() => openItemEdit(item)}
+                                onDuplicate={() => void duplicateItem(item)}
+                                onRemove={() => void removeItem(item)}
+                              />
+                            ))}
+                            <button
+                              id="sc-playlist-add-item"
+                              type="button"
+                              className="flex aspect-video cursor-pointer items-center justify-center rounded-md border border-dashed text-muted transition-colors hover:border-foreground/40 hover:text-foreground"
+                              onClick={() => void openItemCreate()}
+                            >
+                              <Plus size={28} aria-hidden />
+                              <span className="sr-only">Añadir ítem</span>
+                            </button>
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <DialogFooter className="shrink-0 border-t px-6 py-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closePlaylistEditor}
+                >
+                  Cerrar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={savingMeta || loadingPlaylist}
+                  onClick={() => void savePlaylistMeta()}
+                >
+                  {savingMeta
+                    ? 'Guardando…'
+                    : editingPlaylistId
+                      ? 'Guardar playlist'
+                      : 'Crear playlist'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
       <Dialog
         open={monitorDialogOpen}
         onOpenChange={(open) => {
-          if (!open) closeMonitorDialog();
-          else setMonitorDialogOpen(true);
+          if (!open) {
+            if (isFloatingLayerBlockingDismiss()) return;
+            closeMonitorDialog();
+            return;
+          }
+          setMonitorDialogOpen(true);
         }}
       >
         <DialogContent
           className="max-w-lg"
           onPointerDownOutside={(e) => {
+            if (isFloatingLayerBlockingDismiss()) {
+              e.preventDefault();
+              return;
+            }
             const t = e.target as HTMLElement | null;
             if (t?.closest('[data-slot="select-content"]')) e.preventDefault();
           }}
+          onFocusOutside={(e) => {
+            if (isFloatingLayerBlockingDismiss()) e.preventDefault();
+          }}
           onInteractOutside={(e) => {
+            if (isFloatingLayerBlockingDismiss()) {
+              e.preventDefault();
+              return;
+            }
             const t = e.target as HTMLElement | null;
             if (t?.closest('[data-slot="select-content"]')) e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            if (isFloatingLayerBlockingDismiss()) e.preventDefault();
           }}
         >
           <DialogHeader>
@@ -1875,7 +1990,11 @@ export function ScreenCastAdminPage() {
                     type="button"
                     variant="outline"
                     disabled={uploadingMonitorPhoto}
-                    onClick={() => monitorPhotoInputRef.current?.click()}
+                    onClick={() => {
+                      withNativeFilePickerGuard(() => {
+                        monitorPhotoInputRef.current?.click();
+                      });
+                    }}
                   >
                     {uploadingMonitorPhoto ? 'Subiendo…' : 'Subir foto'}
                   </Button>

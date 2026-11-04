@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Folder } from 'lucide-react';
 import type { S3ObjectItem } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { formatBytes } from '@/lib/format-bytes';
+import { notifyFloatingLayerOpen } from '@/lib/floating-layer';
 import { useToast } from '@/contexts/toast-context';
 import {
   Button,
@@ -34,6 +35,13 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
   const [prefix, setPrefix] = useState('');
   const [items, setItems] = useState<S3ObjectItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const layerRegisteredRef = useRef(false);
+
+  const releaseFloatingLayer = useCallback(() => {
+    if (!layerRegisteredRef.current) return;
+    layerRegisteredRef.current = false;
+    notifyFloatingLayerOpen(false);
+  }, []);
 
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -70,6 +78,25 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
     if (open && bucket) void loadObjects();
   }, [open, bucket, prefix, loadObjects]);
 
+  // Controlled `open` may skip Dialog onOpenChange(true); register while mounted open.
+  useEffect(() => {
+    if (!open) {
+      releaseFloatingLayer();
+      return;
+    }
+    if (!layerRegisteredRef.current) {
+      layerRegisteredRef.current = true;
+      notifyFloatingLayerOpen(true);
+    }
+    return () => releaseFloatingLayer();
+  }, [open, releaseFloatingLayer]);
+
+  function handleOpenChange(next: boolean) {
+    // Release synchronously on close so the same pointer/Escape cannot dismiss parents.
+    if (!next) releaseFloatingLayer();
+    onOpenChange(next);
+  }
+
   async function selectFile(item: S3ObjectItem) {
     if (!bucket || item.isFolder) return;
     try {
@@ -79,7 +106,7 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
         return;
       }
       onSelect(url);
-      onOpenChange(false);
+      handleOpenChange(false);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al obtener URL');
     }
@@ -104,8 +131,11 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="max-w-3xl"
+        onEscapeKeyDown={(e) => e.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle>Elegir de S3</DialogTitle>
           <DialogDescription>

@@ -25,3 +25,24 @@ export function isFloatingLayerBlockingDismiss(graceMs = 300) {
   }
   return performance.now() - closedAt < graceMs
 }
+
+/**
+ * Native OS file dialogs steal focus; register a floating layer so parent
+ * Radix Dialogs do not dismiss on the returning focus/click.
+ */
+export function withNativeFilePickerGuard(openPicker: () => void) {
+  notifyFloatingLayerOpen(true)
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    window.removeEventListener("focus", onWindowFocus)
+    notifyFloatingLayerOpen(false)
+  }
+  const onWindowFocus = () => {
+    window.setTimeout(release, 0)
+  }
+  window.addEventListener("focus", onWindowFocus)
+  window.setTimeout(release, 120_000)
+  openPicker()
+}

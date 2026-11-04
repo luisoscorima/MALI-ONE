@@ -2,11 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
+import { notifyFloatingLayerOpen } from '@/lib/floating-layer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +42,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ConfirmOptions>(EMPTY_OPTIONS);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
+  const layerRegisteredRef = useRef(false);
+
+  const releaseFloatingLayer = useCallback(() => {
+    if (!layerRegisteredRef.current) return;
+    layerRegisteredRef.current = false;
+    notifyFloatingLayerOpen(false);
+  }, []);
 
   const confirm = useCallback((next: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -51,11 +60,28 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const settle = useCallback((result: boolean) => {
-    resolveRef.current?.(result);
-    resolveRef.current = null;
-    setOpen(false);
-  }, []);
+  const settle = useCallback(
+    (result: boolean) => {
+      // Sync release so the same Escape/click cannot dismiss a parent Dialog.
+      releaseFloatingLayer();
+      resolveRef.current?.(result);
+      resolveRef.current = null;
+      setOpen(false);
+    },
+    [releaseFloatingLayer],
+  );
+
+  useEffect(() => {
+    if (!open) {
+      releaseFloatingLayer();
+      return;
+    }
+    if (!layerRegisteredRef.current) {
+      layerRegisteredRef.current = true;
+      notifyFloatingLayerOpen(true);
+    }
+    return () => releaseFloatingLayer();
+  }, [open, releaseFloatingLayer]);
 
   const value = useMemo(() => ({ confirm }), [confirm]);
 

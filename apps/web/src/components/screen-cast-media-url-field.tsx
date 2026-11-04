@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react';
 import { FolderOpen, Loader2, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
+import { withNativeFilePickerGuard } from '@/lib/floating-layer';
 import { useToast } from '@/contexts/toast-context';
 import { cn } from '@/lib/utils';
 import {
@@ -138,6 +139,14 @@ export function ScreenCastMediaUrlField({
     void uploadFile(file);
   }
 
+  /** Native file dialog steals focus; keep parent Radix dialogs from closing. */
+  function openNativeFilePicker() {
+    if (uploading) return;
+    withNativeFilePickerGuard(() => {
+      inputRef.current?.click();
+    });
+  }
+
   function handleDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragOver(false);
@@ -189,7 +198,7 @@ export function ScreenCastMediaUrlField({
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                inputRef.current?.click();
+                openNativeFilePicker();
               }
             }}
             onDragEnter={(e) => {
@@ -206,7 +215,7 @@ export function ScreenCastMediaUrlField({
             }}
             onDrop={handleDrop}
             onClick={() => {
-              if (!uploading) inputRef.current?.click();
+              openNativeFilePicker();
             }}
             className={cn(
               'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors',
@@ -239,7 +248,7 @@ export function ScreenCastMediaUrlField({
               disabled={uploading}
               onClick={(e) => {
                 e.stopPropagation();
-                inputRef.current?.click();
+                openNativeFilePicker();
               }}
             >
               <Upload size={14} />
