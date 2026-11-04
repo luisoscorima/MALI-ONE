@@ -96,7 +96,7 @@ export const APP_MODULES: {
   },
   {
     id: 'treasury',
-    label: 'Tesorería y conciliación',
+    label: 'Verificación de pagos',
     description: 'Configurar entidades, cuentas y comercios para el control de ingresos.',
   },
 ];

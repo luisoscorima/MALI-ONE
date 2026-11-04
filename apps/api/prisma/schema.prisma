@@ -84,6 +84,57 @@ model TreasuryTarget {
   @@unique([sourceId, reference, currency])
 }
 
+model NiubizSyncState {
+  id         String   @id
+  runId      String?
+  status     String   @default("idle")
+  startedAt  DateTime?
+  finishedAt DateTime?
+  leaseUntil DateTime?
+  fromDate   String?
+  toDate     String?
+  errorCode  String?
+  results    Json     @default("[]")
+}
+
+model TreasuryPaymentImport {
+  id          String   @id @default(cuid())
+  provider    TreasuryProvider
+  origin      String   @db.VarChar(32)
+  checksum    String   @db.VarChar(64)
+  rowCount    Int
+  createdCount Int
+  updatedCount Int
+  actorId     String
+  createdAt   DateTime @default(now())
+  payments    TreasuryPayment[]
+
+  @@index([createdAt])
+}
+
+model TreasuryPayment {
+  id              String @id @default(cuid())
+  provider        TreasuryProvider
+  merchantCode    String @db.VarChar(64)
+  merchantName    String @db.VarChar(200)
+  transactionCode String @db.VarChar(100)
+  orderNumber     String @db.VarChar(100)
+  customerName    String @db.VarChar(250)
+  currency        TreasuryCurrency
+  amount          Decimal @db.Decimal(18, 2)
+  status          String @db.VarChar(80)
+  transactedAt    DateTime
+  settledOn       DateTime? @db.Date
+  lastImportId    String
+  lastImport      TreasuryPaymentImport @relation(fields: [lastImportId], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([provider, merchantCode, transactionCode])
+  @@index([transactedAt, id])
+  @@index([merchantCode, status])
+}
+
 enum TodoPriority {
   low
   medium

@@ -22,6 +22,12 @@ RUN pnpm --filter @mali-one/shared build
 RUN pnpm --filter @mali-one/api prisma:generate
 RUN pnpm --filter @mali-one/api build
 
+FROM node:24-bookworm-slim AS niubiz-tools
+WORKDIR /opt/niubiz
+COPY scripts/niubiz-runtime/package*.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
+COPY scripts/niubiz-runtime/login.cjs ./
+
 FROM node:20-bookworm-slim AS runner
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
@@ -33,6 +39,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
 ENV NODE_ENV=production
+COPY --from=niubiz-tools /usr/local/bin/node /opt/niubiz/node
+COPY --from=niubiz-tools /opt/niubiz /opt/niubiz
+ENV NIUBIZ_RUNTIME_NODE=/opt/niubiz/node
+ENV NIUBIZ_LOGIN_SCRIPT=/opt/niubiz/login.cjs
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/niubiz/browsers
+RUN /opt/niubiz/node /opt/niubiz/node_modules/playwright/cli.js install --with-deps chromium
 
 COPY --from=builder /app/package.json /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/packages/shared ./packages/shared

@@ -27,6 +27,7 @@ export const moduleMeta: Record<
     icon: typeof Link2;
     group:
       | 'operaciones'
+      | 'finanzas'
       | 'contenido'
       | 'crms'
       | 'widgets'
@@ -35,7 +36,7 @@ export const moduleMeta: Record<
     accent: ModuleCardAccent;
   }
 > = {
-  treasury: { to: '/treasury', icon: Landmark, group: 'operaciones', accent: 'emerald' },
+  treasury: { to: '/treasury', icon: Landmark, group: 'finanzas', accent: 'emerald' },
   portfolio: {
     to: '/portfolio',
     icon: ListTodo,
@@ -143,6 +144,7 @@ export const moduleMeta: Record<
 
 export const groupLabels: Record<string, string> = {
   general: 'General',
+  finanzas: 'Finanzas',
   operaciones: 'Operaciones',
   contenido: 'Contenido',
   crms: 'CRMs',

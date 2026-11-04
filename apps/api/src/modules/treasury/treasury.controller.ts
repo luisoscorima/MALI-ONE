@@ -1,13 +1,36 @@
-import { Body, Controller, Get, Param, Post, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule, User } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
-import { TreasurySourceInputDto, TreasuryTargetInputDto } from './dto/treasury.dto';
+import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto } from './dto/treasury.dto';
+import { TreasuryPaymentsService } from './treasury-payments.service';
 import { TreasuryService } from './treasury.service';
+import { NiubizSyncService } from './niubiz-sync.service';
+import { Roles } from '../../core/guards/roles.decorator';
 
 @Controller('treasury')
 @RequireModule(AppModule.treasury)
 export class TreasuryController {
-  constructor(private readonly treasury: TreasuryService) {}
+  constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService, private readonly niubiz: NiubizSyncService) {}
+
+  @Get('niubiz/status')
+  niubizStatus() { return this.niubiz.status(); }
+
+  @Post('niubiz/sync')
+  @Roles('admin')
+  syncNiubiz(@Req() req: { user: User }, @Body() body: TreasuryPaymentQueryDto) {
+    return this.niubiz.start({ from: body.from, to: body.to }, req.user);
+  }
+
+  @Get('payments')
+  listPayments(@Query() query: TreasuryPaymentQueryDto) { return this.payments.list(query); }
+
+  @Post('payments/import-niubiz')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  importNiubiz(@Req() req: { user: User }, @UploadedFile() file?: Express.Multer.File) {
+    if (!file?.buffer || !file.originalname.toLowerCase().endsWith('.xlsx')) throw new BadRequestException('Selecciona el exportado XLSX de Niubiz.');
+    return this.payments.importXlsx(req.user, file.buffer);
+  }
 
   @Get()
   overview() {

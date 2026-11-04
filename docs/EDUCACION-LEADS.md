@@ -18,6 +18,8 @@ el texto visible del mensaje.
 
 Estados del asesor y del ciclo: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md).
 
+Backlog de requerimientos (Sheet → CRM, fases y RQs): [EDUCACION-REQUERIMIENTOS-LEADS.md](./EDUCACION-REQUERIMIENTOS-LEADS.md).
+
 ## Operación en CRM Educación
 
 La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp, no sobre captaciones sueltas:

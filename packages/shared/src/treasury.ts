@@ -13,6 +13,18 @@ export type TreasuryProvider = (typeof TREASURY_PROVIDERS)[number]['id'];
 export type TreasuryTargetKind = 'bank_account' | 'merchant';
 export type TreasuryCurrency = 'PEN' | 'USD';
 
+export interface TreasuryPaymentsDto {
+  total: number; page: number; pageSize: number;
+  lastImport: { createdAt: string; rowCount: number; origin: string } | null;
+  merchants: { merchantCode: string; merchantName: string }[];
+  states: string[];
+  payments: {
+    id: string; merchantCode: string; merchantName: string; transactionCode: string;
+    orderNumber: string; customerName: string; currency: TreasuryCurrency;
+    amount: string; status: string; transactedAt: string; settledOn: string | null; updatedAt: string;
+  }[];
+}
+
 export interface TreasurySourceInput {
   provider: TreasuryProvider;
   name: string;
@@ -40,6 +52,17 @@ export interface TreasurySourceDto extends TreasurySourceInput {
   targets: TreasuryTargetDto[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NiubizSyncStatusDto {
+  configured: boolean;
+  scheduled: boolean;
+  merchantCount: number;
+  lastRun: null | {
+    runId: string | null; status: string; startedAt: string | null; finishedAt: string | null;
+    fromDate: string | null; toDate: string | null; errorCode: string | null;
+    results: { merchant: string; status: string; rows?: number; createdCount?: number; updatedCount?: number }[];
+  };
 }
 
 export interface TreasuryOverviewDto {

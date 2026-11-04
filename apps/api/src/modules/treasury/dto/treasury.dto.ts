@@ -1,8 +1,23 @@
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsString, Length, Matches } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsString, Length, Matches, IsOptional, IsInt, Min, Max, IsDateString } from 'class-validator';
 import { TreasuryCurrency, TreasuryProvider } from '@prisma/client';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
+
+export class TreasuryPaymentQueryDto {
+  @IsOptional() @Transform(trim) @IsString() @Length(0, 250)
+  q?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000)
+  page?: number;
+  @IsOptional() @Matches(/^\d{9}$/)
+  merchant?: string;
+  @IsOptional() @IsString() @Length(1, 80)
+  status?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true })
+  from?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true })
+  to?: string;
+}
 
 export class TreasurySourceInputDto {
   @IsEnum(TreasuryProvider)

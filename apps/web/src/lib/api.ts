@@ -267,6 +267,14 @@ type EducacionDistritoDto = {
 };
 
 export const api = {
+    niubizStatus: () => request<import('@mali-one/shared').NiubizSyncStatusDto>('/api/treasury/niubiz/status'),
+    syncNiubiz: (range: { from?: string; to?: string }) => request<{ runId: string }>('/api/treasury/niubiz/sync', { method: 'POST', body: JSON.stringify(range) }),
+  treasuryPayments: (params: URLSearchParams) => request<import('@mali-one/shared').TreasuryPaymentsDto>(`/api/treasury/payments?${params}`),
+  importNiubizPayments: (file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return request<{ rows: number; createdCount: number; updatedCount: number; unchangedCount: number }>('/api/treasury/payments/import-niubiz', { method: 'POST', body });
+  },
   treasuryOverview: () => request<import('@mali-one/shared').TreasuryOverviewDto>('/api/treasury'),
   saveTreasurySource: (body: import('@mali-one/shared').TreasurySourceInput, id?: string) =>
     request<{ id: string }>(`/api/treasury/sources${id ? `/${encodeURIComponent(id)}` : ''}`, {

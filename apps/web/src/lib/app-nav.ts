@@ -46,9 +46,14 @@ export const appNavSections: AppNavSection[] = [
     ],
   },
   {
+    label: 'Finanzas',
+    items: [
+      { to: '/treasury', label: 'Verificación de pagos', icon: Landmark, module: 'treasury' },
+    ],
+  },
+  {
     label: 'Operaciones',
     items: [
-      { to: '/treasury', label: 'Tesorería y conciliación', icon: Landmark, module: 'treasury' },
       { to: '/links', label: 'Enlaces y QR', icon: Link2, module: 'links' },
       {
         to: '/admin/users',
