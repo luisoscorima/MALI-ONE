@@ -3,8 +3,7 @@ import {
   WhatsAppCrmClientError,
   WhatsappCrmClientService,
 } from '../crm/whatsapp-crm-client.service';
-
-const AREAS = ['educacion', 'educacion_ca', 'educacion_ep'] as const;
+import { EDUCATION_WRITE_AREA, toWhatsAppAreaQuery } from './education-scope';
 
 function pageNumber(raw: string | undefined, fallback: number, maximum: number): number {
   if (raw === undefined) return fallback;
@@ -26,12 +25,16 @@ export class CrmEducacionService {
   }
 
   contacts(query: {
-    area?: string; q?: string; segment?: string; attr_key?: string;
+    categoria?: string; q?: string; segment?: string; attr_key?: string;
     attr_value?: string; page?: string; limit?: string;
   }) {
     this.ensureConfigured();
     return this.crm.fetchEducationContacts({
-      ...query,
+      area: toWhatsAppAreaQuery(query.categoria),
+      q: query.q,
+      segment: query.segment,
+      attr_key: query.attr_key,
+      attr_value: query.attr_value,
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 2000),
     });
@@ -44,7 +47,7 @@ export class CrmEducacionService {
     attributes?: Record<string, string>;
   }) {
     this.ensureConfigured();
-    if (!AREAS.includes(body.area as (typeof AREAS)[number])) {
+    if (body.area !== EDUCATION_WRITE_AREA) {
       throw new BadRequestException('Área de educación inválida');
     }
     const { area, ...changes } = body;
@@ -53,43 +56,51 @@ export class CrmEducacionService {
 
   async catalogs() {
     this.ensureConfigured();
-    const entries = await Promise.all(AREAS.map(async (area) => {
-      const [attributes, segments] = await Promise.all([
-        this.crm.fetchAttributeDefinitions(area),
-        this.crm.fetchSegments(area),
-      ]);
-      return { area, attributes, segments };
-    }));
+    const area = EDUCATION_WRITE_AREA;
+    const [attributes, segments] = await Promise.all([
+      this.crm.fetchAttributeDefinitions(area),
+      this.crm.fetchSegments(area),
+    ]);
     return {
-      attributes: entries.flatMap(({ area, attributes }) => attributes.map((item) => ({ ...item, area }))),
-      segments: entries.flatMap(({ area, segments }) => segments.map((item) => ({ ...item, area }))),
+      attributes: attributes.map((item) => ({ ...item, area })),
+      segments: segments.map((item) => ({ ...item, area })),
     };
   }
 
-  leads(query: { area?: string; channel?: string; q?: string; view?: string;
+  leads(query: { categoria?: string; channel?: string; q?: string; view?: string;
     unassigned?: string; page?: string; limit?: string }) {
     this.ensureConfigured();
     return this.crm.fetchEducationLeads({
-      ...query,
+      area: toWhatsAppAreaQuery(query.categoria),
+      channel: query.channel,
+      q: query.q,
+      view: query.view,
       unassigned: query.unassigned === 'true',
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 200),
     });
   }
 
-  cycles(query: { area?: string; channel?: string; q?: string; view?: string;
+  cycles(query: { categoria?: string; channel?: string; q?: string; view?: string;
     page?: string; limit?: string }) {
     this.ensureConfigured();
     return this.crm.fetchEducationCycles({
-      ...query,
+      area: toWhatsAppAreaQuery(query.categoria),
+      channel: query.channel,
+      q: query.q,
+      view: query.view,
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 200),
     });
   }
 
-  sla(query: { area?: string; from?: string; to?: string }) {
+  sla(query: { categoria?: string; from?: string; to?: string }) {
     this.ensureConfigured();
-    return this.crm.fetchEducationSla(query);
+    return this.crm.fetchEducationSla({
+      area: toWhatsAppAreaQuery(query.categoria),
+      from: query.from,
+      to: query.to,
+    });
   }
 
   managementCatalogs() {
@@ -125,7 +136,7 @@ export class CrmEducacionService {
     lead_id?: number;
   }, actorEmail: string) {
     this.ensureConfigured();
-    if (!AREAS.includes(body.area as (typeof AREAS)[number])) {
+    if (body.area !== EDUCATION_WRITE_AREA) {
       throw new BadRequestException('Área de educación inválida');
     }
     const { area, ...changes } = body;
@@ -179,15 +190,23 @@ export class CrmEducacionService {
     }
   }
 
-  distribute(params: { area: string; channel?: string; q?: string }, actorEmail: string) {
+  distribute(params: { categoria: string; channel?: string; q?: string }, actorEmail: string) {
     this.ensureConfigured();
-    return this.crm.distributeEducation({ ...params, actor_email: actorEmail });
+    return this.crm.distributeEducation({
+      area: toWhatsAppAreaQuery(params.categoria),
+      channel: params.channel,
+      q: params.q,
+      actor_email: actorEmail,
+    });
   }
 
   review(id: number, body: {
     area: string; action: 'open_new' | 'keep_existing' | 'dismiss';
   }, actorEmail: string) {
     this.ensureConfigured();
+    if (body.area !== EDUCATION_WRITE_AREA) {
+      throw new BadRequestException('Área de educación inválida');
+    }
     return this.crm.reviewEducationEntry(id, body.area, body.action, actorEmail);
   }
 }

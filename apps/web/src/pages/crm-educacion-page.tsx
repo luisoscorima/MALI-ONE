@@ -6,8 +6,8 @@ import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import {
-  api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationContact,
-  type EducationCycle, type EducationCycleCounts, type EducationCycleView,
+  api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationCategoryScope,
+  type EducationContact, type EducationCycle, type EducationCycleCounts, type EducationCycleView,
   type EducationLead, type EducationManagementCatalog, type EducationSlaReport,
 } from '@/lib/api';
 import {
@@ -18,22 +18,30 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
 
-const AREA_LABELS: Record<EducationArea, string> = {
-  educacion: 'Educación',
-  educacion_ca: 'Educación CA',
-  educacion_ep: 'Educación EP',
-};
-const AREAS = Object.keys(AREA_LABELS) as EducationArea[];
+const EDUCATION_AREA: EducationArea = 'educacion';
 
-/** Alcance de catálogos/mutaciones: CA/EP canónico se gestiona como educacion_ca/ep. */
-function managementAreaOf(area: string, categoria?: string | null): EducationArea {
-  const program = String(categoria ?? '').trim().toLowerCase();
-  if (program === 'ca') return 'educacion_ca';
-  if (program === 'ep') return 'educacion_ep';
-  if (area === 'educacion_ca' || area === 'educacion_ep' || area === 'educacion') {
-    return area;
-  }
-  return 'educacion';
+const CATEGORY_SCOPE_LABELS: Record<EducationCategoryScope, string> = {
+  all: 'Todas',
+  general: 'General',
+  ca: 'CA',
+  ep: 'EP',
+};
+const CATEGORY_SCOPES = Object.keys(CATEGORY_SCOPE_LABELS) as EducationCategoryScope[];
+
+function categoryLabel(categoria?: string | null, categorias?: string[] | null) {
+  const value = String(categoria ?? categorias?.[0] ?? '').trim().toLowerCase();
+  if (value === 'ca') return 'CA';
+  if (value === 'ep') return 'EP';
+  if (value === 'general') return 'General';
+  if (!value) return 'General';
+  return value.toUpperCase();
+}
+
+function worksEducation(areas: string[]) {
+  return areas.includes(EDUCATION_AREA)
+    || areas.includes('educacion_ca')
+    || areas.includes('educacion_ep')
+    || areas.length === 0;
 }
 const CHANNEL_LABELS: Record<string, string> = {
   meta_lead_form: 'Formulario Meta', meta_ctwa: 'Anuncio a WhatsApp',
@@ -51,7 +59,6 @@ const SALE_MISSING_LABELS: Record<string, string> = {
 
 type SaleReadyPrompt = {
   contactId: number;
-  area: EducationArea;
   leadId?: number;
   leadStatusId: number;
   missing: string[];
@@ -83,13 +90,13 @@ const EMPTY_MANUAL_LEAD: ManualLeadDraft = {
   curso: '',
 };
 const FIXED_COLUMNS = [
-  ['name', 'Nombre'], ['area', 'Número'], ['last_name', 'Apellido'],
+  ['name', 'Nombre'], ['categoria', 'Categoría'], ['last_name', 'Apellido'],
   ['phone', 'Teléfono'], ['prospectia', 'Prospectia'], ['wa_identity', 'Usuario WhatsApp'], ['email', 'Email'], ['dni', 'DNI'],
   ['segments', 'Segmentos'], ['advisor', 'Asesor'], ['lead_status', 'Estado del lead'],
 ] as const;
-const STORAGE_KEY = 'crm-educacion-contact-cols-v4';
-const PREVIOUS_STORAGE_KEY = 'crm-educacion-contact-cols-v3';
-const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v2';
+const STORAGE_KEY = 'crm-educacion-contact-cols-v5';
+const PREVIOUS_STORAGE_KEY = 'crm-educacion-contact-cols-v4';
+const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v3';
 const PAGE_SIZE = 50;
 
 function storedColumns(): Set<string> {
@@ -98,6 +105,7 @@ function storedColumns(): Set<string> {
     const value = JSON.parse(saved ?? localStorage.getItem(PREVIOUS_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY) ?? 'null');
     if (Array.isArray(value)) {
       const visible = new Set(value.filter((v): v is string => typeof v === 'string'));
+      if (visible.has('area')) { visible.delete('area'); visible.add('categoria'); }
       if (!saved) { visible.add('wa_identity'); visible.add('prospectia'); }
       return visible;
     }
@@ -117,16 +125,19 @@ const LEAD_STATUS_PATH = ['por_contactar', 'contactado', 'evaluando', 'promesa',
 const LEAD_STATUS_EXITS = ['no_contesta', 'no_interesado', 'perdido'] as const;
 
 function LeadStatusSelect({
-  area, value, disabled, statuses, onChange, className,
+  value, disabled, statuses, onChange, className,
 }: {
-  area: EducationArea;
   value: string;
   disabled: boolean;
   statuses: EducationManagementCatalog['statuses'];
   onChange: (value: string) => void;
   className?: string;
 }) {
-  const ofArea = statuses.filter((status) => status.area === area);
+  const ofArea = statuses.filter((status) =>
+    status.area === EDUCATION_AREA
+    || status.area === 'educacion_ca'
+    || status.area === 'educacion_ep'
+  );
   const bySlug = (slugs: readonly string[]) => slugs
     .map((slug) => ofArea.find((status) => status.slug === slug))
     .filter((status): status is (typeof ofArea)[number] => Boolean(status));
@@ -169,7 +180,7 @@ type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email'
 export function CrmEducacionPage() {
   const toast = useToast();
   const [tab, setTab] = useState('contacts');
-  const [area, setArea] = useState<EducationArea | 'all'>('all');
+  const [categoria, setCategoria] = useState<EducationCategoryScope>('all');
   const [catalog, setCatalog] = useState<EducationCatalog>({ attributes: [], segments: [] });
   const [contacts, setContacts] = useState<EducationContact[]>([]);
   const [contactTotal, setContactTotal] = useState(0);
@@ -256,9 +267,9 @@ export function CrmEducacionPage() {
   }, [opportunityQ]);
 
   const contactParams = useMemo(() => ({
-    area, q: debouncedContactQ, segment, attr_key: attrKey,
+    categoria, q: debouncedContactQ, segment, attr_key: attrKey,
     attr_value: debouncedAttrValue, page: contactPage, limit: PAGE_SIZE,
-  }), [area, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage]);
+  }), [categoria, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage]);
   const loadContacts = useCallback(async () => {
     const requestId = ++contactRequestId.current;
     setContactLoading(true);
@@ -279,9 +290,9 @@ export function CrmEducacionPage() {
   }, [contactParams]);
   useEffect(() => { void loadContacts(); }, [loadContacts]);
   const cycleParams = useMemo(() => ({
-    area, channel, q: debouncedOpportunityQ, view: opportunityView,
+    categoria, channel, q: debouncedOpportunityQ, view: opportunityView,
     page: cyclePage, limit: PAGE_SIZE,
-  }), [area, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
+  }), [categoria, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
   const loadCycles = useCallback(async () => {
     const requestId = ++cycleRequestId.current;
     setCycleLoading(true);
@@ -305,7 +316,7 @@ export function CrmEducacionPage() {
     const requestId = ++slaRequestId.current;
     setSlaError('');
     try {
-      const data = await api.getCrmEducationSla({ area });
+      const data = await api.getCrmEducationSla({ categoria });
       if (requestId !== slaRequestId.current) return;
       setSla(data);
     } catch (error) {
@@ -313,7 +324,7 @@ export function CrmEducacionPage() {
       setSla(null);
       setSlaError(error instanceof Error ? error.message : 'No se pudo cargar el SLA');
     }
-  }, [area]);
+  }, [categoria]);
   useEffect(() => { void loadSla(); }, [loadSla]);
 
   const loadReviewEntries = useCallback(async () => {
@@ -322,7 +333,7 @@ export function CrmEducacionPage() {
     setReviewEntryError('');
     try {
       const data = await api.listCrmEducationLeads({
-        area, channel, q: debouncedOpportunityQ, view: 'conflict',
+        categoria, channel, q: debouncedOpportunityQ, view: 'conflict',
         page: reviewEntryPage, limit: PAGE_SIZE,
       });
       if (requestId !== reviewEntryRequestId.current) return;
@@ -334,12 +345,11 @@ export function CrmEducacionPage() {
     } finally {
       if (requestId === reviewEntryRequestId.current) setReviewEntryLoading(false);
     }
-  }, [area, channel, debouncedOpportunityQ, reviewEntryPage]);
+  }, [categoria, channel, debouncedOpportunityQ, reviewEntryPage]);
   useEffect(() => { void loadReviewEntries(); }, [loadReviewEntries]);
 
   const seedSaleReadyPrompt = useCallback((
     contactId: number,
-    contactArea: EducationArea,
     leadStatusId: number,
     leadId: number | undefined,
     missing: string[],
@@ -349,7 +359,6 @@ export function CrmEducacionPage() {
       && (leadId == null || item.id === leadId));
     return {
       contactId,
-      area: contactArea,
       leadId,
       leadStatusId,
       missing,
@@ -360,11 +369,11 @@ export function CrmEducacionPage() {
     };
   }, [contacts, cycles]);
 
-  const updateManagement = useCallback(async (contactId: number, contactArea: EducationArea,
+  const updateManagement = useCallback(async (contactId: number,
     changes: { assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number }) => {
     setManagementSaving(true);
     try {
-      await api.patchCrmEducationManagement(contactId, { area: contactArea, ...changes });
+      await api.patchCrmEducationManagement(contactId, { area: EDUCATION_AREA, ...changes });
       toast.success('Lead actualizado');
       setSaleReadyPrompt(null);
       await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
@@ -376,7 +385,6 @@ export function CrmEducacionPage() {
       ) {
         setSaleReadyPrompt(seedSaleReadyPrompt(
           contactId,
-          contactArea,
           changes.lead_status_id,
           changes.lead_id,
           error.missing_fields ?? [],
@@ -438,14 +446,14 @@ export function CrmEducacionPage() {
     setSaleReadySaving(true);
     try {
       await api.patchCrmEducationContact(saleReadyPrompt.contactId, {
-        area: saleReadyPrompt.area,
+        area: EDUCATION_AREA,
         name: saleReadyPrompt.name,
         last_name: saleReadyPrompt.last_name,
         email: saleReadyPrompt.email || null,
         dni: saleReadyPrompt.dni || null,
       });
       await api.patchCrmEducationManagement(saleReadyPrompt.contactId, {
-        area: saleReadyPrompt.area,
+        area: EDUCATION_AREA,
         lead_status_id: saleReadyPrompt.leadStatusId,
         ...(saleReadyPrompt.leadId ? { lead_id: saleReadyPrompt.leadId } : {}),
       });
@@ -468,7 +476,7 @@ export function CrmEducacionPage() {
   const reviewLead = useCallback(async (lead: EducationLead,
     action: 'open_new' | 'keep_existing' | 'dismiss') => {
     try {
-      await api.reviewCrmEducationLead(lead.id, { area: lead.area, action });
+      await api.reviewCrmEducationLead(lead.id, { area: EDUCATION_AREA, action });
       toast.success('Conflicto resuelto');
       await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo revisar el conflicto'); }
@@ -521,7 +529,7 @@ export function CrmEducacionPage() {
   async function distributeLeads() {
     setDistributing(true);
     try {
-      const result = await api.distributeCrmEducation({ area, channel, q: debouncedOpportunityQ });
+      const result = await api.distributeCrmEducation({ categoria, channel, q: debouncedOpportunityQ });
       toast.success(`${result.assigned} leads asignados`);
       await Promise.all([loadContacts(), loadCycles(), loadReviewEntries()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudieron asignar los leads'); }
@@ -529,17 +537,22 @@ export function CrmEducacionPage() {
   }
 
   const areaAttributes = useMemo(() => catalog.attributes.filter((d) =>
-    d.active && !d.segment_slug && (area === 'all' || d.area === area) &&
+    d.active && !d.segment_slug && d.area === EDUCATION_AREA &&
     !['dni', 'email', 'correo'].includes(d.slug),
-  ).sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)), [catalog, area]);
-  const segments = useMemo(() => catalog.segments.filter((s) => area === 'all' || s.area === area), [catalog, area]);
+  ).sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label)), [catalog]);
+  const segments = useMemo(() => catalog.segments.filter((s) => s.area === EDUCATION_AREA), [catalog]);
   const segmentOptions = useMemo(() => [...new Set(segments.map((s) => s.slug))], [segments]);
   const attrOptions = useMemo(() => [...new Set(areaAttributes.map((d) => d.slug))], [areaAttributes]);
+  const educationAdvisors = useMemo(
+    () => managementCatalog.advisors.filter((advisor) => worksEducation(advisor.areas)),
+    [managementCatalog.advisors],
+  );
 
   const contactColumns = useMemo<ColumnDef<EducationContact>[]>(() => {
     const cols: ColumnDef<EducationContact>[] = [];
     if (visible.has('name')) cols.push({ id: 'name', header: 'Nombre', cell: ({ row }) => row.original.name || '—' });
-    cols.push({ id: 'area', header: 'Número', cell: ({ row }) => <Badge variant="secondary">{AREA_LABELS[row.original.area]}</Badge> });
+    cols.push({ id: 'categoria', header: 'Categoría', cell: ({ row }) =>
+      <Badge variant="secondary">{categoryLabel(row.original.categoria, row.original.categorias)}</Badge> });
     if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
     if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
     if (visible.has('prospectia')) cols.push({ id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
@@ -554,7 +567,7 @@ export function CrmEducacionPage() {
     if (visible.has('segments')) cols.push({
       id: 'segments', header: 'Segmentos', cell: ({ row }) => row.original.segment_slugs.length ?
         <div className="flex flex-wrap gap-1">{row.original.segment_slugs.map((slug) => <Badge key={slug} variant="outline">
-          {catalog.segments.find((s) => s.area === row.original.area && s.slug === slug)?.label ?? slug}
+          {catalog.segments.find((s) => s.area === EDUCATION_AREA && s.slug === slug)?.label ?? slug}
         </Badge>)}</div> : '—',
     });
     if (visible.has('advisor')) cols.push({ id: 'advisor', header: 'Asesor',
@@ -562,18 +575,19 @@ export function CrmEducacionPage() {
     if (visible.has('lead_status')) cols.push({ id: 'lead_status', header: 'Estado del lead',
       cell: ({ row }) => row.original.lead_status_label || '—' });
     for (const definition of areaAttributes) {
-      const key = `attr:${definition.area}:${definition.slug}`;
-      if (!visible.has(key)) continue;
+      const key = `attr:${definition.slug}`;
+      if (!visible.has(key) && !visible.has(`attr:${definition.area}:${definition.slug}`)) continue;
       cols.push({
-        id: key, header: `${AREA_LABELS[definition.area]} · ${definition.label}`,
-        cell: ({ row }) => row.original.area === definition.area ? row.original.attributes[definition.slug] || '—' : '—'
+        id: key, header: definition.label,
+        cell: ({ row }) => row.original.attributes[definition.slug] || '—',
       });
     }
     return cols;
   }, [visible, areaAttributes, catalog.segments]);
 
   const cycleColumns = useMemo<ColumnDef<EducationCycle>[]>(() => [
-    { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
+    { id: 'categoria', header: 'Categoría', cell: ({ row }) =>
+      categoryLabel(row.original.categoria) },
     {
       id: 'person', header: 'Contacto', cell: ({ row }) => {
         const cycle = row.original;
@@ -603,46 +617,42 @@ export function CrmEducacionPage() {
     } },
     { id: 'advisor', header: 'Asesor', cell: ({ row }) => {
       const cycle = row.original;
-      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return <Select value={cycle.assigned_user_id ? String(cycle.assigned_user_id) : '__none__'}
         disabled={Boolean(cycle.closed_at) || managementSaving}
-        onValueChange={(value) => void updateManagement(cycle.contact_id, scope,
+        onValueChange={(value) => void updateManagement(cycle.contact_id,
           { assigned_user_id: Number(value), lead_id: cycle.id })}>
         <SelectTrigger className="min-w-40"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__" disabled>Sin asignar</SelectItem>
-          {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(scope))
-            .map((advisor) => <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
+          {educationAdvisors.map((advisor) =>
+            <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
         </SelectContent>
       </Select>;
     } },
     { id: 'status', header: 'Estado del lead', cell: ({ row }) => {
       const cycle = row.original;
-      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return <LeadStatusSelect
-        area={scope}
         className="min-w-40"
         value={cycle.lead_status_id ? String(cycle.lead_status_id) : '__none__'}
         disabled={Boolean(cycle.closed_at) || managementSaving}
         statuses={managementCatalog.statuses}
-        onChange={(value) => void updateManagement(cycle.contact_id, scope,
+        onChange={(value) => void updateManagement(cycle.contact_id,
           { lead_status_id: value === '__none__' ? null : Number(value), lead_id: cycle.id })}
       />;
     } },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
     { id: 'actions', header: 'Revisión', cell: ({ row }) => {
       const cycle = row.original;
-      const scope = managementAreaOf(cycle.area, cycle.categoria);
       return cycle.requires_review && cycle.assigned_user_id && !cycle.closed_at
         ? <Button size="sm" variant="outline" disabled={managementSaving}
-          onClick={() => void updateManagement(cycle.contact_id, scope,
+          onClick={() => void updateManagement(cycle.contact_id,
             { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
         : '—';
     } },
-  ], [managementCatalog, managementSaving, updateManagement]);
+  ], [educationAdvisors, managementCatalog.statuses, managementSaving, updateManagement]);
 
   const reviewEntryColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
-    { id: 'area', header: 'Número', cell: ({ row }) => AREA_LABELS[row.original.area] },
+    { id: 'area', header: 'Área', cell: () => 'Educación' },
     { id: 'person', header: 'Contacto', cell: ({ row }) => {
       const lead = row.original;
       const name = [lead.contacts?.name, lead.contacts?.last_name].filter(Boolean).join(' ');
@@ -672,14 +682,14 @@ export function CrmEducacionPage() {
     </div> },
   ], [reviewLead]);
 
-  function changeArea(value: string) {
-    setArea(value as EducationArea | 'all');
+  function changeCategoria(value: string) {
+    setCategoria(value as EducationCategoryScope);
     setContactPage(1); setCyclePage(1); setReviewEntryPage(1);
     setSegment(''); setAttrKey(''); setAttrValue('');
     setExpandedId(null);
   }
   function toggleColumn(key: string) {
-    if (key === 'name' || key === 'area') return;
+    if (key === 'name' || key === 'categoria') return;
     setVisible((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -701,7 +711,7 @@ export function CrmEducacionPage() {
     setSaving(true);
     try {
       await api.patchCrmEducationContact(contact.contact_id, {
-        area: contact.area, name: draft.name, last_name: draft.last_name,
+        area: EDUCATION_AREA, name: draft.name, last_name: draft.last_name,
         email: draft.email || null, dni: draft.dni || null,
         opt_in_email: draft.opt_in_email,
         segment_slugs: draft.segment_slugs,
@@ -725,7 +735,7 @@ export function CrmEducacionPage() {
         page += 1;
       }
       const sheet = XLSX.utils.json_to_sheet(rows.map((c) => ({
-        Número: AREA_LABELS[c.area], Nombre: c.name, Apellido: c.last_name,
+        Categoría: categoryLabel(c.categoria, c.categorias), Nombre: c.name, Apellido: c.last_name,
         Teléfono: c.phone ?? '', 'Usuario WhatsApp': waUsername(c.wa_username) ?? '',
         BSUID: c.whatsapp_user_id ?? '', Email: c.email ?? '', DNI: c.dni ?? '',
         Asesor: c.assigned_user_label ?? '',
@@ -741,14 +751,13 @@ export function CrmEducacionPage() {
 
   function renderContactEditor(contact: EducationContact) {
     if (!draft) return null;
-    const scope = managementAreaOf(contact.area, contact.categoria);
-    const areaSegments = catalog.segments.filter((item) => item.area === contact.area);
+    const areaSegments = catalog.segments.filter((item) => item.area === EDUCATION_AREA);
     const segmentSlugs = [...new Set([
       ...areaSegments.map((item) => item.slug),
       ...contact.segment_slugs,
     ])];
     const definitions = catalog.attributes.filter((definition) =>
-      definition.area === contact.area && definition.active &&
+      definition.area === EDUCATION_AREA && definition.active &&
       !definition.segment_slug &&
       !['dni', 'email', 'correo'].includes(definition.slug),
     );
@@ -801,7 +810,7 @@ export function CrmEducacionPage() {
                 </label>;
               })}
               {segmentSlugs.length === 0 && <span className="text-sm text-muted-foreground">
-                No hay segmentos configurados para este número.
+                No hay segmentos configurados para Educación.
               </span>}
             </div>
           </fieldset>
@@ -809,18 +818,18 @@ export function CrmEducacionPage() {
             <Label>Asesor responsable</Label>
             <Select value={contact.assigned_user_id ? String(contact.assigned_user_id) : '__none__'}
               disabled={managementSaving}
-              onValueChange={(value) => void updateManagement(contact.contact_id, scope,
+              onValueChange={(value) => void updateManagement(contact.contact_id,
                 { assigned_user_id: Number(value), ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__" disabled>Sin asignar</SelectItem>
-                {managementCatalog.advisors.filter((advisor) => advisor.areas.includes(scope))
-                  .map((advisor) => <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
+                {educationAdvisors.map((advisor) =>
+                  <SelectItem key={advisor.id} value={String(advisor.id)}>{advisor.label}</SelectItem>)}
               </SelectContent>
             </Select>
             {contact.requires_review && contact.assigned_user_id &&
               <Button size="sm" variant="outline" disabled={managementSaving}
-                onClick={() => void updateManagement(contact.contact_id, scope,
+                onClick={() => void updateManagement(contact.contact_id,
                   { assigned_user_id: contact.assigned_user_id!,
                     ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}>
                 Confirmar asesor
@@ -829,11 +838,10 @@ export function CrmEducacionPage() {
           <div className="space-y-1">
             <Label>Estado del lead</Label>
             <LeadStatusSelect
-              area={scope}
               value={contact.lead_status_id ? String(contact.lead_status_id) : '__none__'}
               disabled={managementSaving}
               statuses={managementCatalog.statuses}
-              onChange={(value) => void updateManagement(contact.contact_id, scope,
+              onChange={(value) => void updateManagement(contact.contact_id,
                 { lead_status_id: value === '__none__' ? null : Number(value),
                   ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}
             />
@@ -955,8 +963,8 @@ export function CrmEducacionPage() {
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ep">Educación EP</SelectItem>
-                <SelectItem value="ca">Educación CA</SelectItem>
+                <SelectItem value="ep">EP</SelectItem>
+                <SelectItem value="ca">CA</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1005,17 +1013,16 @@ export function CrmEducacionPage() {
     </Dialog>
     <PageHeader
       title="CRM Educación"
-      description="Contactos y oportunidades comerciales de los tres números de Educación."
+      description="Vitrina de fichas y oportunidades de Educación (área única) con filtro por categoría CA/EP/General."
     />
     <div className="flex flex-wrap items-end gap-3">
       <div className="w-56 space-y-1">
-        <Label>Número</Label>
-        <Select value={area} onValueChange={changeArea}>
+        <Label>Categoría</Label>
+        <Select value={categoria} onValueChange={changeCategoria}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los números</SelectItem>
-            {AREAS.map((item) => <SelectItem key={item} value={item}>
-              {AREA_LABELS[item]}
+            {CATEGORY_SCOPES.map((item) => <SelectItem key={item} value={item}>
+              {CATEGORY_SCOPE_LABELS[item]}
             </SelectItem>)}
           </SelectContent>
         </Select>
@@ -1093,20 +1100,20 @@ export function CrmEducacionPage() {
               <DropdownMenuLabel>Columnas fijas</DropdownMenuLabel>
               {FIXED_COLUMNS.map(([key, label]) => <DropdownMenuCheckboxItem
                 key={key}
-                checked={key === 'area' || visible.has(key)}
-                disabled={key === 'area' || key === 'name'}
+                checked={key === 'categoria' || visible.has(key)}
+                disabled={key === 'categoria' || key === 'name'}
                 onCheckedChange={() => toggleColumn(key)}
                 onSelect={(event) => event.preventDefault()}
               >{label}</DropdownMenuCheckboxItem>)}
               <DropdownMenuLabel>Atributos WhatsApp</DropdownMenuLabel>
               {areaAttributes.map((definition) => {
-                const key = `attr:${definition.area}:${definition.slug}`;
+                const key = `attr:${definition.slug}`;
                 return <DropdownMenuCheckboxItem
                   key={key}
-                  checked={visible.has(key)}
+                  checked={visible.has(key) || visible.has(`attr:${definition.area}:${definition.slug}`)}
                   onCheckedChange={() => toggleColumn(key)}
                   onSelect={(event) => event.preventDefault()}
-                >{AREA_LABELS[definition.area]} · {definition.label}</DropdownMenuCheckboxItem>;
+                >{definition.label}</DropdownMenuCheckboxItem>;
               })}
             </DropdownMenuContent>
           </DropdownMenu>

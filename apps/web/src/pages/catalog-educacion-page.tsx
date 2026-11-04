@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Power, RotateCcw, Trash2 } from 'lucide-react';
 import { MaterialIconPicker } from '@/components/material-icon-picker';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
-import { api, type EducationArea, type EducationLeadStatusDefinition } from '@/lib/api';
+import { api, type EducationAreaAlias, type EducationLeadStatusDefinition } from '@/lib/api';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { PageHeader } from '@/components/page-header';
@@ -412,7 +412,7 @@ function LeadStatusesPanel() {
   const toast = useToast();
   const confirm = useConfirm();
   const [statuses, setStatuses] = useState<EducationLeadStatusDefinition[]>([]);
-  const [area, setArea] = useState<EducationArea>('educacion_ep');
+  const [area, setArea] = useState<EducationAreaAlias>('educacion_ep');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<EducationLeadStatusDefinition | null | undefined>(undefined);
 
@@ -466,10 +466,10 @@ function LeadStatusesPanel() {
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border px-4 py-3">
           <div className="space-y-1">
             <label className="text-sm font-medium">Número de Educación</label>
-            <Select value={area} onValueChange={(value) => setArea(value as EducationArea)}>
+            <Select value={area} onValueChange={(value) => setArea(value as EducationAreaAlias)}>
               <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(Object.keys(WHATSAPP_AREA_LABEL) as EducationArea[]).map((value) => (
+                {(Object.keys(WHATSAPP_AREA_LABEL) as EducationAreaAlias[]).map((value) => (
                   <SelectItem key={value} value={value}>{WHATSAPP_AREA_LABEL[value]}</SelectItem>
                 ))}
               </SelectContent>
@@ -555,7 +555,7 @@ function LeadStatusDialog({
   onSaved,
 }: {
   state: EducationLeadStatusDefinition | null | undefined;
-  area: EducationArea;
+  area: EducationAreaAlias;
   defaultOrder: number;
   onClose: () => void;
   onSaved: () => void;

@@ -53,8 +53,11 @@ Estados usados aquí:
 | Solo info Meta sin WhatsApp | Canal Instant Form / TikTok + etiqueta **Solo contacto** (`came_with_inbound` = no) |
 | ProspectIA como medio | Match post-captación; puede copiar asesor si aplica; no es un CRM paralelo |
 | FUENTE = META / ORGÁNICO / RRSS | Canal de origen + categoría CA/EP/General (no “campaña” como fuente) |
+| “Área” CA / EP / tres números | **Categoría** dentro del área única `educacion` (ficha canónica) |
 
 **No se pide** recrear Condensado, hojas por asesora ni Apps Script dentro de MALI ONE.
+
+**Límite de sistemas:** mali-whatsapp guarda personas, fichas, leads, ciclos y chat. MALI ONE muestra y opera (CRM Educación) y es dueño de producto/pagos/mailing/captura web; no mantiene BD paralela de leads.
 
 ---
 
@@ -270,7 +273,7 @@ Dos filas del sheet, un solo requerimiento de producto:
 #### RQ0024 — Dashboard de KPIs comerciales
 
 - **Objetivo:** Embudo y conversión por fuente, inversión vs rentabilidad, cuartiles por asesor.
-- **Regla:** Números macro + detalle TMK (campo MOTIVO). Filtros: área CA/EP, asesor, fuente, fecha.
+- **Regla:** Números macro + detalle TMK (campo MOTIVO). Filtros: categoría CA/EP/General, asesor, fuente, fecha.
 - **App:** ONE (tablero) consumiendo WhatsApp.
 - **Fase:** 3 · **Prioridad efectiva:** Alta (vencida 13/11) · **Estado:** Registrado.
 

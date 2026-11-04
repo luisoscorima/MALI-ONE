@@ -68,7 +68,7 @@ Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor reten
 5. **Prueba E2E** (curso EP de prueba):
    - Enviar formulario «Conversemos»
    - Verificar fila en tabla `EducacionLead` (`waStatus=ok`)
-   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación EP** con origen `channel=widget`; `source_key=educacion_lead_widget` para fichas o `source_key=educacion_landing` para landings
+   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación** con categoría **EP** (o CA), origen `channel=widget`; `source_key=educacion_lead_widget` para fichas o `source_key=educacion_landing` para landings
    - Confirmar en el payload del origen: curso, URL, `capture_source`, referrer, UTMs y click IDs presentes en la URL de prueba
    - Si Sheets está on: fila nueva en el rango configurado
    - Apagar Sheet a propósito (`ENABLED=false`) y confirmar que el submit sigue OK y WA sync funciona
@@ -81,12 +81,14 @@ EDUCACION_LEADS_SHEETS_ENABLED=false
 
 No hace falta cambiar el widget ni WordPress. Los leads nuevos solo irán a `EducacionLead` + WhatsApp.
 
-## Áreas WhatsApp
+## Área y categorías (contrato WhatsApp)
 
-Solo **EP** y **CA** en esta fase. La línea genérica `educacion` no se usa todavía.
+WhatsApp es fuente de verdad. **Área de ficha:** solo `educacion`. **Categoría:** `ca` | `ep` | general (`program_id` nulo). Los alias `educacion_ca` / `educacion_ep` en captura/embeds se traducen a categoría; no son tenants.
 
-| Contexto WordPress | Línea WhatsApp | `area` |
-|--------------------|----------------|--------|
-| Extensión Profesional (`extensionprofesional`) | Educación EP | `educacion_ep` |
-| Cursos de Arte (`curso-de-arte`) | Educación CA | `educacion_ca` |
-| Educación (genérica) | pendiente | — |
+CRM Educación en MALI ONE es **vitrina**: lista y opera con `area=educacion` y filtro de categoría (`all` | `general` | `ca` | `ep`).
+
+| Contexto WordPress | Categoría | Notas |
+|--------------------|-----------|--------|
+| Extensión Profesional (`extensionprofesional`) | `ep` | Captura widget/landing aún puede enviar alias legacy; WhatsApp normaliza |
+| Cursos de Arte (`curso-de-arte`) | `ca` | Igual |
+| Educación genérica / sin programa | general | Línea o form sin `program_key` |

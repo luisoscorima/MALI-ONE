@@ -1,15 +1,16 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { AppModule, type User } from '@prisma/client';
 import type { Request } from 'express';
-import { IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import {
+  IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { CrmEducacionService } from './crm-educacion.service';
-
-const AREAS = ['all', 'educacion', 'educacion_ca', 'educacion_ep'] as const;
+import { EDUCATION_CATEGORY_SCOPES, EDUCATION_WRITE_AREA } from './education-scope';
 
 class ListContactsQuery {
-  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
   @IsOptional() @IsString() @MaxLength(120) q?: string;
   @IsOptional() @IsString() @MaxLength(50) segment?: string;
   @IsOptional() @IsString() @MaxLength(64) attr_key?: string;
@@ -19,7 +20,7 @@ class ListContactsQuery {
 }
 
 class ListLeadsQuery {
-  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
   @IsOptional() @IsString() @MaxLength(32) channel?: string;
   @IsOptional() @IsString() @MaxLength(120) q?: string;
   @IsOptional() @IsIn(['recent', 'new_number', 'duplicate', 'reassignable', 'conflict', 'in_progress', 'all']) view?: string;
@@ -29,7 +30,7 @@ class ListLeadsQuery {
 }
 
 class ListCyclesQuery {
-  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
   @IsOptional() @IsString() @MaxLength(32) channel?: string;
   @IsOptional() @IsString() @MaxLength(120) q?: string;
   @IsOptional() @IsIn(['open', 'closed', 'review', 'unassigned']) view?: string;
@@ -38,31 +39,31 @@ class ListCyclesQuery {
 }
 
 class SlaQuery {
-  @IsOptional() @IsIn(AREAS) area?: string;
+  @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
   @IsOptional() @IsString() @MaxLength(10) from?: string;
   @IsOptional() @IsString() @MaxLength(10) to?: string;
 }
 
 class ManagementBody {
-  @IsIn(AREAS.slice(1)) area!: string;
+  @IsIn([EDUCATION_WRITE_AREA]) area!: typeof EDUCATION_WRITE_AREA;
   @IsOptional() @IsInt() @Min(1) assigned_user_id?: number | null;
   @IsOptional() @IsInt() @Min(1) lead_status_id?: number | null;
   @IsOptional() @IsInt() @Min(1) lead_id?: number;
 }
 
 class DistributeBody {
-  @IsIn(AREAS) area!: string;
+  @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria!: string;
   @IsOptional() @IsString() @MaxLength(32) channel?: string;
   @IsOptional() @IsString() @MaxLength(120) q?: string;
 }
 
 class ReviewBody {
-  @IsIn(AREAS.slice(1)) area!: string;
+  @IsIn([EDUCATION_WRITE_AREA]) area!: typeof EDUCATION_WRITE_AREA;
   @IsIn(['open_new', 'keep_existing', 'dismiss']) action!: 'open_new' | 'keep_existing' | 'dismiss';
 }
 
 class PatchContactBody {
-  @IsIn(AREAS.slice(1)) area!: string;
+  @IsIn([EDUCATION_WRITE_AREA]) area!: typeof EDUCATION_WRITE_AREA;
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsString() last_name?: string;
   @IsOptional() @IsString() email?: string | null;
@@ -87,11 +88,11 @@ class ProspectiaCheckBody {
 
 class ManualLeadBody {
   @IsIn(['manual_call', 'manual_historical', 'manual_organic']) source_key!: string;
-  @IsIn(['ca', 'ep', 'educacion_ca', 'educacion_ep']) categoria!: string;
+  @IsIn(['ca', 'ep']) categoria!: string;
   @IsString() @MaxLength(150) name!: string;
   @IsOptional() @IsString() @MaxLength(150) last_name?: string;
   @IsOptional() @IsString() @MaxLength(32) phone?: string;
-  @IsOptional() @IsString() @MaxLength(255) email?: string;
+  @IsOptional() @IsEmail() @MaxLength(255) email?: string;
   @IsOptional() @IsString() @MaxLength(32) dni?: string;
   @IsOptional() @IsString() @MaxLength(200) curso?: string;
 }

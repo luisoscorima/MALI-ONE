@@ -125,7 +125,8 @@ export type CrmContactRow = {
 
 export type EducationLeadStatusDefinition = {
   id: number;
-  area: 'educacion' | 'educacion_ca' | 'educacion_ep';
+  /** Canónico: `educacion`. Alias legacy aún posibles en catálogo de estados. */
+  area: string;
   slug: string;
   label: string;
   sort_order: number;

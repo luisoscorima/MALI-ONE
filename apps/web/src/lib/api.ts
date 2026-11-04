@@ -1,9 +1,17 @@
 import type { AppModule, AppUserDto, AuthUser } from '@mali-one/shared';
 
-export type EducationArea = 'educacion' | 'educacion_ca' | 'educacion_ep';
+/** Área canónica de ficha Educación (WhatsApp). */
+export type EducationArea = 'educacion';
+/** Filtro de listados CRM: categoría, no tenant. */
+export type EducationCategoryScope = 'all' | 'general' | 'ca' | 'ep';
+/**
+ * Alias histórico aún usado por Catálogo Educación / captura (follow-up).
+ * No usar en CRM Educación.
+ */
+export type EducationAreaAlias = 'educacion' | 'educacion_ca' | 'educacion_ep';
 export type EducationLeadStatusDefinition = {
   id: number;
-  area: EducationArea;
+  area: EducationAreaAlias | string;
   slug: string;
   label: string;
   sort_order: number;
@@ -16,7 +24,7 @@ export type EducationLeadStatusDefinition = {
 export type ProspectiaMatch = 'exists' | 'missing' | 'unverified';
 export type EducationContact = {
   contact_id: number;
-  area: EducationArea;
+  area: EducationArea | string;
   name: string;
   last_name: string;
   phone: string | null;
@@ -28,6 +36,7 @@ export type EducationContact = {
   opt_in_email: boolean;
   segment_slugs: string[];
   attributes: Record<string, string>;
+  categorias?: string[];
   lead_id?: number | null;
   categoria?: string | null;
   assigned_user_id?: number | null;
@@ -39,7 +48,7 @@ export type EducationContact = {
 };
 export type EducationLead = {
   id: number;
-  area: EducationArea;
+  area: EducationArea | string;
   channel: string;
   source_key: string | null;
   source_label: string | null;
@@ -83,7 +92,7 @@ export type EducationLeadCounts = {
 export type EducationCycleView = 'open' | 'closed' | 'review' | 'unassigned';
 export type EducationCycle = {
   id: number;
-  area: EducationArea;
+  area: EducationArea | string;
   contact_id: number;
   person_id: number;
   categoria: string | null;
@@ -142,16 +151,16 @@ export type EducationSlaReport = {
   note: string;
 };
 export type EducationManagementCatalog = {
-  advisors: Array<{ id: number; label: string; areas: EducationArea[] }>;
-  statuses: Array<{ id: number; area: EducationArea; slug: string; label: string; is_default: boolean }>;
+  advisors: Array<{ id: number; label: string; areas: string[] }>;
+  statuses: Array<{ id: number; area: string; slug: string; label: string; is_default: boolean }>;
 };
 export type EducationCatalog = {
   attributes: Array<{
-    id: number; area: EducationArea; segment_slug: string | null;
+    id: number; area: EducationArea | string; segment_slug: string | null;
     slug: string; label: string; sort_order: number; active: boolean;
   }>;
   segments: Array<{
-    area: EducationArea; slug: string; label: string; color_key?: string;
+    area: EducationArea | string; slug: string; label: string; color_key?: string;
   }>;
 };
 
@@ -371,7 +380,7 @@ export const api = {
       '/api/crm-educacion/prospectia/sync',
     ),
   listCrmEducationContacts: (params: {
-    area?: EducationArea | 'all'; q?: string; segment?: string;
+    categoria?: EducationCategoryScope; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;
   }) => {
     const qs = new URLSearchParams();
@@ -394,7 +403,7 @@ export const api = {
   getCrmEducationCatalogs: () =>
     request<EducationCatalog>('/api/crm-educacion/catalogs'),
   listCrmEducationLeads: (params: {
-    area?: EducationArea | 'all'; channel?: string; q?: string;
+    categoria?: EducationCategoryScope; channel?: string; q?: string;
     view?: 'recent' | 'new_number' | 'duplicate' | 'reassignable' | 'conflict' | 'in_progress' | 'all';
     unassigned?: boolean;
     page?: number; limit?: number;
@@ -409,7 +418,7 @@ export const api = {
     );
   },
   listCrmEducationCycles: (params: {
-    area?: EducationArea | 'all'; channel?: string; q?: string;
+    categoria?: EducationCategoryScope; channel?: string; q?: string;
     view?: EducationCycleView; page?: number; limit?: number;
   }) => {
     const qs = new URLSearchParams();
@@ -422,7 +431,7 @@ export const api = {
     );
   },
   getCrmEducationSla: (params: {
-    area?: EducationArea | 'all'; from?: string; to?: string;
+    categoria?: EducationCategoryScope; from?: string; to?: string;
   }) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
@@ -438,8 +447,8 @@ export const api = {
   }) => request(`/api/crm-educacion/contacts/${id}/management`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
-  distributeCrmEducation: (params: { area: EducationArea | 'all'; channel?: string; q?: string }) =>
-    request<{ assigned: number; by_area: Array<{ area: EducationArea; assigned: number }> }>(
+  distributeCrmEducation: (params: { categoria: EducationCategoryScope; channel?: string; q?: string }) =>
+    request<{ assigned: number; by_area: Array<{ area: string; assigned: number }> }>(
       '/api/crm-educacion/distribute', { method: 'POST', body: JSON.stringify(params) }),
   reviewCrmEducationLead: (id: number, body: { area: EducationArea;
     action: 'open_new' | 'keep_existing' | 'dismiss' }) =>
@@ -615,13 +624,13 @@ export const api = {
   listEducacionLeadStatuses: () =>
     request<EducationLeadStatusDefinition[]>('/api/educacion-catalog/estados-lead'),
   createEducacionLeadStatus: (body: {
-    area: EducationArea; slug: string; label: string; sort_order?: number;
+    area: EducationAreaAlias | string; slug: string; label: string; sort_order?: number;
     is_default?: boolean; is_terminal?: boolean;
   }) => request<EducationLeadStatusDefinition>('/api/educacion-catalog/estados-lead', {
     method: 'POST', body: JSON.stringify(body),
   }),
   updateEducacionLeadStatus: (id: number, body: {
-    area: EducationArea; label?: string; sort_order?: number;
+    area: EducationAreaAlias | string; label?: string; sort_order?: number;
     is_default?: boolean; is_terminal?: boolean; active?: boolean;
   }) => request<EducationLeadStatusDefinition>(`/api/educacion-catalog/estados-lead/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),

@@ -2,7 +2,7 @@
 
 El asesor elige **una** etapa. Cada paso del camino significa más cerca de la inscripción. Al lado, el sistema podrá marcar si la llegada cuenta como captación nueva; esa marca no se elige a mano.
 
-Catálogo en WhatsApp (`lead_status_definitions`), por número: `educacion`, `educacion_ca`, `educacion_ep`. El selector está en **CRM Educación** de MALI ONE (Contactos y Leads), agrupado en Inscripción e Intento o cierre.
+Catálogo en WhatsApp (`lead_status_definitions`) bajo el área canónica **`educacion`**. CA/EP son **categorías** del ciclo, no áreas. El selector está en **CRM Educación** de MALI ONE (Contactos y Oportunidades), agrupado en Inscripción e Intento o cierre.
 
 La administración del catálogo está en **MALI ONE → Catálogo Educación → Estados de lead**. Desde allí se crean, renombran y ordenan estados, se define el inicial o terminal y se desactivan/reactivan. WhatsApp continúa siendo la fuente de verdad. Desactivar reemplaza a eliminar para conservar los ciclos históricos.
 
@@ -59,7 +59,7 @@ Migración: `20260928120000_education_lead_statuses` en mali-whatsapp. Al abrir 
 
 ## Qué ya hace el sistema
 
-- Las ocho etiquetas existen en los tres números de Educación y se asignan desde CRM Educación.
+- Las ocho etiquetas viven en el área `educacion` y se asignan desde CRM Educación (filtro de categoría CA/EP/General aparte).
 - Por contactar es el estado por defecto de un contacto nuevo.
 - No contesta no cierra el ciclo. No interesado, Perdido y Venta exitosa sí (`is_terminal`).
 - **RQ0017:** no se puede pasar a Venta exitosa (ni legacy Convertido) sin nombre usable, DNI, email, teléfono o identidad WhatsApp, y categoría CA/EP del ciclo. Si faltan datos, el ciclo se queda en el estado anterior; en CRM Educación aparece un diálogo para completar y reintentar.
