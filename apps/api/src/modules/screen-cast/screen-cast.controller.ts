@@ -124,7 +124,12 @@ export class ScreenCastController {
     const playlist = await this.service.updatePlaylist(id, body);
     const keysAfter = await this.service.getScreenKeysForPlaylist(id);
     const keys = [...new Set([...keysBefore, ...keysAfter])];
-    await this.gateway.restartSync(keys, { reason: 'playlist:update' });
+    // Same contract as "Sincronizar todos": hard restart when content changed,
+    // otherwise re-anchor sisters to the shared clock.
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'playlist:update',
+    });
     return playlist;
   }
 
@@ -139,7 +144,10 @@ export class ScreenCastController {
   async deletePlaylist(@Param('id') id: string) {
     const keys = await this.service.getScreenKeysForPlaylist(id);
     const result = await this.service.deletePlaylist(id);
-    await this.gateway.restartSync(keys, { reason: 'playlist:delete' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'playlist:delete',
+    });
     return result;
   }
 
@@ -151,7 +159,10 @@ export class ScreenCastController {
   ) {
     const item = await this.service.createPlaylistItem(playlistId, body);
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    await this.gateway.restartSync(keys, { reason: 'item:create' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'item:create',
+    });
     return item;
   }
 
@@ -167,7 +178,10 @@ export class ScreenCastController {
       orderedIds,
     );
     const keys = await this.service.getScreenKeysForPlaylist(playlistId);
-    await this.gateway.restartSync(keys, { reason: 'item:reorder' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'item:reorder',
+    });
     return items;
   }
 
@@ -176,7 +190,10 @@ export class ScreenCastController {
   async duplicateItem(@Param('id') id: string) {
     const item = await this.service.duplicatePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    await this.gateway.restartSync(keys, { reason: 'item:duplicate' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'item:duplicate',
+    });
     return item;
   }
 
@@ -188,7 +205,10 @@ export class ScreenCastController {
   ) {
     const item = await this.service.updatePlaylistItem(id, body);
     const keys = await this.service.getScreenKeysForPlaylist(item.playlistId);
-    await this.gateway.restartSync(keys, { reason: 'item:update' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'item:update',
+    });
     return item;
   }
 
@@ -197,7 +217,10 @@ export class ScreenCastController {
   async deleteItem(@Param('id') id: string) {
     const result = await this.service.deletePlaylistItem(id);
     const keys = await this.service.getScreenKeysForPlaylist(result.playlistId);
-    await this.gateway.restartSync(keys, { reason: 'item:delete' });
+    await this.gateway.restartSync(keys, {
+      catchUpWhenUnchanged: true,
+      reason: 'item:delete',
+    });
     return { ok: true };
   }
 

@@ -335,6 +335,15 @@ export function ScreenCastPlayerPage() {
   /** Videos every connected screen in this playlist already has locally. */
   const playableUrlsRef = useRef<string[]>([]);
   const playableKnownRef = useRef(false);
+  /**
+   * Local still/GIF progress for sibling desync checks. Video uses
+   * `HTMLVideoElement.currentTime`; stills had `mediaTimeMs: null`, so the
+   * gateway could only see index mismatches after a slide had already flipped.
+   * Anchor = performance.now() when the slot was shown; progress =
+   * entryOffset + elapsed.
+   */
+  const stillShownAtPerfRef = useRef<number | null>(null);
+  const stillEntryOffsetMsRef = useRef(0);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
 
@@ -1138,15 +1147,33 @@ export function ScreenCastPlayerPage() {
       const holding =
         videoHoldingRef.current || syncingRef.current || waitingGoRef.current;
       const video = videoRef.current;
-      const mediaTimeMs =
-        !holding &&
-        videoPlaybackActiveRef.current &&
-        video &&
-        !video.paused &&
-        !video.ended &&
-        Number.isFinite(video.currentTime)
-          ? Math.round(video.currentTime * 1000)
-          : null;
+      let mediaTimeMs: number | null = null;
+      if (!holding) {
+        if (
+          videoPlaybackActiveRef.current &&
+          video &&
+          !video.paused &&
+          !video.ended &&
+          Number.isFinite(video.currentTime)
+        ) {
+          mediaTimeMs = Math.round(video.currentTime * 1000);
+        } else {
+          const item = itemsRef.current[indexRef.current];
+          const shownAt = stillShownAtPerfRef.current;
+          if (
+            item &&
+            (item.mediaType === 'image' || item.mediaType === 'gif') &&
+            shownAt != null
+          ) {
+            mediaTimeMs = Math.max(
+              0,
+              Math.round(
+                stillEntryOffsetMsRef.current + (performance.now() - shownAt),
+              ),
+            );
+          }
+        }
+      }
       socket.emit('status', {
         screenKey,
         index: payload.index,
@@ -1271,6 +1298,8 @@ export function ScreenCastPlayerPage() {
     };
 
     if (item.mediaType === 'video') {
+      stillShownAtPerfRef.current = null;
+      stillEntryOffsetMsRef.current = 0;
       const video = videoRef.current;
       if (!video) return;
 
@@ -1525,6 +1554,8 @@ export function ScreenCastPlayerPage() {
     setHold(false);
     pauseVideoQuiet(videoRef.current);
     lastStillUrlRef.current = item.mediaUrl;
+    stillEntryOffsetMsRef.current = slotOffsetMs;
+    stillShownAtPerfRef.current = performance.now();
 
     scheduleAdvance();
     return () => {
@@ -1567,10 +1598,51 @@ export function ScreenCastPlayerPage() {
       if (pos.index !== indexRef.current) {
         indexRef.current = pos.index;
         setIndex(pos.index);
+        return;
       }
+
+      // Stills/GIFs may re-anchor mid-slot (unlike Tizen video). Keep the
+      // advance timer on the shared clock so sisters don't drift between ticks.
+      if (
+        !currentItem ||
+        currentItem.mediaType === 'video' ||
+        waitingGoRef.current ||
+        syncingRef.current
+      ) {
+        return;
+      }
+
+      const shownAt = stillShownAtPerfRef.current;
+      if (shownAt != null) {
+        const localProgress =
+          stillEntryOffsetMsRef.current + (performance.now() - shownAt);
+        // Same threshold the gateway uses for sibling mediaTime spread.
+        if (Math.abs(localProgress - pos.offsetMs) > 1_200) {
+          stillEntryOffsetMsRef.current = pos.offsetMs;
+          stillShownAtPerfRef.current = performance.now();
+          setKenBurnsAnim((prev) => {
+            if (!prev) return prev;
+            const durationMs = Math.max(currentItem.durationMs || 10_000, 1_000);
+            const delayMs = -Math.min(Math.max(0, pos.offsetMs), durationMs);
+            if (prev.delayMs === delayMs) return prev;
+            return { ...prev, delayMs };
+          });
+        }
+      }
+
+      const wait = Math.max(40, pos.waitMs + pos.remainingMs);
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+      }
+      timerRef.current = window.setTimeout(() => {
+        if (jumpToClock()) return;
+        timerRef.current = window.setTimeout(() => {
+          if (!jumpToClock()) advance();
+        }, 150);
+      }, wait);
     }, DRIFT_INTERVAL_MS);
     return () => window.clearInterval(id);
-  }, [isPreview, nowServer, config]);
+  }, [isPreview, nowServer, config, jumpToClock, advance]);
 
   useEffect(() => {
     return () => {

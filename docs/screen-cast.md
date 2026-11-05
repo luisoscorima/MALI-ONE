@@ -12,8 +12,25 @@ Gestiona **playlists**, **monitores** (tótems/quioscos/TVs) y **overrides de ag
 2. Cada monitor apunta a una playlist base; opcionalmente hay `ScreenCastScheduleOverride` por rango de fechas.
 3. El scheduler recalcula qué playlist aplica y emite sync a las pantallas conectadas.
 4. El player público pide `GET /api/screen-cast/screens/:screenKey/config`, cachea medios (Service Worker) y se une al gateway (`join`, `heartbeat`, `status`, `ready`, `local`).
-5. Soft-sync vía `play:tick`: corrige desfase entre hermanas **sin** interrumpir un video mid-play (catch-up solo con umbral sostenido + cooldown).
-6. Medios: subida a S3 (`POST .../s3/upload`, ffmpeg para MOV→H.264) o picker S3 acotado al prefijo `screen-cast`.
+5. Soft-sync vía `play:tick` + drift local: corrige desfase entre hermanas **sin** interrumpir un video mid-play. Stills/GIF sí se reanclan mid-slot.
+6. Medios: subida a S3 (`POST .../s3/upload`, ffmpeg normaliza MP4/MOV→H.264) o picker S3 acotado al prefijo `screen-cast`.
+
+## Sincronización de pantallas
+
+Contrato común (`restartSync` en el gateway), usado por el admin y por las mutaciones de contenido:
+
+| Disparador | Comportamiento |
+|------------|----------------|
+| **Sincronizar todos** (`POST /monitors/sync`) | `catchUpWhenUnchanged: true`. Si la firma de playlist cambió → reinicio con barrera (`playlist:sync` + `play:go`). Si no → reancla al reloj actual (`catchUp: true`). `force=1` fuerza reinicio. |
+| **Editar playlist / ítems** (CRUD, reorder, duplicate) | Mismo contrato que el botón: `catchUpWhenUnchanged: true`. |
+| **Sincronizar un monitor** | `catchUpScreen` — esa pantalla se reancla sin tumbar el muro. |
+| **Auto desync** (watchdog) | Si hermanas difieren de índice o de `mediaTimeMs` (~1.2 s, racha + cooldown 4 min) → mismo catch-up que el botón (`force: false`). |
+| **Sin pantallas conectadas** al reiniciar | Se invalida el reloj de esa playlist para no servir firma obsoleta al reconectar. |
+
+Firma de playlist (`getPlaylistSignature`): `activo`, `crossfade`, `kenBurns` + ítems activos (`id`, tipo, duración, URL). Un rename solo no tumba el muro; un cambio de media sí.
+
+**Video:** no seek mid-play en Tizen; el soft-tick no corta un clip en reproducción.  
+**Imagen/GIF:** reportan `mediaTimeMs` (progreso local del slot); el player reprograma el avance con el reloj compartido y puede realinear Ken Burns si el desfase supera ~1.2 s.
 
 ## Código
 
@@ -59,7 +76,7 @@ WebSocket (socket.io, path `/socket.io/`, namespace `/screen-cast`):
 | Sistema | Uso |
 |---------|-----|
 | **AWS S3** | Media de playlists (`AWS_S3_BUCKET` / `AWS_S3_SCREEN_CAST_*`); lectura pública opcional `S3_PUBLIC_READ` |
-| **ffmpeg** | Transcodificación MOV→H.264 en upload |
+| **ffmpeg** | Normalización MP4/MOV → H.264 (preview Chrome + Tizen, menor peso) |
 | **socket.io** | Sync en tiempo real pantallas ↔ API |
 | **Nginx Proxy Manager** | Upgrade WebSocket hacia `mali-one-web` → API |
 
@@ -88,4 +105,5 @@ UPLOAD_MAX_MB=25
 ## Notas operativas
 
 - **Upload de video:** MP4 y MOV se normalizan a **H.264 MP4** (CRF 23, lado largo ≤ 1920, AAC si hay audio). Si el origen ya es H.264 y el reencode pesaría más, se conserva el original. Así preview (Chrome) y TVs Tizen coinciden. Ítems HEVC ya publicados hay que **volver a subir** para que entren al pipeline.
-- **Regla dura de sync:** nunca pelear mid-video (ni seek agresivo en Tizen). Catch-up limpio y raro > sync continuo.
+- **Coalesce:** varias ediciones seguidas de la misma playlist se agrupan ~2.5 s en un solo reinicio (`RESTART_COALESCE_MS`).
+- Detalle evolutivo: [screen-cast-CHANGELOG.md](./screen-cast-CHANGELOG.md).

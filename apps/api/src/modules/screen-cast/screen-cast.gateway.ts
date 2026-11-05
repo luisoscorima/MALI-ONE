@@ -608,7 +608,10 @@ export class ScreenCastGateway
   }
 
   notifyPlaylistUpdated(screenKeys: string[]) {
-    void this.restartSync(screenKeys, { reason: 'playlist:updated' });
+    void this.restartSync(screenKeys, {
+      catchUpWhenUnchanged: true,
+      reason: 'playlist:updated',
+    });
   }
 
   /**
@@ -680,7 +683,14 @@ export class ScreenCastGateway
     );
 
     if (pending.size === 0) {
+      // Nobody online to barrier-sync. Drop the stale clock so the next join
+      // starts a fresh session for the new signature instead of serving old
+      // content under a fingerprint that no longer matches the DB.
+      this.clocks.delete(playlistId);
       this.sessions.delete(playlistId);
+      this.logger.log(
+        `sync skip playlist=${playlistId} reason=${reason} — sin pantallas conectadas`,
+      );
       return;
     }
 
@@ -814,6 +824,10 @@ export class ScreenCastGateway
    * interrupts an active video, so a looping solo clip can drift forever until
    * something re-anchors both screens to the shared clock — same path as the
    * admin "Sincronizar todos" catch-up (never force).
+   *
+   * Stills/GIFs also report `mediaTimeMs` (local progress through the slot), so
+   * sisters stuck on the same index with different offsets are detected too —
+   * not only after one screen has already flipped.
    */
   private async checkPlaylistDesync() {
     const now = Date.now();
