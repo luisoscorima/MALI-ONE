@@ -69,6 +69,7 @@ export interface TreasuryPaymentDto {
   transactedAt: string;
   settledOn: string | null;
   updatedAt: string;
+  payload: Record<string, unknown> | null;
 }
 
 export interface TreasuryPaymentsDto {
@@ -126,6 +127,54 @@ export interface NiubizSyncStatusDto {
     runId: string | null; status: string; startedAt: string | null; finishedAt: string | null;
     fromDate: string | null; toDate: string | null; errorCode: string | null;
     results: { merchant: string; status: string; rows?: number; createdCount?: number; updatedCount?: number }[];
+  };
+}
+
+export interface MercadoPagoPaymentDto {
+  id: string;
+  paymentId: string;
+  merchantOrderId: string | null;
+  externalReference: string | null;
+  description: string | null;
+  status: string;
+  statusDetail: string | null;
+  currency: TreasuryCurrency;
+  grossAmount: string;
+  netAmount: string | null;
+  feeAmount: string | null;
+  paymentMethodId: string | null;
+  paymentTypeId: string | null;
+  issuerName: string | null;
+  cardLastDigits: string | null;
+  installments: number | null;
+  payerName: string | null;
+  payerEmail: string | null;
+  createdAtMp: string;
+  approvedAt: string | null;
+  releasedAt: string | null;
+  lastUpdatedAtMp: string;
+  payload: Record<string, unknown> | null;
+}
+
+export interface MercadoPagoPaymentsDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  states: string[];
+  payments: MercadoPagoPaymentDto[];
+}
+
+export interface MercadoPagoSyncStatusDto {
+  configured: boolean;
+  lastRun: null | {
+    runId: string | null;
+    status: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    fromDate: string | null;
+    toDate: string | null;
+    errorCode: string | null;
+    rowCount: number;
   };
 }
 

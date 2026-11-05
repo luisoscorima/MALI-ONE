@@ -67,8 +67,59 @@ model TreasurySource {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   targets             TreasuryTarget[]
+  mercadoPagoPayments MercadoPagoPayment[]
+  mercadoPagoSync     MercadoPagoSyncState?
 
   @@unique([provider, name])
+}
+
+model MercadoPagoSyncState {
+  sourceId    String   @id
+  source      TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  runId       String?
+  status      String   @default("idle")
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  leaseUntil  DateTime?
+  fromDate    String?
+  toDate      String?
+  errorCode   String?
+  rowCount    Int      @default(0)
+}
+
+model MercadoPagoPayment {
+  id                String   @id @default(cuid())
+  sourceId          String
+  source            TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  paymentId         String   @db.VarChar(64)
+  merchantOrderId   String?  @db.VarChar(64)
+  externalReference String?  @db.VarChar(160)
+  description       String?  @db.VarChar(300)
+  status            String   @db.VarChar(40)
+  statusDetail      String?  @db.VarChar(80)
+  currency          TreasuryCurrency
+  grossAmount       Decimal  @db.Decimal(18, 2)
+  netAmount         Decimal? @db.Decimal(18, 2)
+  feeAmount         Decimal? @db.Decimal(18, 2)
+  paymentMethodId   String?  @db.VarChar(80)
+  paymentTypeId     String?  @db.VarChar(40)
+  issuerName        String?  @db.VarChar(120)
+  cardLastDigits    String?  @db.VarChar(8)
+  installments      Int?
+  payerName         String?  @db.VarChar(250)
+  payerEmail        String?  @db.VarChar(250)
+  createdAtMp       DateTime
+  approvedAt        DateTime?
+  releasedAt        DateTime?
+  lastUpdatedAtMp   DateTime
+  /// Sanitized portal sale. Card numbers and payer identity documents are removed.
+  payload           Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([sourceId, paymentId])
+  @@index([sourceId, createdAtMp, id])
+  @@index([sourceId, status])
 }
 
 model TreasuryTarget {
@@ -132,6 +183,8 @@ model TreasuryPayment {
   status          String @db.VarChar(80)
   transactedAt    DateTime
   settledOn       DateTime? @db.Date
+  /// Sanitized portal sale. Card numbers and payer identity documents are removed. Excel imports leave it untouched.
+  payload         Json?
   lastImportId    String
   lastImport      TreasuryPaymentImport @relation(fields: [lastImportId], references: [id], onDelete: Restrict)
   createdAt       DateTime @default(now())

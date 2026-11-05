@@ -32,6 +32,19 @@ export class TreasuryPaymentQueryDto {
   to?: string;
 }
 
+export class MercadoPagoPaymentQueryDto {
+  @IsOptional() @Transform(trim) @IsString() @Length(0, 250)
+  q?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000)
+  page?: number;
+  @IsOptional() @IsString() @Length(1, 80)
+  status?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true })
+  from?: string;
+  @IsOptional() @Matches(/^\d{4}-\d{2}-\d{2}$/) @IsDateString({ strict: true })
+  to?: string;
+}
+
 export class TreasurySourceInputDto {
   @IsEnum(TreasuryProvider)
   provider!: TreasuryProvider;

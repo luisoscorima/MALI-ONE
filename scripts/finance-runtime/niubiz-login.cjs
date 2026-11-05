@@ -1,4 +1,5 @@
-// Isolated worker. stdout is a private pipe to the API, never a log destination.
+// Niubiz login worker in the shared Finance runtime. stdout is a private pipe
+// to the API, never a log destination.
 // No browser profiles, traces, screenshots or plaintext secrets are persisted.
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');

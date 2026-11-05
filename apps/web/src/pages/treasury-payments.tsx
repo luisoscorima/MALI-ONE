@@ -387,11 +387,25 @@ export function TreasuryPayments({
                   <DetailRow label="Billetera" value={detail.wallet || dash} />
                 </>
               )}
+              {detail.payload && <PayloadRecord payload={detail.payload} />}
             </dl>
           )}
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+function PayloadRecord({ payload }: { payload: Record<string, unknown> }) {
+  return (
+    <div className="grid gap-1">
+      <dt className="text-xs font-medium uppercase text-muted-foreground">Registro del portal</dt>
+      <dd>
+        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs">
+          {JSON.stringify(payload, null, 2)}
+        </pre>
+      </dd>
+    </div>
   );
 }
 

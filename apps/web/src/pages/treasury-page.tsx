@@ -16,6 +16,7 @@ import { EmptyState, Spinner } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { cn } from '@/lib/utils';
 import { TreasuryPayments } from './treasury-payments';
+import { MercadoPagoPayments } from './mercadopago-payments';
 import {
   Badge,
   Button,
@@ -108,6 +109,8 @@ export function TreasuryPage() {
   const targetLabel = provider?.targetKind === 'bank_account' ? 'cuenta bancaria' : 'comercio';
   const targetsTitle = provider?.targetKind === 'bank_account' ? 'Cuentas bancarias' : 'Comercios';
   const showNiubizRecords = selected?.provider === 'niubiz_sales';
+  const showMercadoPagoRecords = selected?.provider === 'mercadopago';
+  const showRecords = showNiubizRecords || showMercadoPagoRecords;
 
   function openSource(source?: TreasurySourceDto) {
     setFormError('');
@@ -241,7 +244,7 @@ export function TreasuryPage() {
                 {data.sources.map((source) => {
                   const sourceProvider = data.providers.find((item) => item.id === source.provider);
                   const active = source.id === selectedId;
-                  const isNiubiz = source.provider === 'niubiz_sales';
+                  const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago';
                   return (
                     <button
                       key={source.id}
@@ -259,7 +262,7 @@ export function TreasuryPage() {
                         {sourceProvider?.label}
                       </span>
                       <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {!isNiubiz && (
+                        {!hasConnector && (
                           <span>
                             {source.targets.length}{' '}
                             {sourceProvider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'}
@@ -301,14 +304,16 @@ export function TreasuryPage() {
                   <Button variant="outline" size="sm" onClick={() => openSource(selected)}>
                     <Pencil className="size-4" /> Editar
                   </Button>
-                  {showNiubizRecords && (
+                  {showRecords && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
                         <RefreshCw className="size-4" /> Actualizar pagos
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setMerchantsOpen(true)}>
-                        <Store className="size-4" /> Comercios
-                      </Button>
+                      {showNiubizRecords && (
+                        <Button variant="outline" size="sm" onClick={() => setMerchantsOpen(true)}>
+                          <Store className="size-4" /> Comercios
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -321,6 +326,13 @@ export function TreasuryPage() {
                   onUpdateOpenChange={setUpdateOpen}
                   merchantsOpen={merchantsOpen}
                   onMerchantsOpenChange={setMerchantsOpen}
+                />
+              ) : showMercadoPagoRecords ? (
+                <MercadoPagoPayments
+                  sourceId={selected.id}
+                  sourceName={selected.name}
+                  updateOpen={updateOpen}
+                  onUpdateOpenChange={setUpdateOpen}
                 />
               ) : (
                 <>

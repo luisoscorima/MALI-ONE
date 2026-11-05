@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { parseNiubizRows } from './niubiz-import';
+import { sanitizePaymentPayload } from './payment-payload';
 import merchants from './niubiz-merchants.json';
 
 const base = 'https://api.niubiz.pe/api.backoffice.merchant';
@@ -14,7 +15,7 @@ const vaultRuntime = [
   'FINANCE_VAULT_CLIENT_ID',
   'FINANCE_VAULT_CLIENT_SECRET',
   'FINANCE_VAULT_MASTER_PASSWORD',
-  'NIUBIZ_RUNTIME_NODE',
+  'FINANCE_RUNTIME_NODE',
   'NIUBIZ_LOGIN_SCRIPT',
 ];
 type Result = { merchant: string; status: string; rows?: number; createdCount?: number; updatedCount?: number };
@@ -144,7 +145,7 @@ export class NiubizSyncService {
         FINANCE_VAULT_NIUBIZ_ITEM_ID: vaultItemId,
       };
       execFile(
-        process.env.NIUBIZ_RUNTIME_NODE!,
+        process.env.FINANCE_RUNTIME_NODE!,
         [process.env.NIUBIZ_LOGIN_SCRIPT!],
         { env, timeout: 180000, maxBuffer: 65536, windowsHide: true },
         (err, stdout) => {
@@ -221,7 +222,7 @@ export class NiubizSyncService {
             if (raw.length >= 5000 || (typeof payload.data.count === 'number' && payload.data.count > raw.length)) throw new Error('EXPORT_INCOMPLETE');
             const rows = raw.length ? parseNiubizRows(raw) : [];
             if (rows.some(row => row.merchantCode !== merchant || limaDay(row.transactedAt) < from || limaDay(row.transactedAt) > to)) throw new Error('API_DATA_MISMATCH');
-            const saved = rows.length ? await this.payments.saveRows(rows, 'niubiz_api', createHash('sha256').update(JSON.stringify(rows)).digest('hex'), actor) : { rows: 0, createdCount: 0, updatedCount: 0 };
+            const saved = rows.length ? await this.payments.saveRows(rows, 'niubiz_api', createHash('sha256').update(JSON.stringify(rows)).digest('hex'), actor, raw.map(sanitizePaymentPayload)) : { rows: 0, createdCount: 0, updatedCount: 0 };
             results.push({ merchant, status: 'ok', rows: saved.rows, createdCount: saved.createdCount, updatedCount: saved.updatedCount });
             success = true;
             break;

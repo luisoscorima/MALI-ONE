@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { readNiubizXlsx, NiubizPayment } from './niubiz-import';
+import { samePaymentPayload } from './payment-payload';
 import { TreasuryPaymentQueryDto } from './dto/treasury.dto';
 
 @Injectable()
@@ -15,7 +16,13 @@ export class TreasuryPaymentsService {
     return this.saveRows(rows, 'niubiz_xlsx', checksum, actor);
   }
 
-  async saveRows(rows: NiubizPayment[], origin: 'niubiz_api' | 'niubiz_xlsx', checksum: string, actor?: { id: string; email: string }) {
+  async saveRows(
+    rows: NiubizPayment[],
+    origin: 'niubiz_api' | 'niubiz_xlsx',
+    checksum: string,
+    actor?: { id: string; email: string },
+    payloads?: Prisma.InputJsonObject[],
+  ) {
     return this.prisma.$transaction(async tx => {
       // Serializes imports across API instances, so counts and upserts cannot race.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(782301)`;
@@ -23,14 +30,20 @@ export class TreasuryPaymentsService {
         provider: 'niubiz_sales', origin, checksum, actorId: actor?.id ?? 'niubiz_scheduler',
         rowCount: rows.length, createdCount: 0, updatedCount: 0,
       } });
+      if (payloads && payloads.length !== rows.length) {
+        throw new BadRequestException('El lote y el registro del portal no coinciden.');
+      }
       let createdCount = 0;
       let updatedCount = 0;
-      for (const row of rows) {
+      for (const [index, row] of rows.entries()) {
         const identity = { provider: 'niubiz_sales' as const, merchantCode: row.merchantCode, transactionCode: row.transactionCode };
         const old = await tx.treasuryPayment.findUnique({ where: { provider_merchantCode_transactionCode: identity } });
         const amount = new Prisma.Decimal(row.amount);
+        const payload = payloads?.[index];
+        const payloadChanged = payload ? !samePaymentPayload(old?.payload ?? null, payload) : false;
         if (!old) createdCount++;
         else if (
+          payloadChanged ||
           !old.amount.equals(amount) ||
           old.status !== row.status ||
           old.currency !== row.currency ||
@@ -47,10 +60,11 @@ export class TreasuryPaymentsService {
         ) {
           updatedCount++;
         }
+        const saved = { ...row, amount, lastImportId: batch.id, ...(payload ? { payload } : {}) };
         await tx.treasuryPayment.upsert({
           where: { provider_merchantCode_transactionCode: identity },
-          create: { ...row, provider: 'niubiz_sales', amount, lastImportId: batch.id },
-          update: { ...row, amount, lastImportId: batch.id },
+          create: { ...saved, provider: 'niubiz_sales' },
+          update: saved,
         });
       }
       await tx.treasuryPaymentImport.update({ where: { id: batch.id }, data: { createdCount, updatedCount } });

@@ -3,6 +3,7 @@ import { TreasuryController } from './treasury.controller';
 import { TreasuryService } from './treasury.service';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { NiubizSyncService } from './niubiz-sync.service';
+import { MercadoPagoSyncService } from './mercadopago-sync.service';
 
-@Module({ controllers: [TreasuryController], providers: [TreasuryService, TreasuryPaymentsService, NiubizSyncService] })
+@Module({ controllers: [TreasuryController], providers: [TreasuryService, TreasuryPaymentsService, NiubizSyncService, MercadoPagoSyncService] })
 export class TreasuryModule {}

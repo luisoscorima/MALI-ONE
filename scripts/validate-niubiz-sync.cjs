@@ -46,7 +46,7 @@ async function waitDone() {
   throw new Error('Test timed out');
 }
 async function main() {
-  for (const key of ['FINANCE_VAULT_CLIENT_ID', 'FINANCE_VAULT_CLIENT_SECRET', 'FINANCE_VAULT_MASTER_PASSWORD', 'FINANCE_VAULT_NIUBIZ_ITEM_ID', 'NIUBIZ_RUNTIME_NODE', 'NIUBIZ_LOGIN_SCRIPT']) process.env[key] = 'test-placeholder';
+  for (const key of ['FINANCE_VAULT_CLIENT_ID', 'FINANCE_VAULT_CLIENT_SECRET', 'FINANCE_VAULT_MASTER_PASSWORD', 'FINANCE_VAULT_NIUBIZ_ITEM_ID', 'FINANCE_RUNTIME_NODE', 'NIUBIZ_LOGIN_SCRIPT']) process.env[key] = 'test-placeholder';
   process.env.FINANCE_VAULT_URL = 'https://vault.example.test';
   process.env.NIUBIZ_SYNC_ENABLED = 'false';
   await prisma.niubizSyncState.deleteMany();

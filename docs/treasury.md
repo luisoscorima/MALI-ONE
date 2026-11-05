@@ -4,13 +4,13 @@
 
 ## Qué es
 
-**Fuentes** (portales: Niubiz, BCP, …) y **pagos Niubiz** (import XLSX y sync API), con UI Fuente → operaciones y acciones en modales. Targets CRUD solo para fuentes sin conector. Módulo independiente de PAM. Objetivo: guardar/mostrar ventas Niubiz en horario America/Lima; conciliación bancaria fuera de alcance actual.
+**Fuentes** (portales: Niubiz, Mercado Pago, BCP, …), pagos Niubiz y ventas Mercado Pago, con UI Fuente → operaciones y acciones en modales. Targets CRUD solo para fuentes sin conector. Módulo independiente de PAM; conciliación bancaria fuera de alcance actual.
 
 ## Código
 
-- `apps/api/src/modules/treasury/` — `treasury.controller.ts`, `treasury.service.ts`, `treasury-payments.service.ts`, `niubiz-sync.service.ts`, `niubiz-import.ts`, `niubiz-merchants.json`
-- Runtime login: `scripts/niubiz-runtime/`
-- Web: `treasury-page.tsx`, `treasury-payments.tsx`, `niubiz-sync.tsx`
+- `apps/api/src/modules/treasury/` — servicios de inventario, pagos Niubiz y `mercadopago-sync.service.ts`
+- Runtime compartido de conectores financieros: `scripts/finance-runtime/`
+- Web: `treasury-page.tsx`, `treasury-payments.tsx`, `mercadopago-payments.tsx`, `niubiz-sync.tsx`
 
 ## UI
 
@@ -26,12 +26,14 @@
 | GET | `/api/treasury/payments` | Listado + filtros + `q` |
 | POST | `/api/treasury/payments/import-niubiz` | Import XLSX |
 | GET/POST | `/api/treasury/niubiz/status`, `niubiz/sync` | Sync API |
+| GET/POST | `/api/treasury/mercadopago/:sourceId/payments`, `status`, `sync` | Ventas Mercado Pago por fuente |
 
 ## Datos (Prisma)
 
 - `TreasurySource`, `TreasuryTarget`
-- `TreasuryPayment` (incl. email / tarjeta enmascarada / billetera), `TreasuryPaymentImport`
+- `TreasuryPayment` (incl. email / tarjeta enmascarada / billetera / `payload`), `TreasuryPaymentImport`
 - `NiubizSyncState`
+- `MercadoPagoPayment`, `MercadoPagoSyncState`
 
 ## Conexiones externas
 
@@ -39,6 +41,7 @@
 |---------|-----|
 | **Vaultwarden** | Usuario/password Niubiz vía CLI Bitwarden 2026.6.0 + Node 24 |
 | **Niubiz Comercio** | Login web + API export órdenes |
+| **Mercado Pago** | API oficial de pagos; credenciales productivas desde Vaultwarden |
 | **Chromium/Playwright** | Automatización login en imagen API |
 | **PostgreSQL** | Pagos + locks distribuidos de sync |
 
@@ -55,6 +58,12 @@ FINANCE_VAULT_MASTER_PASSWORD=
 ```
 
 Acceso a la bóveda (URL + API key + master) permanece en `.env`. El UUID del ítem de cada portal vive en la fuente (`TreasurySource.vaultItemId`), editable en UI. **Nunca** `VITE_*` para secretos Niubiz.
+
+### Mercado Pago
+
+El elemento Vaultwarden de una fuente Mercado Pago debe incluir un campo protegido `access_token`, o los campos protegidos `client_id` y `client_secret`. La sincronización usa `GET /v1/payments/search`, guarda la identidad `sourceId + paymentId` y muestra importe bruto, neto, comisiones, estado, cliente, medio de pago y fechas disponibles. El campo `payload` conserva el resto de la venta, sin número de tarjeta ni documento del pagador. No ejecuta reembolsos ni otras acciones financieras.
+
+El login web observado requiere contraseña y, en el primer acceso de un dispositivo, segundo factor. Un modo asistido solo es reutilizable si el perfil de navegador validado pertenece al servidor y se almacena de forma persistente y protegida. Transferir cookies del navegador personal no forma parte del diseño. Por ahora la conexión ejecutable usa la API oficial; la UI y persistencia pueden probarse sin credenciales mediante dobles de API.
 
 ## Permisos
 
@@ -286,13 +295,13 @@ Acceso a Vaultwarden (URL, client id/secret, master password) permanece en `.env
 
 Las comillas simples en el `.env` de Docker Compose conservan los `$` literales; si el secreto contiene comillas simples, aplicar el escape documentado de Compose y comprobarlo sin imprimir su valor. No poner estos valores en variables `VITE_`, en el repositorio ni en el chat. El servidor necesita acceso de red a Vaultwarden, Niubiz y los recursos de su formulario de acceso. Para producción conviene una cuenta de bóveda dedicada con acceso solo a los elementos necesarios; `testing` sirve para esta primera prueba.
 
-La imagen API incluye Chromium y las dependencias de login. `NIUBIZ_RUNTIME_NODE`, `NIUBIZ_LOGIN_SCRIPT` y `PLAYWRIGHT_BROWSERS_PATH` ya están definidos en el Dockerfile; no sobrescribirlos con rutas Windows en producción. El build descarga CLI y navegador y aumenta el tamaño de la imagen.
+La imagen API incluye Chromium y las dependencias de los conectores. `FINANCE_RUNTIME_NODE`, `NIUBIZ_LOGIN_SCRIPT`, `MERCADOPAGO_CREDENTIALS_SCRIPT` y `PLAYWRIGHT_BROWSERS_PATH` ya están definidos en el Dockerfile; no sobrescribirlos con rutas Windows en producción. El build descarga CLI y navegador y aumenta el tamaño de la imagen.
 
 El `.env` permite que el servicio se recupere después de un reinicio sin intervención. Quien tenga acceso administrativo al host/contenedor también puede acceder a estos secretos: limitar permisos del archivo y de la cuenta. La bóveda de Niubiz sigue siendo Vaultwarden; no se crea una segunda bóveda en la base de datos. El worker usa un directorio temporal para el caché cifrado del CLI y lo elimina al terminar normalmente; un cierre forzado puede dejar ese caché temporal cifrado hasta recrear el contenedor.
 
 ## Despliegue y prueba
 
-1. Commit de los cambios revisados, incluyendo las dos migraciones de pagos y sincronización, el JSON de comercios y `scripts/niubiz-runtime/package-lock.json`. No incluir `.env`, Excel ni secretos. Los cambios ajenos de Educación no forman parte de esta funcionalidad.
+1. Commit de los cambios revisados, incluyendo las migraciones de pagos y sincronización, el JSON de comercios y `scripts/finance-runtime/package-lock.json`. No incluir `.env`, Excel ni secretos. Los cambios ajenos de Educación no forman parte de esta funcionalidad.
 2. En el servidor, usando el procedimiento habitual de este repositorio, reconstruir y recrear API y web:
 
    ```sh

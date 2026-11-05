@@ -2,16 +2,32 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req, Quer
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule, User } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
-import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto } from './dto/treasury.dto';
+import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto, MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { TreasuryService } from './treasury.service';
 import { NiubizSyncService } from './niubiz-sync.service';
 import { Roles } from '../../core/guards/roles.decorator';
+import { MercadoPagoSyncService } from './mercadopago-sync.service';
 
 @Controller('treasury')
 @RequireModule(AppModule.treasury)
 export class TreasuryController {
-  constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService, private readonly niubiz: NiubizSyncService) {}
+  constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService,
+    private readonly niubiz: NiubizSyncService, private readonly mercadoPago: MercadoPagoSyncService) {}
+
+  @Get('mercadopago/:sourceId/status')
+  mercadoPagoStatus(@Param('sourceId') sourceId: string) { return this.mercadoPago.status(sourceId); }
+
+  @Post('mercadopago/:sourceId/sync')
+  @Roles('admin')
+  syncMercadoPago(@Req() req: { user: User }, @Param('sourceId') sourceId: string, @Body() body: MercadoPagoPaymentQueryDto) {
+    return this.mercadoPago.start(sourceId, { from: body.from, to: body.to }, req.user);
+  }
+
+  @Get('mercadopago/:sourceId/payments')
+  mercadoPagoPayments(@Param('sourceId') sourceId: string, @Query() query: MercadoPagoPaymentQueryDto) {
+    return this.mercadoPago.list(sourceId, query);
+  }
 
   @Get('niubiz/status')
   niubizStatus() { return this.niubiz.status(); }
