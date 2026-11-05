@@ -1,5 +1,17 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsString, Length, Matches, IsOptional, IsInt, Min, Max, IsDateString } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsString,
+  Length,
+  Matches,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsDateString,
+  ValidateIf,
+} from 'class-validator';
 import { TreasuryCurrency, TreasuryProvider } from '@prisma/client';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
@@ -33,6 +45,19 @@ export class TreasurySourceInputDto {
   @IsString()
   @Length(1, 160)
   legalEntity?: string;
+
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value == null) return value;
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  })
+  @ValidateIf((_, value) => value != null && value !== '')
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
+    message: 'El ID de Vaultwarden debe ser un UUID.',
+  })
+  vaultItemId?: string | null;
 
   @IsBoolean()
   active!: boolean;

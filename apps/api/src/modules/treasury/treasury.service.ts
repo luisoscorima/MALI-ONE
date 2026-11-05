@@ -45,15 +45,37 @@ export class TreasuryService {
         existing?.legalEntity ||
         providerMeta?.entity ||
         input.name;
-      const data = { provider: input.provider, name: input.name, active: input.active, legalEntity };
+      const vaultItemId =
+        input.vaultItemId === undefined
+          ? existing?.vaultItemId ?? null
+          : input.vaultItemId;
+      const data = {
+        provider: input.provider,
+        name: input.name,
+        active: input.active,
+        legalEntity,
+        vaultItemId,
+      };
       const source = id
         ? await tx.treasurySource.update({ where: { id }, data })
         : await tx.treasurySource.create({ data });
       await this.audit(tx, actor, id ? 'TREASURY_SOURCE_UPDATED' : 'TREASURY_SOURCE_CREATED', {
         sourceId: source.id,
         provider: source.provider,
-        before: existing ? { name: existing.name, legalEntity: existing.legalEntity, active: existing.active } : null,
-        after: { name: source.name, legalEntity: source.legalEntity, active: source.active },
+        before: existing
+          ? {
+              name: existing.name,
+              legalEntity: existing.legalEntity,
+              active: existing.active,
+              vaultItemId: existing.vaultItemId,
+            }
+          : null,
+        after: {
+          name: source.name,
+          legalEntity: source.legalEntity,
+          active: source.active,
+          vaultItemId: source.vaultItemId,
+        },
       });
       return { id: source.id };
     }));

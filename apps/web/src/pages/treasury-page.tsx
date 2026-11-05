@@ -42,6 +42,7 @@ import {
 const blankSource: TreasurySourceInput = {
   provider: 'niubiz_sales',
   name: '',
+  vaultItemId: '',
   active: true,
 };
 const blankTarget: TreasuryTargetInput = {
@@ -116,6 +117,7 @@ export function TreasuryPage() {
             input: {
               provider: source.provider,
               name: source.name,
+              vaultItemId: source.vaultItemId ?? '',
               active: source.active,
             },
           }
@@ -259,8 +261,13 @@ export function TreasuryPage() {
                           </span>
                         )}
                         <Badge variant="secondary">
-                          {source.active ? (isNiubiz ? 'Activa' : 'En preparación') : 'Archivada'}
+                          {source.active ? 'Activa' : 'Archivada'}
                         </Badge>
+                        {source.vaultItemId ? (
+                          <Badge variant="outline">Vault</Badge>
+                        ) : (
+                          <Badge variant="outline">Sin Vault</Badge>
+                        )}
                       </span>
                     </button>
                   );
@@ -420,8 +427,8 @@ export function TreasuryPage() {
           <DialogHeader>
             <DialogTitle>{sourceEdit?.id ? 'Editar fuente' : 'Añadir fuente'}</DialogTitle>
             <DialogDescription>
-              Una fuente identifica un acceso a un portal. Las credenciales se configurarán al conectar la
-              entidad.
+              Una fuente es un acceso a un portal. El ID de Vaultwarden apunta al login; la contraseña
+              sigue solo en la bóveda.
             </DialogDescription>
           </DialogHeader>
           {sourceEdit && (
@@ -468,9 +475,30 @@ export function TreasuryPage() {
                     }
                   />
                 </label>
+                <label className="grid gap-2 text-sm font-medium">
+                  ID del elemento en Vaultwarden
+                  <Input
+                    maxLength={36}
+                    spellCheck={false}
+                    autoComplete="off"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={sourceEdit.input.vaultItemId ?? ''}
+                    onChange={(e) =>
+                      setSourceEdit({
+                        ...sourceEdit,
+                        input: { ...sourceEdit.input, vaultItemId: e.target.value },
+                      })
+                    }
+                  />
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  UUID del ítem en vault.mali.pe (usuario/contraseña del portal). Si Niubiz obliga a
+                  renovar la clave, actualizas la contraseña en Vaultwarden; el ID suele permanecer. Si
+                  creas un ítem nuevo, pega aquí el UUID nuevo.
+                </p>
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="treasury-source-active" className="text-sm">
-                    Incluir en la preparación
+                    Fuente activa
                   </label>
                   <Switch
                     id="treasury-source-active"
@@ -484,7 +512,7 @@ export function TreasuryPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Guardar esta fuente no inicia conexiones.
+                  Guardar no inicia conexiones. Vaciar el ID desvincula el login de Vaultwarden.
                 </p>
                 {formError && (
                   <p role="alert" className="text-sm text-destructive">

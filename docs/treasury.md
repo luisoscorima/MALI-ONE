@@ -50,10 +50,11 @@ FINANCE_VAULT_URL=https://vault.mali.pe
 FINANCE_VAULT_CLIENT_ID=
 FINANCE_VAULT_CLIENT_SECRET=
 FINANCE_VAULT_MASTER_PASSWORD=
-FINANCE_VAULT_NIUBIZ_ITEM_ID=
+# Opcional: solo fallback si la fuente Niubiz no tiene vaultItemId en UI.
+# FINANCE_VAULT_NIUBIZ_ITEM_ID=
 ```
 
-Piloto: UUID del ítem en `.env`. Futuro multi-portal: UUID por fuente en DB (`vaultItemId`); acceso a bóveda permanece en env. **Nunca** `VITE_*` para secretos Niubiz.
+Acceso a la bóveda (URL + API key + master) permanece en `.env`. El UUID del ítem de cada portal vive en la fuente (`TreasurySource.vaultItemId`), editable en UI. **Nunca** `VITE_*` para secretos Niubiz.
 
 ## Permisos
 
@@ -88,8 +89,8 @@ La sync Niubiz usa la lista canónica de 77 comercios (`niubiz-merchants.json`).
 ### Secretos y plataformas futuras
 
 - **En `.env` (infraestructura, una vez):** URL, API key y clave maestra de la cuenta de servicio de Vaultwarden, más el flag de cron. Son el acceso a la bóveda, no las contraseñas de cada portal.
-- **Hoy el UUID del elemento Niubiz** también va en `.env` como `FINANCE_VAULT_NIUBIZ_ITEM_ID` (piloto). Cómo obtenerlo: [UUID del elemento Niubiz Comercio](#uuid-del-elemento-niubiz-comercio).
-- **Decisión para más plataformas:** no añadir un env por cada portal. El UUID del ítem de Vaultwarden (puntero, no el secreto) debe vivir en la fuente (`TreasurySource`, p. ej. `vaultItemId`). Usuario y contraseña de Niubiz/BCP/etc. permanecen solo en Vaultwarden; la API los lee en memoria con `bw get item <id>`. No crear una segunda bóveda en PostgreSQL.
+- **UUID del elemento por fuente** en UI (`TreasurySource.vaultItemId`). Cómo obtenerlo: [UUID del elemento Niubiz Comercio](#uuid-del-elemento-niubiz-comercio). `FINANCE_VAULT_NIUBIZ_ITEM_ID` en env es solo fallback legacy.
+- Usuario y contraseña de Niubiz/BCP/Mercado Pago/etc. permanecen solo en Vaultwarden; la API los lee en memoria con `bw get item <id>`. No crear una segunda bóveda en PostgreSQL.
 
 ### Validación previa de persistencia local
 
@@ -264,14 +265,13 @@ FINANCE_VAULT_URL=https://vault.mali.pe
 FINANCE_VAULT_CLIENT_ID='user.UUID_DE_TESTING'
 FINANCE_VAULT_CLIENT_SECRET='CLAVE_API_REGENERADA'
 FINANCE_VAULT_MASTER_PASSWORD='CLAVE_MAESTRA_DE_TESTING'
-FINANCE_VAULT_NIUBIZ_ITEM_ID='UUID_DEL_ELEMENTO_NIUBIZ_COMERCIO'
 ```
 
-Usar la API key personal de la cuenta que tiene acceso al elemento en la colección FINANZAS. La clave maestra corresponde a esa misma cuenta de Vaultwarden. No es la contraseña de Niubiz.
+Usar la API key personal de la cuenta que tiene acceso al elemento en la colección FINANZAS. La clave maestra corresponde a esa misma cuenta de Vaultwarden. No es la contraseña de Niubiz. El UUID del ítem Niubiz se pega en **Editar fuente → ID del elemento en Vaultwarden**.
 
 ### UUID del elemento Niubiz Comercio
 
-`FINANCE_VAULT_NIUBIZ_ITEM_ID` es el **UUID del ítem en Vaultwarden** que guarda usuario y contraseña de Niubiz Comercio. No es la contraseña de Niubiz ni la de la bóveda: es un puntero. El worker hace `bw get item <UUID>`, lee las credenciales en memoria e inicia sesión; esas credenciales no van en el `.env`.
+`TreasurySource.vaultItemId` (UI) es el **UUID del ítem en Vaultwarden** que guarda usuario y contraseña del portal (p. ej. Niubiz Comercio). No es la contraseña de Niubiz ni la de la bóveda: es un puntero. El worker hace `bw get item <UUID>`, lee las credenciales en memoria e inicia sesión.
 
 Cómo obtenerlo si no lo conoces:
 
@@ -282,7 +282,7 @@ Cómo obtenerlo si no lo conoces:
 
 No confundir el ID del elemento con el de colección u organización. Si el ítem no aparece, la cuenta no tiene acceso a Finanzas o el nombre del elemento es distinto.
 
-**Piloto vs. más plataformas:** en esta fase el UUID va en `.env`. Al sumar BCP u otras plataformas, no conviene un env por portal: el acceso a Vaultwarden (URL, client id/secret, master password) permanece en `.env`; el UUID por fuente debe pasar a la base (`TreasurySource.vaultItemId` u equivalente). Usuario/contraseña de cada portal siguen solo en Vaultwarden. Detalle en [Secretos y plataformas futuras](#secretos-y-plataformas-futuras).
+Acceso a Vaultwarden (URL, client id/secret, master password) permanece en `.env`; el UUID por fuente está en la base (`TreasurySource.vaultItemId`). Usuario/contraseña de cada portal siguen solo en Vaultwarden. Detalle en [Secretos y plataformas futuras](#secretos-y-plataformas-futuras).
 
 Las comillas simples en el `.env` de Docker Compose conservan los `$` literales; si el secreto contiene comillas simples, aplicar el escape documentado de Compose y comprobarlo sin imprimir su valor. No poner estos valores en variables `VITE_`, en el repositorio ni en el chat. El servidor necesita acceso de red a Vaultwarden, Niubiz y los recursos de su formulario de acceso. Para producción conviene una cuenta de bóveda dedicada con acceso solo a los elementos necesarios; `testing` sirve para esta primera prueba.
 

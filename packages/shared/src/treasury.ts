@@ -48,6 +48,8 @@ export interface TreasurySourceInput {
   name: string;
   /** Omitted in UI: API fills from provider entity. */
   legalEntity?: string;
+  /** Vaultwarden item UUID (pointer). Empty clears it. */
+  vaultItemId?: string | null;
   active: boolean;
 }
 
@@ -69,6 +71,7 @@ export interface TreasurySourceDto {
   provider: TreasuryProvider;
   name: string;
   legalEntity: string;
+  vaultItemId: string | null;
   active: boolean;
   syncIntervalMinutes: number;
   connectorStatus: 'pending';

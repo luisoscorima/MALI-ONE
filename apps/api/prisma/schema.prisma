@@ -54,12 +54,14 @@ enum TreasuryCurrency {
   USD
 }
 
-/// Inventory only. No credentials or connector execution in this initial module.
+/// Portal access. Credentials stay in Vaultwarden; vaultItemId is only a pointer.
 model TreasurySource {
   id                  String            @id @default(cuid())
   provider            TreasuryProvider
   name                String            @db.VarChar(120)
   legalEntity         String            @db.VarChar(160)
+  /// Vaultwarden item UUID for this portal login. Not a secret.
+  vaultItemId         String?           @db.VarChar(36)
   active              Boolean           @default(true)
   syncIntervalMinutes Int               @default(60)
   createdAt           DateTime          @default(now())

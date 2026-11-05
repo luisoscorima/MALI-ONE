@@ -4,9 +4,13 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- Mover `vaultItemId` a `TreasurySource` (multi-portal).
 - Conectores BCP / otros portales.
 - Separar permisos consulta vs configuración si contabilidad lo pide.
+
+## [2026-11-05] — vaultItemId en UI por fuente
+
+- `TreasurySource.vaultItemId` editable en Editar fuente; sync Niubiz lo usa (fallback opcional `FINANCE_VAULT_NIUBIZ_ITEM_ID`).
+- Migración `20261105210000_treasury_source_vault_item`. Toggle renombrado a «Fuente activa».
 
 ## [2026-11-05] — formulario de fuente reducido
 
