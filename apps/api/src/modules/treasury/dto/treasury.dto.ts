@@ -28,10 +28,11 @@ export class TreasurySourceInputDto {
   @Length(1, 120)
   name!: string;
 
+  @IsOptional()
   @Transform(trim)
   @IsString()
   @Length(1, 160)
-  legalEntity!: string;
+  legalEntity?: string;
 
   @IsBoolean()
   active!: boolean;

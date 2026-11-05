@@ -8,6 +8,10 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 - Conectores BCP / otros portales.
 - Separar permisos consulta vs configuración si contabilidad lo pide.
 
+## [2026-11-05] — formulario de fuente reducido
+
+- Quitado “Titular / razón social” del modal y de la cabecera; `legalEntity` sigue en DB y la API lo rellena con la entidad del proveedor si no viene.
+
 ## [2026-11-05] — UI jerarquía + columnas de pago
 
 - Página: fuentes → cabecera → operaciones; acciones en modales (Editar, Actualizar pagos API+Excel, Comercios lectura, Detalle).

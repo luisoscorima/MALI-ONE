@@ -42,7 +42,6 @@ import {
 const blankSource: TreasurySourceInput = {
   provider: 'niubiz_sales',
   name: '',
-  legalEntity: '',
   active: true,
 };
 const blankTarget: TreasuryTargetInput = {
@@ -117,7 +116,6 @@ export function TreasuryPage() {
             input: {
               provider: source.provider,
               name: source.name,
-              legalEntity: source.legalEntity,
               active: source.active,
             },
           }
@@ -283,8 +281,7 @@ export function TreasuryPage() {
                     {selected.name}
                   </h2>
                   <p className="mt-1 text-pretty text-sm text-muted-foreground">
-                    {selected.legalEntity}
-                    {provider ? ` · ${provider.label}` : ''}
+                    {provider?.label ?? selected.provider}
                     {selected.active ? '' : ' · Archivada'}
                   </p>
                 </div>
@@ -467,20 +464,6 @@ export function TreasuryPage() {
                       setSourceEdit({
                         ...sourceEdit,
                         input: { ...sourceEdit.input, name: e.target.value },
-                      })
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Titular / razón social
-                  <Input
-                    required
-                    maxLength={160}
-                    value={sourceEdit.input.legalEntity}
-                    onChange={(e) =>
-                      setSourceEdit({
-                        ...sourceEdit,
-                        input: { ...sourceEdit.input, legalEntity: e.target.value },
                       })
                     }
                   />

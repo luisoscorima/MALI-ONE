@@ -39,9 +39,16 @@ export class TreasuryService {
       if (existing && existing.provider !== input.provider) {
         throw new BadRequestException('La entidad y el portal no se pueden cambiar. Registra otra fuente.');
       }
+      const providerMeta = TREASURY_PROVIDERS.find((item) => item.id === input.provider);
+      const legalEntity =
+        input.legalEntity?.trim() ||
+        existing?.legalEntity ||
+        providerMeta?.entity ||
+        input.name;
+      const data = { provider: input.provider, name: input.name, active: input.active, legalEntity };
       const source = id
-        ? await tx.treasurySource.update({ where: { id }, data: input })
-        : await tx.treasurySource.create({ data: input });
+        ? await tx.treasurySource.update({ where: { id }, data })
+        : await tx.treasurySource.create({ data });
       await this.audit(tx, actor, id ? 'TREASURY_SOURCE_UPDATED' : 'TREASURY_SOURCE_CREATED', {
         sourceId: source.id,
         provider: source.provider,

@@ -46,7 +46,8 @@ export interface TreasuryPaymentsDto {
 export interface TreasurySourceInput {
   provider: TreasuryProvider;
   name: string;
-  legalEntity: string;
+  /** Omitted in UI: API fills from provider entity. */
+  legalEntity?: string;
   active: boolean;
 }
 
@@ -63,8 +64,12 @@ export interface TreasuryTargetDto extends TreasuryTargetInput {
   kind: TreasuryTargetKind;
 }
 
-export interface TreasurySourceDto extends TreasurySourceInput {
+export interface TreasurySourceDto {
   id: string;
+  provider: TreasuryProvider;
+  name: string;
+  legalEntity: string;
+  active: boolean;
   syncIntervalMinutes: number;
   connectorStatus: 'pending';
   targets: TreasuryTargetDto[];
