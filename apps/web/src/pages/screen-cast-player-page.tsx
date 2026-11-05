@@ -71,6 +71,8 @@ import {
 } from '@/lib/screen-cast-video-cache';
 
 const HEARTBEAT_MS = 30_000;
+/** How often players report index/media time so the API can detect wall drift. */
+const STATUS_INTERVAL_MS = 2_000;
 const KIOSK_CLASS = 'screen-cast-kiosk';
 
 /** Long enough to be read from across a room on a kiosk TV. */
@@ -267,6 +269,7 @@ export function ScreenCastPlayerPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
   const [playbackGen, setPlaybackGen] = useState(0);
   const [loaderHint, setLoaderHint] = useState('Cargando');
   const [toasts, setToasts] = useState<KioskToast[]>([]);
@@ -339,6 +342,10 @@ export function ScreenCastPlayerPage() {
     videoHoldingRef.current = holding;
     setVideoHolding(holding);
   }, []);
+
+  useEffect(() => {
+    syncingRef.current = syncing;
+  }, [syncing]);
 
   /**
    * Backdrop for a held video slot. Right after a boot nothing has been shown
@@ -461,6 +468,7 @@ export function ScreenCastPlayerPage() {
   }, []);
 
   const holdForSync = useCallback(() => {
+    syncingRef.current = true;
     setSyncing(true);
     setLoaderHint('Sincronizando…');
     setVideoCovered(true);
@@ -1127,15 +1135,42 @@ export function ScreenCastPlayerPage() {
       if (isPreview) return;
       const socket = socketRef.current;
       if (!socket?.connected || !screenKey) return;
+      const holding =
+        videoHoldingRef.current || syncingRef.current || waitingGoRef.current;
+      const video = videoRef.current;
+      const mediaTimeMs =
+        !holding &&
+        videoPlaybackActiveRef.current &&
+        video &&
+        !video.paused &&
+        !video.ended &&
+        Number.isFinite(video.currentTime)
+          ? Math.round(video.currentTime * 1000)
+          : null;
       socket.emit('status', {
         screenKey,
         index: payload.index,
         total: payload.total,
         lastError: payload.lastError ?? null,
+        mediaTimeMs,
+        holding,
       });
     },
     [isPreview, screenKey],
   );
+
+  useEffect(() => {
+    if (isPreview || !screenKey) return;
+    const id = window.setInterval(() => {
+      const items = itemsRef.current;
+      if (!items.length) return;
+      emitStatus({
+        index: indexRef.current,
+        total: items.length,
+      });
+    }, STATUS_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [isPreview, screenKey, emitStatus]);
 
   const jumpToClock = useCallback(() => {
     const epoch = epochMsRef.current;

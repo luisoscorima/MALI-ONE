@@ -26,8 +26,9 @@ import {
   UpdateScreenCastScheduleOverrideDto,
 } from './dto/screen-cast.dto';
 import {
-  convertMovBufferToMp4,
   isMovUpload,
+  isVideoUpload,
+  prepareScreenCastVideoUpload,
   probeVideoDurationMs,
 } from './screen-cast-video.util';
 
@@ -130,15 +131,19 @@ export class ScreenCastService {
           'No se pudo procesar la imagen. Prueba otro JPG/PNG.',
         );
       }
-    } else if (isMovUpload(mime, originalName)) {
+    } else if (isVideoUpload(mime, originalName)) {
       try {
-        uploadBuffer = await convertMovBufferToMp4(file.buffer);
+        const prepared = await prepareScreenCastVideoUpload(file.buffer, {
+          fileName: originalName,
+          mime,
+        });
+        uploadBuffer = prepared.buffer;
         uploadMime = 'video/mp4';
         uploadName = toMp4FileName(originalName);
       } catch (e) {
         const detail = e instanceof Error ? e.message : 'error desconocido';
         throw new BadRequestException(
-          `No se pudo convertir el MOV a MP4. ${detail}`,
+          `No se pudo normalizar el video a MP4 H.264. ${detail}`,
         );
       }
     }

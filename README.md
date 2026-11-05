@@ -2,18 +2,22 @@
 
 Sistema de operaciones internas (backoffice) para **mali.pe**.
 
+## Documentación por módulo
+
+La documentación vive en [`docs/`](docs/README.md): un archivo `<modulo>.md` (qué es, cómo funciona, API, conexiones externas) y su `<modulo>-CHANGELOG.md` (evolución). Empieza por el [índice](docs/README.md).
+
 ## Módulos (Fase 1)
 
-- Login Google Workspace (`@mali.pe` únicamente)
-- Gestión manual de usuarios Google Admin
-- **Enlaces y QR** (`/links`): acortador, WhatsApp, archivos S3, QR personalizable, carga masiva Excel y estadísticas
-- Gestor S3 (super admin)
-- Configuradores de widgets embebidos (educación, biblioteca, museo) y membresías PAM
-- **Boletines** (`/admin/newsletters`): editor por bloques, URL pública `/n/{slug}`
-- **CRM PAM** (`/admin/crm-pam`): lista de contactos (fuente WhatsApp) y envío SES de boletines
-- Leads Educación (widget): captura en `EducacionLead` → sync a WhatsApp vía `POST /api/crm/origins` (sin attrs de campaña). Ver [docs/EDUCACION-LEADS.md](docs/EDUCACION-LEADS.md).
-
-Ver ownership CRM/producto/vitrina en [docs/OWNERSHIP-PAM-CRM.md](docs/OWNERSHIP-PAM-CRM.md).
+- Login Google Workspace (`@mali.pe` únicamente) — [auth-google](docs/auth-google.md)
+- Gestión manual de usuarios Google Admin — [google-admin](docs/google-admin.md)
+- **Enlaces y QR** (`/links`) — [links](docs/links.md)
+- Gestor S3 (super admin) — [s3-manager](docs/s3-manager.md)
+- Widgets embebidos y PAM — [widgets](docs/widgets.md), [pam](docs/pam.md)
+- **Boletines** (`/admin/newsletters`) — [newsletters](docs/newsletters.md)
+- **CRM PAM** (`/admin/crm-pam`) — [crm-pam](docs/crm-pam.md)
+- Leads / CRM Educación — [crm-educacion](docs/crm-educacion.md)
+- Transmisión a pantallas — [screen-cast](docs/screen-cast.md)
+- Verificación de pagos — [treasury](docs/treasury.md)
 
 ### Enlaces y QR (`/links`)
 
@@ -26,7 +30,7 @@ Ver ownership CRM/producto/vitrina en [docs/OWNERSHIP-PAM-CRM.md](docs/OWNERSHIP
 | Estilo predeterminado | Por usuario; cada enlace nuevo hereda una copia editable |
 | Estadísticas | Clicks/escaneos por día, dispositivo, navegador y SO (`LinkClick`) |
 
-Ver sugerencias de evolución en [docs/MEJORAS-PROXIMAS.md](docs/MEJORAS-PROXIMAS.md).
+Detalle y backlog: [docs/links.md](docs/links.md), [docs/links-CHANGELOG.md](docs/links-CHANGELOG.md).
 
 ## Stack
 
@@ -103,6 +107,8 @@ El contenedor `mali-one-web` se une a la red **`nginx-proxy-manager_default`**. 
    - `X-Forwarded-For`
 
 ### WebSocket de screen-cast a través de NPM
+
+Documentación del módulo: [docs/screen-cast.md](docs/screen-cast.md). Detalle de plataforma: [docs/plataforma.md](docs/plataforma.md).
 
 Los televisores kiosco se conectan con `transports: ['websocket']` y `upgrade: false`: **no hay fallback a long-polling**, así que si el upgrade no llega al backend la pantalla se queda sin reloj compartido.
 
@@ -278,7 +284,7 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | `bsale_reports` | `/bsale/kardex` | Kardex consolidado Bsale |
 | `password_vault` | `/vault` | Acceso a Vaultwarden |
 
-Ver [docs/WIDGETS-EMBED.md](docs/WIDGETS-EMBED.md) para snippets iframe en sitios públicos.
+Ver [docs/widgets.md](docs/widgets.md) para snippets iframe en sitios públicos.
 
 ### API de enlaces (referencia rápida)
 

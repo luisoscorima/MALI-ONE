@@ -1,4 +1,61 @@
-# Landings de MALI Educación
+# Landings (landings)
+
+> Changelog: [landings-CHANGELOG.md](./landings-CHANGELOG.md) · Índice: [README.md](./README.md)
+
+## Qué es
+
+Editor de páginas de campaña para **MALI Educación**. MALI ONE guarda bloques y publica un **snapshot HTML**; WordPress solo resuelve la URL pública vía plugin `mali-one-embed` (sin theme WP).
+
+## Código
+
+- API: `apps/api/src/modules/landings/` — admin + public controllers, `landing-renderer.ts`, service
+- Web: `landings-page.tsx`
+- Contenido plantilla GC: `packages/shared` (`gestion-cultural-content`)
+
+## UI
+
+| Ruta | Uso |
+|------|-----|
+| `/admin/landings` | CRUD, preview, publish/unpublish |
+
+## API
+
+| Área | Rutas |
+|------|-------|
+| Admin | `/api/landings` CRUD, `preview`, `publish`, `unpublish` |
+| Público | `GET /api/landings/public/:slug` |
+
+## Datos (Prisma)
+
+- `LandingPage` (status draft/published/archived, snapshot HTML, versión)
+
+## Conexiones externas
+
+| Sistema | Uso |
+|---------|-----|
+| **WordPress** + plugin `mali-one-embed` | URL pública `/landing/{slug}/` |
+| **educacion.mali.pe** | Assets (logo, video, fotos docentes) referenciados por URL |
+| **Widget leads Educación** | Bloque formulario |
+| **GTM** opcional | `LANDINGS_GTM_ID` |
+
+## Variables de entorno
+
+```env
+LANDINGS_PUBLIC_BASE_URL=https://educacion.mali.pe/landing
+LANDINGS_GTM_ID=
+APP_URL=https://dev.mali.pe
+```
+
+## Permisos
+
+Módulo: `landings`
+
+## Relacionados
+
+- [widgets.md](./widgets.md)
+- [crm-educacion.md](./crm-educacion.md)
+
+## Producto y operación (consolidado)
 
 El módulo **Landings** mantiene el contenido, genera la vista previa y congela
 una versión HTML al publicar. WordPress conserva la URL pública, pero no guarda
@@ -205,3 +262,4 @@ Playwright con `LANDINGS_PLAYWRIGHT_PATH` y la carpeta de capturas con
 `LANDINGS_QA_DIR`. Usa una API simulada local, sustituye imágenes externas y no
 envía datos a servicios reales. Cubre navbar, malla, límites del formulario sticky,
 desplegable móvil, vista previa y edición/guardado/reapertura de matrícula y bio.
+

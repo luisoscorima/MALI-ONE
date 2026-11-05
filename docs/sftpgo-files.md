@@ -1,4 +1,66 @@
-# SFTPGo en Windows Lightsail — disco para MALI ONE
+# Archivos TMS / SFTPGo (sftpgo-files)
+
+> Changelog: [sftpgo-files-CHANGELOG.md](./sftpgo-files-CHANGELOG.md) · Índice: [README.md](./README.md)
+
+## Qué es
+
+BFF autenticado sobre **SFTPGo** (Windows Lightsail) para explorar el disco `D:\\tms_media`. El navegador **nunca** habla con SFTPGo; solo la API Nest con API key.
+
+## Cómo funciona
+
+```
+Usuario @mali.pe → MALI ONE (JWT) → Nest /api/files
+  → HTTP privado VPC → SFTPGo User API → D:\\tms_media
+```
+
+Listar, mkdir, rename, copy, upload, download, preview (TIFF→JPEG), papelera con retención y job de limpieza.
+
+## Código
+
+- `apps/api/src/modules/sftpgo-files/` — controller, service, scheduler
+- Web: `files-page.tsx`
+
+## UI
+
+| Ruta | Uso |
+|------|-----|
+| `/files` | Explorador Archivos TMS |
+
+## API
+
+Prefijo `/api/files`: `config`, list, `mkdir`, `rename`, `copy`, `restore`, DELETE, `upload`, `preview`, `download`, `trash`.
+
+## Datos (Prisma)
+
+N/A (filesystem remoto vía SFTPGo).
+
+## Conexiones externas
+
+| Sistema | Uso |
+|---------|-----|
+| **SFTPGo** en Lightsail Windows | REST User API |
+| **VPC peering** EC2 ↔ Lightsail | HTTP privado `172.26.4.218:8080` |
+
+## Variables de entorno
+
+```env
+SFTPGO_BASE_URL=http://172.26.4.218:8080
+SFTPGO_API_KEY=
+SFTPGO_PROTECTED_PATHS=Objetos,thumbnails
+SFTPGO_TRASH_DIR=_trash
+SFTPGO_TRASH_RETENTION_DAYS=30
+SFTPGO_PREVIEW_MAX_MB=100
+```
+
+## Permisos
+
+Módulo: `files`
+
+## Relacionados
+
+- [plataforma.md](./plataforma.md)
+
+## Guía de despliegue Lightsail
 
 MALI ONE no monta el disco: **SFTPGo** es el motor (listar, subir, bajar, permisos). La API NestJS actúa de BFF con la cookie Google de MALI ONE y llama a la REST API de SFTPGo con una API key. El navegador nunca ve secretos de SFTPGo.
 
@@ -155,3 +217,4 @@ El módulo `files` proxyfica:
 4. `SFTPGO_BASE_URL=http://172.26.4.218:8080` y `SFTPGO_API_KEY` en `.env`; recrear `api`.
 5. Módulo `files` asignado al usuario en Accesos MALI ONE.
 6. Abrir `/files`: listar, crear carpeta, subir, bajar, borrar.
+

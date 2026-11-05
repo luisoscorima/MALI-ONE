@@ -1,3 +1,90 @@
+# Widgets embebidos (widgets)
+
+> Changelog: [widgets-CHANGELOG.md](./widgets-CHANGELOG.md) · Índice: [README.md](./README.md)
+
+## Qué es
+
+Módulo Nest `widgets` con subáreas **educación**, **biblioteca**, **museo** y **pam**. Sirve shells HTML en `{APP_URL}/widgets/**` y config en `/api/widgets/**` para sitios públicos (WordPress, Koha, mali.pe).
+
+**Política:** no modificar `apps/web/public/widgets/**` sin requisito explícito (están en producción).
+
+## Cómo funciona
+
+1. Admin configura datos en `/admin/widgets/...` o `/admin/widget-pam`.
+2. Sitios embeben iframe/script apuntando a `/widgets/...`.
+3. El shell hace fetch a `/api/widgets/.../config` (CORS: `CORS_ORIGINS`).
+4. Leads Educación: ver [crm-educacion.md](./crm-educacion.md). PAM checkout: ver [pam.md](./pam.md).
+
+## Código
+
+```
+apps/api/src/modules/widgets/
+  educacion/   biblioteca/   museo/   pam/
+apps/web/public/widgets/
+apps/web/src/pages/widget-*.tsx
+```
+
+## UI (admin)
+
+| Módulo permiso | Ruta |
+|----------------|------|
+| `widget_educacion` | `/admin/widgets/educacion` (+ mapa, selector, calendario, popup, aliados, lead-form) |
+| `widget_biblioteca` | `/admin/widgets/biblioteca` |
+| `widget_museo` | `/admin/widgets/museo` |
+| `widget_pam` | `/admin/widget-pam` |
+
+## API (resumen)
+
+| Prefijo | Capacidad |
+|---------|-----------|
+| `/api/widgets/educacion` | config pública, admin settings, districts/sedes, popup, aliados, `POST leads`, calendar |
+| `/api/widgets/biblioteca` | carrusel config/admin CRUD |
+| `/api/widgets/museo` | popup config |
+| `/api/widgets/pam` | config, registrations, webhook Mercado Pago |
+
+## Datos (Prisma)
+
+- Educación: `EducacionWidgetSettings`, `EducacionDistrict`, `EducacionSelectorSede`, `EducacionPopupSettings`, `EducacionAliado`, `EducacionLead`
+- Biblioteca: `BibliotecaCarouselItem`, `BibliotecaCarouselSettings`
+- Museo: `MuseoPopupSettings`
+- PAM: `PamWidgetSettings`, `PamPlan`, `PamRegistration`, …
+
+## Conexiones externas
+
+| Sistema | Uso |
+|---------|-----|
+| **educacion.mali.pe / biblioteca.mali.pe / mali.pe** | Embeds |
+| **Google Maps / Calendar** | Widgets educación (`GOOGLE_MAPS_API_KEY`, `GOOGLE_CALENDAR_API_KEY`) |
+| **Google Sheets** | Espejo leads (opcional) |
+| **mali-whatsapp** | Sync leads / PAM (cliente `crm` global) |
+| **Redis** | Rate limit en captura de leads |
+| **Mercado Pago** | Membresías PAM (webhook) |
+| **SMTP PAM** | Welcome mail desde flujo widget |
+| **WordPress plugin mali-one-embed** | Shortcodes |
+| **S3 `mali-assets`** | Assets públicos referenciados por widgets |
+
+## Variables de entorno
+
+```env
+CORS_ORIGINS=https://educacion.mali.pe,https://biblioteca.mali.pe,https://mali.pe
+GOOGLE_MAPS_API_KEY=
+GOOGLE_CALENDAR_API_KEY=
+# WIDGET_SEED_ON_START=true   # solo entorno vacío
+EDUCACION_LEADS_SHEETS_ENABLED=false
+WHATSAPP_CRM_BASE_URL=
+WHATSAPP_CRM_SERVICE_TOKEN=
+```
+
+## Permisos
+
+`widget_educacion` | `widget_biblioteca` | `widget_museo` | `widget_pam`
+
+## Relacionados
+
+- [crm-educacion.md](./crm-educacion.md), [pam.md](./pam.md), [landings.md](./landings.md), [catalog-educacion.md](./catalog-educacion.md)
+
+## Embeds, shortcodes y fuentes
+
 # Widgets embebidos en sitios públicos
 
 MALI ONE sirve los shells HTML en `{APP_URL}/widgets/**` y la configuración en `{APP_URL}/api/widgets/**`.
@@ -193,7 +280,7 @@ Query params del embed:
 
 Tras un envío OK, el widget abre un chat prellenado (`api.whatsapp.com`) para que el visitante envíe el mensaje y abra la ventana de 24 h. Si el navegador bloquea el popup, queda el botón «Continuar por WhatsApp».
 
-Shortcode WP: `[mali_lead_form]` (infiere área por `post_type`). Checklist go-live: [docs/EDUCACION-LEADS.md](EDUCACION-LEADS.md).
+Shortcode WP: `[mali_lead_form]` (infiere área por `post_type`). Checklist go-live: [crm-educacion.md](./crm-educacion.md).
 
 ## Seed inicial
 

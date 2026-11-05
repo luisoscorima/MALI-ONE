@@ -1,11 +1,246 @@
-# Requerimientos Educación — Leads (MALI ONE + WhatsApp)
+# CRM Educación (crm-educacion)
+
+> Changelog: [crm-educacion-CHANGELOG.md](./crm-educacion-CHANGELOG.md) · Índice: [README.md](./README.md)
+
+## Qué es
+
+Panel operativo de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño). La captación entra por el widget de leads; la fuente de verdad de ciclos/estados/SLA es **mali-whatsapp**. MALI ONE orquesta UI, catálogo local de apoyo y sync.
+
+## Cómo funciona
+
+1. Widget `lead-form` → `POST /api/widgets/educacion/leads` → `EducacionLead` → sync origen WhatsApp (+ Sheets opcional).
+2. CRM Educación lista contactos/leads/ciclos/SLA vía API WhatsApp (`education` scope).
+3. Asesores cambian etapa, asignan, revisan; estados terminales cierran ciclo.
+4. Catálogo de estados administrable desde [catalog-educacion.md](./catalog-educacion.md) (espejo hacia WA).
+
+## Código
+
+- `apps/api/src/modules/crm-educacion/`
+- Leads widget: `apps/api/src/modules/widgets/educacion/educacion-leads*.ts`
+- Cliente: `apps/api/src/modules/crm/whatsapp-crm-client.service.ts`
+- Web: `crm-educacion-page.tsx`
+
+## UI
+
+| Ruta | Uso |
+|------|-----|
+| `/admin/crm-educacion` | Contactos, oportunidades, SLA, sync Prospectia |
+
+## API
+
+Prefijo `/api/crm-educacion`: contacts, leads, cycles, sla, catalogs, management, distribute, review, manual lead, prospectia sync/check.
+
+## Datos (Prisma)
+
+- `EducacionLead` (captación local + estado sync WA/Sheets)
+- Ciclos/estados/SLA: mali-whatsapp
+- Catálogo apoyo: modelos `EducacionCatalog*`
+
+## Conexiones externas
+
+| Sistema | Uso |
+|---------|-----|
+| **mali-whatsapp** | CRM educación, orígenes, SLA, estados |
+| **Google Sheets** (opcional) | Espejo EP/CA/Diseño si `EDUCACION_LEADS_SHEETS_ENABLED` |
+| **WordPress / landings** | Origen de captura del formulario |
+| **Prospectia** | Sync/check endpoints |
+
+## Variables de entorno
+
+```env
+WHATSAPP_CRM_BASE_URL=
+WHATSAPP_CRM_SERVICE_TOKEN=
+EDUCACION_LEADS_SHEETS_ENABLED=false
+GOOGLE_SHEETS_LEADS_EP_ID=
+GOOGLE_SHEETS_LEADS_TAB_EP=EP
+GOOGLE_SHEETS_LEADS_CA_ID=
+GOOGLE_SHEETS_LEADS_TAB_CA=CA
+GOOGLE_SHEETS_LEADS_DISENO_ID=
+GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
+```
+
+## Permisos
+
+Módulo: `crm_educacion`
+
+## Relacionados
+
+- [widgets.md](./widgets.md), [catalog-educacion.md](./catalog-educacion.md), [landings.md](./landings.md)
+
+## Go-live y operación (leads)
+
+# Leads Educación — go-live y apagado del Sheet
+
+Widget `lead-form.html` → `POST /api/widgets/educacion/leads` → `EducacionLead` → MALI WhatsApp (+ Google Sheets opcional).
+
+El widget es único para las fichas oficiales de WordPress y las landings. El
+documento padre le entrega por `postMessage` la URL real, referrer, origen de
+captura y atribución. Se aceptan estos campos:
+
+- `captureSource`: `wordpress_widget` o `landing`.
+- `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`.
+- `gclid`, `fbclid`, `pageUrl` y `referrer`.
+
+Si una visita entra con atribución y navega antes de enviar, los valores se
+conservan en `sessionStorage`. Una URL con una campaña nueva reemplaza la
+atribución anterior de esa sesión. Después del alta, el widget abre el prefill
+de WhatsApp; las UTMs quedan en MALI ONE y en el origen de MALI WhatsApp, no en
+el texto visible del mensaje.
+
+Estados del asesor y del ciclo: [Estados de lead](#estados-de-lead).
+
+Backlog de requerimientos (Sheet → CRM, fases y RQs): [Requerimientos Educación](#requerimientos-educación--backlog-consolidado).
+
+SLA 1.ª respuesta (promedio / % / por asesor): CRM Educación → pestaña **Oportunidades** (datos desde WhatsApp `GET /api/crm/education/sla`).
+
+## Operación en CRM Educación
+
+La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp, no sobre captaciones sueltas:
+
+- **Abiertas**: cartera activa.
+- **Cerradas**: ciclos finalizados por un estado terminal.
+- **Requieren revisión**: separa asesores retenidos por confirmar y conflictos comerciales de reingreso.
+- **Sin asignar**: ciclos abiertos sin asesor responsable.
+
+Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor retenido y cambiar la etapa comercial. Seleccionar un estado terminal cierra el ciclo. El curso o interés y el origen reciente se leen de la última captación asociada. La conversación continúa operándose en el inbox de MALI WhatsApp.
+
+## Checklist go-live
+
+1. **Migración**
+   ```bash
+   pnpm --filter @mali-one/api prisma:migrate
+   ```
+2. **WhatsApp CRM** en `.env` de MALI ONE:
+   - `WHATSAPP_CRM_BASE_URL=https://whatsapp.mali.pe`
+   - `WHATSAPP_CRM_SERVICE_TOKEN=` (mismo que `CRM_SERVICE_TOKEN` en mali-whatsapp)
+3. **Sheet (transitorio)** — crear **tres** spreadsheets (EP, CA, Diseño) y compartirlos con el `client_email` de la service account (Editor):
+   - `EDUCACION_LEADS_SHEETS_ENABLED=true`
+   - `GOOGLE_SHEETS_LEADS_EP_ID=` ID **o URL** del libro Extensión Profesional
+   - `GOOGLE_SHEETS_LEADS_TAB_EP=EP` (nombre exacto de la pestaña)
+   - `GOOGLE_SHEETS_LEADS_CA_ID=` ID **o URL** del libro Cursos de Arte
+   - `GOOGLE_SHEETS_LEADS_TAB_CA=CA`
+   - `GOOGLE_SHEETS_LEADS_DISENO_ID=` ID **o URL** del libro Diseño y Comunicaciones
+   - `GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno`
+   - Columnas append: Fecha, Nombres, Apellidos, DNI, Celular, Correo, Curso, Fuente, Source, URL, OptIn Marketing, Lead ID, Bucket
+
+   Enrutado automático:
+
+   | Origen | Destino |
+   |--------|---------|
+   | `/extensionprofesional/…` (WhatsApp EP) | Libro EP |
+   | `/diseno-y-comunicaciones/…` (sigue siendo WhatsApp EP) | Libro Diseño |
+   | Cursos de Arte (WhatsApp CA) | Libro CA |
+
+   Para cambiar de libro: solo edita la URL/ID en `.env` y reinicia la API.
+4. **WordPress**
+   - Plugin `mali-one-embed` ≥ 1.1.4 para atribución, eventos, caché de landings de 60 segundos y aislamiento de GSpeech (incluida la pantalla de landing no encontrada)
+   - `MALI_ONE_URL` apunta al entorno correcto
+   - Plantillas EP / cursos ya usan `[mali_lead_form]`
+5. **Prueba E2E** (curso EP de prueba):
+   - Enviar formulario «Conversemos»
+   - Verificar fila en tabla `EducacionLead` (`waStatus=ok`)
+   - Contacto en [whatsapp.mali.pe](https://whatsapp.mali.pe) área **Educación** con categoría **EP** (o CA), origen `channel=widget`; `source_key=educacion_lead_widget` para fichas o `source_key=educacion_landing` para landings
+   - Confirmar en el payload del origen: curso, URL, `capture_source`, referrer, UTMs y click IDs presentes en la URL de prueba
+   - Si Sheets está on: fila nueva en el rango configurado
+   - Apagar Sheet a propósito (`ENABLED=false`) y confirmar que el submit sigue OK y WA sync funciona
+
+## Apagar el espejo Sheet (cuando CRM Educación / WhatsApp baste)
+
+```env
+EDUCACION_LEADS_SHEETS_ENABLED=false
+```
+
+No hace falta cambiar el widget ni WordPress. Los leads nuevos solo irán a `EducacionLead` + WhatsApp.
+
+## Área y categorías (contrato WhatsApp)
+
+WhatsApp es fuente de verdad. **Área de ficha:** solo `educacion`. **Categoría:** `ca` | `ep` | general (`program_id` nulo). Los alias `educacion_ca` / `educacion_ep` en captura/embeds se traducen a categoría; no son tenants.
+
+CRM Educación en MALI ONE es **vitrina**: lista y opera con `area=educacion` y filtro de categoría (`all` | `general` | `ca` | `ep`).
+
+| Contexto WordPress | Categoría | Notas |
+|--------------------|-----------|--------|
+| Extensión Profesional (`extensionprofesional`) | `ep` | Captura widget/landing aún puede enviar alias legacy; WhatsApp normaliza |
+| Cursos de Arte (`curso-de-arte`) | `ca` | Igual |
+| Educación genérica / sin programa | general | Línea o form sin `program_key` |
+
+
+## Estados de lead
+
+# Estados de lead — Educación
+
+El asesor elige **una** etapa. Cada paso del camino significa más cerca de la inscripción. Al lado, el sistema podrá marcar si la llegada cuenta como captación nueva; esa marca no se elige a mano.
+
+Catálogo en WhatsApp (`lead_status_definitions`) bajo el área canónica **`educacion`**. CA/EP son **categorías** del ciclo, no áreas. El selector está en **CRM Educación** de MALI ONE (Contactos y Oportunidades), agrupado en Inscripción e Intento o cierre.
+
+La administración del catálogo está en **MALI ONE → Catálogo Educación → Estados de lead**. Desde allí se crean, renombran y ordenan estados, se define el inicial o terminal y se desactivan/reactivan. WhatsApp continúa siendo la fuente de verdad. Desactivar reemplaza a eliminar para conservar los ciclos históricos.
+
+Definición: `EDUCATION_LEAD_STATUSES` en mali-whatsapp (`api/src/leads/leads.types.ts`). PAM, TI y Patronato no usan este catálogo.
+
+## Camino de inscripción
+
+| Orden | Estado | Slug | Qué significa |
+|------:|--------|------|----------------|
+| 1 | Por contactar | `por_contactar` | Llegó y nadie ha hecho el primer intento. Es el estado inicial. |
+| 2 | Contactado | `contactado` | El asesor ya escribió o llamó. |
+| 3 | Evaluando | `evaluando` | La persona respondió y está mirando curso, horario o precio. |
+| 4 | Promesa | `promesa` | Hay una fecha concreta de pago o inscripción. |
+| 5 | Venta exitosa | `venta_exitosa` | Se inscribió. El ciclo se cierra. |
+
+## Intento o cierre
+
+Desde Contactado el ciclo puede desviarse. Eso no adelanta la inscripción.
+
+| Estado | Slug | Ciclo | Qué significa |
+|--------|------|-------|----------------|
+| No contesta | `no_contesta` | Sigue abierto | Hubo intento y no hubo respuesta. Se reintenta. Si responde, pasa a Evaluando. Si se agotan los intentos, cierra en Perdido. |
+| No interesado | `no_interesado` | Cierra | Dijo que no. |
+| Perdido | `perdido` | Cierra | Se cierra sin venta. Lleva un motivo: no contestó más, promesa vencida, dejó de responder o dato inválido. |
+
+Promesa exige fecha. Si esa fecha pasa, el ciclo cierra en Perdido con motivo «promesa vencida».
+
+## Marcas del sistema
+
+El asesor no las elige. Van junto a cualquier etapa.
+
+| Marca | Cuándo |
+|-------|--------|
+| Nuevo | La captación abre ciclo: otro curso, o el mismo curso ya fuera de la ventana. |
+| Duplicado | Mismo número y mismo curso, dentro de la ventana. No abre otro ciclo. |
+| Retorno | Reaparece alguien que estaba en No interesado. Ese contacto se excluye de un masivo de la misma promo. |
+| Prometió antes | Vuelve después de una promesa vencida. El ciclo nuevo arranca en Por contactar. |
+
+La ventana de trabajo es de **60 días** desde el último mensaje del cliente. Una venta recién cerrada no abre otro ciclo sola: queda en revisión. Pasada la ventana, sí abre ciclo nuevo.
+
+## Catálogo anterior
+
+Los leads ya etiquetados se movieron así. Las etiquetas viejas quedan inactivas y no salen en el selector.
+
+| Antes | Ahora |
+|-------|--------|
+| Nuevo | Por contactar |
+| Contactado | Contactado |
+| Calificado | Evaluando |
+| Convertido | Venta exitosa |
+| Perdido | Perdido |
+
+Migración: `20260928120000_education_lead_statuses` en mali-whatsapp. Al abrir CRM Educación el API también deja el catálogo al día.
+
+## Qué ya hace el sistema
+
+- Las ocho etiquetas viven en el área `educacion` y se asignan desde CRM Educación (filtro de categoría CA/EP/General aparte).
+- Por contactar es el estado por defecto de un contacto nuevo.
+- No contesta no cierra el ciclo. No interesado, Perdido y Venta exitosa sí (`is_terminal`).
+- **RQ0017:** no se puede pasar a Venta exitosa (ni legacy Convertido) sin nombre usable, DNI, email, teléfono o identidad WhatsApp, y categoría CA/EP del ciclo. Si faltan datos, el ciclo se queda en el estado anterior; en CRM Educación aparece un diálogo para completar y reintentar.
+
+Todavía no están solas la fecha de Promesa, el motivo de Perdido, ni las marcas Nuevo, Duplicado, Retorno y Prometió antes. Mientras tanto, un reingreso se clasifica con la regla de 60 días que ya corre en WhatsApp: Venta exitosa va a revisión; No interesado dentro de la ventana también; el resto, dentro de la ventana, sigue en el mismo ciclo.
+
+## Requerimientos Educación — backlog (consolidado)
 
 Backlog de negocio ordenado a partir del sheet de RQs (jul–oct 2026). Traduce el lenguaje de hojas Condensado / BBDD 2026 al modelo actual: **WhatsApp guarda y decide; MALI ONE muestra y opera.**
 
 Documentos vivos del producto:
 
-- Go-live y captura web: [EDUCACION-LEADS.md](./EDUCACION-LEADS.md)
-- Estados del asesor: [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md)
 - Modelo y operación (fuente de verdad): `mali-whatsapp/docs/LEADS.md`
 
 Fecha de corte de este ordenamiento: **4 nov 2026**. Las fechas de fase del plan original (30/10, 6/11, 13/11) ya vencieron → **prioridad efectiva Alta** salvo las explícitamente Baja con horizonte 30/11.
@@ -63,7 +298,7 @@ Estados usados aquí:
 
 ## 2. Qué ya no se pide al CRM (legacy Sheets)
 
-Estos RQs hablan de copiar filas entre hojas. El flujo operativo ya es **widget / Meta / TikTok / orgánico → EducacionLead o WhatsApp → CRM Educación**. El espejo Sheet es opcional y se puede apagar ([EDUCACION-LEADS.md](./EDUCACION-LEADS.md)).
+Estos RQs hablan de copiar filas entre hojas. El flujo operativo ya es **widget / Meta / TikTok / orgánico → EducacionLead o WhatsApp → CRM Educación**. El espejo Sheet es opcional y se puede apagar ([Go-live y operación (leads)](#go-live-y-operación-leads)).
 
 | RQ | Pedido original | Lectura actual |
 |----|-----------------|----------------|
@@ -154,7 +389,7 @@ Comentario de negocio (“esto es lo que se hace manual… no tiene nada que ver
 #### RQ0010 — Estados de leads transversales
 
 - **Objetivo:** Misma lectura en apps y en la data trazada.
-- **Regla:** Un solo catálogo sincronizado (hoy: camino inscripción + intento/cierre en [EDUCACION-ESTADOS-LEAD.md](./EDUCACION-ESTADOS-LEAD.md)). No inventar un segundo set “tipo Sheet”. Completar marcas de sistema (Nuevo, Duplicado, Retorno, Prometió antes) cuando el producto las exponga.
+- **Regla:** Un solo catálogo sincronizado (hoy: camino inscripción + intento/cierre en [Estados de lead](#estados-de-lead)). No inventar un segundo set “tipo Sheet”. Completar marcas de sistema (Nuevo, Duplicado, Retorno, Prometió antes) cuando el producto las exponga.
 - **App:** Ambos.
 - **Fase:** 3 · **Prioridad efectiva:** Alta (vencida 13/11) · **Estado:** En desarrollo (8 estados vivos; marcas sistema pendientes).
 

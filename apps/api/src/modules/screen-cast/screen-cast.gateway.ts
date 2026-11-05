@@ -41,6 +41,23 @@ const OFFLINE_GRACE_MS = 15_000;
  */
 const PING_INTERVAL_MS = 20_000;
 const PING_TIMEOUT_MS = 45_000;
+/** Status older than this is ignored by the relative-desync watchdog. */
+const PLAYBACK_FRESH_MS = 15_000;
+/** Sibling mediaTime delta that counts as a desync sample. */
+const DESYNC_MEDIA_MS = 1_200;
+/** Consecutive tick evaluations required before auto catch-up. */
+const DESYNC_STREAK_NEEDED = 3;
+/** Minimum gap between auto catch-ups for the same playlist. */
+const DESYNC_COOLDOWN_MS = 4 * 60_000;
+
+type PlaybackStatus = {
+  index: number;
+  total: number;
+  lastError: string | null;
+  mediaTimeMs: number | null;
+  holding: boolean;
+  updatedAt: number;
+};
 
 type PlaylistClock = {
   syncId: string;
@@ -90,6 +107,20 @@ function mergeDurations(a: number[] | null, b: number[]): number[] {
     out.push(Math.max(a[i] ?? 0, b[i] ?? 0));
   }
   return out;
+}
+
+/**
+ * Spread between sibling media clocks. When the slot duration is known, treat
+ * the timeline as circular so a loop wrap (59s vs 0.2s) is not a false desync.
+ */
+function mediaTimeSpreadMs(times: number[], slotMs: number): number {
+  if (times.length < 2) return 0;
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  const linear = max - min;
+  if (!(slotMs > 0) || linear <= slotMs / 2) return linear;
+  // Points hug both ends of the loop: measure the complementary gap.
+  return slotMs - linear;
 }
 
 const MAX_LOCAL_URLS = 64;
@@ -145,10 +176,7 @@ export class ScreenCastGateway
   /** Live player sockets per screenKey (excludes preview tabs). */
   private readonly connections = new Map<string, Set<string>>();
   /** Last playback status reported by each screen. */
-  private readonly playback = new Map<
-    string,
-    { index: number; total: number; lastError: string | null; updatedAt: number }
-  >();
+  private readonly playback = new Map<string, PlaybackStatus>();
   private readonly playlistByScreen = new Map<string, string>();
   private readonly clocks = new Map<string, PlaylistClock>();
   private readonly sessions = new Map<string, SyncSession>();
@@ -166,13 +194,22 @@ export class ScreenCastGateway
   private readonly localUrlsByScreen = new Map<string, Set<string>>();
   /** Intersection of connected screens' local sets, per playlist. */
   private readonly playableByPlaylist = new Map<string, string[]>();
+  /** Sustained desync sample count per playlist. */
+  private readonly desyncStreak = new Map<string, number>();
+  /** Earliest time an auto catch-up may fire again for a playlist. */
+  private readonly desyncCooldownUntil = new Map<string, number>();
+  /** Playlists currently running an auto catch-up. */
+  private readonly desyncInFlight = new Set<string>();
   private readonly tickTimer: ReturnType<typeof setInterval>;
 
   @WebSocketServer()
   server!: Server;
 
   constructor(private readonly service: ScreenCastService) {
-    this.tickTimer = setInterval(() => this.broadcastTicks(), TICK_MS);
+    this.tickTimer = setInterval(() => {
+      this.broadcastTicks();
+      void this.checkPlaylistDesync();
+    }, TICK_MS);
   }
 
   onModuleDestroy() {
@@ -185,6 +222,9 @@ export class ScreenCastGateway
     this.sessions.clear();
     this.offlineTimers.clear();
     this.restartTimers.clear();
+    this.desyncStreak.clear();
+    this.desyncCooldownUntil.clear();
+    this.desyncInFlight.clear();
   }
 
   handleConnection(client: Socket) {
@@ -293,6 +333,8 @@ export class ScreenCastGateway
       index?: number;
       total?: number;
       lastError?: string | null;
+      mediaTimeMs?: number | null;
+      holding?: boolean;
     },
   ) {
     const key = (
@@ -303,10 +345,19 @@ export class ScreenCastGateway
     if (!key) return { ok: false };
     const index = Number(body?.index);
     const total = Number(body?.total);
+    const mediaRaw = body?.mediaTimeMs;
+    const mediaTimeMs =
+      mediaRaw == null || mediaRaw === undefined
+        ? null
+        : Number.isFinite(Number(mediaRaw))
+          ? Math.max(0, Math.round(Number(mediaRaw)))
+          : null;
     this.playback.set(key, {
       index: Number.isFinite(index) ? index : 0,
       total: Number.isFinite(total) ? total : 0,
       lastError: body?.lastError?.trim() || null,
+      mediaTimeMs,
+      holding: body?.holding === true,
       updatedAt: Date.now(),
     });
     return { ok: true };
@@ -755,6 +806,97 @@ export class ScreenCastGateway
         playableUrls: this.playableUrls(playlistId),
         serverNow,
       });
+    }
+  }
+
+  /**
+   * Relative desync between siblings sharing a playlist. Soft tick/drift never
+   * interrupts an active video, so a looping solo clip can drift forever until
+   * something re-anchors both screens to the shared clock — same path as the
+   * admin "Sincronizar todos" catch-up (never force).
+   */
+  private async checkPlaylistDesync() {
+    const now = Date.now();
+    const seen = new Set<string>();
+    for (const playlistId of this.playlistByScreen.values()) {
+      if (seen.has(playlistId)) continue;
+      seen.add(playlistId);
+
+      if (!this.clocks.has(playlistId)) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+      const session = this.sessions.get(playlistId);
+      if (session && !session.done) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+      if ((this.desyncCooldownUntil.get(playlistId) ?? 0) > now) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+      if (this.desyncInFlight.has(playlistId)) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+
+      const keys = this.connectedKeysForPlaylist(playlistId);
+      if (keys.length < 2) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+
+      const playing: PlaybackStatus[] = [];
+      for (const key of keys) {
+        const row = this.playback.get(key);
+        if (!row) continue;
+        if (now - row.updatedAt > PLAYBACK_FRESH_MS) continue;
+        if (row.holding) continue;
+        playing.push(row);
+      }
+      if (playing.length < 2) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+
+      const indices = new Set(playing.map((row) => row.index));
+      let desynced = indices.size > 1;
+      if (!desynced) {
+        const times = playing
+          .map((row) => row.mediaTimeMs)
+          .filter((t): t is number => t != null);
+        if (times.length >= 2) {
+          const slotIndex = playing[0]?.index ?? 0;
+          const slotMs =
+            this.clocks.get(playlistId)?.durationsMs?.[slotIndex] ?? 0;
+          desynced = mediaTimeSpreadMs(times, slotMs) > DESYNC_MEDIA_MS;
+        }
+      }
+
+      if (!desynced) {
+        this.desyncStreak.delete(playlistId);
+        continue;
+      }
+
+      const streak = (this.desyncStreak.get(playlistId) ?? 0) + 1;
+      this.desyncStreak.set(playlistId, streak);
+      if (streak < DESYNC_STREAK_NEEDED) continue;
+
+      this.desyncStreak.delete(playlistId);
+      this.desyncCooldownUntil.set(playlistId, now + DESYNC_COOLDOWN_MS);
+      this.desyncInFlight.add(playlistId);
+      this.logger.warn(
+        `desfase detectado playlist=${playlistId} pantallas=${keys.join(',')} — catch-up automático`,
+      );
+      try {
+        await this.restartSync(keys, {
+          catchUpWhenUnchanged: true,
+          force: false,
+          reason: 'auto:desync',
+        });
+      } finally {
+        this.desyncInFlight.delete(playlistId);
+      }
     }
   }
 

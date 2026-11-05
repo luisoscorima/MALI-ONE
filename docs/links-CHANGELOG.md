@@ -1,3 +1,24 @@
+# Changelog — links
+
+Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del módulo debe registrarse aquí.
+
+## [Unreleased]
+
+- Más formas de QR + validación de contraste.
+- Informe Excel post-carga masiva.
+- Carpetas/campañas para enlaces.
+- Cache de QR en S3; cola bulk; retención LinkClick.
+
+## [2026-11-05] — baseline documental
+
+Reorganización de la documentación por módulo. Contenido consolidado desde el código y la documentación previa del módulo.
+
+- QR con estilos, logo presets MALI, bulk Excel, stats `LinkClick`, redirect `/r/:slug`.
+- Catálogo interno WhatsApp para mali-whatsapp.
+- Canvas/QR en Docker con `node:20-bookworm-slim` (hecho).
+
+## Backlog histórico (desde MEJORAS-PROXIMAS)
+
 # Mejoras próximas — MALI ONE
 
 Sugerencias de evolución priorizadas por área. No constituyen compromiso de implementación; sirven como backlog de producto y técnico.
@@ -75,6 +96,45 @@ Sugerencias de evolución priorizadas por área. No constituyen compromiso de im
 
 ---
 
+## Screen-cast (pared de pantallas / lobby)
+
+Contexto: las pantallas que comparten playlist (p. ej. `lobby_izquierdo` / `lobby_derecho`) usan un reloj compartido. El soft-sync (`play:tick` + drift) **no interrumpe** un video que ya está decodificando a propósito: en el pasado, nivelar en plena reproducción provocaba lageo y turnos de pantalla negra.
+
+**Ya en código (fase actual, a desplegar):** auto catch-up solo si hay desfase relativo sostenido entre hermanas (≥ ~1.2 s de `mediaTimeMs` o índice distinto, racha ~15 s, cooldown 4 min). Usa el mismo path que «Sincronizar todos» sin `force`. No corrige frame a frame durante el play.
+
+### Problema conocido (histórico): preview admin vs pantallas (HEVC)
+
+Algunos videos de lobby ya publicados están en **HEVC / H.265**. Chrome no los preview; Tizen sí. **Uploads nuevos** se normalizan a H.264 MP4 (ver [screen-cast.md](../screen-cast.md)). Ítems viejos: volver a subir el archivo.
+
+### Siguiente fase (experiencia del espectador)
+
+Orden sugerido; cada paso debe preservar la regla dura: **nunca pelear mid-video** (ni seek en Tizen, ni sync agresivo cada pocos segundos). Una corrección limpia y rara > sync continuo.
+
+1. **Catch-up con still en vez de negro** *(riesgo bajo)*  
+   El catch-up (manual o auto) hoy cubre con overlay negro «Sincronizando…». Mantener el último frame/still visible durante el re-anclaje reduce el golpe visual sin cambiar cuándo ni cómo se dispara la sync. Mismo evento, otra máscara.
+
+2. **Re-anclar en el borde del loop** *(riesgo bajo–medio)*  
+   Si el detector ya confirmó desfase, diferir el catch-up al próximo fin de clip / wrap del ciclo en lugar de cortar a mitad de toma. Debe ser **un solo** catch-up coordinado + cooldown; no un bucle de reintentos que reintroduzca el lageo histórico.
+
+3. **Umbral / sensibilidad más perezosos** *(riesgo muy bajo)*  
+   Si en lobby el auto-sync corta más de lo deseable, subir el umbral de media (p. ej. 1.5–2 s) o exigir evidencia en ≥2 pantallas reproduciendo el mismo ítem. Preferible un leve desfase visible a flashes innecesarios.
+
+4. **Hold nunca negro puro en lobby** *(riesgo bajo)*  
+   Cuando falta copia local / playable, asegurar siempre still de respaldo (la lógica ya apunta ahí; reforzar para que el panel no quede negro).
+
+### Qué no hacer en esta línea
+
+- Corregir drift mid-video mientras el clip está `playing`.
+- `currentTime` / seek en Tizen.
+- Auto-sync periódico ciego (`force` o catch-up cada X minutos sin desfase).
+- Varias pantallas “intentando nivelarse” en bucle sin cooldown.
+
+### Validación antes de la siguiente fase
+
+Observar unos días en lobby tras desplegar el auto-desync: ¿dispara?, ¿el negro molesta?, ¿hay falsos positivos cerca del wrap del loop? Con eso priorizar (1) o (3) antes que (2).
+
+---
+
 ## Priorización sugerida (corto plazo)
 
 1. ~~Dependencias `canvas` en Docker de producción~~ (hecho en Dockerfile.api).
@@ -82,7 +142,9 @@ Sugerencias de evolución priorizadas por área. No constituyen compromiso de im
 3. Carpetas/campañas para enlaces.
 4. Más formas de QR + validación de contraste.
 5. Retención/archivado de `LinkClick`.
+6. Screen-cast: observar auto-desync en lobby; luego still-en-catch-up / borde de loop (ver sección arriba).
 
 ---
 
-*Última actualización: julio 2026 — tras implementación de QR personalizable, carga masiva Excel y estadísticas por enlace.*
+*Última actualización: noviembre 2026 — auto-desync screen-cast; problema conocido preview HEVC vs TVs documentado.*
+
