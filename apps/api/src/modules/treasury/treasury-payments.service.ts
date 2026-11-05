@@ -30,7 +30,23 @@ export class TreasuryPaymentsService {
         const old = await tx.treasuryPayment.findUnique({ where: { provider_merchantCode_transactionCode: identity } });
         const amount = new Prisma.Decimal(row.amount);
         if (!old) createdCount++;
-        else if (!old.amount.equals(amount) || old.status !== row.status || old.currency !== row.currency || old.orderNumber !== row.orderNumber || old.customerName !== row.customerName || old.merchantName !== row.merchantName || old.transactedAt.getTime() !== row.transactedAt.getTime() || old.settledOn?.getTime() !== row.settledOn?.getTime()) updatedCount++;
+        else if (
+          !old.amount.equals(amount) ||
+          old.status !== row.status ||
+          old.currency !== row.currency ||
+          old.orderNumber !== row.orderNumber ||
+          old.customerName !== row.customerName ||
+          old.customerEmail !== row.customerEmail ||
+          old.cardBrand !== row.cardBrand ||
+          old.cardType !== row.cardType ||
+          old.cardLastDigits !== row.cardLastDigits ||
+          old.wallet !== row.wallet ||
+          old.merchantName !== row.merchantName ||
+          old.transactedAt.getTime() !== row.transactedAt.getTime() ||
+          old.settledOn?.getTime() !== row.settledOn?.getTime()
+        ) {
+          updatedCount++;
+        }
         await tx.treasuryPayment.upsert({
           where: { provider_merchantCode_transactionCode: identity },
           create: { ...row, provider: 'niubiz_sales', amount, lastImportId: batch.id },
@@ -54,6 +70,7 @@ export class TreasuryPaymentsService {
         { orderNumber: { contains: search, mode: 'insensitive' as const } },
         { transactionCode: { contains: search, mode: 'insensitive' as const } },
         { customerName: { contains: search, mode: 'insensitive' as const } },
+        { customerEmail: { contains: search, mode: 'insensitive' as const } },
       ] } : {}),
       ...(query.merchant ? { merchantCode: query.merchant } : {}),
       ...(query.status ? { status: query.status } : {}),

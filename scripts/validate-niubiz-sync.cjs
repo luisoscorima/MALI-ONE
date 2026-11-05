@@ -22,7 +22,7 @@ let mode = 'ok';
 let requests = 0;
 let logins = 0;
 let importStart;
-const fixture = merchant => ({ 'Código de comercio': merchant, 'Nombre de comercio': 'Test', 'Código de transaccion': 'TESTNIUBIZSYNC', 'Nro Pedido': 'TEST', Cliente: '', Moneda: 'PEN', 'Importe Pedido': '10.00', Estado: 'Liquidada', 'Fecha de Transacción': '10/10/2026 12:00:00', 'Fecha de Liquidación': '' });
+const fixture = merchant => ({ 'Código de comercio': merchant, 'Nombre de comercio': 'Test', 'Código de transaccion': 'TESTNIUBIZSYNC', 'Nro Pedido': 'TEST', Cliente: '', Correo: '', Marca: '', PAN: '', Producto: '', 'Medio de Pago': '', Moneda: 'PEN', 'Importe Pedido': '10.00', Estado: 'Liquidada', 'Fecha de Transacción': '10/10/2026 12:00:00', 'Fecha de Liquidación': '' });
 global.fetch = async (url, options) => {
   assert.equal(url, 'https://api.niubiz.pe/api.backoffice.merchant/order');
   assert.equal(options.headers.Authorization, `Bearer ${token}`);

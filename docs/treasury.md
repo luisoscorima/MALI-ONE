@@ -4,7 +4,7 @@
 
 ## Qué es
 
-Inventario de **fuentes** (portales: Niubiz, BCP, …) y **targets** (comercios/cuentas), más **pagos Niubiz** (import XLSX y sync API). Módulo independiente de PAM. Objetivo: guardar/mostrar ventas Niubiz en horario America/Lima; conciliación bancaria fuera de alcance actual.
+**Fuentes** (portales: Niubiz, BCP, …) y **pagos Niubiz** (import XLSX y sync API), con UI Fuente → operaciones y acciones en modales. Targets CRUD solo para fuentes sin conector. Módulo independiente de PAM. Objetivo: guardar/mostrar ventas Niubiz en horario America/Lima; conciliación bancaria fuera de alcance actual.
 
 ## Código
 
@@ -30,7 +30,7 @@ Inventario de **fuentes** (portales: Niubiz, BCP, …) y **targets** (comercios/
 ## Datos (Prisma)
 
 - `TreasurySource`, `TreasuryTarget`
-- `TreasuryPayment`, `TreasuryPaymentImport`
+- `TreasuryPayment` (incl. email / tarjeta enmascarada / billetera), `TreasuryPaymentImport`
 - `NiubizSyncState`
 
 ## Conexiones externas
@@ -70,19 +70,20 @@ Módulo: `treasury`
 
 La implementación actual incluye extracción API de los 77 comercios, login con credenciales de Vaultwarden, persistencia, renovación de sesión, ejecución manual desde MALI ONE y cron cada dos horas desactivado por defecto. Ver [configuración y prueba de despliegue](#niubiz-primer-despliegue). No se ha desplegado a producción. El login automático desde ese servidor debe probarse con la clave regenerada, especialmente por reCAPTCHA. Los apartados posteriores conservan el historial de las verificaciones parciales.
 
-### Interfaz: jerarquía fuente → registros → inventario
+### Interfaz: jerarquía fuente → operaciones (+ modales)
 
-En **Finanzas → Verificación de pagos** (`/treasury`) el orden de la pantalla es:
+En **Finanzas → Verificación de pagos** (`/treasury`):
 
-1. **Fuentes** — selector visible. Cada fuente es un acceso a un portal (Niubiz · Comercio, BCP, etc.). Al cargar se prioriza una fuente Niubiz activa si existe.
-2. **Registros** — vista operativa de la fuente seleccionada. Solo `niubiz_sales` muestra sincronización, buscador, filtros y tabla; el resto indica que la sincronización aún no está disponible.
-3. **Inventario de la fuente** — comercios o cuentas de esa misma fuente. No es un bloque hermano de «Niubiz»: Niubiz es una fuente; sus registros cuelgan de ella.
+1. **Fuentes** (página) — cada card es un acceso a un portal. Al cargar se prioriza una fuente Niubiz activa si existe.
+2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar**, y en Niubiz también **Actualizar pagos** y **Comercios** (modales).
+3. **Operaciones** (página) — filtros y tabla; es el contenido diario de la fuente. Columnas: fecha, comercio (código + nombre), pedido, código de transacción, cliente, email, importe, estado; **Tarjeta** y **Billetera** solo si hay datos en la página. Clic en fila → modal de detalle.
+4. **Modales** — Actualizar pagos (API + Excel juntos); Comercios (lectura: N del conector + lista con operaciones); Editar fuente; Detalle de operación.
 
-La sincronización Niubiz sigue usando la lista canónica de 77 comercios del conector (`niubiz-merchants.json`); el inventario editable todavía no modifica esa lista.
+La sync Niubiz usa la lista canónica de 77 comercios (`niubiz-merchants.json`). No hay CRUD de inventario Niubiz en la página; fuentes sin conector siguen pudiendo registrar cuentas/comercios como configuración.
 
 ### Buscador de pagos
 
-`GET /api/treasury/payments` acepta `q` (texto) además de comercio, estado, fechas y página. La búsqueda es en servidor, case-insensitive y parcial, sobre número de pedido, código de transacción y nombre del cliente. Escapa comodines SQL (`%`, `_`, `\`). Se combina con el resto de filtros. La UI envía `q` al pulsar Buscar (no en cada tecla) y resetea a página 1. Validación local: `scripts/validate-niubiz-search.cjs`.
+`GET /api/treasury/payments` acepta `q` (texto) además de comercio, estado, fechas y página. La búsqueda es en servidor, case-insensitive y parcial, sobre número de pedido, código de transacción, nombre del cliente y correo. Escapa comodines SQL (`%`, `_`, `\`). Se combina con el resto de filtros. La UI envía `q` al pulsar Buscar (no en cada tecla) y resetea a página 1. Validación local: `scripts/validate-niubiz-search.cjs`.
 
 ### Secretos y plataformas futuras
 
@@ -94,7 +95,7 @@ La sincronización Niubiz sigue usando la lista canónica de 77 comercios del co
 
 Implementados `TreasuryPayment` y `TreasuryPaymentImport`, importación autenticada `POST /api/treasury/payments/import-niubiz` (multipart `file`, XLSX de hasta 5 MB/5000 filas) y consulta `GET /api/treasury/payments` con comercio, estado, fechas de Lima, búsqueda `q` y paginación de 50 operaciones. Ambos endpoints heredan el permiso `treasury` y la autenticación global de la aplicación.
 
-La importación conserva importe decimal, moneda, estado original, fecha, pedido, cliente y referencias de comercio/transacción. No importa PAN, correo, tokens ni el resto del archivo. Identidad única: proveedor + comercio + transacción. Valida todo el archivo antes de escribir, serializa importaciones con un bloqueo transaccional PostgreSQL y registra auditoría, checksum y conteos de altas/cambios. Una reimportación conserva las operaciones y aplica el estado del archivo; el operador debe usar una exportación actualizada para evitar sobrescribir estados con una versión antigua. La última importación no representa una consulta en vivo a Niubiz.
+La importación conserva importe decimal, moneda, estado original, fecha, pedido, cliente, correo, marca/tipo de tarjeta con últimos dígitos del PAN ya enmascarado, billetera (p. ej. Yape/Plin) y referencias de comercio/transacción. No importa PAN completo, tokens ni la respuesta cruda. Identidad única: proveedor + comercio + transacción. Valida todo el archivo antes de escribir, serializa importaciones con un bloqueo transaccional PostgreSQL y registra auditoría, checksum y conteos de altas/cambios. Una reimportación conserva las operaciones y aplica el estado del archivo; el operador debe usar una exportación actualizada para evitar sobrescribir estados con una versión antigua. La última importación no representa una consulta en vivo a Niubiz.
 
 Validado en la base **local aislada** `mali_niubiz_local`, puerto `55439`, contenedor `mali-niubiz-local-db`, volumen persistente `mali-niubiz-local-pgdata`: 252 operaciones de octubre del comercio `650177853`, 232 liquidadas y 20 denegadas. Pruebas reales: reimportación sin duplicados, actualización de una operación y restauración al reporte original, rechazo íntegro de un archivo inválido, filtros, paginación y conversión de fechas de Lima. Compilaciones de shared/API/web correctas. Migraciones aplicadas solo a la base local.
 
@@ -247,7 +248,7 @@ Esta fase guarda y muestra ventas en Finanzas → Verificación de pagos. No con
 - Vaultwarden entrega el usuario y contraseña de Niubiz mediante el UUID del elemento compartido. Bitwarden CLI está fijado en **2026.6.0**, versión que funcionó en la prueba local; se ejecuta con Node 24 aislado del Node de la API.
 - Chromium abre el formulario normal de Niubiz, completa sus campos y espera la respuesta de login. No resuelve ni evita desafíos CAPTCHA/MFA. El token permanece en memoria durante la ejecución. Si vence o llega un HTTP 401, intenta iniciar sesión de nuevo, con un máximo de tres logins por ejecución.
 - `POST /order` con `export:true` alimenta directamente PostgreSQL. La lista canónica está en `apps/api/src/modules/treasury/niubiz-merchants.json`: 77 comercios. No depende del Excel ni del inventario editable de fuentes.
-- Identidad única: proveedor + comercio + código de transacción. Repetir el rango actualiza estados sin duplicar. No se guardan PAN, correos de clientes ni respuestas completas de Niubiz.
+- Identidad única: proveedor + comercio + código de transacción. Repetir el rango actualiza estados sin duplicar. Se guardan correo y PAN solo enmascarado (últimos dígitos); no se guardan PAN completo ni respuestas crudas de Niubiz.
 - Guardado atómico por comercio, estado de la última ejecución y resultados por comercio. Una consulta fallida no equivale a cero operaciones. Las ejecuciones parciales conservan los comercios guardados. Reintentar el mismo rango recupera los pendientes.
 - Dos horas entre ejecuciones programadas (00:00, 02:00, etc., Lima), consultando hoy y los 31 días anteriores. Un rango manual permite recuperar períodos anteriores, de hasta 32 días cada vez. Las operaciones anteriores a esa ventana solo se revisan mediante un rango manual.
 - Bloqueo distribuido en PostgreSQL para evitar ejecuciones simultáneas. El bloqueo dura 90 minutos ante una caída del proceso; al vencer se muestra como interrumpida. Las ejecuciones tienen un límite de 45 minutos más la solicitud en curso y no se reanudan en medio de un comercio después de un reinicio.

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Server, Socket } from 'socket.io';
+import { Namespace, Server, Socket } from 'socket.io';
 import { Public } from '../../core/guards/public.decorator';
 import { ScreenCastService } from './screen-cast.service';
 
@@ -202,8 +202,12 @@ export class ScreenCastGateway
   private readonly desyncInFlight = new Set<string>();
   private readonly tickTimer: ReturnType<typeof setInterval>;
 
+  /**
+   * With `namespace: '/screen-cast'`, Nest injects the Namespace (not the root
+   * Server). `namespace.sockets` is already the Map<id, Socket>.
+   */
   @WebSocketServer()
-  server!: Server;
+  server!: Namespace;
 
   constructor(private readonly service: ScreenCastService) {
     this.tickTimer = setInterval(() => {
@@ -587,7 +591,7 @@ export class ScreenCastGateway
     const socketIds = this.connections.get(key);
     if (socketIds) {
       for (const socketId of socketIds) {
-        const client = this.server.sockets.sockets.get(socketId);
+        const client = this.socketById(socketId);
         if (client) await this.bindPlaylistRoom(client, playlistId);
       }
     } else if (playlistId) {
@@ -605,6 +609,20 @@ export class ScreenCastGateway
 
     // First screen on this playlist: start a sync session (catchUp: false).
     await this.restartSync([key], { reason: 'schedule:boundary' });
+  }
+
+  /** Resolve a live socket under the `/screen-cast` namespace. */
+  private socketById(socketId: string): Socket | undefined {
+    const ns = this.server;
+    if (!ns) return undefined;
+    // Namespace (Nest injects this for namespaced gateways): sockets is the Map.
+    const asNamespace = ns as Namespace;
+    if (asNamespace.sockets instanceof Map) {
+      return asNamespace.sockets.get(socketId);
+    }
+    // Root Server fallback: server.sockets is the default Namespace.
+    const asServer = ns as unknown as Server;
+    return asServer.sockets?.sockets?.get(socketId);
   }
 
   notifyPlaylistUpdated(screenKeys: string[]) {

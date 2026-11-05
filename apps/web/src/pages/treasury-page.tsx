@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Landmark, Pencil, Plus } from 'lucide-react';
+import { Landmark, Pencil, Plus, RefreshCw, Store } from 'lucide-react';
 import type {
   TreasuryCurrency,
   TreasuryOverviewDto,
@@ -55,10 +55,12 @@ const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo completar la operación';
 
 function preferredSourceId(sources: TreasurySourceDto[]) {
-  return sources.find((source) => source.provider === 'niubiz_sales' && source.active)?.id
-    ?? sources.find((source) => source.active)?.id
-    ?? sources[0]?.id
-    ?? '';
+  return (
+    sources.find((source) => source.provider === 'niubiz_sales' && source.active)?.id ??
+    sources.find((source) => source.active)?.id ??
+    sources[0]?.id ??
+    ''
+  );
 }
 
 export function TreasuryPage() {
@@ -75,6 +77,8 @@ export function TreasuryPage() {
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [merchantsOpen, setMerchantsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,7 +181,7 @@ export function TreasuryPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Verificación de pagos"
-        description="Elige una fuente, consulta sus registros y administra sus comercios o cuentas."
+        description="Elige una fuente para ver sus operaciones. Las acciones (editar, actualizar, comercios) se abren en modales."
       />
 
       {loading ? (
@@ -202,8 +206,7 @@ export function TreasuryPage() {
                   Fuentes
                 </h2>
                 <p className="mt-1 text-pretty text-sm text-muted-foreground">
-                  Cada fuente es un acceso a un portal. Niubiz es una de ellas; sus registros aparecen debajo al
-                  seleccionarla.
+                  Cada fuente es un acceso a un portal. Al seleccionarla ves sus operaciones debajo.
                 </p>
               </div>
               <Button size="sm" onClick={() => openSource()}>
@@ -218,7 +221,7 @@ export function TreasuryPage() {
                   Sin fuentes todavía
                 </div>
                 <p className="text-pretty text-sm text-muted-foreground">
-                  Empieza registrando una fuente, por ejemplo Niubiz · Comercio, y luego sus códigos de comercio.
+                  Empieza registrando una fuente, por ejemplo Niubiz · Comercio.
                 </p>
                 <Button className="self-start" onClick={() => openSource()}>
                   <Plus className="size-4" /> Añadir primera fuente
@@ -233,6 +236,7 @@ export function TreasuryPage() {
                 {data.sources.map((source) => {
                   const sourceProvider = data.providers.find((item) => item.id === source.provider);
                   const active = source.id === selectedId;
+                  const isNiubiz = source.provider === 'niubiz_sales';
                   return (
                     <button
                       key={source.id}
@@ -242,9 +246,7 @@ export function TreasuryPage() {
                       onClick={() => setSelectedId(source.id)}
                       className={cn(
                         'rounded-xl border p-4 text-left transition-colors',
-                        active
-                          ? 'border-primary bg-accent'
-                          : 'border-border hover:bg-muted/50',
+                        active ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50',
                       )}
                     >
                       <span className="block break-words font-medium">{source.name}</span>
@@ -252,12 +254,14 @@ export function TreasuryPage() {
                         {sourceProvider?.label}
                       </span>
                       <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>
-                          {source.targets.length}{' '}
-                          {sourceProvider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'}
-                        </span>
+                        {!isNiubiz && (
+                          <span>
+                            {source.targets.length}{' '}
+                            {sourceProvider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'}
+                          </span>
+                        )}
                         <Badge variant="secondary">
-                          {source.active ? 'En preparación' : 'Archivada'}
+                          {source.active ? (isNiubiz ? 'Activa' : 'En preparación') : 'Archivada'}
                         </Badge>
                       </span>
                     </button>
@@ -268,133 +272,143 @@ export function TreasuryPage() {
           </section>
 
           {selected && (
-            <>
-              <section aria-labelledby="records-heading" className="flex flex-col gap-4 border-t pt-8">
-                <h2 id="records-heading" className="sr-only">
-                  Registros de {selected.name}
-                </h2>
-                {showNiubizRecords ? (
-                  <TreasuryPayments sourceName={selected.name} />
-                ) : (
+            <section
+              aria-labelledby="source-surface-title"
+              className="flex flex-col gap-6 border-t pt-8"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Fuente seleccionada</p>
+                  <h2 id="source-surface-title" className="text-balance text-xl font-semibold">
+                    {selected.name}
+                  </h2>
+                  <p className="mt-1 text-pretty text-sm text-muted-foreground">
+                    {selected.legalEntity}
+                    {provider ? ` · ${provider.label}` : ''}
+                    {selected.active ? '' : ' · Archivada'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => openSource(selected)}>
+                    <Pencil className="size-4" /> Editar
+                  </Button>
+                  {showNiubizRecords && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
+                        <RefreshCw className="size-4" /> Actualizar pagos
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setMerchantsOpen(true)}>
+                        <Store className="size-4" /> Comercios
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {showNiubizRecords ? (
+                <TreasuryPayments
+                  sourceName={selected.name}
+                  updateOpen={updateOpen}
+                  onUpdateOpenChange={setUpdateOpen}
+                  merchantsOpen={merchantsOpen}
+                  onMerchantsOpenChange={setMerchantsOpen}
+                />
+              ) : (
+                <>
                   <Card className="gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground">
-                          Registros
-                        </p>
-                        <h3 className="text-balance text-xl font-semibold">{selected.name}</h3>
-                      </div>
+                      <p className="text-sm font-medium">Operaciones</p>
                       <Badge variant="secondary">Pendiente</Badge>
                     </div>
                     <p className="text-pretty text-sm text-muted-foreground">
                       La sincronización automática de {provider?.label ?? 'esta fuente'} todavía no está
-                      disponible. Mientras tanto puedes mantener su inventario de{' '}
-                      {provider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'} al día.
+                      disponible. Mientras tanto puedes mantener sus{' '}
+                      {provider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'} en la
+                      configuración de abajo.
                     </p>
                   </Card>
-                )}
-              </section>
 
-              <section
-                aria-labelledby="targets-title"
-                className="flex flex-col gap-4 border-t pt-8"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      Inventario de la fuente
-                    </p>
-                    <h2 id="targets-title" className="text-balance text-lg font-semibold">
-                      {targetsTitle}
-                    </h2>
-                    <p className="mt-1 text-pretty text-sm text-muted-foreground">
-                      {selected.legalEntity}
-                      {provider ? ` · ${provider.scope}` : ''}
-                      {selected.active
-                        ? ` · Frecuencia prevista: ${selected.syncIntervalMinutes} min`
-                        : ' · Fuente archivada'}
-                    </p>
-                    {showNiubizRecords && (
-                      <p className="mt-2 text-pretty text-xs text-muted-foreground">
-                        La sincronización Niubiz usa la lista de 77 comercios del conector; este inventario aún no
-                        modifica esa lista.
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-balance text-lg font-semibold">{targetsTitle}</h3>
+                        <p className="mt-1 text-pretty text-sm text-muted-foreground">
+                          Configuración de esta fuente
+                          {provider ? ` · ${provider.scope}` : ''}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!selected.active}
+                        onClick={() => openTarget()}
+                      >
+                        <Plus className="size-4" /> Añadir {targetLabel}
+                      </Button>
+                    </div>
+
+                    {!selected.active && (
+                      <p className="text-sm text-muted-foreground">
+                        Fuente archivada. Sus registros se conservan y quedarán excluidos de futuras
+                        sincronizaciones.
                       </p>
                     )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openSource(selected)}>
-                      <Pencil className="size-4" /> Editar fuente
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={!selected.active}
-                      onClick={() => openTarget()}
-                    >
-                      <Plus className="size-4" /> Añadir {targetLabel}
-                    </Button>
-                  </div>
-                </div>
 
-                {!selected.active && (
-                  <p className="text-sm text-muted-foreground">
-                    Fuente archivada. Sus registros se conservan y quedarán excluidos de futuras sincronizaciones.
-                  </p>
-                )}
-
-                {selected.targets.length === 0 ? (
-                  <EmptyState
-                    title={`Sin ${provider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'} registrados`}
-                    description="Añade los registros que se consultarán en esta fuente. Puedes registrar una referencia por cada moneda."
-                  />
-                ) : (
-                  <div className="overflow-x-auto rounded-xl border border-border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nombre / referencia</TableHead>
-                          <TableHead>Moneda</TableHead>
-                          <TableHead>Estado</TableHead>
-                          <TableHead>
-                            <span className="sr-only">Acciones</span>
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selected.targets.map((target) => (
-                          <TableRow key={target.id}>
-                            <TableCell>
-                              <span className="block font-medium">{target.name}</span>
-                              <span className="font-mono text-xs text-muted-foreground">
-                                {target.reference}
-                              </span>
-                            </TableCell>
-                            <TableCell className="tabular-nums">{target.currency}</TableCell>
-                            <TableCell>
-                              {!selected.active
-                                ? 'Fuente archivada'
-                                : target.active
-                                  ? 'En preparación'
-                                  : 'Archivado'}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openTarget(target)}
-                                aria-label={`Editar ${target.name}`}
-                              >
-                                <Pencil className="size-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    {selected.targets.length === 0 ? (
+                      <EmptyState
+                        title={`Sin ${provider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'} registrados`}
+                        description="Añade los registros que se consultarán en esta fuente. Puedes registrar una referencia por cada moneda."
+                      />
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Nombre / referencia</TableHead>
+                              <TableHead>Moneda</TableHead>
+                              <TableHead>Estado</TableHead>
+                              <TableHead>
+                                <span className="sr-only">Acciones</span>
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {selected.targets.map((target) => (
+                              <TableRow key={target.id}>
+                                <TableCell>
+                                  <span className="block font-medium">{target.name}</span>
+                                  <span className="font-mono text-xs text-muted-foreground">
+                                    {target.reference}
+                                  </span>
+                                </TableCell>
+                                <TableCell className="tabular-nums">{target.currency}</TableCell>
+                                <TableCell>
+                                  {!selected.active
+                                    ? 'Fuente archivada'
+                                    : target.active
+                                      ? 'En preparación'
+                                      : 'Archivado'}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openTarget(target)}
+                                    aria-label={`Editar ${target.name}`}
+                                  >
+                                    <Pencil className="size-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </div>
-                )}
-              </section>
-            </>
+                </>
+              )}
+            </section>
           )}
         </>
       ) : null}
@@ -409,7 +423,8 @@ export function TreasuryPage() {
           <DialogHeader>
             <DialogTitle>{sourceEdit?.id ? 'Editar fuente' : 'Añadir fuente'}</DialogTitle>
             <DialogDescription>
-              Una fuente identifica un acceso a un portal. Las credenciales se configurarán al conectar la entidad.
+              Una fuente identifica un acceso a un portal. Las credenciales se configurarán al conectar la
+              entidad.
             </DialogDescription>
           </DialogHeader>
           {sourceEdit && (
@@ -486,7 +501,7 @@ export function TreasuryPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Frecuencia prevista: cada hora. Guardar esta fuente no inicia conexiones.
+                  Guardar esta fuente no inicia conexiones.
                 </p>
                 {formError && (
                   <p role="alert" className="text-sm text-destructive">

@@ -1,9 +1,24 @@
 import { useEffect, useState } from 'react';
-import type { TreasuryPaymentsDto } from '@mali-one/shared';
+import type { TreasuryPaymentDto, TreasuryPaymentsDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
-import { Badge, Button, Card, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui';
 import { Spinner } from '@/components/feedback';
-import { NiubizSync } from './niubiz-sync';
+import { NiubizUpdateDialog } from './niubiz-sync';
 
 const date = (value: string) =>
   new Intl.DateTimeFormat('es-PE', {
@@ -12,24 +27,46 @@ const date = (value: string) =>
     timeStyle: 'short',
   }).format(new Date(value));
 
+const dateOnly = (value: string) =>
+  new Intl.DateTimeFormat('es-PE', {
+    timeZone: 'UTC',
+    dateStyle: 'short',
+  }).format(new Date(value));
+
 const emptyFilters = { q: '', merchant: '', status: '', from: '', to: '', page: 1 };
 const selectClass = 'h-9 w-full rounded-md border border-input bg-background px-3 text-sm';
+const dash = '—';
+
+function cardLabel(p: TreasuryPaymentDto) {
+  const parts = [p.cardBrand, p.cardType, p.cardLastDigits ? `•••• ${p.cardLastDigits}` : null].filter(
+    Boolean,
+  );
+  return parts.length ? parts.join(' · ') : null;
+}
 
 type Props = {
   sourceName: string;
+  updateOpen: boolean;
+  onUpdateOpenChange: (open: boolean) => void;
+  merchantsOpen: boolean;
+  onMerchantsOpenChange: (open: boolean) => void;
 };
 
-export function TreasuryPayments({ sourceName }: Props) {
+export function TreasuryPayments({
+  sourceName,
+  updateOpen,
+  onUpdateOpenChange,
+  merchantsOpen,
+  onMerchantsOpenChange,
+}: Props) {
   const [data, setData] = useState<TreasuryPaymentsDto | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [search, setSearch] = useState('');
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
-  const [result, setResult] = useState('');
+  const [detail, setDetail] = useState<TreasuryPaymentDto | null>(null);
+  const [merchantCount, setMerchantCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,46 +92,36 @@ export function TreasuryPayments({ sourceName }: Props) {
     };
   }, [filters, revision]);
 
+  useEffect(() => {
+    if (!merchantsOpen) return;
+    let cancelled = false;
+    api
+      .niubizStatus()
+      .then((status) => {
+        if (!cancelled) setMerchantCount(status.merchantCount);
+      })
+      .catch(() => {
+        if (!cancelled) setMerchantCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [merchantsOpen]);
+
   function filter(key: 'merchant' | 'status' | 'from' | 'to', value: string) {
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
   }
 
-  async function importFile() {
-    if (!file || importing) return;
-    setImporting(true);
-    setImportError('');
-    setResult('');
-    try {
-      const r = await api.importNiubizPayments(file);
-      setResult(
-        `${r.rows} operaciones: ${r.createdCount} nuevas, ${r.updatedCount} actualizadas y ${r.unchangedCount} sin cambios.`,
-      );
-      setSearch('');
-      setFilters({ ...emptyFilters });
-      setRevision((v) => v + 1);
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'No se pudo importar.');
-    } finally {
-      setImporting(false);
-    }
-  }
-
   const hasFilters = !!(filters.q || filters.merchant || filters.status || filters.from || filters.to);
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
+  const showCard = !!data?.payments.some((p) => cardLabel(p));
+  const showWallet = !!data?.payments.some((p) => p.wallet);
 
   return (
     <section aria-labelledby="payments-title" className="flex flex-col gap-5">
-      <div className="flex flex-col gap-1">
-        <p className="text-xs font-medium uppercase text-muted-foreground">Registros</p>
-        <h2 id="payments-title" className="text-balance text-xl font-semibold">
-          {sourceName}
-        </h2>
-        <p className="text-pretty text-sm text-muted-foreground">
-          Operaciones guardadas · Horario de Lima
-        </p>
+      <div className="sr-only">
+        <h2 id="payments-title">Operaciones de {sourceName}</h2>
       </div>
-
-      <NiubizSync onUpdated={() => setRevision((v) => v + 1)} />
 
       {data?.lastImport && (
         <p className="text-xs text-muted-foreground">
@@ -118,7 +145,7 @@ export function TreasuryPayments({ sourceName }: Props) {
             <Input
               type="search"
               maxLength={250}
-              placeholder="Pedido, código de transacción o nombre del cliente"
+              placeholder="Pedido, transacción, cliente o email"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -202,38 +229,65 @@ export function TreasuryPayments({ sourceName }: Props) {
           </p>
 
           {data.payments.length === 0 ? (
-            <EmptyPayments hasFilters={hasFilters} />
+            <EmptyPayments hasFilters={hasFilters} onUpdate={() => onUpdateOpenChange(true)} />
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Fecha</TableHead>
-                    <TableHead>Comercio / pedido</TableHead>
+                    <TableHead>Comercio</TableHead>
+                    <TableHead>Pedido</TableHead>
+                    <TableHead>Código de transacción</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead className="text-right">Importe</TableHead>
                     <TableHead>Estado</TableHead>
+                    {showCard && <TableHead>Tarjeta</TableHead>}
+                    {showWallet && <TableHead>Billetera</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.payments.map((p) => (
-                    <TableRow key={p.id}>
+                    <TableRow
+                      key={p.id}
+                      className="cursor-pointer"
+                      tabIndex={0}
+                      onClick={() => setDetail(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setDetail(p);
+                        }
+                      }}
+                    >
                       <TableCell className="whitespace-nowrap tabular-nums">{date(p.transactedAt)}</TableCell>
                       <TableCell>
-                        <span className="block font-medium">
-                          {p.merchantCode} · {p.orderNumber}
-                        </span>
-                        <span className="text-xs text-muted-foreground">Transacción {p.transactionCode}</span>
+                        <span className="block font-medium tabular-nums">{p.merchantCode}</span>
+                        <span className="text-xs text-muted-foreground">{p.merchantName || dash}</span>
                       </TableCell>
-                      <TableCell className="max-w-[16rem] truncate">
-                        {p.customerName || 'Sin nombre informado'}
+                      <TableCell className="max-w-[10rem] truncate tabular-nums">{p.orderNumber}</TableCell>
+                      <TableCell className="max-w-[10rem] truncate font-mono text-xs">
+                        {p.transactionCode}
                       </TableCell>
+                      <TableCell className="max-w-[12rem] truncate">
+                        {p.customerName || dash}
+                      </TableCell>
+                      <TableCell className="max-w-[14rem] truncate">{p.customerEmail || dash}</TableCell>
                       <TableCell className="whitespace-nowrap text-right tabular-nums">
                         {p.currency} {p.amount}
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{p.status}</Badge>
                       </TableCell>
+                      {showCard && (
+                        <TableCell className="max-w-[12rem] truncate text-sm">
+                          {cardLabel(p) || dash}
+                        </TableCell>
+                      )}
+                      {showWallet && (
+                        <TableCell className="whitespace-nowrap text-sm">{p.wallet || dash}</TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -265,55 +319,118 @@ export function TreasuryPayments({ sourceName }: Props) {
         </>
       ) : null}
 
-      <details className="rounded-xl border border-border p-4">
-        <summary className="cursor-pointer text-sm font-medium">Importación alternativa desde archivo</summary>
-        <Card className="mt-3 gap-3 border-0 bg-transparent p-0 shadow-none">
-          <p className="text-pretty text-sm text-muted-foreground">
-            Para una recuperación manual, importa el Excel original de Niubiz. Los estados se actualizarán según ese
-            archivo.
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="grid min-w-0 flex-1 gap-1.5 text-sm">
-              <span className="font-medium">Archivo XLSX (hasta 5 MB)</span>
-              <Input
-                type="file"
-                accept=".xlsx"
-                disabled={importing}
-                onChange={(e) => {
-                  setFile(e.target.files?.[0] ?? null);
-                  setResult('');
-                  setImportError('');
-                }}
+      <NiubizUpdateDialog
+        open={updateOpen}
+        onOpenChange={onUpdateOpenChange}
+        sourceName={sourceName}
+        lastImport={data?.lastImport ?? null}
+        onUpdated={() => {
+          setSearch('');
+          setFilters({ ...emptyFilters });
+          setRevision((v) => v + 1);
+        }}
+      />
+
+      <Dialog open={merchantsOpen} onOpenChange={onMerchantsOpenChange}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Comercios de esta fuente</DialogTitle>
+            <DialogDescription>
+              El conector consulta {merchantCount ?? '…'} códigos. La lista muestra los que ya tienen
+              operaciones guardadas.
+            </DialogDescription>
+          </DialogHeader>
+          {!data?.merchants.length ? (
+            <p className="text-sm text-muted-foreground">
+              Todavía no hay comercios con operaciones. Actualiza pagos para poblar esta lista.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-xl border border-border">
+              {data.merchants.map((m) => (
+                <li key={m.merchantCode} className="flex flex-col gap-0.5 px-3 py-2 text-sm">
+                  <span className="font-medium tabular-nums">{m.merchantCode}</span>
+                  <span className="text-muted-foreground">{m.merchantName || 'Sin nombre'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detail !== null} onOpenChange={(open) => !open && setDetail(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detalle de operación</DialogTitle>
+            <DialogDescription>
+              {detail ? `${detail.merchantCode} · ${detail.transactionCode}` : sourceName}
+            </DialogDescription>
+          </DialogHeader>
+          {detail && (
+            <dl className="grid gap-3 text-sm">
+              <DetailRow label="Fecha" value={date(detail.transactedAt)} />
+              <DetailRow
+                label="Comercio"
+                value={`${detail.merchantCode}${detail.merchantName ? ` · ${detail.merchantName}` : ''}`}
               />
-            </label>
-            <Button disabled={!file || importing} onClick={() => void importFile()}>
-              {importing ? 'Importando…' : 'Importar pagos'}
-            </Button>
-          </div>
-          {result && (
-            <p role="status" className="text-sm">
-              {result}
-            </p>
+              <DetailRow label="Pedido" value={detail.orderNumber} />
+              <DetailRow label="Código de transacción" value={detail.transactionCode} mono />
+              <DetailRow label="Cliente" value={detail.customerName || dash} />
+              <DetailRow label="Email" value={detail.customerEmail || dash} />
+              <DetailRow label="Importe" value={`${detail.currency} ${detail.amount}`} />
+              <DetailRow label="Estado" value={detail.status} />
+              {detail.settledOn && (
+                <DetailRow label="Liquidación" value={dateOnly(detail.settledOn)} />
+              )}
+              {(cardLabel(detail) || detail.wallet) && (
+                <>
+                  <DetailRow label="Tarjeta" value={cardLabel(detail) || dash} />
+                  <DetailRow label="Billetera" value={detail.wallet || dash} />
+                </>
+              )}
+            </dl>
           )}
-          {importError && (
-            <p role="alert" className="text-sm text-destructive">
-              {importError}
-            </p>
-          )}
-        </Card>
-      </details>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
-function EmptyPayments({ hasFilters }: { hasFilters: boolean }) {
+function DetailRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="grid gap-1 border-b border-border pb-2 last:border-0">
+      <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+      <dd className={mono ? 'break-all font-mono text-xs' : 'break-words'}>{value}</dd>
+    </div>
+  );
+}
+
+function EmptyPayments({
+  hasFilters,
+  onUpdate,
+}: {
+  hasFilters: boolean;
+  onUpdate: () => void;
+}) {
   return (
     <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
       <p className="text-pretty text-sm text-muted-foreground">
         {hasFilters
           ? 'No hay pagos para estos filtros.'
-          : 'Todavía no hay pagos guardados. Inicia una sincronización con Niubiz.'}
+          : 'Todavía no hay pagos guardados. Actualiza desde la API Niubiz o un Excel.'}
       </p>
+      {!hasFilters && (
+        <Button className="mt-4" variant="outline" onClick={onUpdate}>
+          Actualizar pagos
+        </Button>
+      )}
     </div>
   );
 }

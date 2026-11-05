@@ -106,4 +106,5 @@ UPLOAD_MAX_MB=25
 
 - **Upload de video:** MP4 y MOV se normalizan a **H.264 MP4** (CRF 23, lado largo ≤ 1920, AAC si hay audio). Si el origen ya es H.264 y el reencode pesaría más, se conserva el original. Así preview (Chrome) y TVs Tizen coinciden. Ítems HEVC ya publicados hay que **volver a subir** para que entren al pipeline.
 - **Coalesce:** varias ediciones seguidas de la misma playlist se agrupan ~2.5 s en un solo reinicio (`RESTART_COALESCE_MS`).
+- **Agenda / overrides:** el cron cada 15 s + timers exactos detectan cambio de playlist efectiva y llaman `applyScheduleTransition` (catch-up o sync). El gateway namespaced resuelve sockets con `namespace.sockets.get(id)`.
 - Detalle evolutivo: [screen-cast-CHANGELOG.md](./screen-cast-CHANGELOG.md).

@@ -9,6 +9,12 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 - Umbrales de auto-desync más perezosos si hay falsos positivos en lobby.
 - Hold nunca negro puro cuando falta copia local.
 
+## [2026-11-05] — fix fronteras de agenda (`Cannot read … 'get'`)
+
+- `applyScheduleTransition` usaba `server.sockets.sockets.get`; con namespace `/screen-cast` Nest inyecta un `Namespace` y el Map correcto es `server.sockets`.
+- El poll de agenda aísla errores por pantalla para no abortar el resto del tick.
+- Sin el fix, el override no aplicaba y reintentaba cada 15 s con el mismo error.
+
 ## [2026-11-05] — editar playlist = mismo sync que «Sincronizar todos»
 
 - Mutaciones de playlist/ítems usan `catchUpWhenUnchanged: true` (mismo contrato que el botón admin).

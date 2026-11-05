@@ -120,6 +120,11 @@ model TreasuryPayment {
   transactionCode String @db.VarChar(100)
   orderNumber     String @db.VarChar(100)
   customerName    String @db.VarChar(250)
+  customerEmail  String? @db.VarChar(250)
+  cardBrand       String? @db.VarChar(80)
+  cardType        String? @db.VarChar(80)
+  cardLastDigits  String? @db.VarChar(8)
+  wallet          String? @db.VarChar(40)
   currency        TreasuryCurrency
   amount          Decimal @db.Decimal(18, 2)
   status          String @db.VarChar(80)

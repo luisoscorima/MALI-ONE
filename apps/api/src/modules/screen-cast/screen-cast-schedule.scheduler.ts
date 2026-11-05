@@ -58,8 +58,18 @@ export class ScreenCastScheduleScheduler {
         this.logger.log(
           `schedule:boundary screen=${key} from=${prev ?? 'none'} to=${row.playlistId ?? 'none'}`,
         );
-        await this.gateway.applyScheduleTransition(key);
-        this.lastEffective.set(key, row.playlistId);
+        try {
+          await this.gateway.applyScheduleTransition(key);
+          this.lastEffective.set(key, row.playlistId);
+        } catch (err) {
+          // Keep `prev` so the next tick retries this screen; do not abort the
+          // rest of the monitors in this poll.
+          this.logger.error(
+            `Error en frontera screen=${key}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
       }
 
       const live = new Set(rows.map((r) => r.screenKey.trim().toLowerCase()));

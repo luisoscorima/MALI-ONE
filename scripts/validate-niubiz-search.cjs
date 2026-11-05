@@ -15,7 +15,7 @@ async function main() {
   assert.ok(all.length > 50, 'Needs payments beyond the first page');
   const late = all[all.length - 1];
   for (const q of [late.transactionCode, late.orderNumber, late.customerName.toLowerCase().slice(0, 8), '%', '_', '\\', 'no-existing-niubiz-record']) {
-    const expected = all.filter(row => [row.orderNumber, row.transactionCode, row.customerName].some(v => v.toLowerCase().includes(q.toLowerCase())));
+    const expected = all.filter(row => [row.orderNumber, row.transactionCode, row.customerName, row.customerEmail ?? ''].some(v => v.toLowerCase().includes(q.toLowerCase())));
     const result = await service.list({ q: `  ${q}  ` });
     assert.equal(result.total, expected.length);
     assert.deepEqual(result.payments.map(p => p.id), expected.slice(0, 50).map(p => p.id));

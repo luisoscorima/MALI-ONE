@@ -13,16 +13,34 @@ export type TreasuryProvider = (typeof TREASURY_PROVIDERS)[number]['id'];
 export type TreasuryTargetKind = 'bank_account' | 'merchant';
 export type TreasuryCurrency = 'PEN' | 'USD';
 
+export interface TreasuryPaymentDto {
+  id: string;
+  merchantCode: string;
+  merchantName: string;
+  transactionCode: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string | null;
+  cardBrand: string | null;
+  cardType: string | null;
+  cardLastDigits: string | null;
+  wallet: string | null;
+  currency: TreasuryCurrency;
+  amount: string;
+  status: string;
+  transactedAt: string;
+  settledOn: string | null;
+  updatedAt: string;
+}
+
 export interface TreasuryPaymentsDto {
-  total: number; page: number; pageSize: number;
+  total: number;
+  page: number;
+  pageSize: number;
   lastImport: { createdAt: string; rowCount: number; origin: string } | null;
   merchants: { merchantCode: string; merchantName: string }[];
   states: string[];
-  payments: {
-    id: string; merchantCode: string; merchantName: string; transactionCode: string;
-    orderNumber: string; customerName: string; currency: TreasuryCurrency;
-    amount: string; status: string; transactedAt: string; settledOn: string | null; updatedAt: string;
-  }[];
+  payments: TreasuryPaymentDto[];
 }
 
 export interface TreasurySourceInput {
