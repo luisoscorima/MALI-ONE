@@ -13,6 +13,44 @@ export type TreasuryProvider = (typeof TREASURY_PROVIDERS)[number]['id'];
 export type TreasuryTargetKind = 'bank_account' | 'merchant';
 export type TreasuryCurrency = 'PEN' | 'USD';
 
+const VAULT_ITEM_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Accepts a raw Vaultwarden item UUID or a vault web URL that contains `itemId=…`
+ * (including hash routes like `#/vault?itemId=…`). Returns the UUID or null if empty.
+ * Returns the trimmed input unchanged when it cannot be parsed (caller validates).
+ */
+export function parseVaultItemRef(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (VAULT_ITEM_UUID.test(trimmed)) return trimmed;
+
+  const fromQuery = (query: string) => {
+    const id = new URLSearchParams(query.startsWith('?') ? query.slice(1) : query).get('itemId');
+    return id && VAULT_ITEM_UUID.test(id) ? id : null;
+  };
+
+  try {
+    const url = new URL(trimmed.includes('://') ? trimmed : `https://vault.local/${trimmed}`);
+    const fromSearch = fromQuery(url.search);
+    if (fromSearch) return fromSearch;
+    const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+    const q = hash.indexOf('?');
+    if (q >= 0) {
+      const fromHash = fromQuery(hash.slice(q + 1));
+      if (fromHash) return fromHash;
+    }
+  } catch {
+    /* fall through */
+  }
+
+  const match = /(?:^|[?&#])itemId=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i.exec(
+    trimmed,
+  );
+  return match?.[1] ?? trimmed;
+}
+
 export interface TreasuryPaymentDto {
   id: string;
   merchantCode: string;

@@ -9,6 +9,7 @@ import type {
   TreasuryTargetDto,
   TreasuryTargetInput,
 } from '@mali-one/shared';
+import { parseVaultItemRef } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { PageHeader } from '@/components/page-header';
 import { EmptyState, Spinner } from '@/components/feedback';
@@ -148,7 +149,11 @@ export function TreasuryPage() {
     setSaving(true);
     setFormError('');
     try {
-      const result = await api.saveTreasurySource(sourceEdit.input, sourceEdit.id);
+      const vaultItemId = parseVaultItemRef(sourceEdit.input.vaultItemId ?? '');
+      const result = await api.saveTreasurySource(
+        { ...sourceEdit.input, vaultItemId },
+        sourceEdit.id,
+      );
       setSourceEdit(null);
       setSelectedId(result.id);
       toast.success('Fuente guardada');
@@ -476,12 +481,11 @@ export function TreasuryPage() {
                   />
                 </label>
                 <label className="grid gap-2 text-sm font-medium">
-                  ID del elemento en Vaultwarden
+                  Elemento en Vaultwarden
                   <Input
-                    maxLength={36}
                     spellCheck={false}
                     autoComplete="off"
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    placeholder="Pega el enlace del ítem o su UUID"
                     value={sourceEdit.input.vaultItemId ?? ''}
                     onChange={(e) =>
                       setSourceEdit({
@@ -489,12 +493,21 @@ export function TreasuryPage() {
                         input: { ...sourceEdit.input, vaultItemId: e.target.value },
                       })
                     }
+                    onBlur={() => {
+                      const raw = sourceEdit.input.vaultItemId ?? '';
+                      const parsed = parseVaultItemRef(raw);
+                      if (parsed !== raw) {
+                        setSourceEdit({
+                          ...sourceEdit,
+                          input: { ...sourceEdit.input, vaultItemId: parsed ?? '' },
+                        });
+                      }
+                    }}
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  UUID del ítem en vault.mali.pe (usuario/contraseña del portal). Si Niubiz obliga a
-                  renovar la clave, actualizas la contraseña en Vaultwarden; el ID suele permanecer. Si
-                  creas un ítem nuevo, pega aquí el UUID nuevo.
+                  Puedes pegar el enlace completo de vault.mali.pe (con <code>itemId=</code>) o solo el
+                  UUID. Solo se guarda el ID; la contraseña sigue en la bóveda.
                 </p>
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="treasury-source-active" className="text-sm">

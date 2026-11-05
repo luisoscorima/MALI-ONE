@@ -12,6 +12,7 @@ import {
   IsDateString,
   ValidateIf,
 } from 'class-validator';
+import { parseVaultItemRef } from '@mali-one/shared';
 import { TreasuryCurrency, TreasuryProvider } from '@prisma/client';
 
 const trim = ({ value }: { value: unknown }) => typeof value === 'string' ? value.trim() : value;
@@ -50,12 +51,11 @@ export class TreasurySourceInputDto {
   @Transform(({ value }: { value: unknown }) => {
     if (value == null) return value;
     if (typeof value !== 'string') return value;
-    const trimmed = value.trim();
-    return trimmed === '' ? null : trimmed;
+    return parseVaultItemRef(value);
   })
   @ValidateIf((_, value) => value != null && value !== '')
   @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, {
-    message: 'El ID de Vaultwarden debe ser un UUID.',
+    message: 'Pega el UUID del ítem o el enlace de Vaultwarden que incluye itemId.',
   })
   vaultItemId?: string | null;
 
