@@ -17,9 +17,12 @@ export function DashboardPage() {
     }),
   );
 
+  // Keep in sync with `group` values in `dashboard-modules.ts` / sidebar sections.
   const groups = [
     'general',
+    'finanzas',
     'operaciones',
+    'contenido',
     'crms',
     'widgets',
     'herramientas',
