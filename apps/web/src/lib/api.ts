@@ -357,6 +357,9 @@ export const api = {
   mercadoPagoStatus: (sourceId: string) => request<import('@mali-one/shared').MercadoPagoSyncStatusDto>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/status`),
   syncMercadoPago: (sourceId: string, range: { from?: string; to?: string }) => request<{ runId: string }>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/sync`, { method: 'POST', body: JSON.stringify(range) }),
   mercadoPagoPayments: (sourceId: string, params: URLSearchParams) => request<import('@mali-one/shared').MercadoPagoPaymentsDto>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/payments?${params}`),
+  pagoEfectivoStatus: (sourceId: string) => request<import('@mali-one/shared').PagoEfectivoSyncStatusDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/status`),
+  syncPagoEfectivo: (sourceId: string) => request<{ ready: true }>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/sync`, { method: 'POST', body: '{}' }),
+  pagoEfectivoPayments: (sourceId: string, params: URLSearchParams) => request<import('@mali-one/shared').PagoEfectivoPaymentsDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/payments?${params}`),
   importNiubizPayments: (file: File) => {
     const body = new FormData();
     body.append('file', file);

@@ -69,6 +69,8 @@ model TreasurySource {
   targets             TreasuryTarget[]
   mercadoPagoPayments MercadoPagoPayment[]
   mercadoPagoSync     MercadoPagoSyncState?
+  pagoEfectivoPayments PagoEfectivoPayment[]
+  pagoEfectivoSync     PagoEfectivoSyncState?
 
   @@unique([provider, name])
 }
@@ -120,6 +122,52 @@ model MercadoPagoPayment {
   @@unique([sourceId, paymentId])
   @@index([sourceId, createdAtMp, id])
   @@index([sourceId, status])
+}
+
+model PagoEfectivoSyncState {
+  sourceId    String   @id
+  source      TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  runId       String?
+  status      String   @default("idle")
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  leaseUntil  DateTime?
+  fromDate    String?
+  toDate      String?
+  errorCode   String?
+  rowCount    Int      @default(0)
+}
+
+model PagoEfectivoPayment {
+  id                String   @id @default(cuid())
+  sourceId          String
+  source            TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  transactionId     String   @db.VarChar(100)
+  cip               String?  @db.VarChar(80)
+  externalReference String?  @db.VarChar(160)
+  description       String?  @db.VarChar(300)
+  status            String   @db.VarChar(60)
+  currency          TreasuryCurrency
+  amount            Decimal  @db.Decimal(18, 2)
+  feeAmount         Decimal? @db.Decimal(18, 2)
+  netAmount         Decimal? @db.Decimal(18, 2)
+  payerName         String?  @db.VarChar(250)
+  payerEmail        String?  @db.VarChar(250)
+  paymentChannel    String?  @db.VarChar(100)
+  financialEntity   String?  @db.VarChar(120)
+  createdAtPe       DateTime
+  paidAt            DateTime?
+  transferredAt     DateTime?
+  lastUpdatedAtPe   DateTime
+  /// Sanitized portal sale. Card numbers and payer identity documents are removed.
+  payload           Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([sourceId, transactionId])
+  @@index([sourceId, createdAtPe, id])
+  @@index([sourceId, status])
+  @@index([sourceId, cip])
 }
 
 model TreasuryTarget {

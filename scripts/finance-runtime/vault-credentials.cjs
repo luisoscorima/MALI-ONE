@@ -1,5 +1,6 @@
-// Mercado Pago credential worker in the shared Finance runtime. Secrets are emitted only to
-// the API process through stdout and are never logged or persisted.
+// Provider-aware credential worker in the shared Finance runtime. It exposes
+// only the whitelisted fields required by a connector. Secrets travel through
+// stdout to the API process and are never logged or persisted.
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { mkdtemp, rm } = require('node:fs/promises');
@@ -24,15 +25,24 @@ async function main() {
     delete env.BW_PASSWORD;
     stage = 'VAULT_ITEM';
     await bw(['sync']);
-    const item = JSON.parse(await bw(['get', 'item', process.env.FINANCE_VAULT_MP_ITEM_ID]));
+    const item = JSON.parse(await bw(['get', 'item', process.env.FINANCE_VAULT_ITEM_ID]));
     if (item.deletedDate) throw new Error();
-    const fields = Object.fromEntries((item.fields || []).map(field => [String(field.name).toLowerCase(), field.value]));
-    const accessToken = fields.access_token || fields.accesstoken ||
-      (String(item.login?.password || '').startsWith('APP_USR-') ? item.login.password : null);
-    const clientId = fields.client_id || fields.clientid;
-    const clientSecret = fields.client_secret || fields.clientsecret;
-    if (!accessToken && !(clientId && clientSecret)) throw new Error();
-    process.stdout.write(JSON.stringify({ accessToken, clientId, clientSecret }));
+    const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const fields = Object.fromEntries((item.fields || []).map(field => [normalize(field.name), field.value]));
+    const get = name => fields[normalize(name)] || null;
+    const provider = process.env.FINANCE_PROVIDER;
+    if (provider === 'mercadopago') {
+      const accessToken = get('access_token') ||
+        (String(item.login?.password || '').startsWith('APP_USR-') ? item.login.password : null);
+      if (!accessToken) throw new Error();
+      process.stdout.write(JSON.stringify({ accessToken }));
+    } else if (provider === 'pagoefectivo') {
+      const result = { accessKey: get('access_key'), secretKey: get('secret_key'), serviceId: get('id_service') };
+      if (!result.accessKey || !result.secretKey || !result.serviceId) throw new Error();
+      process.stdout.write(JSON.stringify(result));
+    } else {
+      throw new Error();
+    }
   } catch {
     process.stdout.write(JSON.stringify({ error: stage }));
     process.exitCode = 1;

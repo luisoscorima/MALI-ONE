@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MercadoPagoPaymentDto, MercadoPagoPaymentsDto, MercadoPagoSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { Spinner } from '@/components/feedback';
@@ -23,8 +23,10 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
   const [detail, setDetail] = useState<MercadoPagoPaymentDto | null>(null);
   const [revision, setRevision] = useState(0);
   const [status, setStatus] = useState<MercadoPagoSyncStatusDto | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [syncError, setSyncError] = useState('');
   const [range, setRange] = useState({ from: '', to: '' });
+  const seen = useRef('');
 
   useEffect(() => {
     let cancelled = false;
@@ -44,14 +46,20 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
     const poll = () => api.mercadoPagoStatus(sourceId).then(value => {
       if (cancelled) return;
       setStatus(value);
-      setSyncing(value.lastRun?.status === 'running');
-      if (value.lastRun?.status === 'running') timer = setTimeout(poll, 1500);
-      else setRevision(value => value + 1);
-    }).catch(err => !cancelled && setError(err instanceof Error ? err.message : 'No se pudo consultar el estado.'));
+      const version = `${value.lastRun?.runId}:${value.lastRun?.status}:${value.lastRun?.rowCount}`;
+      if (seen.current && seen.current !== version) setRevision(current => current + 1);
+      seen.current = version;
+      timer = setTimeout(poll, value.lastRun?.status === 'running' ? 1500 : 5000);
+    }).catch(err => {
+      if (cancelled) return;
+      setSyncError(err instanceof Error ? err.message : 'No se pudo consultar el estado.');
+      timer = setTimeout(poll, 5000);
+    });
     void poll();
     return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [sourceId, updateOpen]);
 
+  const syncing = busy || status?.lastRun?.status === 'running';
   const hasFilters = !!(filters.q || filters.status || filters.from || filters.to);
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const setFilter = (key: 'status' | 'from' | 'to', value: string) => setFilters(old => ({ ...old, [key]: value, page: 1 }));
@@ -104,11 +112,13 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
       <DialogDescription>Consulta la API oficial y guarda las operaciones en esta fuente.</DialogDescription></DialogHeader>
       <div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm"><span className="font-medium">Desde</span><Input type="date" value={range.from} onChange={e => setRange(old => ({ ...old, from: e.target.value }))} /></label>
         <label className="grid gap-1.5 text-sm"><span className="font-medium">Hasta</span><Input type="date" value={range.to} onChange={e => setRange(old => ({ ...old, to: e.target.value }))} /></label></div>
-        {status && !status.configured && <p role="alert" className="text-sm text-destructive">Falta configurar el elemento de Vaultwarden o el runtime del servidor.</p>}
+        {status && !status.configured && <p role="alert" className="text-sm text-destructive">Falta el access token en el ítem de Vaultwarden, o el acceso a la bóveda en el servidor.</p>}
         {status?.lastRun?.errorCode && <p role="alert" className="text-sm text-destructive">La última actualización falló: {status.lastRun.errorCode}</p>}
+        {status?.lastRun?.status === 'interrupted' && <p role="alert" className="text-sm text-destructive">La última actualización se interrumpió. Puedes volver a lanzarla.</p>}
         {status?.lastRun?.status === 'completed' && <p className="text-sm">Última actualización: {status.lastRun.rowCount} operaciones procesadas.</p>}
-        <Button disabled={syncing || status?.configured === false} onClick={async () => { setError(''); setSyncing(true); try { await api.syncMercadoPago(sourceId, { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) });
-          setStatus(await api.mercadoPagoStatus(sourceId)); } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo iniciar.'); setSyncing(false); } }}>{syncing ? 'Actualizando…' : 'Sincronizar ventas'}</Button>
+        {syncError && <p role="alert" className="text-sm text-destructive">{syncError}</p>}
+        <Button disabled={syncing || status?.configured === false} onClick={async () => { setSyncError(''); setBusy(true); try { await api.syncMercadoPago(sourceId, { ...(range.from ? { from: range.from } : {}), ...(range.to ? { to: range.to } : {}) });
+          setStatus(await api.mercadoPagoStatus(sourceId)); } catch (err) { setSyncError(err instanceof Error ? err.message : 'No se pudo iniciar.'); } finally { setBusy(false); } }}>{syncing ? 'Actualizando…' : 'Sincronizar ventas'}</Button>
       </div></DialogContent></Dialog>
 
     <Dialog open={detail !== null} onOpenChange={open => !open && setDetail(null)}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Detalle de operación</DialogTitle><DialogDescription>{detail ? `Operación ${detail.paymentId}` : sourceName}</DialogDescription></DialogHeader>

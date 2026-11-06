@@ -45,6 +45,8 @@ export class MercadoPagoPaymentQueryDto {
   to?: string;
 }
 
+export class PagoEfectivoPaymentQueryDto extends MercadoPagoPaymentQueryDto {}
+
 export class TreasurySourceInputDto {
   @IsEnum(TreasuryProvider)
   provider!: TreasuryProvider;

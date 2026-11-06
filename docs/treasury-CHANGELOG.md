@@ -7,6 +7,12 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 - Conectores BCP / otros portales.
 - Separar permisos consulta vs configuración si contabilidad lo pide.
 
+## [2026-11-05] — PagoEfectivo y token único de Mercado Pago
+
+- Persistencia por fuente (`PagoEfectivoPayment`, `PagoEfectivoSyncState`, `payload`) y migración `20261105233000_pagoefectivo_sync`.
+- El ítem de Vaultwarden de PagoEfectivo guarda `accessKey`, `secretKey` e `idService`. No hay variables de entorno de esa API. La consulta de movimientos queda pendiente del contrato oficial.
+- Mercado Pago sincroniza solo con `access_token`, en páginas de 50, filtrando por fecha de creación. Se quitó `client_id` / `client_secret`.
+
 ## [2026-11-05] — registro del portal en cada venta
 
 - `TreasuryPayment.payload` y `MercadoPagoPayment.payload` guardan la venta recibida de la API, sin número de tarjeta ni documento del pagador.

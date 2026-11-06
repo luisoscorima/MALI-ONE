@@ -2,18 +2,20 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req, Quer
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule, User } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
-import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto, MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
+import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto, MercadoPagoPaymentQueryDto, PagoEfectivoPaymentQueryDto } from './dto/treasury.dto';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { TreasuryService } from './treasury.service';
 import { NiubizSyncService } from './niubiz-sync.service';
 import { Roles } from '../../core/guards/roles.decorator';
 import { MercadoPagoSyncService } from './mercadopago-sync.service';
+import { PagoEfectivoSyncService } from './pagoefectivo-sync.service';
 
 @Controller('treasury')
 @RequireModule(AppModule.treasury)
 export class TreasuryController {
   constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService,
-    private readonly niubiz: NiubizSyncService, private readonly mercadoPago: MercadoPagoSyncService) {}
+    private readonly niubiz: NiubizSyncService, private readonly mercadoPago: MercadoPagoSyncService,
+    private readonly pagoEfectivo: PagoEfectivoSyncService) {}
 
   @Get('mercadopago/:sourceId/status')
   mercadoPagoStatus(@Param('sourceId') sourceId: string) { return this.mercadoPago.status(sourceId); }
@@ -27,6 +29,20 @@ export class TreasuryController {
   @Get('mercadopago/:sourceId/payments')
   mercadoPagoPayments(@Param('sourceId') sourceId: string, @Query() query: MercadoPagoPaymentQueryDto) {
     return this.mercadoPago.list(sourceId, query);
+  }
+
+  @Get('pagoefectivo/:sourceId/status')
+  pagoEfectivoStatus(@Param('sourceId') sourceId: string) { return this.pagoEfectivo.status(sourceId); }
+
+  @Post('pagoefectivo/:sourceId/sync')
+  @Roles('admin')
+  syncPagoEfectivo(@Param('sourceId') sourceId: string) {
+    return this.pagoEfectivo.start(sourceId);
+  }
+
+  @Get('pagoefectivo/:sourceId/payments')
+  pagoEfectivoPayments(@Param('sourceId') sourceId: string, @Query() query: PagoEfectivoPaymentQueryDto) {
+    return this.pagoEfectivo.listPayments(sourceId, query);
   }
 
   @Get('niubiz/status')

@@ -7,9 +7,16 @@ import { MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
 import { sanitizePaymentPayload } from './payment-payload';
 
 const apiBase = 'https://api.mercadopago.com';
+const pageSize = 50;
 const limaDay = (now = new Date()) => new Date(now.getTime() - 5 * 3600000).toISOString().slice(0, 10);
-type Credentials = { accessToken?: string | null; clientId?: string; clientSecret?: string };
+const vaultRuntime = ['FINANCE_VAULT_URL', 'FINANCE_VAULT_CLIENT_ID', 'FINANCE_VAULT_CLIENT_SECRET',
+  'FINANCE_VAULT_MASTER_PASSWORD', 'FINANCE_RUNTIME_NODE', 'FINANCE_CREDENTIALS_SCRIPT'];
 type MpPayment = Record<string, any>;
+const clip = (value: unknown, max: number) => {
+  if (value == null || value === '') return null;
+  const text = String(value).trim();
+  return text ? text.slice(0, max) : null;
+};
 
 @Injectable()
 export class MercadoPagoSyncService {
@@ -28,72 +35,69 @@ export class MercadoPagoSyncService {
       this.source(sourceId),
       this.prisma.mercadoPagoSyncState.findUnique({ where: { sourceId } }),
     ]);
-    const runtimeReady = ['FINANCE_VAULT_URL', 'FINANCE_VAULT_CLIENT_ID', 'FINANCE_VAULT_CLIENT_SECRET',
-      'FINANCE_VAULT_MASTER_PASSWORD', 'FINANCE_RUNTIME_NODE', 'MERCADOPAGO_CREDENTIALS_SCRIPT']
-      .every(key => !!process.env[key]);
-    return { configured: runtimeReady && !!source.vaultItemId, lastRun };
+    if (lastRun?.status === 'running' && (!lastRun.leaseUntil || lastRun.leaseUntil < new Date())) lastRun.status = 'interrupted';
+    return { configured: vaultRuntime.every(key => !!process.env[key]) && !!source.vaultItemId, lastRun };
   }
 
   async start(sourceId: string, range: { from?: string; to?: string }, actor: Pick<User, 'id' | 'email'>) {
+    if (!vaultRuntime.every(key => !!process.env[key])) {
+      throw new ServiceUnavailableException('Configura el acceso a Vaultwarden y el runtime en el servidor.');
+    }
     const source = await this.source(sourceId);
     if (!source.vaultItemId) throw new ServiceUnavailableException('Configura el elemento de Vaultwarden de esta fuente.');
     const to = range.to ?? limaDay();
     const from = range.from ?? limaDay(new Date(Date.now() - 31 * 86400000));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || to > limaDay()) {
-      throw new BadRequestException('Rango de fechas inválido.');
+    const oldest = limaDay(new Date(Date.now() - 365 * 86400000));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || to > limaDay() || from < oldest) {
+      throw new BadRequestException('Mercado Pago solo devuelve ventas de los últimos 12 meses, sin fechas futuras.');
     }
+    if (Date.parse(to) - Date.parse(from) > 31 * 86400000) throw new BadRequestException('El rango debe ser de hasta 32 días.');
     await this.prisma.mercadoPagoSyncState.upsert({ where: { sourceId }, create: { sourceId }, update: {} });
     const now = new Date();
     const runId = randomUUID();
     const locked = await this.prisma.mercadoPagoSyncState.updateMany({
       where: { sourceId, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
       data: { runId, status: 'running', startedAt: now, finishedAt: null,
-        leaseUntil: new Date(now.getTime() + 30 * 60000), fromDate: from, toDate: to, errorCode: null, rowCount: 0 },
+        leaseUntil: new Date(now.getTime() + 90 * 60000), fromDate: from, toDate: to, errorCode: null, rowCount: 0 },
     });
     if (!locked.count) throw new ConflictException('Ya existe una sincronización en curso.');
     void this.run(sourceId, source.vaultItemId, runId, from, to, actor);
     return { runId };
   }
 
-  private credentials(itemId: string): Promise<Credentials> {
+  private credentials(itemId: string): Promise<string> {
     return new Promise((resolve, reject) => execFile(process.env.FINANCE_RUNTIME_NODE!,
-      [process.env.MERCADOPAGO_CREDENTIALS_SCRIPT!], { timeout: 90000, maxBuffer: 65536, env: {
+      [process.env.FINANCE_CREDENTIALS_SCRIPT!], { timeout: 90000, maxBuffer: 65536, env: {
         PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, HOME: process.env.HOME,
         FINANCE_VAULT_URL: process.env.FINANCE_VAULT_URL,
         FINANCE_VAULT_CLIENT_ID: process.env.FINANCE_VAULT_CLIENT_ID,
         FINANCE_VAULT_CLIENT_SECRET: process.env.FINANCE_VAULT_CLIENT_SECRET,
         FINANCE_VAULT_MASTER_PASSWORD: process.env.FINANCE_VAULT_MASTER_PASSWORD,
-        FINANCE_VAULT_MP_ITEM_ID: itemId,
+        FINANCE_VAULT_ITEM_ID: itemId,
+        FINANCE_PROVIDER: 'mercadopago',
       } }, (error, stdout) => {
         try {
           const result = JSON.parse(stdout);
-          if (error || result.error || (!result.accessToken && !(result.clientId && result.clientSecret))) throw new Error(result.error || 'MP_CREDENTIALS');
-          resolve(result);
-        } catch (cause) { reject(cause); }
+          const safe = ['VAULT_AUTH', 'VAULT_UNLOCK', 'VAULT_ITEM'];
+          if (error || result.error || typeof result.accessToken !== 'string' || !result.accessToken) {
+            throw new Error(safe.includes(result.error) ? result.error : 'MP_CREDENTIALS');
+          }
+          resolve(result.accessToken);
+        } catch (cause) { reject(cause instanceof Error ? cause : new Error('MP_CREDENTIALS')); }
       }));
-  }
-
-  private async token(itemId: string) {
-    const credentials = await this.credentials(itemId);
-    if (credentials.accessToken) return credentials.accessToken;
-    const response = await fetch(`${apiBase}/oauth/token`, { method: 'POST', signal: AbortSignal.timeout(30000),
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-        grant_type: 'client_credentials', client_id: credentials.clientId, client_secret: credentials.clientSecret,
-      }) });
-    const body = await response.json() as { access_token?: string };
-    if (!response.ok || !body.access_token) throw new Error('MP_AUTH');
-    return body.access_token;
   }
 
   private async run(sourceId: string, itemId: string, runId: string, from: string, to: string, actor: Pick<User, 'id' | 'email'>) {
     let errorCode: string | null = null;
     let rowCount = 0;
     try {
-      const token = await this.token(itemId);
-      for (let offset = 0;; offset += 100) {
+      const token = await this.credentials(itemId);
+      let offset = 0;
+      for (;;) {
+        if (offset > 10000 - pageSize) throw new Error('MP_PAGINATION_LIMIT');
         const url = new URL(`${apiBase}/v1/payments/search`);
-        Object.entries({ sort: 'date_last_updated', criteria: 'asc', range: 'date_last_updated',
-          begin_date: `${from}T00:00:00.000-05:00`, end_date: `${to}T23:59:59.999-05:00`, limit: '100', offset: String(offset) })
+        Object.entries({ sort: 'date_created', criteria: 'asc', range: 'date_created',
+          begin_date: `${from}T00:00:00.000-05:00`, end_date: `${to}T23:59:59.999-05:00`, limit: String(pageSize), offset: String(offset) })
           .forEach(([key, value]) => url.searchParams.set(key, value));
         const response = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}` } });
         if (response.status === 401 || response.status === 403) throw new Error('MP_AUTH');
@@ -113,13 +117,18 @@ export class MercadoPagoSyncService {
           });
           rowCount++;
         }
-        if (offset + payload.results.length >= Number(payload.paging?.total ?? payload.results.length) || payload.results.length === 0) break;
+        offset += payload.results.length;
+        const total = Number(payload.paging?.total ?? offset);
+        await this.prisma.mercadoPagoSyncState.updateMany({ where: { sourceId, runId }, data: {
+          rowCount, leaseUntil: new Date(Date.now() + 90 * 60000),
+        } });
+        if (payload.results.length < pageSize || offset >= total) break;
       }
       await this.prisma.adminAuditLog.create({ data: { actorId: actor.id, actorEmail: actor.email,
         action: 'TREASURY_MERCADOPAGO_SYNCED', payload: { sourceId, from, to, rowCount } } });
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
-      errorCode = ['VAULT_AUTH', 'VAULT_UNLOCK', 'VAULT_ITEM', 'MP_AUTH', 'RATE_LIMITED', 'MP_API', 'MP_SCHEMA'].includes(code) ? code : 'SYNC_FAILED';
+      errorCode = ['VAULT_AUTH', 'VAULT_UNLOCK', 'VAULT_ITEM', 'MP_CREDENTIALS', 'MP_AUTH', 'RATE_LIMITED', 'MP_API', 'MP_SCHEMA', 'MP_PAGINATION_LIMIT'].includes(code) ? code : 'SYNC_FAILED';
     } finally {
       await this.prisma.mercadoPagoSyncState.updateMany({ where: { sourceId, runId }, data: {
         status: errorCode ? 'failed' : 'completed', errorCode, rowCount, finishedAt: new Date(), leaseUntil: null,
@@ -129,15 +138,15 @@ export class MercadoPagoSyncService {
 
   private mapPayment(sourceId: string, payment: MpPayment, fee: number | null, payerName: string | null) {
     const net = payment.transaction_details?.net_received_amount;
-    return { sourceId, paymentId: String(payment.id), merchantOrderId: payment.order?.id ? String(payment.order.id) : null,
-      externalReference: payment.external_reference || null, description: payment.description || null,
-      status: String(payment.status || 'unknown'), statusDetail: payment.status_detail || null,
+    return { sourceId, paymentId: String(payment.id).slice(0, 64), merchantOrderId: payment.order?.id ? String(payment.order.id).slice(0, 64) : null,
+      externalReference: clip(payment.external_reference, 160), description: clip(payment.description, 300),
+      status: String(payment.status || 'unknown').slice(0, 40), statusDetail: clip(payment.status_detail, 80),
       currency: payment.currency_id as 'PEN' | 'USD', grossAmount: new Prisma.Decimal(payment.transaction_amount),
       netAmount: net == null ? null : new Prisma.Decimal(net), feeAmount: fee == null ? null : new Prisma.Decimal(fee),
-      paymentMethodId: payment.payment_method_id || null, paymentTypeId: payment.payment_type_id || null,
-      issuerName: payment.issuer_id ? String(payment.issuer_id) : null, cardLastDigits: payment.card?.last_four_digits || null,
-      installments: Number.isInteger(payment.installments) ? payment.installments : null, payerName,
-      payerEmail: payment.payer?.email || null, createdAtMp: new Date(payment.date_created),
+      paymentMethodId: clip(payment.payment_method_id, 80), paymentTypeId: clip(payment.payment_type_id, 40),
+      issuerName: null, cardLastDigits: clip(payment.card?.last_four_digits, 8),
+      installments: Number.isInteger(payment.installments) ? payment.installments : null, payerName: clip(payerName, 250),
+      payerEmail: clip(payment.payer?.email, 250), createdAtMp: new Date(payment.date_created),
       approvedAt: payment.date_approved ? new Date(payment.date_approved) : null,
       releasedAt: payment.money_release_date ? new Date(payment.money_release_date) : null,
       lastUpdatedAtMp: new Date(payment.date_last_updated), payload: sanitizePaymentPayload(payment) };

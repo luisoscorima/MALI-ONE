@@ -178,6 +178,52 @@ export interface MercadoPagoSyncStatusDto {
   };
 }
 
+export interface PagoEfectivoPaymentDto {
+  id: string;
+  transactionId: string;
+  cip: string | null;
+  externalReference: string | null;
+  description: string | null;
+  status: string;
+  currency: TreasuryCurrency;
+  amount: string;
+  feeAmount: string | null;
+  netAmount: string | null;
+  payerName: string | null;
+  payerEmail: string | null;
+  paymentChannel: string | null;
+  financialEntity: string | null;
+  createdAtPe: string;
+  paidAt: string | null;
+  transferredAt: string | null;
+  lastUpdatedAtPe: string;
+  payload: Record<string, unknown> | null;
+}
+
+export interface PagoEfectivoPaymentsDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  states: string[];
+  payments: PagoEfectivoPaymentDto[];
+}
+
+export interface PagoEfectivoSyncStatusDto {
+  configured: boolean;
+  /** False until the official movements query is implemented. Credentials can still be stored. */
+  connected: boolean;
+  lastRun: null | {
+    runId: string | null;
+    status: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    fromDate: string | null;
+    toDate: string | null;
+    errorCode: string | null;
+    rowCount: number;
+  };
+}
+
 export interface TreasuryOverviewDto {
   providers: typeof TREASURY_PROVIDERS;
   sources: TreasurySourceDto[];

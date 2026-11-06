@@ -27,7 +27,7 @@ WORKDIR /opt/finance
 COPY scripts/finance-runtime/package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund
 COPY scripts/finance-runtime/niubiz-login.cjs ./
-COPY scripts/finance-runtime/mercadopago-credentials.cjs ./
+COPY scripts/finance-runtime/vault-credentials.cjs ./
 
 FROM node:20-bookworm-slim AS runner
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -44,7 +44,7 @@ COPY --from=finance-tools /usr/local/bin/node /opt/finance/node
 COPY --from=finance-tools /opt/finance /opt/finance
 ENV FINANCE_RUNTIME_NODE=/opt/finance/node
 ENV NIUBIZ_LOGIN_SCRIPT=/opt/finance/niubiz-login.cjs
-ENV MERCADOPAGO_CREDENTIALS_SCRIPT=/opt/finance/mercadopago-credentials.cjs
+ENV FINANCE_CREDENTIALS_SCRIPT=/opt/finance/vault-credentials.cjs
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/finance/browsers
 RUN /opt/finance/node /opt/finance/node_modules/playwright/cli.js install --with-deps chromium
 

@@ -17,6 +17,7 @@ import { useToast } from '@/contexts/toast-context';
 import { cn } from '@/lib/utils';
 import { TreasuryPayments } from './treasury-payments';
 import { MercadoPagoPayments } from './mercadopago-payments';
+import { PagoEfectivoPayments } from './pagoefectivo-payments';
 import {
   Badge,
   Button,
@@ -110,7 +111,8 @@ export function TreasuryPage() {
   const targetsTitle = provider?.targetKind === 'bank_account' ? 'Cuentas bancarias' : 'Comercios';
   const showNiubizRecords = selected?.provider === 'niubiz_sales';
   const showMercadoPagoRecords = selected?.provider === 'mercadopago';
-  const showRecords = showNiubizRecords || showMercadoPagoRecords;
+  const showPagoEfectivoRecords = selected?.provider === 'pagoefectivo';
+  const showRecords = showNiubizRecords || showMercadoPagoRecords || showPagoEfectivoRecords;
 
   function openSource(source?: TreasurySourceDto) {
     setFormError('');
@@ -244,7 +246,7 @@ export function TreasuryPage() {
                 {data.sources.map((source) => {
                   const sourceProvider = data.providers.find((item) => item.id === source.provider);
                   const active = source.id === selectedId;
-                  const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago';
+                  const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago' || source.provider === 'pagoefectivo';
                   return (
                     <button
                       key={source.id}
@@ -329,6 +331,13 @@ export function TreasuryPage() {
                 />
               ) : showMercadoPagoRecords ? (
                 <MercadoPagoPayments
+                  sourceId={selected.id}
+                  sourceName={selected.name}
+                  updateOpen={updateOpen}
+                  onUpdateOpenChange={setUpdateOpen}
+                />
+              ) : showPagoEfectivoRecords ? (
+                <PagoEfectivoPayments
                   sourceId={selected.id}
                   sourceName={selected.name}
                   updateOpen={updateOpen}
