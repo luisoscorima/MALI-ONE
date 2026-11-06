@@ -4,7 +4,7 @@ import {
   applyMalichimpFiles,
   inspectMalichimpFiles,
   locateMalichimpFiles,
-} from './lib/malichimp-import-runner';
+} from '../src/modules/malichimp/lib/malichimp-import-runner';
 
 const prisma = new PrismaClient();
 

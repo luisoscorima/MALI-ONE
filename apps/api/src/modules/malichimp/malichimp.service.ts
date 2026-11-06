@@ -18,8 +18,8 @@ import {
   locateMalichimpFiles,
   type MalichimpImportReport,
   type MalichimpLocatedFile,
-} from '../../../prisma/lib/malichimp-import-runner';
-import { extractMailchimpZip } from '../../../prisma/lib/mailchimp-zip';
+} from './lib/malichimp-import-runner';
+import { extractMailchimpZip } from './lib/mailchimp-zip';
 import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 
 type ImportPreview = {

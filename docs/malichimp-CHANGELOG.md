@@ -14,3 +14,4 @@
 
 - CRM PAM deja de exponer campañas o depender de SES.
 - Documentación y `.env.example` separan SES compartido del SMTP PAM (`PAM_SMTP_*`).
+- El importador vive en `src/modules/malichimp/lib` para no romper `dist/main.js` en el build Nest.
