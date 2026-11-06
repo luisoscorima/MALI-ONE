@@ -14,7 +14,9 @@
     "prisma:seed:catalog": "tsx prisma/seed-educacion-catalog.ts",
     "prisma:seed:todos": "tsx prisma/seed-todos.ts",
     "prisma:seed:landings": "tsx prisma/seed-landings.ts",
-    "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts"
+    "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts",
+    "prisma:import:malichimp": "tsx prisma/import-malichimp.ts",
+    "test:malichimp-import": "tsx --test prisma/lib/malichimp-import.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",

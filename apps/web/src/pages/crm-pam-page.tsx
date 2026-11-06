@@ -3,7 +3,6 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Columns3, Link2, Mail, MessageCircle, Plus, RefreshCw, Save, Send, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type {
-  EmailCampaignDto,
   PamPaymentMethodDto,
   PamPlanDto,
   PamRegistrationDto,
@@ -80,13 +79,6 @@ type AttrDef = {
   sort_order: number;
   required: boolean;
   active: boolean;
-};
-
-type PublishedNewsletter = {
-  id: string;
-  slug: string;
-  title: string;
-  subject: string;
 };
 
 const MP_STATUSES = [
@@ -309,29 +301,6 @@ export function CrmPamPage() {
     }>;
   } | null>(null);
 
-  const [newsletters, setNewsletters] = useState<PublishedNewsletter[]>([]);
-  const [campaigns, setCampaigns] = useState<EmailCampaignDto[]>([]);
-  const [newsletterId, setNewsletterId] = useState('');
-  const [campaignName, setCampaignName] = useState('');
-  const [includeSegments, setIncludeSegments] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [excludeSegments, setExcludeSegments] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [audiencePreview, setAudiencePreview] = useState<{
-    total: number;
-    sample: Array<{
-      contact_id: number;
-      email: string;
-      name: string;
-      last_name: string;
-    }>;
-  } | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [saving, setSaving] = useState(false);
   const [visibleCols, setVisibleCols] = useState<Set<string>>(
     () => loadStoredVisibleCols() ?? new Set(DEFAULT_VISIBLE_COLS),
   );
@@ -614,20 +583,6 @@ export function CrmPamPage() {
     }
   }, []);
 
-  const loadCampaigns = useCallback(async () => {
-    try {
-      const [n, c] = await Promise.all([
-        api.listCrmPamNewsletters(),
-        api.listEmailCampaigns(),
-      ]);
-      setNewsletters(n);
-      setCampaigns(c);
-      setNewsletterId((prev) => prev || n[0]?.id || '');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al cargar campañas');
-    }
-  }, [toast]);
-
   useEffect(() => {
     void loadContacts();
   }, [loadContacts]);
@@ -646,10 +601,6 @@ export function CrmPamPage() {
       return { ...prev, plan: activePamPlans[0].slug };
     });
   }, [activePamPlans]);
-
-  useEffect(() => {
-    if (tab === 'send') void loadCampaigns();
-  }, [tab, loadCampaigns]);
 
   function openContactEditor(c: CrmContact) {
     setExpandedContactId((prev) =>
@@ -896,115 +847,6 @@ export function CrmPamPage() {
       toast.error(e instanceof Error ? e.message : 'Error al vincular');
     } finally {
       setLinking(false);
-    }
-  }
-
-  async function handlePreviewAudience() {
-    const segmentList = [...includeSegments];
-    if (!segmentList.length) {
-      toast.error('Marca al menos un segmento');
-      return;
-    }
-    setPreviewLoading(true);
-    try {
-      const preview = await api.previewCrmPamAudience({
-        audienceArea: 'pam',
-        audienceSegments: segmentList,
-        audienceExcludeSegments: [...excludeSegments],
-      });
-      setAudiencePreview({
-        total: preview.total,
-        sample: preview.sample,
-      });
-      toast.success(`${preview.total} destinatarios`);
-    } catch (e) {
-      setAudiencePreview(null);
-      toast.error(e instanceof Error ? e.message : 'Error al previsualizar');
-    } finally {
-      setPreviewLoading(false);
-    }
-  }
-
-  function invalidateAudiencePreview() {
-    setAudiencePreview(null);
-  }
-
-  function toggleCampaignSegment(
-    slug: string,
-    which: 'include' | 'exclude',
-  ) {
-    const setter = which === 'include' ? setIncludeSegments : setExcludeSegments;
-    const otherSetter =
-      which === 'include' ? setExcludeSegments : setIncludeSegments;
-    setter((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      return next;
-    });
-    otherSetter((prev) => {
-      if (!prev.has(slug)) return prev;
-      const next = new Set(prev);
-      next.delete(slug);
-      return next;
-    });
-    invalidateAudiencePreview();
-  }
-
-  async function handleCreateCampaign(mode: 'now' | 'scheduled') {
-    if (!newsletterId) {
-      toast.error('Elige un boletín publicado');
-      return;
-    }
-    const segmentList = [...includeSegments];
-    if (!segmentList.length) {
-      toast.error('Marca al menos un segmento');
-      return;
-    }
-    if (mode === 'scheduled' && !scheduledAt.trim()) {
-      toast.error('Indica fecha y hora de programación');
-      return;
-    }
-
-    const when =
-      mode === 'scheduled'
-        ? `programada para ${new Date(scheduledAt).toLocaleString('es-PE')}`
-        : 'envío inmediato';
-    const ok = await confirm({
-      title: mode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
-      description: `Se creará la campaña (${when}) hacia contactos PAM con email y opt-in.`,
-      confirmLabel: mode === 'scheduled' ? 'Programar' : 'Enviar',
-    });
-    if (!ok) return;
-
-    setSaving(true);
-    try {
-      const campaign = await api.createEmailCampaign({
-        newsletterId,
-        name:
-          campaignName ||
-          `Envío ${new Date().toLocaleString('es-PE')}`,
-        audienceArea: 'pam',
-        audienceSegments: segmentList,
-        audienceExcludeSegments: [...excludeSegments],
-        ...(mode === 'scheduled'
-          ? { scheduledAt: new Date(scheduledAt).toISOString() }
-          : {}),
-      });
-
-      if (mode === 'now') {
-        await api.sendEmailCampaign(campaign.id);
-        toast.success('Envío iniciado');
-      } else {
-        toast.success('Campaña programada');
-      }
-      setCampaignName('');
-      await loadCampaigns();
-      setTab('send');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Error al crear campaña');
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -1321,53 +1163,6 @@ export function CrmPamPage() {
     [expandedPaymentId, draftMethod, linkedPaymentIds, paymentMethods],
   );
 
-  const campaignColumns = useMemo<ColumnDef<EmailCampaignDto>[]>(
-    () => [
-      {
-        accessorKey: 'name',
-        header: 'Envío',
-        cell: ({ row }) => (
-          <span className="font-medium">{row.original.name}</span>
-        ),
-      },
-      { accessorKey: 'status', header: 'Estado' },
-      {
-        id: 'segments',
-        header: 'Segmentos',
-        cell: ({ row }) => {
-          const segs =
-            row.original.audienceSegments?.length > 0
-              ? row.original.audienceSegments
-              : row.original.audienceSegment
-                ? [row.original.audienceSegment]
-                : [];
-          return segs.length ? segs.join(', ') : '—';
-        },
-      },
-      {
-        id: 'scheduled',
-        header: 'Programado',
-        cell: ({ row }) =>
-          row.original.scheduledAt
-            ? new Date(row.original.scheduledAt).toLocaleString('es-PE')
-            : '—',
-      },
-      {
-        id: 'sent',
-        header: 'Enviados',
-        cell: ({ row }) =>
-          `${row.original.sentCount}/${row.original.totalRecipients}`,
-      },
-      {
-        id: 'engagement',
-        header: 'Opens / Clicks',
-        cell: ({ row }) =>
-          `${row.original.openCount} / ${row.original.clickCount}`,
-      },
-    ],
-    [],
-  );
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -1381,7 +1176,6 @@ export function CrmPamPage() {
         <TabsList>
           <TabsTrigger value="contacts">Contactos</TabsTrigger>
           <TabsTrigger value="payments">Pagos</TabsTrigger>
-          <TabsTrigger value="send">Campañas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contacts" className="space-y-4">
@@ -2416,215 +2210,6 @@ export function CrmPamPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="send" className="space-y-4">
-          <div className="space-y-5 rounded-lg border border-border/60 p-4">
-            <div className="space-y-2">
-              <Label>1. Incluir segmentos</Label>
-              <p className="text-xs text-muted-foreground">
-                Contactos en cualquiera de los segmentos (unión), con email y
-                opt-in.
-              </p>
-              {segments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No hay segmentos cargados desde WhatsApp CRM.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {segments.map((s) => {
-                    const on = includeSegments.has(s.slug);
-                    return (
-                      <Button
-                        key={`inc-${s.slug}`}
-                        type="button"
-                        size="sm"
-                        variant={on ? 'default' : 'outline'}
-                        onClick={() =>
-                          toggleCampaignSegment(s.slug, 'include')
-                        }
-                      >
-                        {s.label}
-                      </Button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2 border-t border-border/50 pt-4">
-              <Label>Excluir segmentos (opcional)</Label>
-              <div className="flex flex-wrap gap-2">
-                {segments.map((s) => {
-                  const on = excludeSegments.has(s.slug);
-                  const blocked = includeSegments.has(s.slug);
-                  return (
-                    <Button
-                      key={`exc-${s.slug}`}
-                      type="button"
-                      size="sm"
-                      variant={on ? 'secondary' : 'outline'}
-                      disabled={blocked}
-                      onClick={() =>
-                        toggleCampaignSegment(s.slug, 'exclude')
-                      }
-                    >
-                      {s.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2 border-t border-border/50 pt-4">
-              <Label>2. Vista previa de destinatarios</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={previewLoading || includeSegments.size === 0}
-                  onClick={() => void handlePreviewAudience()}
-                >
-                  {previewLoading ? 'Cargando…' : 'Mostrar destinatarios'}
-                </Button>
-                {audiencePreview ? (
-                  <span className="text-sm text-muted-foreground">
-                    {audiencePreview.total} destinatarios
-                  </span>
-                ) : null}
-              </div>
-              {audiencePreview ? (
-                <div className="max-h-64 overflow-auto rounded-md border border-border/50">
-                  <table className="w-full text-left text-sm">
-                    <thead className="sticky top-0 bg-muted/80">
-                      <tr>
-                        <th className="px-3 py-2 font-medium">Nombre</th>
-                        <th className="px-3 py-2 font-medium">Apellidos</th>
-                        <th className="px-3 py-2 font-medium">Email</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {audiencePreview.sample.map((r) => (
-                        <tr
-                          key={r.contact_id}
-                          className="border-t border-border/40"
-                        >
-                          <td className="px-3 py-1.5">{r.name || '—'}</td>
-                          <td className="px-3 py-1.5">{r.last_name || '—'}</td>
-                          <td className="px-3 py-1.5">{r.email}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {audiencePreview.total > audiencePreview.sample.length ? (
-                    <p className="border-t border-border/40 px-3 py-2 text-xs text-muted-foreground">
-                      Mostrando {audiencePreview.sample.length} de{' '}
-                      {audiencePreview.total}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="grid gap-3 border-t border-border/50 pt-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label>3. Boletín publicado</Label>
-                <Select value={newsletterId} onValueChange={setNewsletterId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {newsletters.map((n) => (
-                      <SelectItem key={n.id} value={n.id}>
-                        {n.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="cname">Nombre del envío</Label>
-                <Input
-                  id="cname"
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="Opcional"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3 border-t border-border/50 pt-4">
-              <Label>4. Programación y envío</Label>
-              <div className="flex flex-wrap gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="scheduleMode"
-                    checked={scheduleMode === 'now'}
-                    onChange={() => setScheduleMode('now')}
-                  />
-                  Enviar ahora
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="scheduleMode"
-                    checked={scheduleMode === 'scheduled'}
-                    onChange={() => setScheduleMode('scheduled')}
-                  />
-                  Programar envío
-                </label>
-              </div>
-              {scheduleMode === 'scheduled' ? (
-                <div className="max-w-xs space-y-1">
-                  <Label htmlFor="schedAt">Fecha y hora</Label>
-                  <Input
-                    id="schedAt"
-                    type="datetime-local"
-                    value={scheduledAt}
-                    onChange={(e) => setScheduledAt(e.target.value)}
-                  />
-                </div>
-              ) : null}
-              <div className="flex flex-wrap gap-2">
-                {scheduleMode === 'now' ? (
-                  <Button
-                    onClick={() => void handleCreateCampaign('now')}
-                    disabled={
-                      saving || !newsletterId || includeSegments.size === 0
-                    }
-                  >
-                    <Send className="mr-1 size-4" />
-                    {saving ? 'Enviando…' : 'Enviar'}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => void handleCreateCampaign('scheduled')}
-                    disabled={
-                      saving ||
-                      !newsletterId ||
-                      includeSegments.size === 0 ||
-                      !scheduledAt.trim()
-                    }
-                  >
-                    {saving ? 'Guardando…' : 'Programar'}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {campaigns.length === 0 ? (
-            <EmptyState
-              title="Sin campañas"
-              description="Las campañas aparecerán aquí."
-            />
-          ) : (
-            <DataTable
-              columns={campaignColumns}
-              data={campaigns}
-              getRowId={(c) => c.id}
-            />
-          )}
-        </TabsContent>
       </Tabs>
     </div>
   );

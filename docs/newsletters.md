@@ -4,13 +4,13 @@
 
 ## Qué es
 
-Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El **envío masivo SES** se dispara desde CRM PAM (campañas), no desde el editor solo.
+Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El editor no decide audiencia ni transporta correo.
 
 ## Cómo funciona
 
 1. Crear/editar newsletter (draft/published).
 2. URL pública sirve HTML; tracking opens/clicks vía tokens `/mail/o|c/:token` cuando hay campaña.
-3. CRM PAM selecciona audiencia WhatsApp + newsletter y envía por SES.
+3. MALICHIMP será el consumidor del boletín para campañas de correo; el transporte SES es infraestructura compartida.
 
 ## Código
 
@@ -30,26 +30,22 @@ Público: `GET /n/:slug`, `GET /mail/o/:token`, `GET /mail/c/:token`.
 ## Datos (Prisma)
 
 - `Newsletter`
-- Campañas/envíos viven con CRM PAM: `EmailCampaign`, `EmailSend`, `EmailEvent`
+- Los modelos históricos `EmailCampaign`, `EmailSend` y `EmailEvent` se conservan mientras se rediseña el flujo independiente de campañas.
 
 ## Conexiones externas
 
-| **AWS SES** | Envío masivo (desde crm-pam) |
+| **MALICHIMP** | Audiencia futura para campañas |
 | Públicos | HTML del boletín |
 
 ## Variables de entorno
 
-```env
-SES_FROM_EMAIL=noreply@mali.pe
-SES_FROM_NAME=MALI
-# mismas AWS_ACCESS_KEY_ID / SECRET / REGION
-```
+El editor no envía correo. El transporte SES vive en `core/email-delivery` (ver [malichimp.md](./malichimp.md)). El SMTP de PAM (`PAM_SMTP_*`) es otro canal, solo para welcome transaccional.
 
 ## Permisos
 
-Módulo: `newsletters` (envío requiere también `crm_pam`)
+Módulo: `newsletters`
 
 ## Relacionados
 
-- [crm-pam.md](./crm-pam.md)
-- [crm-pam.md](./crm-pam.md)
+- [malichimp.md](./malichimp.md)
+- [crm-pam.md](./crm-pam.md) — SMTP PAM, no SES

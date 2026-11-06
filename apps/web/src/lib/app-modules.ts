@@ -62,6 +62,11 @@ export const APP_MODULES: {
       'Editor visual drag & drop de boletines con URL pública compartible.',
   },
   {
+    id: 'malichimp',
+    label: 'MALICHIMP',
+    description: 'Contactos, segmentos y supresiones para boletines por Amazon SES.',
+  },
+  {
     id: 'landings',
     label: 'Landings',
     description:

@@ -4,7 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- _(vacío — registrar aquí cada cambio evolutivo)_
+- Se retiran campañas, programador y transporte SES de CRM PAM.
+- CRM PAM queda limitado a contactos WhatsApp y ledger de pagos.
 
 ## [2026-11-05] — baseline documental
 

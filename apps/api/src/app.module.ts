@@ -31,6 +31,8 @@ import { CrmEducacionModule } from './modules/crm-educacion/crm-educacion.module
 import { TodosModule } from './modules/todos/todos.module';
 import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
+import { MalichimpModule } from './modules/malichimp/malichimp.module';
+import { EmailDeliveryModule } from './core/email-delivery/email-delivery.module';
 
 @Module({
   imports: [
@@ -40,6 +42,7 @@ import { TreasuryModule } from './modules/treasury/treasury.module';
     RedisModule,
     S3Module,
     QrModule,
+    EmailDeliveryModule,
     CrmClientModule,
     AuthGoogleModule,
     GoogleAdminModule,
@@ -59,6 +62,7 @@ import { TreasuryModule } from './modules/treasury/treasury.module';
     TodosModule,
     SftpgoFilesModule,
     TreasuryModule,
+    MalichimpModule,
   ],
   controllers: [HealthController],
   providers: [

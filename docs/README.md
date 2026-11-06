@@ -39,6 +39,7 @@ Convención de nombres: kebab-case alineado a `apps/api/src/modules/<modulo>/` (
 |--------|-----|-----------|
 | Landings | [landings.md](./landings.md) | [CHANGELOG](./landings-CHANGELOG.md) |
 | Boletines | [newsletters.md](./newsletters.md) | [CHANGELOG](./newsletters-CHANGELOG.md) |
+| MALICHIMP | [malichimp.md](./malichimp.md) | [CHANGELOG](./malichimp-CHANGELOG.md) |
 | CRM PAM | [crm-pam.md](./crm-pam.md) | [CHANGELOG](./crm-pam-CHANGELOG.md) |
 | CRM Educación | [crm-educacion.md](./crm-educacion.md) | [CHANGELOG](./crm-educacion-CHANGELOG.md) |
 | Catálogo Educación | [catalog-educacion.md](./catalog-educacion.md) | [CHANGELOG](./catalog-educacion-CHANGELOG.md) |

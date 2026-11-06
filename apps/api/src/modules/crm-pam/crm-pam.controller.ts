@@ -8,21 +8,17 @@ import {
   Patch,
   Post,
   Query,
-  Req,
 } from '@nestjs/common';
-import { AppModule, User } from '@prisma/client';
-import type { Request } from 'express';
+import { AppModule } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { RequirePermission } from '../../core/guards/permission.decorator';
 import { CrmPamService } from './crm-pam.service';
 import {
   CreateCrmAttributeDefinitionDto,
-  CreateEmailCampaignDto,
   CreatePamPaymentDto,
   CreatePamPaymentMethodDto,
   ListCrmContactsQueryDto,
   PatchCrmContactDto,
-  PreviewEmailAudienceDto,
   UpdateCrmAttributeDefinitionDto,
   UpdatePamPaymentMethodDto,
 } from './dto/crm-pam.dto';
@@ -128,45 +124,5 @@ export class CrmPamController {
   @RequirePermission('pam.registros.manage')
   linkPayment(@Param('id') id: string) {
     return this.crmPam.linkPayment(id);
-  }
-
-  @Get('newsletters')
-  listPublishedNewsletters() {
-    return this.crmPam.listPublishedNewsletters();
-  }
-
-  @Get('campaigns')
-  listCampaigns() {
-    return this.crmPam.listCampaigns();
-  }
-
-  @Get('campaigns/:id')
-  getCampaign(@Param('id') id: string) {
-    return this.crmPam.getCampaign(id);
-  }
-
-  @Get('campaigns/:id/stats')
-  getCampaignStats(@Param('id') id: string) {
-    return this.crmPam.getCampaignStats(id);
-  }
-
-  @Post('campaigns')
-  createCampaign(@Req() req: Request, @Body() body: CreateEmailCampaignDto) {
-    return this.crmPam.createCampaign((req.user as User).id, body);
-  }
-
-  @Post('audience-preview')
-  previewAudienceQuery(@Body() body: PreviewEmailAudienceDto) {
-    return this.crmPam.previewAudienceQuery(body);
-  }
-
-  @Get('campaigns/:id/audience-preview')
-  previewAudience(@Param('id') id: string) {
-    return this.crmPam.previewAudience(id);
-  }
-
-  @Post('campaigns/:id/send')
-  startCampaign(@Param('id') id: string) {
-    return this.crmPam.startCampaign(id);
   }
 }

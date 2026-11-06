@@ -40,6 +40,7 @@ import { PortfolioPage } from '@/pages/portfolio-page';
 import { FilesPage } from '@/pages/files-page';
 import { LandingsPage } from '@/pages/landings-page';
 import { TreasuryPage } from '@/pages/treasury-page';
+import { MalichimpPage } from '@/pages/malichimp-page';
 
 /** Authenticated app shell — not mounted on the public kiosk player. */
 function AuthenticatedApp() {
@@ -157,6 +158,9 @@ function AuthenticatedApp() {
                       path="admin/newsletters"
                       element={<NewslettersPage />}
                     />
+                  </Route>
+                  <Route element={<ModuleGuard module="malichimp" />}>
+                    <Route path="admin/malichimp" element={<MalichimpPage />} />
                   </Route>
                   <Route element={<ModuleGuard module="landings" />}>
                     <Route path="admin/landings" element={<LandingsPage />} />

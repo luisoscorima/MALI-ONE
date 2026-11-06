@@ -15,6 +15,7 @@ export type AppModule =
   | 'bsale_reports'
   | 'mailing'
   | 'newsletters'
+  | 'malichimp'
   | 'landings'
   | 'crm_pam'
   | 'crm_educacion'
@@ -22,6 +23,96 @@ export type AppModule =
   | 'portfolio'
   | 'files'
   | 'treasury';
+
+export type MalichimpContactStatus =
+  | 'subscribed'
+  | 'unsubscribed'
+  | 'cleaned'
+  | 'nonsubscribed';
+
+export interface MalichimpTagDto {
+  id: string;
+  name: string;
+  normalizedName: string;
+  contacts?: number;
+}
+
+export interface MalichimpContactDto {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  institutionName: string | null;
+  jobTitle: string | null;
+  city: string | null;
+  country: string | null;
+  classification: string | null;
+  source: string | null;
+  status: MalichimpContactStatus;
+  optInAt: string | null;
+  confirmedAt: string | null;
+  statusChangedAt: string | null;
+  attributes: Record<string, string> | null;
+  createdAt: string;
+  updatedAt: string;
+  tags: MalichimpTagDto[];
+}
+
+export interface MalichimpStatsDto {
+  total: number;
+  eligible: number;
+  byStatus: Record<MalichimpContactStatus, number>;
+  suppressions: number;
+  tags: number;
+  delivery: {
+    provider: 'aws_ses';
+    configured: boolean;
+    region: string;
+    defaultFromEmail: string;
+    defaultFromName: string;
+  };
+  lastImport: {
+    id: string;
+    sourceKey: string;
+    fileFingerprint: string;
+    counts: unknown;
+    startedAt: string;
+    completedAt: string | null;
+  } | null;
+}
+
+export interface MalichimpImportReportDto {
+  counts: Record<string, number>;
+  totalUnique: number;
+  eligibleContacts: number;
+  retainedContacts: number;
+  suppressions: number;
+  tags: number;
+  errors: string[];
+  fingerprint: string;
+}
+
+export interface MalichimpImportPreviewDto {
+  previewId: string;
+  fileName: string;
+  report: MalichimpImportReportDto;
+  expiresAt: string;
+  previouslyImported: { id: string; completedAt: string | null } | null;
+}
+
+export interface MalichimpImportJobDto {
+  id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  originalName: string;
+  processed: number;
+  total: number;
+  progress: number;
+  runId: string | null;
+  error: string | null;
+  startedAt: string;
+  completedAt: string | null;
+}
 
 export * from './treasury';
 

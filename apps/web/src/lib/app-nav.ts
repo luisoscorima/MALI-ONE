@@ -19,6 +19,7 @@ import {
   FolderOpen,
   ScrollText,
   PanelsTopLeft,
+  Database,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -112,6 +113,12 @@ export const appNavSections: AppNavSection[] = [
         label: 'Boletines',
         icon: Newspaper,
         module: 'newsletters',
+      },
+      {
+        to: '/admin/malichimp',
+        label: 'MALICHIMP',
+        icon: Database,
+        module: 'malichimp',
       },
       {
         to: '/admin/crm-pam',

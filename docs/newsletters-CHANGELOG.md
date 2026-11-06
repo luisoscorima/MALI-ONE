@@ -4,7 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- _(vacío — registrar aquí cada cambio evolutivo)_
+- Se desacopla el editor de CRM PAM; audiencia MALICHIMP y transporte SES quedan como responsabilidades independientes.
+- Se aclara que el SMTP PAM no forma parte del flujo de boletines/SES.
 
 ## [2026-11-05] — baseline documental
 

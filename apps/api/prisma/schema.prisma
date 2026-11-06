@@ -24,6 +24,7 @@ enum AppModule {
   screen_cast
   bsale_reports
   mailing
+  malichimp
   newsletters
   landings
   crm_pam
@@ -822,6 +823,21 @@ enum EmailEventType {
   click
 }
 
+enum MalichimpContactStatus {
+  subscribed
+  unsubscribed
+  cleaned
+  nonsubscribed
+}
+
+enum MalichimpSuppressionReason {
+  mailchimp_unsubscribed
+  mailchimp_cleaned
+  ses_bounce
+  ses_complaint
+  manual
+}
+
 model Newsletter {
   id          String           @id @default(cuid())
   slug        String           @unique
@@ -932,6 +948,84 @@ model EmailEvent {
   @@index([campaignId, createdAt])
   @@index([sendId])
   @@index([type])
+}
+
+/// Contact database imported from Mailchimp. It remains independent from the WhatsApp CRM.
+model MalichimpContact {
+  id              String                  @id @default(cuid())
+  email           String                  @unique @db.VarChar(320)
+  firstName       String?                 @db.VarChar(160)
+  lastName        String?                 @db.VarChar(160)
+  phone           String?                 @db.VarChar(80)
+  institutionName String?                 @db.VarChar(300)
+  jobTitle        String?                 @db.VarChar(200)
+  city            String?                 @db.VarChar(160)
+  country         String?                 @db.VarChar(120)
+  classification  String?                 @db.VarChar(160)
+  source          String?                 @db.VarChar(240)
+  status          MalichimpContactStatus
+  optInAt         DateTime?
+  confirmedAt     DateTime?
+  statusChangedAt DateTime?
+  /// Sparse segmentation fields retained without creating dozens of mostly empty columns.
+  attributes      Json?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  tags            MalichimpContactTag[]
+
+  @@index([status])
+  @@index([lastName, firstName])
+  @@index([updatedAt])
+}
+
+model MalichimpTag {
+  id             String                 @id @default(cuid())
+  name           String                 @db.VarChar(200)
+  normalizedName String                 @unique @db.VarChar(200)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  contacts       MalichimpContactTag[]
+
+  @@index([name])
+}
+
+model MalichimpContactTag {
+  contactId String
+  tagId     String
+  contact   MalichimpContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       MalichimpTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+
+  @@id([contactId, tagId])
+  @@index([tagId])
+}
+
+/// Addresses that must never receive a campaign, regardless of segment membership.
+model MalichimpSuppression {
+  id         String                      @id @default(cuid())
+  email      String                      @unique @db.VarChar(320)
+  reason     MalichimpSuppressionReason
+  source     String                      @db.VarChar(80)
+  occurredAt DateTime?
+  metadata   Json?
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @updatedAt
+
+  @@index([reason])
+  @@index([updatedAt])
+}
+
+model MalichimpImportRun {
+  id              String   @id @default(cuid())
+  sourceKey       String   @db.VarChar(160)
+  sourceDirectory String   @db.VarChar(500)
+  fileFingerprint String   @db.VarChar(64)
+  counts          Json
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([sourceKey, startedAt])
+  @@index([fileFingerprint])
 }
 
 model TodoType {

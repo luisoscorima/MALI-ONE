@@ -17,6 +17,7 @@ import {
   Newspaper,
   Contact,
   FolderOpen,
+  Database,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
@@ -115,6 +116,12 @@ export const moduleMeta: Record<
     icon: Newspaper,
     group: 'crms',
     accent: 'blue',
+  },
+  malichimp: {
+    to: '/admin/malichimp',
+    icon: Database,
+    group: 'crms',
+    accent: 'emerald',
   },
   crm_pam: {
     to: '/admin/crm-pam',

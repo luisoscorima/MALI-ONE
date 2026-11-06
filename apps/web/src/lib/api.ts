@@ -351,6 +351,53 @@ type EducacionDistritoDto = {
 };
 
 export const api = {
+  getMalichimpStats: () =>
+    request<import('@mali-one/shared').MalichimpStatsDto>('/api/malichimp/stats'),
+
+  listMalichimpTags: () =>
+    request<import('@mali-one/shared').MalichimpTagDto[]>('/api/malichimp/tags'),
+
+  listMalichimpContacts: (filters: {
+    q?: string;
+    status?: import('@mali-one/shared').MalichimpContactStatus;
+    tag?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) => {
+    const params = new URLSearchParams();
+    if (filters.q) params.set('q', filters.q);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.tag) params.set('tag', filters.tag);
+    if (filters.page) params.set('page', String(filters.page));
+    if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
+    return request<{
+      items: import('@mali-one/shared').MalichimpContactDto[];
+      total: number;
+      page: number;
+      pageSize: number;
+      pages: number;
+    }>(`/api/malichimp/contacts?${params}`);
+  },
+
+  previewMalichimpImport: (file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return request<import('@mali-one/shared').MalichimpImportPreviewDto>(
+      '/api/malichimp/imports/preview',
+      { method: 'POST', body },
+    );
+  },
+
+  applyMalichimpImport: (previewId: string) =>
+    request<import('@mali-one/shared').MalichimpImportJobDto>(
+      `/api/malichimp/imports/${encodeURIComponent(previewId)}/apply`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  getMalichimpImportJob: (jobId: string) =>
+    request<import('@mali-one/shared').MalichimpImportJobDto>(
+      `/api/malichimp/imports/jobs/${encodeURIComponent(jobId)}`,
+    ),
     niubizStatus: () => request<import('@mali-one/shared').NiubizSyncStatusDto>('/api/treasury/niubiz/status'),
     syncNiubiz: (range: { from?: string; to?: string }) => request<{ runId: string }>('/api/treasury/niubiz/sync', { method: 'POST', body: JSON.stringify(range) }),
   treasuryPayments: (params: URLSearchParams) => request<import('@mali-one/shared').TreasuryPaymentsDto>(`/api/treasury/payments?${params}`),
@@ -1655,60 +1702,6 @@ export const api = {
       phones: number;
       errors: Array<{ paymentId: string; error: string }>;
     }>('/api/crm-pam/payments/link-by-phone', { method: 'POST' }),
-
-  listCrmPamNewsletters: () =>
-    request<
-      Array<{
-        id: string;
-        slug: string;
-        title: string;
-        subject: string;
-        status: string;
-        updatedAt: string;
-      }>
-    >('/api/crm-pam/newsletters'),
-
-  listEmailCampaigns: () =>
-    request<import('@mali-one/shared').EmailCampaignDto[]>(
-      '/api/crm-pam/campaigns',
-    ),
-
-  getEmailCampaign: (id: string) =>
-    request<import('@mali-one/shared').EmailCampaignDto>(
-      `/api/crm-pam/campaigns/${id}`,
-    ),
-
-  getEmailCampaignStats: (id: string) =>
-    request<import('@mali-one/shared').EmailCampaignStatsDto>(
-      `/api/crm-pam/campaigns/${id}/stats`,
-    ),
-
-  createEmailCampaign: (
-    body: import('@mali-one/shared').CreateEmailCampaignDto,
-  ) =>
-    request<import('@mali-one/shared').EmailCampaignDto>(
-      '/api/crm-pam/campaigns',
-      { method: 'POST', body: JSON.stringify(body) },
-    ),
-
-  previewCrmPamAudience: (
-    body: import('@mali-one/shared').PreviewEmailAudienceDto,
-  ) =>
-    request<import('@mali-one/shared').EmailAudiencePreviewDto>(
-      '/api/crm-pam/audience-preview',
-      { method: 'POST', body: JSON.stringify(body) },
-    ),
-
-  previewEmailAudience: (id: string) =>
-    request<import('@mali-one/shared').EmailAudiencePreviewDto>(
-      `/api/crm-pam/campaigns/${id}/audience-preview`,
-    ),
-
-  sendEmailCampaign: (id: string) =>
-    request<import('@mali-one/shared').EmailCampaignDto>(
-      `/api/crm-pam/campaigns/${id}/send`,
-      { method: 'POST' },
-    ),
 
   getTodoMeta: () =>
     request<import('@mali-one/shared').TodoMetaDto>('/api/todos/meta'),

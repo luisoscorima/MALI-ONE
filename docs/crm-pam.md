@@ -4,7 +4,7 @@
 
 ## Qué es
 
-Operación de **contactos PAM** (fuente WhatsApp), **ledger de pagos**, medios de pago y **campañas de boletines SES**. La vitrina del widget está en [pam.md](./pam.md) / [widgets.md](./widgets.md); la persona nativa vive en mali-whatsapp.
+Operación de **contactos PAM** (fuente WhatsApp), **ledger de pagos** y medios de pago. No contiene transporte SES ni campañas de correo. La vitrina del widget está en [pam.md](./pam.md) / [widgets.md](./widgets.md); la persona nativa vive en mali-whatsapp.
 
 ## Cómo funciona
 
@@ -12,32 +12,30 @@ Operación de **contactos PAM** (fuente WhatsApp), **ledger de pagos**, medios d
 Widget / alta manual → PamRegistration (ledger ONE)
   → sync attrs a WhatsApp (payment_id, medio_pago, plan, …)
   → welcome SMTP / WhatsApp template
-  → campañas SES desde contactos/segmentos CRM
 ```
 
 Cruce: `contact.attributes.payment_id === PamRegistration.id`.
 
 ## Código
 
-- `apps/api/src/modules/crm-pam/` — controller, service, scheduler, `ses-mail.service.ts`
+- `apps/api/src/modules/crm-pam/` — controller y servicio de CRM/pagos
 - Cliente WA global: `apps/api/src/modules/crm/` (`CrmClientModule` + `whatsapp-crm-client.service.ts`) — compartido con educación, widgets y catálogo
 - Web: `crm-pam-page.tsx`
-- Ledger/admin planes también en módulo `pam`; importa `NewslettersModule` para campañas
+- Ledger/admin planes también en módulo `pam`
 
 ## UI
 
 | Ruta | Uso |
 |------|-----|
-| `/admin/crm-pam` | Contactos, pagos, medios, campañas |
+| `/admin/crm-pam` | Contactos, pagos y medios |
 
 ## API
 
-Prefijo `/api/crm-pam`: contacts, attribute-definitions, segments, payments, payment-methods, newsletters, campaigns (+ audience-preview, send).
+Prefijo `/api/crm-pam`: contacts, attribute-definitions, segments, payments y payment-methods.
 
 ## Datos (Prisma)
 
 - `PamRegistration`, `PamPaymentMethod`, `PamPlan`, `PamWidgetSettings` (vitrina)
-- `EmailCampaign`, `EmailSend`, `EmailEvent`
 - Contactos: **mali-whatsapp** (no tabla local de persona)
 
 ## Conexiones externas
@@ -45,8 +43,7 @@ Prefijo `/api/crm-pam`: contacts, attribute-definitions, segments, payments, pay
 | Sistema | Uso |
 |---------|-----|
 | **mali-whatsapp** (`WHATSAPP_CRM_*`) | Contactos, attrs, segmentos área `pam` |
-| **AWS SES** | Campañas |
-| **SMTP PAM** | Welcome `pam@mali.pe` |
+| **SMTP PAM** | Welcome `pam@mali.pe` (canal propio; no usa SES ni MALICHIMP) |
 | **Mercado Pago** | Checkout widget (webhook en widgets/pam) |
 | **Meta WhatsApp template** | `PAM_WA_WELCOME_TEMPLATE` |
 
@@ -55,7 +52,6 @@ Prefijo `/api/crm-pam`: contacts, attribute-definitions, segments, payments, pay
 ```env
 WHATSAPP_CRM_BASE_URL=
 WHATSAPP_CRM_SERVICE_TOKEN=
-SES_FROM_EMAIL=noreply@mali.pe
 PAM_SMTP_HOST=
 PAM_SMTP_USER=
 PAM_SMTP_PASS=
@@ -81,7 +77,8 @@ Módulo: `crm_pam`
 |------|------------|-----|
 | **Vitrina** | `/admin/widget-pam` Widget PAM | Solo planes, beneficios, checkout del widget |
 | **CRM + pagos** | `/admin/crm-pam` CRM PAM | Contactos WhatsApp + ledger de pagos + **medios de pago** |
-| **Boletines** | `/admin/newsletters` | Editor; envío masivo SES desde CRM PAM |
+| **Boletines** | `/admin/newsletters` | Editor HTML independiente |
+| **MALICHIMP** | `/admin/malichimp` | Audiencia de correo independiente |
 | **Atributos / persona** | [WhatsApp `/attributes`](https://whatsapp.mali.pe/attributes) y `/contacts` | Catálogo y edición de attrs (incl. `payment_id`, `medio_pago`) |
 
 ## Fuente de verdad
@@ -139,5 +136,5 @@ Widget → ONE ledger (medio = Mercado Pago)
 | Módulo | Qué abre |
 |--------|----------|
 | `widget_pam` | Vitrina `/admin/widget-pam` |
-| `crm_pam` | Contactos + Pagos + medios + envío boletines |
+| `crm_pam` | Contactos + Pagos + medios |
 | `newsletters` | Editor |
