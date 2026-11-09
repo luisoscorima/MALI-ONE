@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildTags,
+  cleanImportedText,
+  decodeCsvBuffer,
   mapMailchimpRecord,
   normalizeEmail,
   parseCsvText,
   parseMailchimpDate,
+  repairMojibake,
 } from './malichimp-import';
 
 test('parsea CSV con comas, comillas y saltos de línea', () => {
@@ -48,4 +52,33 @@ test('mapea campos, etiquetas y una baja como supresión', () => {
 test('un suscrito no genera una supresión', () => {
   const row = mapMailchimpRecord({ 'Email Address': 'ok@example.com' }, 'subscribed');
   assert.equal(row.suppression, null);
+});
+
+test('repara mojibake y descarta errores de Excel o texto irrecuperable', () => {
+  assert.equal(repairMojibake('ExtensiÃ³n Profesional'), 'Extensión Profesional');
+  assert.equal(repairMojibake('FORMACIÃ“N CULTURAL'), 'FORMACIÓN CULTURAL');
+  assert.equal(cleanImportedText('#¡VALOR!'), null);
+  assert.equal(cleanImportedText('#Â¡VALOR!'), null);
+  assert.equal(cleanImportedText('???????? ????????'), null);
+});
+
+test('limpia comillas, repara y deduplica etiquetas del export de Mailchimp', () => {
+  const tags = buildTags(
+    '"FORMACIÓN CULTURAL","ExtensiónProfesional","ExtensiÃ³nProfesional","FORMACIÃ“N CULTURAL"',
+  );
+  assert.deepEqual(
+    tags.map((tag) => tag.name),
+    ['FORMACIÓN CULTURAL', 'ExtensiónProfesional'],
+  );
+});
+
+test('acepta exports CSV antiguos codificados en Windows-1252', () => {
+  const csv = decodeCsvBuffer(
+    Buffer.from([
+      ...Buffer.from('Email Address,First Name\r\nana@mali.pe,', 'ascii'),
+      0xc1,
+      ...Buffer.from('ngela\r\n', 'ascii'),
+    ]),
+  );
+  assert.equal(csv, 'Email Address,First Name\r\nana@mali.pe,Ángela\r\n');
 });

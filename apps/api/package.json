@@ -16,6 +16,7 @@
     "prisma:seed:landings": "tsx prisma/seed-landings.ts",
     "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts",
     "prisma:import:malichimp": "tsx prisma/import-malichimp.ts",
+    "prisma:repair:malichimp": "node dist/cli/repair-malichimp-import.js",
     "test:malichimp-import": "node --import tsx --test src/modules/malichimp/lib/malichimp-import.test.ts",
     "test:ses-events": "node --import tsx --test src/core/email-delivery/ses-event.test.ts",
     "test:ses-events:integration": "node --import tsx --test src/core/email-delivery/ses-event-processor.integration.test.ts"
