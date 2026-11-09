@@ -901,6 +901,7 @@ model EmailCampaign {
   newsletterId            String
   newsletter              Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
   name                    String
+  replyToEmail            String?
   status                  EmailCampaignStatus @default(draft)
   audienceArea            String              @default("pam")
   /// Legacy singular; prefer audienceSegments.

@@ -9,6 +9,7 @@ import { CreateInternalCampaignDto } from './dto/create-internal-campaign.dto';
 
 const AUDIENCE_AREA = 'internal_workspace';
 const MAX_RECIPIENTS = 200;
+const DEFAULT_REPLY_TO = 'tecnologia@mali.pe';
 
 @Injectable()
 export class InternalCommunicationsService {
@@ -39,11 +40,15 @@ export class InternalCommunicationsService {
 
   async createCampaign(userId: string, dto: CreateInternalCampaignDto) {
     const recipients = [...new Set(dto.recipients.map((email) => email.trim().toLowerCase()))];
+    const replyTo = dto.replyTo.trim().toLowerCase();
     if (recipients.length > MAX_RECIPIENTS) {
       throw new BadRequestException(`El máximo por envío es ${MAX_RECIPIENTS}`);
     }
     if (recipients.some((email) => !email.endsWith('@mali.pe'))) {
       throw new BadRequestException('Comunicación Interna solo permite cuentas @mali.pe');
+    }
+    if (!replyTo.endsWith('@mali.pe')) {
+      throw new BadRequestException('La dirección de respuesta debe pertenecer a @mali.pe');
     }
 
     const audience = await this.googleAdmin.listRecentlyActiveInternalUsers(30);
@@ -65,6 +70,7 @@ export class InternalCommunicationsService {
       data: {
         newsletterId: newsletter.id,
         name: dto.name.trim(),
+        replyToEmail: replyTo,
         status: EmailCampaignStatus.queued,
         audienceArea: AUDIENCE_AREA,
         audienceSegments: ['google-workspace-active-30d'],
@@ -134,6 +140,7 @@ export class InternalCommunicationsService {
         newsletterId: row.newsletterId,
         newsletterTitle: row.newsletter.title,
         subject: row.newsletter.subject,
+        replyTo: row.replyToEmail ?? DEFAULT_REPLY_TO,
         status: row.status,
         totalRecipients: row.totalRecipients,
         sent: row.sentCount,
@@ -177,7 +184,8 @@ export class InternalCommunicationsService {
             to: send.email,
             subject: campaign.newsletter.subject,
             html,
-            fromName: 'MALI - Comunicacion Interna',
+            fromName: 'MALI - Comunicación Interna',
+            replyTo: campaign.replyToEmail ?? DEFAULT_REPLY_TO,
             tags: { campaign: campaign.id, send: send.id },
           });
           await this.prisma.$transaction([

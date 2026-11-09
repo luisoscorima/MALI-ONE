@@ -143,6 +143,7 @@ export interface InternalCampaignDto {
   newsletterId: string;
   newsletterTitle: string;
   subject: string;
+  replyTo: string;
   status: InternalCampaignStatus;
   totalRecipients: number;
   sent: number;
@@ -159,6 +160,7 @@ export interface InternalCampaignDto {
 export interface CreateInternalCampaignDto {
   name: string;
   newsletterId: string;
+  replyTo: string;
   recipients: string[];
 }
 

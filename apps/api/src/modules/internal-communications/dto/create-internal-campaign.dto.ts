@@ -9,6 +9,10 @@ export class CreateInternalCampaignDto {
   @IsString()
   newsletterId!: string;
 
+  @IsEmail()
+  @MaxLength(254)
+  replyTo!: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(200)

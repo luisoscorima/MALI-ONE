@@ -38,6 +38,11 @@ import {
 
 const nf = new Intl.NumberFormat('es-PE');
 const df = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' });
+const DEFAULT_REPLY_TO = 'tecnologia@mali.pe';
+const REPLY_TO_OPTIONS = [
+  { value: 'tecnologia@mali.pe', label: 'Tecnología' },
+  { value: 'loscorima@mali.pe', label: 'Luis Oscorima' },
+] as const;
 
 function Metric({ label, value, hint }: { label: string; value: number; hint: string }) {
   return (
@@ -60,6 +65,7 @@ export function InternalCommunicationsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newsletterId, setNewsletterId] = useState('');
   const [name, setName] = useState('');
+  const [replyTo, setReplyTo] = useState(DEFAULT_REPLY_TO);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -123,7 +129,12 @@ export function InternalCommunicationsPage() {
     if (!newsletterId || !name.trim() || selected.size === 0) return;
     setSending(true);
     try {
-      await api.createInternalCampaign({ name: name.trim(), newsletterId, recipients: [...selected] });
+      await api.createInternalCampaign({
+        name: name.trim(),
+        newsletterId,
+        replyTo,
+        recipients: [...selected],
+      });
       toast.success(`Envío encolado para ${selected.size} personas`);
       setSelected(new Set());
       setName('');
@@ -163,7 +174,7 @@ export function InternalCommunicationsPage() {
           <CardDescription>Usa un boletín publicado y selecciona hasta 200 destinatarios internos.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="campaign-name">Nombre interno de la campaña</Label>
               <Input id="campaign-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Comunicado interno – noviembre" maxLength={160} />
@@ -174,6 +185,24 @@ export function InternalCommunicationsPage() {
                 <SelectTrigger><SelectValue placeholder="Selecciona un boletín" /></SelectTrigger>
                 <SelectContent>{newsletters.map((newsletter) => <SelectItem key={newsletter.id} value={newsletter.id}>{newsletter.title}</SelectItem>)}</SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Las respuestas llegarán a</Label>
+              <Select value={replyTo} onValueChange={setReplyTo}>
+                <SelectTrigger aria-label="Dirección que recibirá las respuestas">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPLY_TO_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} · {option.value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                El destinatario verá boletines@mali.pe como remitente, pero su respuesta llegará a esta dirección.
+              </p>
             </div>
           </div>
 
@@ -221,7 +250,11 @@ export function InternalCommunicationsPage() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Confirmar envío interno</DialogTitle><DialogDescription>Se encolará “{name}” para {selected.size} cuentas @mali.pe. Esta acción iniciará el envío real mediante Amazon SES.</DialogDescription></DialogHeader>
-          <div className="rounded-lg border p-4 text-sm"><p className="flex items-center gap-2 font-medium"><CheckCircle2 className="size-4 text-primary" />Boletín: {newsletters.find((item) => item.id === newsletterId)?.title}</p><p className="mt-2 text-muted-foreground">Destinatarios: {selected.size} · Regla: acceso a Workspace en los últimos 30 días</p></div>
+          <div className="rounded-lg border p-4 text-sm">
+            <p className="flex items-center gap-2 font-medium"><CheckCircle2 className="size-4 text-primary" />Boletín: {newsletters.find((item) => item.id === newsletterId)?.title}</p>
+            <p className="mt-2 text-muted-foreground">Destinatarios: {selected.size} · Regla: acceso a Workspace en los últimos 30 días</p>
+            <p className="mt-1 text-muted-foreground">Las respuestas llegarán a: <span className="font-medium text-foreground">{replyTo}</span></p>
+          </div>
           <DialogFooter><Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button><Button onClick={() => void submit()} disabled={sending}>{sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}{sending ? 'Encolando…' : 'Confirmar envío'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
