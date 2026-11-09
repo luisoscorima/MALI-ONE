@@ -1493,6 +1493,29 @@ export const api = {
       method: 'DELETE',
     }),
 
+  getInternalAudience: (activeDays = 30) =>
+    request<import('@mali-one/shared').InternalAudienceDto>(
+      `/api/internal-communications/audience?activeDays=${activeDays}`,
+    ),
+
+  listInternalNewsletters: () =>
+    request<import('@mali-one/shared').NewsletterDto[]>(
+      '/api/internal-communications/newsletters',
+    ),
+
+  listInternalCampaigns: () =>
+    request<import('@mali-one/shared').InternalCampaignDto[]>(
+      '/api/internal-communications/campaigns',
+    ),
+
+  createInternalCampaign: (
+    body: import('@mali-one/shared').CreateInternalCampaignDto,
+  ) =>
+    request<{ id: string; status: string; totalRecipients: number }>(
+      '/api/internal-communications/campaigns',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   listLandings: () =>
     request<import('@mali-one/shared').LandingPageDto[]>('/api/landings'),
 

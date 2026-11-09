@@ -14,6 +14,7 @@
     "prisma:seed:catalog": "tsx prisma/seed-educacion-catalog.ts",
     "prisma:seed:todos": "tsx prisma/seed-todos.ts",
     "prisma:seed:landings": "tsx prisma/seed-landings.ts",
+    "prisma:seed:newsletter-ti": "tsx prisma/seed-newsletter-ti.ts",
     "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts",
     "prisma:import:malichimp": "tsx prisma/import-malichimp.ts",
     "prisma:repair:malichimp": "node dist/cli/repair-malichimp-import.js",

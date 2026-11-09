@@ -20,6 +20,7 @@ import {
   ScrollText,
   PanelsTopLeft,
   Database,
+  Send,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
 import { hasModule } from '@/lib/user-modules';
@@ -119,6 +120,12 @@ export const appNavSections: AppNavSection[] = [
         label: 'MALICHIMP',
         icon: Database,
         module: 'malichimp',
+      },
+      {
+        to: '/admin/comunicacion-interna',
+        label: 'Comunicación Interna',
+        icon: Send,
+        module: 'internal_communications',
       },
       {
         to: '/admin/crm-pam',

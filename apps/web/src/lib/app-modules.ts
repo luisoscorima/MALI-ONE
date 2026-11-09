@@ -67,6 +67,11 @@ export const APP_MODULES: {
     description: 'Contactos, segmentos y supresiones para boletines por Amazon SES.',
   },
   {
+    id: 'internal_communications',
+    label: 'Comunicación Interna',
+    description: 'Envíos internos a cuentas activas de Google Workspace con estadísticas.',
+  },
+  {
     id: 'landings',
     label: 'Landings',
     description:

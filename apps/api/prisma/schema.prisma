@@ -25,6 +25,7 @@ enum AppModule {
   bsale_reports
   mailing
   malichimp
+  internal_communications
   newsletters
   landings
   crm_pam

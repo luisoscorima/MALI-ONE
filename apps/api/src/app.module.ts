@@ -33,6 +33,7 @@ import { SftpgoFilesModule } from './modules/sftpgo-files/sftpgo-files.module';
 import { TreasuryModule } from './modules/treasury/treasury.module';
 import { MalichimpModule } from './modules/malichimp/malichimp.module';
 import { EmailDeliveryModule } from './core/email-delivery/email-delivery.module';
+import { InternalCommunicationsModule } from './modules/internal-communications/internal-communications.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { EmailDeliveryModule } from './core/email-delivery/email-delivery.module
     SftpgoFilesModule,
     TreasuryModule,
     MalichimpModule,
+    InternalCommunicationsModule,
   ],
   controllers: [HealthController],
   providers: [

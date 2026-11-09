@@ -169,6 +169,49 @@ export class GoogleAdminService {
     });
   }
 
+  /**
+   * Read-only audience for internal communications. `lastLoginTime` is exposed
+   * by Directory API and lets us start without granting access to message data.
+   */
+  async listRecentlyActiveInternalUsers(activeDays = 30) {
+    return this.run('listRecentlyActiveInternalUsers', async () => {
+      const admin = this.getDirectory();
+      const users: admin_directory_v1.Schema$User[] = [];
+      let pageToken: string | undefined;
+
+      do {
+        const response = await admin.users.list({
+          customer: 'my_customer',
+          domain: 'mali.pe',
+          maxResults: 500,
+          pageToken,
+          orderBy: 'email',
+          projection: 'full',
+        });
+        users.push(...(response.data.users ?? []));
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+
+      const cutoff = Date.now() - activeDays * 24 * 60 * 60 * 1000;
+      return users
+        .filter((user) => {
+          if (user.suspended || user.archived || user.isMailboxSetup === false) {
+            return false;
+          }
+          const email = user.primaryEmail?.trim().toLowerCase() ?? '';
+          const lastLogin = Date.parse(user.lastLoginTime ?? '');
+          return email.endsWith('@mali.pe') && Number.isFinite(lastLogin) && lastLogin >= cutoff;
+        })
+        .map((user) => ({
+          id: user.id ?? user.primaryEmail ?? '',
+          email: user.primaryEmail?.trim().toLowerCase() ?? '',
+          name: user.name?.fullName?.trim() || user.primaryEmail?.split('@')[0] || '',
+          orgUnitPath: user.orgUnitPath ?? '/',
+          lastActivityAt: user.lastLoginTime as string,
+        }));
+    });
+  }
+
   async getUser(email: string) {
     return this.run('getUser', async () => {
       const admin = this.getDirectory();

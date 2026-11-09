@@ -16,6 +16,7 @@ export type AppModule =
   | 'mailing'
   | 'newsletters'
   | 'malichimp'
+  | 'internal_communications'
   | 'landings'
   | 'crm_pam'
   | 'crm_educacion'
@@ -112,6 +113,53 @@ export interface MalichimpImportJobDto {
   error: string | null;
   startedAt: string;
   completedAt: string | null;
+}
+
+export interface InternalAudienceMemberDto {
+  id: string;
+  email: string;
+  name: string;
+  orgUnitPath: string;
+  lastActivityAt: string;
+}
+
+export interface InternalAudienceDto {
+  members: InternalAudienceMemberDto[];
+  activeDays: number;
+  generatedAt: string;
+  source: 'google_workspace_last_login';
+  note: string;
+}
+
+export type InternalCampaignStatus =
+  | 'queued'
+  | 'sending'
+  | 'completed'
+  | 'failed';
+
+export interface InternalCampaignDto {
+  id: string;
+  name: string;
+  newsletterId: string;
+  newsletterTitle: string;
+  subject: string;
+  status: InternalCampaignStatus;
+  totalRecipients: number;
+  sent: number;
+  failed: number;
+  delivered: number;
+  bounced: number;
+  complaints: number;
+  opened: number;
+  clicked: number;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface CreateInternalCampaignDto {
+  name: string;
+  newsletterId: string;
+  recipients: string[];
 }
 
 export * from './treasury';
