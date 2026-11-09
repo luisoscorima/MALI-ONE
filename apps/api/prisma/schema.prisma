@@ -57,19 +57,19 @@ enum TreasuryCurrency {
 
 /// Portal access. Credentials stay in Vaultwarden; vaultItemId is only a pointer.
 model TreasurySource {
-  id                  String            @id @default(cuid())
-  provider            TreasuryProvider
-  name                String            @db.VarChar(120)
-  legalEntity         String            @db.VarChar(160)
+  id                   String                 @id @default(cuid())
+  provider             TreasuryProvider
+  name                 String                 @db.VarChar(120)
+  legalEntity          String                 @db.VarChar(160)
   /// Vaultwarden item UUID for this portal login. Not a secret.
-  vaultItemId         String?           @db.VarChar(36)
-  active              Boolean           @default(true)
-  syncIntervalMinutes Int               @default(60)
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  targets             TreasuryTarget[]
-  mercadoPagoPayments MercadoPagoPayment[]
-  mercadoPagoSync     MercadoPagoSyncState?
+  vaultItemId          String?                @db.VarChar(36)
+  active               Boolean                @default(true)
+  syncIntervalMinutes  Int                    @default(60)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  targets              TreasuryTarget[]
+  mercadoPagoPayments  MercadoPagoPayment[]
+  mercadoPagoSync      MercadoPagoSyncState?
   pagoEfectivoPayments PagoEfectivoPayment[]
   pagoEfectivoSync     PagoEfectivoSyncState?
 
@@ -77,48 +77,48 @@ model TreasurySource {
 }
 
 model MercadoPagoSyncState {
-  sourceId    String   @id
-  source      TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  runId       String?
-  status      String   @default("idle")
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  leaseUntil  DateTime?
-  fromDate    String?
-  toDate      String?
-  errorCode   String?
-  rowCount    Int      @default(0)
+  sourceId   String         @id
+  source     TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  runId      String?
+  status     String         @default("idle")
+  startedAt  DateTime?
+  finishedAt DateTime?
+  leaseUntil DateTime?
+  fromDate   String?
+  toDate     String?
+  errorCode  String?
+  rowCount   Int            @default(0)
 }
 
 model MercadoPagoPayment {
-  id                String   @id @default(cuid())
+  id                String           @id @default(cuid())
   sourceId          String
-  source            TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  paymentId         String   @db.VarChar(64)
-  merchantOrderId   String?  @db.VarChar(64)
-  externalReference String?  @db.VarChar(160)
-  description       String?  @db.VarChar(300)
-  status            String   @db.VarChar(40)
-  statusDetail      String?  @db.VarChar(80)
+  source            TreasurySource   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  paymentId         String           @db.VarChar(64)
+  merchantOrderId   String?          @db.VarChar(64)
+  externalReference String?          @db.VarChar(160)
+  description       String?          @db.VarChar(300)
+  status            String           @db.VarChar(40)
+  statusDetail      String?          @db.VarChar(80)
   currency          TreasuryCurrency
-  grossAmount       Decimal  @db.Decimal(18, 2)
-  netAmount         Decimal? @db.Decimal(18, 2)
-  feeAmount         Decimal? @db.Decimal(18, 2)
-  paymentMethodId   String?  @db.VarChar(80)
-  paymentTypeId     String?  @db.VarChar(40)
-  issuerName        String?  @db.VarChar(120)
-  cardLastDigits    String?  @db.VarChar(8)
+  grossAmount       Decimal          @db.Decimal(18, 2)
+  netAmount         Decimal?         @db.Decimal(18, 2)
+  feeAmount         Decimal?         @db.Decimal(18, 2)
+  paymentMethodId   String?          @db.VarChar(80)
+  paymentTypeId     String?          @db.VarChar(40)
+  issuerName        String?          @db.VarChar(120)
+  cardLastDigits    String?          @db.VarChar(8)
   installments      Int?
-  payerName         String?  @db.VarChar(250)
-  payerEmail        String?  @db.VarChar(250)
+  payerName         String?          @db.VarChar(250)
+  payerEmail        String?          @db.VarChar(250)
   createdAtMp       DateTime
   approvedAt        DateTime?
   releasedAt        DateTime?
   lastUpdatedAtMp   DateTime
   /// Sanitized portal sale. Card numbers and payer identity documents are removed.
   payload           Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@unique([sourceId, paymentId])
   @@index([sourceId, createdAtMp, id])
@@ -126,44 +126,44 @@ model MercadoPagoPayment {
 }
 
 model PagoEfectivoSyncState {
-  sourceId    String   @id
-  source      TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  runId       String?
-  status      String   @default("idle")
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  leaseUntil  DateTime?
-  fromDate    String?
-  toDate      String?
-  errorCode   String?
-  rowCount    Int      @default(0)
+  sourceId   String         @id
+  source     TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  runId      String?
+  status     String         @default("idle")
+  startedAt  DateTime?
+  finishedAt DateTime?
+  leaseUntil DateTime?
+  fromDate   String?
+  toDate     String?
+  errorCode  String?
+  rowCount   Int            @default(0)
 }
 
 model PagoEfectivoPayment {
-  id                String   @id @default(cuid())
+  id                String           @id @default(cuid())
   sourceId          String
-  source            TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  transactionId     String   @db.VarChar(100)
-  cip               String?  @db.VarChar(80)
-  externalReference String?  @db.VarChar(160)
-  description       String?  @db.VarChar(300)
-  status            String   @db.VarChar(60)
+  source            TreasurySource   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  transactionId     String           @db.VarChar(100)
+  cip               String?          @db.VarChar(80)
+  externalReference String?          @db.VarChar(160)
+  description       String?          @db.VarChar(300)
+  status            String           @db.VarChar(60)
   currency          TreasuryCurrency
-  amount            Decimal  @db.Decimal(18, 2)
-  feeAmount         Decimal? @db.Decimal(18, 2)
-  netAmount         Decimal? @db.Decimal(18, 2)
-  payerName         String?  @db.VarChar(250)
-  payerEmail        String?  @db.VarChar(250)
-  paymentChannel    String?  @db.VarChar(100)
-  financialEntity   String?  @db.VarChar(120)
+  amount            Decimal          @db.Decimal(18, 2)
+  feeAmount         Decimal?         @db.Decimal(18, 2)
+  netAmount         Decimal?         @db.Decimal(18, 2)
+  payerName         String?          @db.VarChar(250)
+  payerEmail        String?          @db.VarChar(250)
+  paymentChannel    String?          @db.VarChar(100)
+  financialEntity   String?          @db.VarChar(120)
   createdAtPe       DateTime
   paidAt            DateTime?
   transferredAt     DateTime?
   lastUpdatedAtPe   DateTime
   /// Sanitized portal sale. Card numbers and payer identity documents are removed.
   payload           Json?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   @@unique([sourceId, transactionId])
   @@index([sourceId, createdAtPe, id])
@@ -187,57 +187,57 @@ model TreasuryTarget {
 }
 
 model NiubizSyncState {
-  id         String   @id
+  id         String    @id
   runId      String?
-  status     String   @default("idle")
+  status     String    @default("idle")
   startedAt  DateTime?
   finishedAt DateTime?
   leaseUntil DateTime?
   fromDate   String?
   toDate     String?
   errorCode  String?
-  results    Json     @default("[]")
+  results    Json      @default("[]")
 }
 
 model TreasuryPaymentImport {
-  id          String   @id @default(cuid())
-  provider    TreasuryProvider
-  origin      String   @db.VarChar(32)
-  checksum    String   @db.VarChar(64)
-  rowCount    Int
+  id           String            @id @default(cuid())
+  provider     TreasuryProvider
+  origin       String            @db.VarChar(32)
+  checksum     String            @db.VarChar(64)
+  rowCount     Int
   createdCount Int
   updatedCount Int
-  actorId     String
-  createdAt   DateTime @default(now())
-  payments    TreasuryPayment[]
+  actorId      String
+  createdAt    DateTime          @default(now())
+  payments     TreasuryPayment[]
 
   @@index([createdAt])
 }
 
 model TreasuryPayment {
-  id              String @id @default(cuid())
+  id              String                @id @default(cuid())
   provider        TreasuryProvider
-  merchantCode    String @db.VarChar(64)
-  merchantName    String @db.VarChar(200)
-  transactionCode String @db.VarChar(100)
-  orderNumber     String @db.VarChar(100)
-  customerName    String @db.VarChar(250)
-  customerEmail  String? @db.VarChar(250)
-  cardBrand       String? @db.VarChar(80)
-  cardType        String? @db.VarChar(80)
-  cardLastDigits  String? @db.VarChar(8)
-  wallet          String? @db.VarChar(40)
+  merchantCode    String                @db.VarChar(64)
+  merchantName    String                @db.VarChar(200)
+  transactionCode String                @db.VarChar(100)
+  orderNumber     String                @db.VarChar(100)
+  customerName    String                @db.VarChar(250)
+  customerEmail   String?               @db.VarChar(250)
+  cardBrand       String?               @db.VarChar(80)
+  cardType        String?               @db.VarChar(80)
+  cardLastDigits  String?               @db.VarChar(8)
+  wallet          String?               @db.VarChar(40)
   currency        TreasuryCurrency
-  amount          Decimal @db.Decimal(18, 2)
-  status          String @db.VarChar(80)
+  amount          Decimal               @db.Decimal(18, 2)
+  status          String                @db.VarChar(80)
   transactedAt    DateTime
-  settledOn       DateTime? @db.Date
+  settledOn       DateTime?             @db.Date
   /// Sanitized portal sale. Card numbers and payer identity documents are removed. Excel imports leave it untouched.
   payload         Json?
   lastImportId    String
   lastImport      TreasuryPaymentImport @relation(fields: [lastImportId], references: [id], onDelete: Restrict)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@unique([provider, merchantCode, transactionCode])
   @@index([transactedAt, id])
@@ -333,21 +333,21 @@ enum LinkType {
 }
 
 model User {
-  id             String      @id @default(cuid())
-  googleId       String      @unique
-  email          String      @unique
-  name           String
-  picture        String?
-  role           UserRole           @default(operator)
-  qrDefaultStyle Json?
-  accentTheme    String?
-  createdAt      DateTime           @default(now())
-  shortLinks     ShortLink[]
-  auditLogs      AdminAuditLog[]    @relation("ActorAuditLogs")
-  moduleAccess   UserModuleAccess[]
+  id                  String               @id @default(cuid())
+  googleId            String               @unique
+  email               String               @unique
+  name                String
+  picture             String?
+  role                UserRole             @default(operator)
+  qrDefaultStyle      Json?
+  accentTheme         String?
+  createdAt           DateTime             @default(now())
+  shortLinks          ShortLink[]
+  auditLogs           AdminAuditLog[]      @relation("ActorAuditLogs")
+  moduleAccess        UserModuleAccess[]
   newsletters         Newsletter[]
-  landingsCreated     LandingPage[] @relation("LandingCreatedBy")
-  landingsUpdated     LandingPage[] @relation("LandingUpdatedBy")
+  landingsCreated     LandingPage[]        @relation("LandingCreatedBy")
+  landingsUpdated     LandingPage[]        @relation("LandingUpdatedBy")
   emailCampaigns      EmailCampaign[]
   todoItems           TodoItem[]
   portfolioProjects   PortfolioProject[]
@@ -376,22 +376,22 @@ model AdminAuditLog {
 }
 
 model ShortLink {
-  id          String      @id @default(cuid())
-  slug        String      @unique
-  targetUrl   String
-  type        LinkType    @default(URL)
-  s3Key       String?
-  fileName    String?
-  mimeType    String?
-  qrStyle     Json?
-  qrLogoKey   String?
-  createdById String
-  createdBy   User        @relation(fields: [createdById], references: [id])
-  createdAt   DateTime    @default(now())
-  archivedAt  DateTime?
-  clickCount  Int         @default(0)
-  tags        String[]    @default([])
-  clicks      LinkClick[]
+  id                String                    @id @default(cuid())
+  slug              String                    @unique
+  targetUrl         String
+  type              LinkType                  @default(URL)
+  s3Key             String?
+  fileName          String?
+  mimeType          String?
+  qrStyle           Json?
+  qrLogoKey         String?
+  createdById       String
+  createdBy         User                      @relation(fields: [createdById], references: [id])
+  createdAt         DateTime                  @default(now())
+  archivedAt        DateTime?
+  clickCount        Int                       @default(0)
+  tags              String[]                  @default([])
+  clicks            LinkClick[]
   catalogCursoId    String?
   catalogCurso      EducacionCatalogCurso?    @relation(fields: [catalogCursoId], references: [id], onDelete: SetNull)
   catalogProgramaId String?
@@ -427,17 +427,17 @@ model EducacionCatalogArea {
 }
 
 model EducacionCatalogCurso {
-  id        String                @id @default(cuid())
+  id        String                          @id @default(cuid())
   nombre    String
-  precio    Decimal?              @db.Decimal(10, 2)
+  precio    Decimal?                        @db.Decimal(10, 2)
   descuento String?
   horario   String?
-  activo    Boolean               @default(true)
-  sortOrder Int                   @default(0)
+  activo    Boolean                         @default(true)
+  sortOrder Int                             @default(0)
   areaId    String?
-  area      EducacionCatalogArea? @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  area      EducacionCatalogArea?           @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  createdAt DateTime                        @default(now())
+  updatedAt DateTime                        @updatedAt
   links     ShortLink[]
   programas EducacionCatalogProgramaCurso[]
 
@@ -470,25 +470,25 @@ model EducacionCatalogProgramaCurso {
 }
 
 model EducacionCatalogSede {
-  id             String      @id @default(cuid())
-  slug           String      @unique
-  nombre          String
-  nombreMapa      String?
-  nombreSelector  String?
-  direccion       String?
-  brochureUrl     String?
-  icon           String      @default("location_on")
+  id             String             @id @default(cuid())
+  slug           String             @unique
+  nombre         String
+  nombreMapa     String?
+  nombreSelector String?
+  direccion      String?
+  brochureUrl    String?
+  icon           String             @default("location_on")
   lat            Float?
   lng            Float?
-  horarioHtml    String?     @db.Text
+  horarioHtml    String?            @db.Text
   districtId     String?
   district       EducacionDistrict? @relation(fields: [districtId], references: [id], onDelete: SetNull)
-  showOnSelector Boolean     @default(true)
-  showOnMap      Boolean     @default(false)
-  activo         Boolean     @default(true)
-  sortOrder      Int         @default(0)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  showOnSelector Boolean            @default(true)
+  showOnMap      Boolean            @default(false)
+  activo         Boolean            @default(true)
+  sortOrder      Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
   links          ShortLink[]
 
   @@index([districtId])
@@ -509,17 +509,17 @@ model LinkClick {
 }
 
 model EducacionWidgetSettings {
-  id              String   @id @default("default")
-  whatsapp        String
-  telefono        String
-  email           String
-  emailVirtual    String
-  soporteVirtual  String
-  imageRectangulo String
-  imageWhatsapp   String
-  imageCirculo    String
-  imageCorreo     String
-  imageMarker     String
+  id               String   @id @default("default")
+  whatsapp         String
+  telefono         String
+  email            String
+  emailVirtual     String
+  soporteVirtual   String
+  imageRectangulo  String
+  imageWhatsapp    String
+  imageCirculo     String
+  imageCorreo      String
+  imageMarker      String
   mapsApiKey       String?
   googleCalendarId String?
   updatedAt        DateTime @updatedAt
@@ -545,47 +545,47 @@ model EducacionSelectorSede {
 }
 
 model EducacionPopupSettings {
-  id                 String   @id @default("default")
-  activo             Boolean  @default(false)
-  imagenUrl          String
-  imagenLinkUrl      String?
-  imagenTarget       String   @default("_blank")
-  titulo             String?
-  botonTexto         String
-  botonUrl           String
-  botonTarget        String   @default("_blank")
-  showOnce           Boolean  @default(false)
-  delayMs            Int      @default(800)
-  animationSpeedMs   Int      @default(300)
-  scheduleEnabled    Boolean  @default(false)
-  scheduleDateStart  String?
-  scheduleDateEnd    String?
-  scheduleTimeStart  String?
-  scheduleTimeEnd    String?
-  scheduleTimezone   String   @default("America/Lima")
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default("default")
+  activo            Boolean  @default(false)
+  imagenUrl         String
+  imagenLinkUrl     String?
+  imagenTarget      String   @default("_blank")
+  titulo            String?
+  botonTexto        String
+  botonUrl          String
+  botonTarget       String   @default("_blank")
+  showOnce          Boolean  @default(false)
+  delayMs           Int      @default(800)
+  animationSpeedMs  Int      @default(300)
+  scheduleEnabled   Boolean  @default(false)
+  scheduleDateStart String?
+  scheduleDateEnd   String?
+  scheduleTimeStart String?
+  scheduleTimeEnd   String?
+  scheduleTimezone  String   @default("America/Lima")
+  updatedAt         DateTime @updatedAt
 }
 
 model MuseoPopupSettings {
-  id                 String   @id @default("default")
-  activo             Boolean  @default(false)
-  imagenUrl          String
-  imagenLinkUrl      String?
-  imagenTarget       String   @default("_blank")
-  titulo             String?
-  botonTexto         String
-  botonUrl           String
-  botonTarget        String   @default("_blank")
-  showOnce           Boolean  @default(false)
-  delayMs            Int      @default(800)
-  animationSpeedMs   Int      @default(300)
-  scheduleEnabled    Boolean  @default(false)
-  scheduleDateStart  String?
-  scheduleDateEnd    String?
-  scheduleTimeStart  String?
-  scheduleTimeEnd    String?
-  scheduleTimezone   String   @default("America/Lima")
-  updatedAt          DateTime @updatedAt
+  id                String   @id @default("default")
+  activo            Boolean  @default(false)
+  imagenUrl         String
+  imagenLinkUrl     String?
+  imagenTarget      String   @default("_blank")
+  titulo            String?
+  botonTexto        String
+  botonUrl          String
+  botonTarget       String   @default("_blank")
+  showOnce          Boolean  @default(false)
+  delayMs           Int      @default(800)
+  animationSpeedMs  Int      @default(300)
+  scheduleEnabled   Boolean  @default(false)
+  scheduleDateStart String?
+  scheduleDateEnd   String?
+  scheduleTimeStart String?
+  scheduleTimeEnd   String?
+  scheduleTimezone  String   @default("America/Lima")
+  updatedAt         DateTime @updatedAt
 }
 
 model EducacionAliado {
@@ -660,8 +660,8 @@ model PamPaymentMethod {
 
 model PamRegistration {
   /// Ledger de pago/membresía (MP, welcome, expiry). La persona vive en WhatsApp CRM.
-  id               String          @id @default(cuid())
-  createdAt        DateTime        @default(now())
+  id               String         @id @default(cuid())
+  createdAt        DateTime       @default(now())
   nombres          String
   apellidos        String
   dni              String
@@ -677,11 +677,11 @@ model PamRegistration {
   frecuencia       String
   checkoutUrl      String?
   /// Slug de PamPaymentMethod (default mercado_pago en widget).
-  paymentMethod    String          @default("mercado_pago")
+  paymentMethod    String         @default("mercado_pago")
   aceptaPrivacidad Boolean
   mpStatus         PamMpStatus?
-  welcomeEmail     PamEmailStatus  @default(PENDIENTE)
-  expiryNotice     PamEmailStatus  @default(PENDIENTE)
+  welcomeEmail     PamEmailStatus @default(PENDIENTE)
+  expiryNotice     PamEmailStatus @default(PENDIENTE)
   expiryDate       DateTime?
 
   @@index([correo])
@@ -692,39 +692,39 @@ model PamRegistration {
 
 /// Lead del widget «Conversemos» (Educación). Persona canónica en WhatsApp CRM.
 model EducacionLead {
-  id              String   @id @default(cuid())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  nombres         String
-  apellidos       String
-  dni             String?
-  celular         String
-  email           String?
-  optInMarketing  Boolean  @default(false)
-  acceptPrivacy   Boolean
-  courseSlug      String?
-  courseTitle     String?
-  pageUrl         String?
-  captureSource   String   @default("wordpress_widget")
-  referrer        String?
-  utmSource       String?
-  utmMedium       String?
-  utmCampaign     String?
-  utmContent      String?
-  utmTerm         String?
-  gclid           String?
-  fbclid          String?
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  nombres        String
+  apellidos      String
+  dni            String?
+  celular        String
+  email          String?
+  optInMarketing Boolean  @default(false)
+  acceptPrivacy  Boolean
+  courseSlug     String?
+  courseTitle    String?
+  pageUrl        String?
+  captureSource  String   @default("wordpress_widget")
+  referrer       String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  utmContent     String?
+  utmTerm        String?
+  gclid          String?
+  fbclid         String?
   /// Área WhatsApp: educacion_ep (Extensión Profesional) | educacion_ca (Cursos de Arte)
-  whatsappArea    String   @default("educacion_ep")
-  fuente          String   @default("Web MALI Educación")
+  whatsappArea   String   @default("educacion_ep")
+  fuente         String   @default("Web MALI Educación")
   /// Identificador técnico del origen (widget, import, etc.)
-  source          String   @default("educacion_lead_widget")
+  source         String   @default("educacion_lead_widget")
   /// pending | ok | error | skipped
-  waStatus        String   @default("pending")
-  waError         String?
+  waStatus       String   @default("pending")
+  waError        String?
   /// pending | ok | error | skipped | disabled
-  sheetStatus     String   @default("pending")
-  sheetError      String?
+  sheetStatus    String   @default("pending")
+  sheetError     String?
 
   @@index([celular])
   @@index([email])
@@ -735,15 +735,15 @@ model EducacionLead {
 }
 
 model ScreenCastPlaylist {
-  id        String                       @id @default(cuid())
-  name      String
-  activo    Boolean                      @default(true)
-  crossfade Boolean                      @default(false)
-  kenBurns  Boolean                      @default(false)
-  createdAt DateTime                     @default(now())
-  updatedAt DateTime                     @updatedAt
-  items     ScreenCastPlaylistItem[]
-  monitors  ScreenCastMonitor[]
+  id                String                       @id @default(cuid())
+  name              String
+  activo            Boolean                      @default(true)
+  crossfade         Boolean                      @default(false)
+  kenBurns          Boolean                      @default(false)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  items             ScreenCastPlaylistItem[]
+  monitors          ScreenCastMonitor[]
   scheduleOverrides ScreenCastScheduleOverride[]
 }
 
@@ -761,32 +761,32 @@ model ScreenCastPlaylistItem {
 }
 
 model ScreenCastMonitor {
-  id          String                @id @default(cuid())
-  screenKey   String                @unique
-  name        String
-  location    String?
-  photoUrl    String?
-  orientation ScreenCastOrientation @default(LANDSCAPE)
-  playlistId  String?
-  playlist    ScreenCastPlaylist?   @relation(fields: [playlistId], references: [id], onDelete: SetNull)
-  lastSeenAt  DateTime?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  id                String                       @id @default(cuid())
+  screenKey         String                       @unique
+  name              String
+  location          String?
+  photoUrl          String?
+  orientation       ScreenCastOrientation        @default(LANDSCAPE)
+  playlistId        String?
+  playlist          ScreenCastPlaylist?          @relation(fields: [playlistId], references: [id], onDelete: SetNull)
+  lastSeenAt        DateTime?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
   scheduleOverrides ScreenCastScheduleOverride[]
 
   @@index([playlistId])
 }
 
 model ScreenCastScheduleOverride {
-  id         String              @id @default(cuid())
+  id         String             @id @default(cuid())
   monitorId  String
   playlistId String
   startsAt   DateTime
   endsAt     DateTime
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
-  monitor    ScreenCastMonitor   @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-  playlist   ScreenCastPlaylist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  monitor    ScreenCastMonitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+  playlist   ScreenCastPlaylist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
   @@index([monitorId, startsAt, endsAt])
   @@index([startsAt, endsAt])
@@ -835,7 +835,21 @@ enum MalichimpSuppressionReason {
   mailchimp_cleaned
   ses_bounce
   ses_complaint
+  ses_unsubscribe
   manual
+}
+
+enum SesEventType {
+  send
+  rendering_failure
+  reject
+  delivery
+  bounce
+  complaint
+  delivery_delay
+  subscription
+  open
+  click
 }
 
 model Newsletter {
@@ -882,32 +896,32 @@ model LandingPage {
 }
 
 model EmailCampaign {
-  id                       String              @id @default(cuid())
-  newsletterId             String
-  newsletter               Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
-  name                     String
-  status                   EmailCampaignStatus @default(draft)
-  audienceArea             String              @default("pam")
+  id                      String              @id @default(cuid())
+  newsletterId            String
+  newsletter              Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  name                    String
+  status                  EmailCampaignStatus @default(draft)
+  audienceArea            String              @default("pam")
   /// Legacy singular; prefer audienceSegments.
-  audienceSegment          String?
-  audienceSegments         String[]            @default([])
-  audienceExcludeSegments  String[]            @default([])
-  audienceAttrKey          String?
-  audienceAttrValue        String?
-  totalRecipients          Int                 @default(0)
-  sentCount                Int                 @default(0)
-  openCount                Int                 @default(0)
-  clickCount               Int                 @default(0)
-  errorCount               Int                 @default(0)
-  scheduledAt              DateTime?
-  startedAt                DateTime?
-  completedAt              DateTime?
-  createdById              String
-  createdBy                User                @relation(fields: [createdById], references: [id])
-  createdAt                DateTime            @default(now())
-  updatedAt                DateTime            @updatedAt
-  sends                    EmailSend[]
-  events                   EmailEvent[]
+  audienceSegment         String?
+  audienceSegments        String[]            @default([])
+  audienceExcludeSegments String[]            @default([])
+  audienceAttrKey         String?
+  audienceAttrValue       String?
+  totalRecipients         Int                 @default(0)
+  sentCount               Int                 @default(0)
+  openCount               Int                 @default(0)
+  clickCount              Int                 @default(0)
+  errorCount              Int                 @default(0)
+  scheduledAt             DateTime?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  createdById             String
+  createdBy               User                @relation(fields: [createdById], references: [id])
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  sends                   EmailSend[]
+  events                  EmailEvent[]
 
   @@index([newsletterId])
   @@index([createdById])
@@ -952,25 +966,25 @@ model EmailEvent {
 
 /// Contact database imported from Mailchimp. It remains independent from the WhatsApp CRM.
 model MalichimpContact {
-  id              String                  @id @default(cuid())
-  email           String                  @unique @db.VarChar(320)
-  firstName       String?                 @db.VarChar(160)
-  lastName        String?                 @db.VarChar(160)
-  phone           String?                 @db.VarChar(80)
-  institutionName String?                 @db.VarChar(300)
-  jobTitle        String?                 @db.VarChar(200)
-  city            String?                 @db.VarChar(160)
-  country         String?                 @db.VarChar(120)
-  classification  String?                 @db.VarChar(160)
-  source          String?                 @db.VarChar(240)
+  id              String                 @id @default(cuid())
+  email           String                 @unique @db.VarChar(320)
+  firstName       String?                @db.VarChar(160)
+  lastName        String?                @db.VarChar(160)
+  phone           String?                @db.VarChar(80)
+  institutionName String?                @db.VarChar(300)
+  jobTitle        String?                @db.VarChar(200)
+  city            String?                @db.VarChar(160)
+  country         String?                @db.VarChar(120)
+  classification  String?                @db.VarChar(160)
+  source          String?                @db.VarChar(240)
   status          MalichimpContactStatus
   optInAt         DateTime?
   confirmedAt     DateTime?
   statusChangedAt DateTime?
   /// Sparse segmentation fields retained without creating dozens of mostly empty columns.
   attributes      Json?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
   tags            MalichimpContactTag[]
 
   @@index([status])
@@ -979,11 +993,11 @@ model MalichimpContact {
 }
 
 model MalichimpTag {
-  id             String                 @id @default(cuid())
-  name           String                 @db.VarChar(200)
-  normalizedName String                 @unique @db.VarChar(200)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  id             String                @id @default(cuid())
+  name           String                @db.VarChar(200)
+  normalizedName String                @unique @db.VarChar(200)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
   contacts       MalichimpContactTag[]
 
   @@index([name])
@@ -1002,30 +1016,49 @@ model MalichimpContactTag {
 
 /// Addresses that must never receive a campaign, regardless of segment membership.
 model MalichimpSuppression {
-  id         String                      @id @default(cuid())
-  email      String                      @unique @db.VarChar(320)
+  id         String                     @id @default(cuid())
+  email      String                     @unique @db.VarChar(320)
   reason     MalichimpSuppressionReason
-  source     String                      @db.VarChar(80)
+  source     String                     @db.VarChar(80)
   occurredAt DateTime?
   metadata   Json?
-  createdAt  DateTime                    @default(now())
-  updatedAt  DateTime                    @updatedAt
+  createdAt  DateTime                   @default(now())
+  updatedAt  DateTime                   @updatedAt
 
   @@index([reason])
   @@index([updatedAt])
 }
 
 model MalichimpImportRun {
-  id              String   @id @default(cuid())
-  sourceKey       String   @db.VarChar(160)
-  sourceDirectory String   @db.VarChar(500)
-  fileFingerprint String   @db.VarChar(64)
+  id              String    @id @default(cuid())
+  sourceKey       String    @db.VarChar(160)
+  sourceDirectory String    @db.VarChar(500)
+  fileFingerprint String    @db.VarChar(64)
   counts          Json
-  startedAt       DateTime @default(now())
+  startedAt       DateTime  @default(now())
   completedAt     DateTime?
 
   @@index([sourceKey, startedAt])
   @@index([fileFingerprint])
+}
+
+/// Immutable, idempotent record of an SES event received through EventBridge/SQS.
+/// It belongs to the shared email engine, not to a specific CRM module.
+model SesEventRecord {
+  id         String       @id @default(cuid())
+  eventKey   String       @unique @db.VarChar(500)
+  eventId    String       @db.VarChar(120)
+  messageId  String?      @db.VarChar(255)
+  type       SesEventType
+  email      String?      @db.VarChar(320)
+  occurredAt DateTime
+  payload    Json
+  createdAt  DateTime     @default(now())
+
+  @@index([messageId])
+  @@index([eventId])
+  @@index([email, occurredAt])
+  @@index([type, occurredAt])
 }
 
 model TodoType {
@@ -1064,23 +1097,23 @@ model PortfolioProjectStatus {
 }
 
 model PortfolioProject {
-  id          String                  @id @default(cuid())
+  id          String                 @id @default(cuid())
   name        String
-  detail      String?                 @db.Text
+  detail      String?                @db.Text
   statusId    String
-  status      PortfolioProjectStatus  @relation(fields: [statusId], references: [id])
-  area        PortfolioArea           @default(otros)
-  projectType PortfolioProjectType    @default(otro)
+  status      PortfolioProjectStatus @relation(fields: [statusId], references: [id])
+  area        PortfolioArea          @default(otros)
+  projectType PortfolioProjectType   @default(otro)
   stakeholder String?
-  impact      PortfolioImpact         @default(medium)
+  impact      PortfolioImpact        @default(medium)
   link        String?
   targetAt    DateTime?
   ownerId     String
-  owner       User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  sortOrder   Int                     @default(0)
+  owner       User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  sortOrder   Int                    @default(0)
   archivedAt  DateTime?
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
   tasks       TodoItem[]
 
   @@index([ownerId])
@@ -1093,33 +1126,33 @@ model PortfolioProject {
 }
 
 model TodoItem {
-  id               String           @id @default(cuid())
+  id               String            @id @default(cuid())
   title            String
-  detail           String?          @db.Text
+  detail           String?           @db.Text
   typeId           String?
-  type             TodoType?        @relation(fields: [typeId], references: [id], onDelete: SetNull)
-  priority         TodoPriority     @default(medium)
+  type             TodoType?         @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  priority         TodoPriority      @default(medium)
   effort           TodoEffort?
   statusId         String
-  status           TodoStatus       @relation(fields: [statusId], references: [id])
+  status           TodoStatus        @relation(fields: [statusId], references: [id])
   ownerId          String
-  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   projectId        String?
   project          PortfolioProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   area             PortfolioArea?
-  origin           TodoOrigin       @default(internal)
-  impact           PortfolioImpact  @default(medium)
+  origin           TodoOrigin        @default(internal)
+  impact           PortfolioImpact   @default(medium)
   link             String?
-  registeredAt     DateTime         @default(now())
+  registeredAt     DateTime          @default(now())
   dueAt            DateTime?
   scheduledAt      DateTime?
-  statusChangedAt  DateTime         @default(now())
+  statusChangedAt  DateTime          @default(now())
   completedAt      DateTime?
   archivedAt       DateTime?
-  sortOrder        Int              @default(0)
-  timeSpentMinutes Int              @default(0)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  sortOrder        Int               @default(0)
+  timeSpentMinutes Int               @default(0)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([ownerId])
   @@index([statusId])
@@ -1135,15 +1168,15 @@ model TodoItem {
 }
 
 model OperationalService {
-  id        String                    @id @default(cuid())
+  id        String                   @id @default(cuid())
   name      String
-  status    OperationalServiceStatus  @default(up)
-  notes     String?                   @db.Text
-  sortOrder Int                       @default(0)
+  status    OperationalServiceStatus @default(up)
+  notes     String?                  @db.Text
+  sortOrder Int                      @default(0)
   ownerId   String
-  owner     User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt DateTime                  @default(now())
-  updatedAt DateTime                  @updatedAt
+  owner     User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
 
   @@index([ownerId])
   @@index([status])

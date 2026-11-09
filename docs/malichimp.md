@@ -63,14 +63,20 @@ Permiso de lectura: `malichimp`. La importación requiere además rol `admin`.
 
 ## Motor SES compartido
 
-`EmailDeliveryService` solo conoce transporte. No conoce campañas, contactos ni módulos de negocio. Admite credenciales SES dedicadas y, por compatibilidad, credenciales AWS generales:
+`EmailDeliveryService` solo conoce transporte. No conoce campañas, contactos ni
+módulos de negocio. En producción usa el rol del EC2 mediante la cadena estándar
+del SDK de AWS:
 
 ```env
+AWS_SES_ENABLED=true
 AWS_SES_REGION=us-east-1
-AWS_SES_ACCESS_KEY_ID=
-AWS_SES_SECRET_ACCESS_KEY=
+AWS_SES_CONFIGURATION_SET=mali-one-newsletters
+AWS_SES_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/mali-one-ses-events
 SES_FROM_EMAIL=boletines@mali.pe
 SES_FROM_NAME=MALI
 ```
 
-La existencia del motor no habilita envíos. La ejecución masiva, límites, eventos de rebote/queja y salida del sandbox se incorporarán en una fase posterior.
+El conjunto publica eventos en EventBridge y la cola SQS. El consumidor guarda
+cada evento de forma idempotente en `SesEventRecord`; rebotes, quejas y bajas se
+sincronizan con `MalichimpSuppression`. La ejecución masiva, límites y cola de
+campañas siguen siendo una fase independiente del transporte.

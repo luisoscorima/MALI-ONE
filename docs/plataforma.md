@@ -56,7 +56,11 @@ Service Account + Domain-Wide Delegation; JSON en `secrets/google-sa.json` monta
 
 ## AWS S3 (base)
 
-Bucket principal `AWS_S3_BUCKET`. Con `S3_PUBLIC_READ=false`, redirects usan URL presignada. Gestor multi-bucket: [s3-manager.md](./s3-manager.md).
+Bucket principal `AWS_S3_BUCKET`. En producción, S3, SES y SQS usan credenciales
+temporales del rol asociado al EC2; no se guardan access keys en `.env`. Las
+políticas del rol permanecen separadas por servicio. Los contenedores Docker
+requieren IMDSv2 con `HttpPutResponseHopLimit=2`. Con `S3_PUBLIC_READ=false`,
+los redirects usan URL presignada. Gestor multi-bucket: [s3-manager.md](./s3-manager.md).
 
 ## Migraciones
 
@@ -75,4 +79,5 @@ pnpm --filter @mali-one/api prisma:migrate
 | `apps/api/src/core/prisma` | PrismaService |
 | `apps/api/src/core/redis` | Redis |
 | `apps/api/src/core/s3` | Cliente S3 |
+| `apps/api/src/core/email-delivery` | Transporte SES y consumidor EventBridge/SQS |
 | `apps/api/src/core/qr` | Generación QR |

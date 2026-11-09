@@ -197,22 +197,29 @@ Verifica: `GET https://dev.mali.pe/api/health/google-admin`
 
 ## AWS S3
 
+Configuración completa del rol de ejecución, SES y SQS:
+[docs/aws-runtime-role.md](docs/aws-runtime-role.md).
+
 1. Bucket en `us-east-1` (ej. `mali-one-files`)
-2. IAM user con permisos sobre los buckets que uses
-3. Variables en `.env`: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`
+2. Rol IAM asociado al EC2 con permisos sobre los buckets utilizados
+3. Variable en `.env`: `AWS_S3_BUCKET`. No guardar claves AWS en producción.
+
+El SDK utiliza la cadena estándar de credenciales: en EC2 resuelve automáticamente
+el rol de instancia. `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` solo se admiten
+temporalmente para migraciones o desarrollo local.
 
 Con `S3_PUBLIC_READ=false` (recomendado), los archivos se sirven con URL presignada al seguir el enlace corto `/r/{slug}`.
 
 ### Gestor S3 (solo super admin)
 
-Mismas `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`, pero la política IAM debe incluir **todos los buckets** del gestor:
+El mismo rol EC2 debe incluir **todos los buckets** del gestor:
 
 ```env
 BOOTSTRAP_ADMIN_EMAIL=loscorima@mali.pe
 AWS_S3_MANAGER_BUCKETS=mali-assets,mali-backups,mali-one-files,tmsaws
 ```
 
-Ejemplo de política IAM (mismas keys). **Importante:** `s3:PutObject` (subir en Enlaces) y `s3:ListBucket` (listar en Gestor S3) son permisos distintos:
+Ejemplo de política IAM. **Importante:** `s3:PutObject` (subir en Enlaces) y `s3:ListBucket` (listar en Gestor S3) son permisos distintos:
 
 ```json
 {

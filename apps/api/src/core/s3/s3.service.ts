@@ -9,6 +9,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { Readable } from 'stream';
+import { optionalAwsCredentials } from '../aws/aws-client-options';
 
 @Injectable()
 export class S3Service {
@@ -22,12 +23,10 @@ export class S3Service {
     this.bucket = config.getOrThrow<string>('AWS_S3_BUCKET');
     this.publicRead = config.get<string>('S3_PUBLIC_READ') === 'true';
 
+    const credentials = optionalAwsCredentials(config, 'AWS');
     this.client = new S3Client({
       region: this.region,
-      credentials: {
-        accessKeyId: config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
-      },
+      ...(credentials ? { credentials } : {}),
     });
   }
 

@@ -13,6 +13,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { optionalAwsCredentials } from '../../core/aws/aws-client-options';
 
 @Injectable()
 export class S3ManagerService {
@@ -35,12 +36,10 @@ export class S3ManagerService {
       config.get<string>('AWS_S3_SCREEN_CAST_PREFIX') ?? 'screen-cast',
     );
 
+    const credentials = optionalAwsCredentials(config, 'AWS');
     this.client = new S3Client({
       region: this.region,
-      credentials: {
-        accessKeyId: config.getOrThrow<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: config.getOrThrow<string>('AWS_SECRET_ACCESS_KEY'),
-      },
+      ...(credentials ? { credentials } : {}),
     });
   }
 
@@ -199,7 +198,7 @@ export class S3ManagerService {
       const message = e.message ?? 'Error desconocido';
 
       if (code === 'AccessDenied') {
-        return `Acceso denegado. El usuario IAM necesita s3:ListBucket en arn:aws:s3:::BUCKET y s3:GetObject en arn:aws:s3:::BUCKET/* (${message})`;
+        return `Acceso denegado. El rol IAM necesita s3:ListBucket en arn:aws:s3:::BUCKET y s3:GetObject en arn:aws:s3:::BUCKET/* (${message})`;
       }
 
       return code ? `${code}: ${message}` : message;

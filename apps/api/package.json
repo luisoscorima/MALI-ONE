@@ -16,11 +16,14 @@
     "prisma:seed:landings": "tsx prisma/seed-landings.ts",
     "prisma:import:pam-sheets": "tsx prisma/import-pam-sheets.ts",
     "prisma:import:malichimp": "tsx prisma/import-malichimp.ts",
-    "test:malichimp-import": "tsx --test src/modules/malichimp/lib/malichimp-import.test.ts"
+    "test:malichimp-import": "node --import tsx --test src/modules/malichimp/lib/malichimp-import.test.ts",
+    "test:ses-events": "node --import tsx --test src/core/email-delivery/ses-event.test.ts",
+    "test:ses-events:integration": "node --import tsx --test src/core/email-delivery/ses-event-processor.integration.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/client-ses": "^3.1091.0",
+    "@aws-sdk/client-sqs": "^3.1091.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@loskir/styled-qr-code-node": "^2.0.0",
     "@mali-one/shared": "workspace:*",

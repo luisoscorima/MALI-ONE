@@ -8,7 +8,7 @@ Explorador multi-bucket (listar, descargar, URL pública, borrar) restringido al
 
 ## Cómo funciona
 
-Lista buckets de `AWS_S3_MANAGER_BUCKETS`, navega prefijos, genera URLs y borra objetos con las mismas keys IAM ampliadas.
+Lista buckets de `AWS_S3_MANAGER_BUCKETS`, navega prefijos, genera URLs y borra objetos con el rol IAM del EC2.
 
 ## Código
 
@@ -36,10 +36,11 @@ N/A (objetos en S3).
 
 ```env
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
 AWS_S3_MANAGER_BUCKETS=mali-assets,mali-backups,mali-one-files,tmsaws
 ```
+
+En producción no se definen access keys permanentes. El SDK obtiene
+credenciales temporales del rol asociado a la instancia.
 
 ## Permisos
 
