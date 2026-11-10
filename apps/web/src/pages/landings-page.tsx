@@ -271,6 +271,48 @@ export function LandingsPage() {
     }
   }
 
+  async function incorporateInvestmentDesign() {
+    const accepted = await confirm({
+      title: '¿Actualizar solo el bloque de inversión?',
+      description: 'Actualiza el bloque de inversión. Si sus tarifas siguen siendo las iniciales, incorpora también el precio al contado y la promoción de la referencia. Conserva los datos que ya hayas editado.',
+      confirmLabel: 'Actualizar inversión',
+    });
+    if (!accepted) return;
+
+    const source = DEFAULT_GESTION_CULTURAL_LANDING_CONTENT.blocks.find(
+      (block) => block.id === 'inversion',
+    );
+    if (!source) return;
+    setContent({
+      ...content,
+      blocks: content.blocks.map((block) =>
+        block.id === 'inversion' ? (() => {
+          const originalPrices = ['enrollment', 'installments', 'installmentAmount']
+            .every((key) => block.data[key] === source.data[key]);
+          const tuition = Number(String(block.data.enrollment ?? '').replace(/,/g, ''));
+          const installments = Number(String(block.data.installments ?? '').replace(/,/g, ''));
+          const amount = Number(String(block.data.installmentAmount ?? '').replace(/,/g, ''));
+          const total = tuition > 0 && installments > 0 && amount > 0 && Number.isFinite(tuition + installments * amount)
+            ? (tuition + installments * amount).toLocaleString('en-US') : '';
+          return {
+            ...block,
+            data: {
+              ...(originalPrices ? source.data : {
+                regularTuition: block.data.enrollment,
+                regularInstallments: block.data.installments,
+                regularInstallmentAmount: block.data.installmentAmount,
+                totalAmount: total,
+              }),
+              ...block.data,
+            },
+          };
+        })() : block,
+      ),
+    });
+    setPreviewHtml('');
+    toast.success('Diseño de inversión incorporado. Revisa la vista previa y guarda los cambios.');
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -340,8 +382,11 @@ export function LandingsPage() {
 
           {mode === 'edit' && slug === 'gestion-cultural' ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
-              <p className="text-sm">Añade el contenido aprobado y las nuevas opciones a esta landing.</p>
-              <Button type="button" variant="outline" disabled={saving} onClick={() => void incorporateContent()}>Incorporar mejoras de Gestión Cultural</Button>
+              <p className="text-sm">Incorpora opciones nuevas sin reemplazar los cambios manuales.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={saving} onClick={() => void incorporateInvestmentDesign()}>Actualizar solo inversión</Button>
+                <Button type="button" variant="outline" disabled={saving} onClick={() => void incorporateContent()}>Incorporar otras mejoras de Gestión Cultural</Button>
+              </div>
             </div>
           ) : null}
           <fieldset disabled={saving} className="min-w-0">

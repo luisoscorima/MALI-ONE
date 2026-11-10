@@ -13,6 +13,8 @@
       --lead-input-bg: #ffffff;
       --lead-input-text: #1a1a1a;
       --lead-error: #7a1020;
+      --lead-accent: #5c1599;
+      --lead-primary: #0022cc;
     }
 
     * { box-sizing: border-box; }
@@ -260,7 +262,7 @@
     .lead-form--done .lead-form__submit {
       display: none;
     }
-    .lead-compact .lead-form { padding: 20px 18px; --lead-text: #101018; --lead-btn: #0022cc; --text-subtitle: 20px; --text-body: 16px; --text-meta: 14px; font-size: var(--text-body); }
+    .lead-compact .lead-form { padding: 20px 18px; --lead-text: #101018; --lead-btn: var(--lead-primary); --text-subtitle: 20px; --text-body: 16px; --text-meta: 14px; font-size: var(--text-body); }
     .lead-compact .lead-form__title { font-size: var(--text-subtitle); }
     .lead-compact .lead-form__subtitle { margin-bottom: 14px; font-size: var(--text-body); line-height: 1.6; }
     .lead-compact .lead-form__field { margin-bottom: 9px; }
@@ -273,7 +275,7 @@
     .lead-compact .lead-form__prefix-option,
     .lead-compact .lead-form__submit,
     .lead-compact .lead-form__wa a { font-size: var(--text-body); }
-    .lead-compact .lead-form { padding: 22px 20px; border-top: 3px solid #5c1599; }
+    .lead-compact .lead-form { padding: 22px 20px; border-top: 3px solid var(--lead-accent); }
     .lead-compact .lead-form__title, .lead-compact .lead-form__subtitle { text-align: left; }
     .lead-compact .lead-form__subtitle { color: #625b67; }
     .lead-compact .lead-form__field input:not([type="hidden"]),
@@ -281,11 +283,11 @@
     .lead-compact .lead-form__prefix-btn { min-height: 44px; padding: 9px 12px; border: 1px solid #ded8e6; border-radius: 10px; transition: border-color .2s, box-shadow .2s; }
     .lead-compact .lead-form__field input:focus,
     .lead-compact .lead-form__field select:focus,
-    .lead-compact .lead-form__prefix-btn:focus-visible { border-color: #5c1599; outline: 2px solid #5c1599; outline-offset: 2px; }
-    .lead-compact .lead-form__check input { accent-color: #0022cc; }
+    .lead-compact .lead-form__prefix-btn:focus-visible { border-color: var(--lead-accent); outline: 2px solid var(--lead-accent); outline-offset: 2px; }
+    .lead-compact .lead-form__check input { accent-color: var(--lead-primary); }
     .lead-compact .lead-form__submit { min-height: 48px; border-radius: 12px; transition: background-color .2s; }
-    .lead-compact .lead-form__submit:hover { background: #001baa; }
-    .lead-compact .lead-form__submit:focus-visible { outline: 3px solid #5c1599; outline-offset: 3px; }
+    .lead-compact .lead-form__submit:hover { background: color-mix(in srgb, var(--lead-primary) 85%, #000); }
+    .lead-compact .lead-form__submit:focus-visible { outline: 3px solid var(--lead-accent); outline-offset: 3px; }
     .lead-compact .lead-form__prefix-list { border: 1px solid #ded8e6; border-radius: 10px; }
     @media(prefers-reduced-motion: reduce) { .lead-compact * { transition: none !important; } }
     .lead-preview .lead-form__wa { display: none !important; }
@@ -422,6 +424,10 @@
   if (bg) {
     document.documentElement.style.setProperty('--lead-bg', bg);
   }
+  var primary = params.get('primary') || '';
+  var accent = params.get('accent') || '';
+  if (/^#[0-9a-fA-F]{6}$/.test(primary)) document.documentElement.style.setProperty('--lead-primary', primary);
+  if (/^#[0-9a-fA-F]{6}$/.test(accent)) document.documentElement.style.setProperty('--lead-accent', accent);
   if (privacy) {
     document.getElementById('privacy-link').href = privacy;
   }

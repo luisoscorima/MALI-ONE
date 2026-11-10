@@ -2,8 +2,9 @@ import type {
   LandingBlock,
   LandingBlockType,
   LandingDocument,
+  LandingTheme,
 } from '@mali-one/shared';
-import { DEFAULT_LANDING_FOOTER } from '@mali-one/shared';
+import { DEFAULT_GESTION_CULTURAL_LANDING_CONTENT, DEFAULT_LANDING_FOOTER } from '@mali-one/shared';
 
 const BLOCK_TYPES = new Set<LandingBlockType>([
   'hero',
@@ -368,7 +369,7 @@ function renderCta(block: LandingBlock, hasForm: boolean): string {
   </div></section>`;
 }
 
-function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, sticky = false): string {
+function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, theme: LandingTheme, sticky = false): string {
   const data = block.data;
   const params = new URLSearchParams({
     area:
@@ -382,13 +383,15 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
     compact: '1',
     formTitle: text(data.title, 200),
     formDescription: text(data.body, 500),
+    primary: theme.primary,
+    accent: theme.accent,
   });
   const privacyUrl = safeUrl(data.privacyUrl);
   if (privacyUrl) params.set('privacy', privacyUrl);
   const whatsappPhone = text(data.whatsappPhone, 30).replace(/\D/g, '');
   if (whatsappPhone) params.set('wa', whatsappPhone);
   const configuredColor = color(data.backgroundColor, '');
-  const backgroundColor = sticky && (!configuredColor || configuredColor.toLowerCase() === '#b4b3ff') ? '#f8f6fb' : configuredColor;
+  const backgroundColor = sticky && (!configuredColor || configuredColor.toLowerCase() === '#b4b3ff') ? theme.surface : configuredColor;
   if (backgroundColor) params.set('bg', backgroundColor);
   if (preview) params.set('preview', '1');
   const widgetUrl = `${apiBase}/widgets/educacion/lead-form.html?${params.toString()}`;
@@ -434,10 +437,22 @@ function renderCurriculum(block: LandingBlock): string {
 
 function renderInvestment(block: LandingBlock): string {
   const data = block.data;
-  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${escapeHtml(data.currency || 'S/')} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}</div></div></section>`;
+  const currency = escapeHtml(data.currency || 'S/');
+  const enhanced = Boolean(data.totalAmount || data.cashPrice || data.benefitLabel || data.paymentMethods);
+  if (!enhanced) {
+    return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${currency} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${currency} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}</div></div></section>`;
+  }
+  const paymentMethods = String(data.paymentMethods || '').split(',').map((name) => name.trim()).filter(Boolean);
+  return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box investment-box--enhanced">
+    <div class="investment-main">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-price"><div class="investment-amount">${icon('wallet')}${currency} ${escapeHtml(data.totalAmount || data.enrollment)}</div><p class="investment-regular">Inversión regular:<br>Matrícula <strong>${currency} ${escapeHtml(data.regularTuition || data.enrollment)}</strong>${data.regularInstallments && data.regularInstallmentAmount ? ` + <strong>${currency} ${escapeHtml(data.regularInstallmentAmount)} x ${escapeHtml(data.regularInstallments)}</strong>` : ''}</p></div></div>
+    ${data.cashPrice ? `<div class="investment-cash"><strong>Descuento por<br>pago al contado:</strong><span>${currency} ${escapeHtml(data.cashPrice)}</span></div>` : ''}
+    ${data.benefitLabel ? `<div class="investment-benefit">${icon('wallet')}<div><strong>Beneficio: hasta</strong><span>${escapeHtml(data.benefitLabel)}</span></div>${data.benefitInstallments && data.benefitInstallmentAmount ? `<strong class="investment-benefit__price">${escapeHtml(data.benefitInstallments)} cuotas x<br>${currency} ${escapeHtml(data.benefitInstallmentAmount)}</strong>` : ''}</div>` : ''}
+    ${paymentMethods.length ? `<ul class="investment-payments" aria-label="Entidades y tarjetas participantes">${paymentMethods.map((name) => `<li>${escapeHtml(name)}</li>`).join('')}</ul>` : ''}
+    ${data.paymentNote ? `<div class="investment-payment-note">${paragraphs(data.paymentNote)}</div>` : ''}${data.note ? `<p class="investment-note">${escapeHtml(data.note)}</p>` : ''}
+  </div></div></section>`;
 }
 
-function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, preview: boolean): string {
+function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, preview: boolean, theme: LandingTheme): string {
   switch (block.type) {
     case 'hero':
       return renderHero(block, hasForm, apiBase);
@@ -460,7 +475,7 @@ function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, pre
     case 'cta':
       return renderCta(block, hasForm);
     case 'lead_form':
-      return renderLeadForm(block, apiBase, preview);
+      return renderLeadForm(block, apiBase, preview, theme);
     case 'footer':
       return renderFooter(block);
   }
@@ -498,6 +513,13 @@ export function renderLandingHtml(input: {
   const sectionTones = new Map(enabled.filter((block) => neutralTypes.has(block.type))
     .map((block, index) => [block.id, index % 2 === 0 ? 'light' : 'soft']));
   const render = (block: LandingBlock) => {
+    if ((input.slug === 'gestion-cultural' || input.slug === 'vista-previa') && block.type === 'investment' && block.id === 'inversion') {
+      const seeded = DEFAULT_GESTION_CULTURAL_LANDING_CONTENT.blocks.find((item) => item.id === 'inversion');
+      if (seeded && ['enrollment', 'installments', 'installmentAmount']
+        .every((key) => block.data[key] === seeded.data[key])) {
+        block = { ...block, data: { ...seeded.data, ...block.data } };
+      }
+    }
     if (block === overview && galleryPhoto && !text(block.data.imageUrl)) {
       block = { ...block, data: { ...block.data, imageUrl: galleryPhoto.imageUrl,
         imageAlt: text(block.data.imageAlt) || galleryPhoto.imageAlt,
@@ -505,9 +527,9 @@ export function renderLandingHtml(input: {
     }
     if (block.type === 'cta' && typeof block.data.url === 'string' &&
       block.data.url.startsWith('#') && !targets.has(block.data.url.slice(1))) {
-      return renderBlock({ ...block, data: { ...block.data, url: '' } }, apiBase, !!form, !!input.preview);
+      return renderBlock({ ...block, data: { ...block.data, url: '' } }, apiBase, !!form, !!input.preview, document.theme);
     }
-    const html = renderBlock(block, apiBase, !!form, !!input.preview);
+    const html = renderBlock(block, apiBase, !!form, !!input.preview, document.theme);
     const tone = sectionTones.get(block.id);
     return tone ? html.replace(/^<section /, `<section data-section-tone="${tone}" `) : html;
   };
@@ -530,7 +552,7 @@ export function renderLandingHtml(input: {
   const split = heroIndex < 0 ? 0 : heroIndex + 1;
   const footers = sticky ? enabled.filter((block) => block.type === 'footer') : [];
   const ordinaryBlock = (block: LandingBlock) => block.type !== 'lead_form' && block.type !== 'footer';
-  const blocks = sticky ? `${renderFlow(enabled.slice(0, split).filter(ordinaryBlock))}<div class="landing-body shell"><div class="landing-sections">${renderFlow(enabled.slice(split).filter(ordinaryBlock))}</div>${renderLeadForm(form!, apiBase, !!input.preview, true)}</div>${footers.map(render).join('')}` : renderFlow(enabled);
+  const blocks = sticky ? `${renderFlow(enabled.slice(0, split).filter(ordinaryBlock))}<div class="landing-body shell"><div class="landing-sections">${renderFlow(enabled.slice(split).filter(ordinaryBlock))}</div>${renderLeadForm(form!, apiBase, !!input.preview, document.theme, true)}</div>${footers.map(render).join('')}` : renderFlow(enabled);
   const navigation = (document.navigation ?? []).filter((item) => enabled.some((block) => block.id === item.blockId && block.type !== 'footer'));
   const heroTitle = document.blocks.find(
     (block) => block.enabled && block.type === 'hero',
@@ -570,11 +592,12 @@ export function renderLandingHtml(input: {
     .faculty-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.faculty-card{min-height:0;display:flex;flex-direction:column}.faculty-card img{width:100%;height:280px;min-height:0;object-fit:cover;object-position:center 18%}.faculty-card__copy{position:static;padding:20px;background:#1b1220;flex:1}.faculty-card__copy p{line-height:1.55}.faculty-link{display:inline-flex;margin-top:14px;color:#fff;text-underline-offset:4px;font-weight:700}
     .curriculum-module{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:#fff}.curriculum-module summary{padding:18px;cursor:pointer;font-weight:700;list-style-position:inside}.curriculum-module summary span{display:inline-block;margin-right:12px;color:var(--primary)}.curriculum-module p{padding:0 20px;margin:0 0 20px;color:#5f5865}.final-project{padding:24px;border-radius:16px;background:var(--primary);color:#fff;margin-top:18px}.final-project h3{margin:0 0 10px;font-size:var(--text-subtitle)}.final-project p{margin:0}
     .investment{padding-top:0}.section.investment{padding-bottom:12px}.section.cta-section{padding-block:12px}.landing-sections>.cta-section+.section--soft{margin-top:12px}.investment-box{border:1px solid var(--line);border-radius:24px;padding:30px;background:var(--surface)}.investment-box h2{font-size:var(--text-section)}.investment-amount{font-size:var(--text-section);font-weight:800;color:var(--primary);margin-top:20px}.investment-box p{max-width:720px}.investment-box .button{margin-top:10px}
+    .investment-box--enhanced{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px 24px;align-items:center;background:linear-gradient(135deg,#f8f6fb,#f1f4fc)}.investment-main{min-width:0}.investment-main h2{margin-bottom:8px}.investment-price{display:flex;align-items:center;gap:22px}.investment-price .investment-amount{margin:0;font-size:clamp(40px,4vw,62px);line-height:1.05;white-space:nowrap}.investment-regular{margin:0!important;padding-left:22px;border-left:1px solid #c6ccd6;font-size:14px!important;line-height:1.4!important}.investment-regular strong{color:var(--primary)}.investment-cash{display:grid;gap:4px;padding:12px 18px;border-radius:18px;background:#dceafa;color:var(--ink);line-height:1.2}.investment-cash span{font-size:clamp(26px,3vw,38px);font-weight:800;color:var(--primary)}.investment-benefit{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:18px;background:#dceafa;color:var(--ink)}.investment-benefit>.landing-icon{width:38px;height:38px;color:var(--primary)}.investment-benefit>div{display:grid;line-height:1.25}.investment-benefit>div span{font-size:clamp(18px,2.2vw,26px);font-weight:800;color:var(--primary)}.investment-benefit__price{margin-left:auto;padding:8px 14px;border-radius:14px;background:var(--primary);color:#fff;text-align:center;line-height:1.3}.investment-payments{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:4px 8px;list-style:none;color:var(--primary);font-weight:800}.investment-payments li{padding-inline:10px;border-right:1px solid #b8c1d0}.investment-payments li:last-child{border:0}.investment-payment-note{grid-column:1/-1;font-size:12px;font-style:italic;line-height:1.35}.investment-payment-note p,.investment-note{margin:0;font-size:12px!important;line-height:1.4!important}.investment-note{grid-column:1/-1;color:#4e5661}
     .landing-body{width:min(1440px,calc(100% - 40px));display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:stretch}.landing-sections{min-width:0}.landing-sections>.section>.shell,.landing-sections>.contact>.shell{width:100%}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:24px;border-radius:24px;margin-block:16px}.landing-sections .section__head--split{display:block}.landing-sections .section__head--split>p{margin-top:18px}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr;grid-template-rows:repeat(2,190px)}
     .lead-sidebar{padding-block:24px;min-width:0}.lead-panel{position:sticky;top:calc(var(--header-height) + 16px);max-height:calc(100dvh - var(--header-height) - 32px);overflow:auto;border-radius:20px;background:#b4b3ff;border:1px solid var(--line);overscroll-behavior:contain}.lead-panel .lead-frame{display:block;width:100%;height:1px;min-height:0;border-radius:0}.lead-close,.lead-toggle{display:none}.landing-body:has(+footer){margin-bottom:16px}
     @media(min-width:1101px){.lead-panel{visibility:visible!important;transform:none!important}}
     @media(max-width:1100px){:root{--header-height:90px}.site-logo{max-height:68px}.brand{max-width:50%}.nav-toggle{display:block;margin-left:auto}.site-nav{display:none;position:absolute;top:100%;left:0;right:0;padding:20px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}.site-nav.is-open{display:flex}.landing-body{display:block;width:min(1180px,calc(100% - 32px))}.lead-sidebar{padding:0}.lead-panel{position:fixed;left:auto;right:16px;bottom:88px;top:auto;width:min(420px,calc(100% - 32px));max-height:calc(100dvh - var(--header-height) - 100px);z-index:70;visibility:hidden;transform:translateY(20px);opacity:0;pointer-events:none}.lead-panel.is-open{visibility:visible;transform:none;opacity:1;pointer-events:auto}.lead-close{display:block;position:sticky;top:0;width:100%;border:0;background:#fff;padding:12px;text-align:right;font-weight:700;cursor:pointer;z-index:1}.lead-toggle{display:block;position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:75;max-width:calc(100% - 32px);white-space:nowrap;background:var(--primary);color:#fff;border:0;border-radius:999px;padding:16px 24px;font-weight:700;cursor:pointer}.lead-toggle[hidden]{display:none}.landing-sections .editorial-gallery{grid-template-columns:1.2fr 1fr}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:20px}}
-    @media(max-width:760px){:root{--header-height:84px}.site-head .shell{width:calc(100% - 24px);gap:10px}.site-logo{width:min(var(--logo-width),210px);max-height:62px}.brand{max-width:52%}.header-cta{display:none}.hero{min-height:0}.hero__content{padding-block:52px 40px}.hero__shade{background:linear-gradient(0deg,var(--hero-bg),color-mix(in srgb,var(--hero-bg) 72%,transparent))}.section{padding-block:36px}.contact{padding-block:36px}.section__head{margin-bottom:20px}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:16px}.faculty-grid{grid-template-columns:1fr 1fr;gap:12px}.faculty-card img{height:200px}.faculty-card__copy{padding:14px}.faculty-card__copy h3{font-size:var(--text-body)}.faculty-card__copy p{font-size:var(--text-meta)}.landing-sections .editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:220px}.investment-box{padding:24px}.investment-box h2{font-size:var(--text-section)}.investment-amount{font-size:var(--text-section)}footer{padding-bottom:86px}}
+    @media(max-width:760px){:root{--header-height:84px}.site-head .shell{width:calc(100% - 24px);gap:10px}.site-logo{width:min(var(--logo-width),210px);max-height:62px}.brand{max-width:52%}.header-cta{display:none}.hero{min-height:0}.hero__content{padding-block:52px 40px}.hero__shade{background:linear-gradient(0deg,var(--hero-bg),color-mix(in srgb,var(--hero-bg) 72%,transparent))}.section{padding-block:36px}.contact{padding-block:36px}.section__head{margin-bottom:20px}.landing-sections>.section--soft,.landing-sections>.faculty-section{padding-inline:16px}.faculty-grid{grid-template-columns:1fr 1fr;gap:12px}.faculty-card img{height:200px}.faculty-card__copy{padding:14px}.faculty-card__copy h3{font-size:var(--text-body)}.faculty-card__copy p{font-size:var(--text-meta)}.landing-sections .editorial-gallery{grid-template-columns:1fr;grid-template-rows:none}.gallery-card,.gallery-card:first-child{grid-row:auto;min-height:220px}.investment-box{padding:24px}.investment-box h2{font-size:var(--text-section)}.investment-amount{font-size:var(--text-section)}.investment-box--enhanced{grid-template-columns:1fr;gap:14px}.investment-price{align-items:flex-start;flex-direction:column;gap:8px}.investment-price .investment-amount{font-size:clamp(38px,12vw,54px)}.investment-regular{padding-left:0;border-left:0}.investment-cash{justify-self:start}.investment-benefit{grid-column:auto;flex-wrap:wrap;gap:10px}.investment-benefit__price{margin-left:auto}.investment-payments{grid-column:auto;justify-content:flex-start;flex-wrap:wrap;padding:0;gap:4px}.investment-payments li{padding-inline:8px;font-size:13px}.investment-payment-note,.investment-note{grid-column:auto}footer{padding-bottom:86px}}
     @media(max-width:400px){.faculty-grid{grid-template-columns:1fr}.faculty-card img{height:280px}}
     .faculty-slider{min-width:0}.faculty-carousel{position:relative;display:flex;gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:0;overscroll-behavior-x:contain;padding:6px 0 14px}.faculty-carousel:focus-visible{outline:2px solid #fff;outline-offset:5px;border-radius:6px}
     .faculty-carousel,.lead-panel{scrollbar-width:none;-ms-overflow-style:none}.faculty-carousel::-webkit-scrollbar,.lead-panel::-webkit-scrollbar{display:none;width:0;height:0}
@@ -613,6 +636,7 @@ export function renderLandingHtml(input: {
     .conversion-row>.section{display:flex;min-width:0;padding:0}
     .conversion-row>.investment>.shell{display:flex;width:100%;max-width:none;margin:0;padding:0}
     .conversion-row .investment-box{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:29px calc(var(--content-inset) - 1px)}
+    .conversion-row .investment-box--enhanced{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;align-items:center}.conversion-row .investment-price{flex-wrap:wrap}.conversion-row .investment-regular{min-width:160px}.conversion-row .investment-cash{justify-self:start}.conversion-row .investment-benefit,.conversion-row .investment-payments,.conversion-row .investment-payment-note,.conversion-row .investment-note{grid-column:1}
     .conversion-row>.cta-section>.cta-panel{display:flex;flex-direction:column;align-items:flex-start;gap:24px;width:100%;max-width:none;margin:0;padding:30px var(--content-inset)}
     .conversion-row .section h2{font-size:var(--text-section);line-height:1.12}
     .conversion-row .investment-box>.button,.conversion-row .cta-action{margin-top:auto}
@@ -667,15 +691,17 @@ export function renderLandingHtml(input: {
     .hero .program-facts .facts li{min-width:0;padding:8px 18px;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;backdrop-filter:none;align-items:start}
     .hero .program-facts .facts li:first-child{border-left:0;padding-left:0}.program-facts .facts small{color:#625b67;letter-spacing:.06em}
     .program-facts .facts strong{font-size:var(--text-body);line-height:1.5}.program-facts .facts .landing-icon{color:var(--primary);margin-top:3px}
-    .lead-panel{background:#f8f6fb;border:1px solid #e3ddec;box-shadow:0 8px 28px rgba(45,23,65,.07)}
+    .lead-panel{background:var(--surface);border:1px solid color-mix(in srgb,var(--primary) 15%,#fff);box-shadow:0 8px 28px rgba(0,0,0,.08)}
     .faculty-carousel .faculty-card__copy{padding:22px;gap:0}.faculty-carousel .faculty-card__copy h3{min-height:2.6em;margin:0 0 8px;line-height:1.3}
     .faculty-carousel .faculty-card__copy p.faculty-role{font-size:var(--text-meta);font-weight:700;color:#dcc5ef;margin:0 0 10px}
+    .faculty-section{background:radial-gradient(circle at 85% 5%,color-mix(in srgb,var(--accent) 28%,transparent),transparent 34%),linear-gradient(135deg,color-mix(in srgb,var(--primary) 35%,#061426),color-mix(in srgb,var(--secondary) 48%,#061426))}.faculty-section .eyebrow{color:color-mix(in srgb,var(--accent) 35%,#fff)}.faculty-section .section__head--split>p,.faculty-section .section__head>p:last-child:not(.eyebrow){color:#e2eaf4}.faculty-card,.faculty-card__photo,.faculty-card__copy,.faculty-carousel .faculty-card__copy{background:color-mix(in srgb,var(--primary) 22%,#081728)}.faculty-carousel .faculty-card__copy p.faculty-role,.faculty-bio-toggle{color:color-mix(in srgb,var(--accent) 30%,#fff)}.faculty-carousel .faculty-card__copy .faculty-description{color:#e2eaf4}
     .faculty-carousel .faculty-card__copy .faculty-description{margin:0;color:#e2d9e7;line-height:1.6}
     .faculty-description.is-collapsible:not(.is-expanded){display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden}
     .faculty-card__actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-top:auto;padding-top:14px}
     .faculty-carousel .faculty-card__actions .faculty-link{padding:0;margin:0;min-height:44px}
     .faculty-bio-toggle{min-height:44px;padding:0;border:0;background:transparent;color:#f3b8dd;font:inherit;font-size:var(--text-meta);font-weight:700;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
     .faculty-bio-toggle:focus-visible{outline:2px solid #fff;outline-offset:3px}.faculty-bio-toggle[hidden]{display:none}
+    .faculty-section .faculty-bio-toggle{color:color-mix(in srgb,var(--accent) 30%,#fff)}.faculty-section .faculty-carousel .faculty-card__copy .faculty-description{color:#e2eaf4}
     .faculty-carousel .faculty-card.is-current{box-shadow:inset 0 0 0 1px var(--accent)}
     .site-nav a{position:relative;padding-block:8px}.site-nav a:after{content:"";position:absolute;bottom:0;left:0;width:100%;height:2px;border-radius:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .2s ease}
     .site-nav a[aria-current="location"]:after{transform:scaleX(1)}
