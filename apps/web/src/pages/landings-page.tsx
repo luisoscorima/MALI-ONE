@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  CheckCircle2,
+  CircleAlert,
   Copy,
   ExternalLink,
   Eye,
@@ -20,6 +22,7 @@ import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
+import { analyzeLandingSeo } from '@/lib/landing-seo';
 import {
   Badge,
   Button,
@@ -67,11 +70,18 @@ export function LandingsPage() {
   const [seoDescription, setSeoDescription] = useState(
     'Estudia Gestión Cultural en el Museo de Arte de Lima. Fórmate para diseñar y liderar proyectos culturales de gran impacto.',
   );
+  const [focusKeyphrase, setFocusKeyphrase] = useState('');
   const [ogImageUrl, setOgImageUrl] = useState(
     'https://educacion.mali.pe/wp-content/uploads/2025/11/Gestion-Cultural.webp',
   );
   const [content, setContent] = useState<LandingDocument>(cloneDefault);
   const [previewHtml, setPreviewHtml] = useState('');
+  const seoAnalysis = analyzeLandingSeo(
+    focusKeyphrase,
+    seoTitle.trim() || name.trim(),
+    seoDescription,
+    content,
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +113,7 @@ export function LandingsPage() {
     setSeoDescription(
       'Estudia Gestión Cultural en el Museo de Arte de Lima. Fórmate para diseñar y liderar proyectos culturales de gran impacto.',
     );
+    setFocusKeyphrase('');
     setOgImageUrl(
       'https://educacion.mali.pe/wp-content/uploads/2025/11/Gestion-Cultural.webp',
     );
@@ -119,6 +130,7 @@ export function LandingsPage() {
       setName(item.name);
       setSeoTitle(item.seoTitle ?? '');
       setSeoDescription(item.seoDescription ?? '');
+      setFocusKeyphrase(item.focusKeyphrase ?? '');
       setOgImageUrl(item.ogImageUrl ?? '');
       setContent(item.content ?? cloneDefault());
       setPreviewHtml('');
@@ -161,6 +173,7 @@ export function LandingsPage() {
           content,
           seoTitle: seoTitle.trim() || null,
           seoDescription: seoDescription.trim() || null,
+          focusKeyphrase: focusKeyphrase.trim() || null,
           ogImageUrl: ogImageUrl.trim() || null,
         });
         id = created.id;
@@ -174,6 +187,7 @@ export function LandingsPage() {
           content,
           seoTitle: seoTitle.trim() || null,
           seoDescription: seoDescription.trim() || null,
+          focusKeyphrase: focusKeyphrase.trim() || null,
           ogImageUrl: ogImageUrl.trim() || null,
         });
       }
@@ -362,6 +376,20 @@ export function LandingsPage() {
               />
             </div>
             <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="landing-focus-keyphrase">Frase clave objetivo</Label>
+              <Input
+                id="landing-focus-keyphrase"
+                value={focusKeyphrase}
+                onChange={(event) => setFocusKeyphrase(event.target.value)}
+                maxLength={160}
+                aria-describedby="landing-focus-keyphrase-help"
+                placeholder="Ej.: programa de especialización en gestión cultural"
+              />
+              <p id="landing-focus-keyphrase-help" className="text-sm text-muted-foreground">
+                Guía para revisar el contenido. No se publica como etiqueta de palabras clave.
+              </p>
+            </div>
+            <div className="space-y-1 md:col-span-2">
               <Label htmlFor="landing-seo-title">Título SEO</Label>
               <Input id="landing-seo-title" value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} />
             </div>
@@ -374,6 +402,30 @@ export function LandingsPage() {
                 rows={3}
               />
             </div>
+            {seoAnalysis ? (
+              <div className="space-y-2 border-t border-border/60 pt-3 md:col-span-2">
+                <p className="text-sm font-semibold">Revisión de la frase clave</p>
+                <ul className="space-y-2 text-sm">
+                  {([
+                    ['title', 'Título que se publicará'],
+                    ['description', 'Descripción SEO'],
+                    ['content', 'Contenido de los bloques visibles'],
+                  ] as const).map(([key, label]) => (
+                    <li key={key} className="flex items-center gap-2">
+                      {seoAnalysis[key] ? (
+                        <CheckCircle2 className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
+                      ) : (
+                        <CircleAlert className="size-4 shrink-0 text-amber-700" aria-hidden="true" />
+                      )}
+                      <span>{label}: {seoAnalysis[key] ? 'incluida' : 'no encontrada'}</span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  Son recomendaciones de redacción; no impiden guardar ni publicar.
+                </p>
+              </div>
+            ) : null}
             <div className="space-y-1 md:col-span-2">
               <Label htmlFor="landing-og-image">Imagen Open Graph</Label>
               <Input id="landing-og-image" value={ogImageUrl} onChange={(event) => setOgImageUrl(event.target.value)} />

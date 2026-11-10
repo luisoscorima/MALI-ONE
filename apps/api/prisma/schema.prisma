@@ -880,6 +880,7 @@ model LandingPage {
   content          Json
   seoTitle         String?
   seoDescription   String?
+  focusKeyphrase   String?
   ogImageUrl       String?
   publishedHtml    String?       @db.Text
   publishedVersion Int           @default(0)

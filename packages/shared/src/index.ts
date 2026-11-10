@@ -1235,6 +1235,7 @@ export interface LandingPageDto {
   content?: LandingDocument;
   seoTitle: string | null;
   seoDescription: string | null;
+  focusKeyphrase: string | null;
   ogImageUrl: string | null;
   publishedVersion: number;
   publishedAt: string | null;
@@ -1251,6 +1252,7 @@ export interface CreateLandingPageDto {
   content: LandingDocument;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  focusKeyphrase?: string | null;
   ogImageUrl?: string | null;
 }
 
@@ -1259,6 +1261,7 @@ export interface UpdateLandingPageDto {
   content?: LandingDocument;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  focusKeyphrase?: string | null;
   ogImageUrl?: string | null;
 }
 

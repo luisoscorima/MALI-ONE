@@ -36,6 +36,11 @@ export class CreateLandingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(160)
+  focusKeyphrase?: string | null;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(1000)
   ogImageUrl?: string | null;
 }
@@ -60,6 +65,11 @@ export class UpdateLandingDto {
   @IsString()
   @MaxLength(320)
   seoDescription?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  focusKeyphrase?: string | null;
 
   @IsOptional()
   @IsString()

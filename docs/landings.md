@@ -61,6 +61,12 @@ El módulo **Landings** mantiene el contenido, genera la vista previa y congela
 una versión HTML al publicar. WordPress conserva la URL pública, pero no guarda
 el contenido ni carga su theme.
 
+El editor guarda una frase clave objetivo opcional por landing y muestra si la
+frase aparece en el título que se publicará, la descripción SEO y los bloques
+visibles. La comparación ignora mayúsculas y tildes; los avisos son orientativos
+y no impiden publicar. La frase se conserva como dato editorial y no se añade
+al HTML como `meta keywords`.
+
 ## Flujo
 
 1. En MALI ONE, un usuario con acceso a `landings` crea o edita bloques.

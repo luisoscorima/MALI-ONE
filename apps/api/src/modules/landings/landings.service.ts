@@ -94,6 +94,7 @@ export class LandingsService {
           status: true,
           seoTitle: true,
           seoDescription: true,
+          focusKeyphrase: true,
           ogImageUrl: true,
           publishedVersion: true,
           publishedAt: true,
@@ -141,6 +142,7 @@ export class LandingsService {
           content: this.prepareContent(dto.content),
           seoTitle: this.blankToNull(dto.seoTitle),
           seoDescription: this.blankToNull(dto.seoDescription),
+          focusKeyphrase: this.blankToNull(dto.focusKeyphrase),
           ogImageUrl: this.blankToNull(dto.ogImageUrl),
           createdById: userId,
           updatedById: userId,
@@ -173,6 +175,9 @@ export class LandingsService {
           : {}),
         ...(dto.seoDescription !== undefined
           ? { seoDescription: this.blankToNull(dto.seoDescription) }
+          : {}),
+        ...(dto.focusKeyphrase !== undefined
+          ? { focusKeyphrase: this.blankToNull(dto.focusKeyphrase) }
           : {}),
         ...(dto.ogImageUrl !== undefined
           ? { ogImageUrl: this.blankToNull(dto.ogImageUrl) }
