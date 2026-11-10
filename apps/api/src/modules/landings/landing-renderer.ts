@@ -124,6 +124,10 @@ function icon(name: keyof typeof ICON_PATHS, className = ''): string {
   return `<svg class="landing-icon ${className}" data-icon="${name}" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON_PATHS[name]}</svg>`;
 }
 
+function brandAsset(apiBase: string, name: string, label: string): string {
+  return `<img class="brand-logo" src="${escapeHtml(`${apiBase}/landing-brands/${name}.svg`)}" alt="${escapeHtml(label)}" loading="lazy">`;
+}
+
 function contentIcon(label: unknown): keyof typeof ICON_PATHS {
   const value = text(label).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/virtual|digital|tecnolog/.test(value)) return 'monitor';
@@ -260,7 +264,7 @@ function renderFaculty(block: LandingBlock, apiBase: string): string {
     .map(
       (item, index) => `<article class="faculty-card" id="${escapeHtml(block.id)}-docente-${index + 1}">
         ${item.imageUrl ? `<div class="faculty-card__photo"><img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.imageAlt || item.name || 'Docente del programa')}" loading="lazy"></div>` : ''}
-        <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p class="faculty-role">${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p class="faculty-description" id="${escapeHtml(block.id)}-bio-${index + 1}">${escapeHtml(item.description)}</p>` : ''}<div class="faculty-card__actions">${item.description ? `<button class="faculty-bio-toggle" type="button" aria-expanded="false" aria-controls="${escapeHtml(block.id)}-bio-${index + 1}" hidden>Leer más<span class="sr-only"> sobre ${escapeHtml(item.name)}</span></button>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">${icon('linkedin')}<span>Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span></span>${icon('external', 'button-arrow')}</a>` : ''}</div></div>
+        <div class="faculty-card__copy">${item.name ? `<h3>${escapeHtml(item.name)}</h3>` : ''}${item.role ? `<p class="faculty-role">${escapeHtml(item.role)}</p>` : ''}${item.description ? `<p class="faculty-description" id="${escapeHtml(block.id)}-bio-${index + 1}">${escapeHtml(item.description)}</p>` : ''}<div class="faculty-card__actions">${item.description ? `<button class="faculty-bio-toggle" type="button" aria-expanded="false" aria-controls="${escapeHtml(block.id)}-bio-${index + 1}" hidden>Leer más<span class="sr-only"> sobre ${escapeHtml(item.name)}</span></button>` : ''}${item.linkedinUrl ? `<a class="faculty-link" href="${escapeHtml(item.linkedinUrl)}" target="_blank" rel="noopener noreferrer">${brandAsset(apiBase, 'linkedin', '')}<span>Ver LinkedIn<span class="sr-only"> de ${escapeHtml(item.name)}</span></span>${icon('external', 'button-arrow')}</a>` : ''}</div></div>
       </article>`,
     )
     .join('');
@@ -345,7 +349,7 @@ function renderFaq(block: LandingBlock): string {
   </div></section>`;
 }
 
-function renderCta(block: LandingBlock, hasForm: boolean): string {
+function renderCta(block: LandingBlock, hasForm: boolean, apiBase: string): string {
   const data = block.data;
   const href = safeUrl(data.url, true) || '#contacto';
   if (href === '#contacto' && !hasForm) return '';
@@ -362,7 +366,7 @@ function renderCta(block: LandingBlock, hasForm: boolean): string {
   return `<section class="section cta-section" id="${escapeHtml(block.id)}"><div class="shell cta-panel">
     <div class="cta-panel__copy">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><p>${escapeHtml(data.body)}</p></div>
     <a class="button button--light cta-action cta-action--${tracking}" href="${escapeHtml(href)}"${href.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''} data-track="${tracking}">
-      <span class="cta-action__icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icon}</svg></span>
+      <span class="cta-action__icon">${tracking === 'whatsapp' ? brandAsset(apiBase, 'whatsapp', '') : `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icon}</svg>`}</span>
       <span class="cta-action__label">${escapeHtml(data.label || (tracking === 'whatsapp' ? 'Conversar por WhatsApp' : tracking === 'brochure' ? 'Descargar brochure' : 'Ver más'))}</span>
       <svg class="cta-action__arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="${href.startsWith('http') ? 'M7 17 17 7M7 7h10v10' : 'M5 12h14m-6-6 6 6-6 6'}"/></svg>
     </a>
@@ -391,7 +395,8 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
   const whatsappPhone = text(data.whatsappPhone, 30).replace(/\D/g, '');
   if (whatsappPhone) params.set('wa', whatsappPhone);
   const configuredColor = color(data.backgroundColor, '');
-  const backgroundColor = sticky && (!configuredColor || configuredColor.toLowerCase() === '#b4b3ff') ? theme.surface : configuredColor;
+  const backgroundColor = sticky && (!configuredColor || configuredColor.toLowerCase() === '#b4b3ff')
+    ? (theme.surface.toLowerCase() === '#f8f6fb' ? '#eef5fc' : theme.surface) : configuredColor;
   if (backgroundColor) params.set('bg', backgroundColor);
   if (preview) params.set('preview', '1');
   const widgetUrl = `${apiBase}/widgets/educacion/lead-form.html?${params.toString()}`;
@@ -405,7 +410,7 @@ function renderLeadForm(block: LandingBlock, apiBase: string, preview: boolean, 
   </div></section>`;
 }
 
-function renderFooter(block: LandingBlock): string {
+function renderFooter(block: LandingBlock, apiBase: string): string {
   const data = block.data;
   const defaults = DEFAULT_LANDING_FOOTER;
   const title = text(data.title, 160) || defaults.title;
@@ -418,7 +423,7 @@ function renderFooter(block: LandingBlock): string {
   ] as const;
   const social = platforms.map(([key, label, name]) => {
     const url = safeUrl(data[key] === undefined ? defaults[key] : data[key]);
-    return url ? `<a class="footer-social__link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${label}" title="${label}">${icon(name)}</a>` : '';
+    return url ? `<a class="footer-social__link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" aria-label="${label}" title="${label}">${name === 'linkedin' ? brandAsset(apiBase, 'linkedin', '') : icon(name)}</a>` : '';
   }).join('');
   const note = text(data.text, 500);
   return `<footer class="landing-footer"><div class="shell">
@@ -435,7 +440,7 @@ function renderCurriculum(block: LandingBlock): string {
   return `<section class="section" id="${escapeHtml(block.id)}"><div class="shell"><div class="section__head">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2>${paragraphs(data.intro)}</div>${items}${data.finalTitle ? `<article class="final-project"><h3>${escapeHtml(data.finalTitle)}</h3>${paragraphs(data.finalDescription)}</article>` : ''}</div></section>`;
 }
 
-function renderInvestment(block: LandingBlock): string {
+function renderInvestment(block: LandingBlock, apiBase: string): string {
   const data = block.data;
   const currency = escapeHtml(data.currency || 'S/');
   const enhanced = Boolean(data.totalAmount || data.cashPrice || data.benefitLabel || data.paymentMethods);
@@ -443,11 +448,15 @@ function renderInvestment(block: LandingBlock): string {
     return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-amount">${icon('wallet')}${currency} ${escapeHtml(data.enrollment)}</div><p>Matrícula${data.installments && data.installmentAmount ? ` + ${escapeHtml(data.installments)} cuotas de ${currency} ${escapeHtml(data.installmentAmount)}` : ''}</p>${paragraphs(data.note)}</div></div></section>`;
   }
   const paymentMethods = String(data.paymentMethods || '').split(',').map((name) => name.trim()).filter(Boolean);
+  const paymentLogos: Record<string, string[]> = {
+    'bcp visa': ['bcp', 'visa'], bbva: ['bbva'], interbank: ['interbank'],
+    'diners club': ['diners-club'], scotiabank: ['scotiabank'],
+  };
   return `<section class="section investment" id="${escapeHtml(block.id)}"><div class="shell"><div class="investment-box investment-box--enhanced">
     <div class="investment-main">${eyebrow(data)}<h2>${escapeHtml(data.title)}</h2><div class="investment-price"><div class="investment-amount">${icon('wallet')}${currency} ${escapeHtml(data.totalAmount || data.enrollment)}</div><p class="investment-regular">Inversión regular:<br>Matrícula <strong>${currency} ${escapeHtml(data.regularTuition || data.enrollment)}</strong>${data.regularInstallments && data.regularInstallmentAmount ? ` + <strong>${currency} ${escapeHtml(data.regularInstallmentAmount)} x ${escapeHtml(data.regularInstallments)}</strong>` : ''}</p></div></div>
     ${data.cashPrice ? `<div class="investment-cash"><strong>Descuento por<br>pago al contado:</strong><span>${currency} ${escapeHtml(data.cashPrice)}</span></div>` : ''}
-    ${data.benefitLabel ? `<div class="investment-benefit">${icon('wallet')}<div><strong>Beneficio: hasta</strong><span>${escapeHtml(data.benefitLabel)}</span></div>${data.benefitInstallments && data.benefitInstallmentAmount ? `<strong class="investment-benefit__price">${escapeHtml(data.benefitInstallments)} cuotas x<br>${currency} ${escapeHtml(data.benefitInstallmentAmount)}</strong>` : ''}</div>` : ''}
-    ${paymentMethods.length ? `<ul class="investment-payments" aria-label="Entidades y tarjetas participantes">${paymentMethods.map((name) => `<li>${escapeHtml(name)}</li>`).join('')}</ul>` : ''}
+    ${data.benefitLabel ? `<div class="investment-benefit"><div><strong>Beneficio: hasta</strong><span>${escapeHtml(data.benefitLabel)}</span></div>${data.benefitInstallments && data.benefitInstallmentAmount ? `<strong class="investment-benefit__price">${escapeHtml(data.benefitInstallments)} cuotas x<br>${currency} ${escapeHtml(data.benefitInstallmentAmount)}</strong>` : ''}</div>` : ''}
+    ${paymentMethods.length ? `<ul class="investment-payments" aria-label="Entidades y tarjetas participantes">${paymentMethods.map((name) => `<li>${(paymentLogos[name.toLowerCase()] || []).length ? paymentLogos[name.toLowerCase()].map((logo) => brandAsset(apiBase, logo, logo === 'diners-club' ? 'Diners Club' : logo.toUpperCase())).join('') : escapeHtml(name)}</li>`).join('')}</ul>` : ''}
     ${data.paymentNote ? `<div class="investment-payment-note">${paragraphs(data.paymentNote)}</div>` : ''}${data.note ? `<p class="investment-note">${escapeHtml(data.note)}</p>` : ''}
   </div></div></section>`;
 }
@@ -469,15 +478,15 @@ function renderBlock(block: LandingBlock, apiBase: string, hasForm: boolean, pre
     case 'curriculum':
       return renderCurriculum(block);
     case 'investment':
-      return renderInvestment(block);
+      return renderInvestment(block, apiBase);
     case 'faq':
       return renderFaq(block);
     case 'cta':
-      return renderCta(block, hasForm);
+      return renderCta(block, hasForm, apiBase);
     case 'lead_form':
       return renderLeadForm(block, apiBase, preview, theme);
     case 'footer':
-      return renderFooter(block);
+      return renderFooter(block, apiBase);
   }
 }
 
@@ -631,17 +640,17 @@ export function renderLandingHtml(input: {
     .landing-sections>.section[data-section-tone]{border-radius:24px}
     @media(max-width:1100px){:root{--page-gutter:16px;--content-inset:24px}}
     @media(max-width:760px){:root{--content-inset:20px}}
-    .conversion-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:stretch;width:min(var(--page-width),calc(100% - 2 * var(--page-gutter)));margin-inline:auto;padding-bottom:12px}
+    .conversion-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start;width:min(var(--page-width),calc(100% - 2 * var(--page-gutter)));margin-inline:auto;padding-bottom:12px}
     .landing-sections>.conversion-row{width:100%;margin-inline:0}
     .conversion-row>.section{display:flex;min-width:0;padding:0}
     .conversion-row>.investment>.shell{display:flex;width:100%;max-width:none;margin:0;padding:0}
     .conversion-row .investment-box{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:29px calc(var(--content-inset) - 1px)}
-    .conversion-row .investment-box--enhanced{display:grid;grid-template-columns:minmax(0,1fr);align-content:start;align-items:center}.conversion-row .investment-price{flex-wrap:wrap}.conversion-row .investment-regular{min-width:160px}.conversion-row .investment-cash{justify-self:start}.conversion-row .investment-benefit,.conversion-row .investment-payments,.conversion-row .investment-payment-note,.conversion-row .investment-note{grid-column:1}
+    .conversion-row .investment-box--enhanced{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,190px);align-content:start;align-items:center;gap:16px}.conversion-row .investment-main{grid-column:1;grid-row:1}.conversion-row .investment-price{display:block}.conversion-row .investment-regular{min-width:0;margin-top:10px!important;padding-left:0;border-left:0}.conversion-row .investment-cash{grid-column:2;grid-row:1;justify-self:stretch}.conversion-row .investment-benefit,.conversion-row .investment-payments,.conversion-row .investment-payment-note,.conversion-row .investment-note{grid-column:1/-1}.conversion-row .investment-payments{justify-content:flex-start;flex-wrap:wrap;gap:4px 8px}.conversion-row .investment-payments li{padding-inline:8px;white-space:nowrap}.conversion-row .investment-payments li:first-child{padding-left:0}
     .conversion-row>.cta-section>.cta-panel{display:flex;flex-direction:column;align-items:flex-start;gap:24px;width:100%;max-width:none;margin:0;padding:30px var(--content-inset)}
     .conversion-row .section h2{font-size:var(--text-section);line-height:1.12}
     .conversion-row .investment-box>.button,.conversion-row .cta-action{margin-top:auto}
     .conversion-row .cta-action{width:100%}
-    @media(max-width:760px){.conversion-row{grid-template-columns:1fr}.conversion-row .section h2{font-size:var(--text-section)}}
+    @media(max-width:760px){.conversion-row{grid-template-columns:1fr}.conversion-row .section h2{font-size:var(--text-section)}.conversion-row .investment-box--enhanced{grid-template-columns:1fr}.conversion-row .investment-main,.conversion-row .investment-cash,.conversion-row .investment-benefit,.conversion-row .investment-payments,.conversion-row .investment-payment-note,.conversion-row .investment-note{grid-column:1;grid-row:auto}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
 
     /* Escala común: principal, sección, subtítulo, cuerpo y auxiliar. */
@@ -691,7 +700,11 @@ export function renderLandingHtml(input: {
     .hero .program-facts .facts li{min-width:0;padding:8px 18px;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;backdrop-filter:none;align-items:start}
     .hero .program-facts .facts li:first-child{border-left:0;padding-left:0}.program-facts .facts small{color:#625b67;letter-spacing:.06em}
     .program-facts .facts strong{font-size:var(--text-body);line-height:1.5}.program-facts .facts .landing-icon{color:var(--primary);margin-top:3px}
-    .lead-panel{background:var(--surface);border:1px solid color-mix(in srgb,var(--primary) 15%,#fff);box-shadow:0 8px 28px rgba(0,0,0,.08)}
+    .lead-panel{background:color-mix(in srgb,var(--primary) 7%,#fff);border:1px solid color-mix(in srgb,var(--primary) 15%,#fff);box-shadow:0 8px 28px rgba(0,0,0,.08)}
+    .cta-panel .eyebrow{color:color-mix(in srgb,var(--accent) 25%,#fff)}
+    .hero .eyebrow{color:color-mix(in srgb,var(--accent) 25%,#fff)}
+    .faculty-link .brand-logo{width:20px;height:20px;object-fit:contain}.cta-action__icon .brand-logo{width:24px;height:24px;object-fit:contain}.footer-social__link .brand-logo{width:22px;height:22px;object-fit:contain}
+    .investment-payments li{display:flex;align-items:center;justify-content:center;min-width:0}.investment-payments li:first-child{flex-direction:column;gap:2px}.investment-payments .brand-logo{display:block;width:auto;max-width:100%;height:23px;object-fit:contain}.investment-payments li:first-child .brand-logo{height:20px}
     .faculty-carousel .faculty-card__copy{padding:22px;gap:0}.faculty-carousel .faculty-card__copy h3{min-height:2.6em;margin:0 0 8px;line-height:1.3}
     .faculty-carousel .faculty-card__copy p.faculty-role{font-size:var(--text-meta);font-weight:700;color:#dcc5ef;margin:0 0 10px}
     .faculty-section{background:radial-gradient(circle at 85% 5%,color-mix(in srgb,var(--accent) 28%,transparent),transparent 34%),linear-gradient(135deg,color-mix(in srgb,var(--primary) 35%,#061426),color-mix(in srgb,var(--secondary) 48%,#061426))}.faculty-section .eyebrow{color:color-mix(in srgb,var(--accent) 35%,#fff)}.faculty-section .section__head--split>p,.faculty-section .section__head>p:last-child:not(.eyebrow){color:#e2eaf4}.faculty-card,.faculty-card__photo,.faculty-card__copy,.faculty-carousel .faculty-card__copy{background:color-mix(in srgb,var(--primary) 22%,#081728)}.faculty-carousel .faculty-card__copy p.faculty-role,.faculty-bio-toggle{color:color-mix(in srgb,var(--accent) 30%,#fff)}.faculty-carousel .faculty-card__copy .faculty-description{color:#e2eaf4}
