@@ -17,8 +17,7 @@ export function isFloatingLayerBlockingDismiss(graceMs = 300) {
   if (typeof document !== "undefined") {
     if (
       document.querySelector("[data-slot='select-content']") ||
-      document.querySelector("[data-radix-select-content]") ||
-      document.querySelector("[role='listbox']")
+      document.querySelector("[data-radix-select-content]")
     ) {
       return true
     }

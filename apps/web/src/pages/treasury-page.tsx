@@ -121,7 +121,15 @@ export function TreasuryPage() {
   const showNiubizRecords = selected?.provider === 'niubiz_sales';
   const showMercadoPagoRecords = selected?.provider === 'mercadopago';
   const showPagoEfectivoRecords = selected?.provider === 'pagoefectivo';
-  const showRecords = showNiubizRecords || showMercadoPagoRecords || showPagoEfectivoRecords;
+
+  function openSourceUpdate(source: TreasurySourceDto) {
+    setSelectedId(source.id);
+    if (source.provider === 'niubiz_sales') {
+      setFullUpdateOpen(true);
+    } else {
+      setUpdateOpen(true);
+    }
+  }
 
   function openSource(source?: TreasurySourceDto) {
     setFormError('');
@@ -197,10 +205,11 @@ export function TreasuryPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title="Verificación de pagos"
-        description="Elige una fuente para ver sus operaciones. Las acciones (editar, actualizar, comercios) se abren en modales."
+        description="Elige una fuente para ver sus operaciones."
+        className="mb-0"
       />
 
       {loading ? (
@@ -224,9 +233,6 @@ export function TreasuryPage() {
                 <h2 id="sources-title" className="text-balance text-lg font-semibold">
                   Fuentes
                 </h2>
-                <p className="mt-1 text-pretty text-sm text-muted-foreground">
-                  Cada fuente es un acceso a un portal. Al seleccionarla ves sus operaciones debajo.
-                </p>
               </div>
               <Button size="sm" onClick={() => openSource()}>
                 <Plus className="size-4" /> Añadir fuente
@@ -247,48 +253,56 @@ export function TreasuryPage() {
                 </Button>
               </Card>
             ) : (
-              <div
-                role="listbox"
-                aria-label="Fuentes registradas"
-                className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-              >
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {data.sources.map((source) => {
                   const sourceProvider = data.providers.find((item) => item.id === source.provider);
                   const active = source.id === selectedId;
                   const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago' || source.provider === 'pagoefectivo';
                   return (
-                    <button
-                      key={source.id}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      onClick={() => setSelectedId(source.id)}
-                      className={cn(
-                        'rounded-xl border p-4 text-left transition-colors',
-                        active ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50',
-                      )}
-                    >
-                      <span className="block break-words font-medium">{source.name}</span>
-                      <span className="mt-1 block text-sm text-muted-foreground">
-                        {sourceProvider?.label}
-                      </span>
-                      <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {!hasConnector && (
-                          <span>
-                            {source.targets.length}{' '}
-                            {sourceProvider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'}
-                          </span>
+                    <div key={source.id} className="group relative">
+                      <button
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => setSelectedId(source.id)}
+                        className={cn(
+                          'h-full w-full rounded-xl border p-4 pr-20 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                          active ? 'border-primary bg-accent' : 'border-border hover:bg-muted/50',
                         )}
-                        <Badge variant="secondary">
-                          {source.active ? 'Activa' : 'Archivada'}
-                        </Badge>
-                        {source.vaultItemId ? (
-                          <Badge variant="outline">Vault</Badge>
-                        ) : (
-                          <Badge variant="outline">Sin Vault</Badge>
-                        )}
-                      </span>
-                    </button>
+                      >
+                        <span className="block break-words font-medium">{source.name}</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          {sourceProvider?.label}
+                        </span>
+                        <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          {!hasConnector && (
+                            <span>
+                              {source.targets.length}{' '}
+                              {sourceProvider?.targetKind === 'bank_account' ? 'cuentas' : 'comercios'}
+                            </span>
+                          )}
+                          <Badge variant="secondary">
+                            {source.active ? 'Activa' : 'Archivada'}
+                          </Badge>
+                          {source.vaultItemId ? (
+                            <Badge variant="outline">Vault</Badge>
+                          ) : (
+                            <Badge variant="outline">Sin Vault</Badge>
+                          )}
+                        </span>
+                      </button>
+                      <div className="absolute right-3 top-3 flex gap-1 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100">
+                        <Button type="button" variant="outline" size="icon-sm" aria-label={`Editar ${source.name}`}
+                          title={`Editar ${source.name}`} onClick={() => openSource(source)}>
+                          <Pencil aria-hidden="true" />
+                        </Button>
+                        {hasConnector && <Button type="button" variant="outline" size="icon-sm"
+                          aria-label={`Actualizar toda la fuente ${source.name}`}
+                          title={`Actualizar toda la fuente ${source.name}`}
+                          onClick={() => openSourceUpdate(source)}>
+                          <RefreshCw aria-hidden="true" />
+                        </Button>}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
@@ -298,34 +312,12 @@ export function TreasuryPage() {
           {selected && (
             <section
               aria-labelledby="source-surface-title"
-              className="flex flex-col gap-6 border-t pt-8"
+              className="flex flex-col gap-6 border-t pt-6"
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase text-muted-foreground">Fuente seleccionada</p>
-                  <h2 id="source-surface-title" className="text-balance text-xl font-semibold">
-                    {selected.name}
-                  </h2>
-                  <p className="mt-1 text-pretty text-sm text-muted-foreground">
-                    {provider?.label ?? selected.provider}
-                    {selected.active ? '' : ' · Archivada'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => openSource(selected)}>
-                    <Pencil className="size-4" /> Editar
-                  </Button>
-                  {showNiubizRecords ? (
-                    <Button variant="outline" size="sm" onClick={() => setFullUpdateOpen(true)}>
-                      <RefreshCw className="size-4" aria-hidden="true" /> Actualizar toda la fuente
-                    </Button>
-                  ) : showRecords && (
-                    <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
-                      <RefreshCw className="size-4" aria-hidden="true" /> Actualizar pagos
-                    </Button>
-                  )}
-                </div>
-              </div>
+              <h2 id="source-surface-title" className="text-balance text-lg font-semibold">
+                Operaciones
+                <span className="sr-only"> de {selected.name}</span>
+              </h2>
 
               {showNiubizRecords ? (
                 <Tabs value={niubizTab} onValueChange={(value) => {

@@ -154,6 +154,7 @@ export interface NiubizPayCashPaymentsDto {
 export interface NiubizPayCashSyncStatusDto {
   configured: boolean;
   merchantCode: '650177853';
+  lastSuccessful: null | { finishedAt: string; rowCount: number };
   lastRun: null | {
     runId: string | null;
     status: string;

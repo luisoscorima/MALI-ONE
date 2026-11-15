@@ -22,7 +22,14 @@ export class NiubizPayCashService {
     if (lastRun?.status === 'running' && (!lastRun.leaseUntil || lastRun.leaseUntil < new Date())) {
       lastRun.status = 'interrupted';
     }
-    return { configured: connection.configured, merchantCode: PAYCASH_MERCHANT, lastRun };
+    return {
+      configured: connection.configured,
+      merchantCode: PAYCASH_MERCHANT,
+      lastRun,
+      lastSuccessful: lastRun?.lastSuccessfulAt && lastRun.lastSuccessfulRowCount != null
+        ? { finishedAt: lastRun.lastSuccessfulAt, rowCount: lastRun.lastSuccessfulRowCount }
+        : null,
+    };
   }
 
   async start(actor: { id: string; email: string }) {
@@ -92,10 +99,13 @@ export class NiubizPayCashService {
         'LOGIN_WORKER_FAILED', 'RATE_LIMITED', 'API_HTTP_ERROR', 'API_SCHEMA_ERROR',
         'API_DATA_MISMATCH', 'EXPORT_INCOMPLETE', 'SESSION_EXPIRED'].includes(code) ? code : 'SYNC_FAILED';
     } finally {
+      const finishedAt = new Date();
       await this.prisma.niubizPayCashSyncState.updateMany({
         where: { id: stateId, runId },
-        data: { status: errorCode ? 'failed' : 'completed', errorCode, finishedAt: new Date(),
-          leaseUntil: null, ...result },
+        data: { status: errorCode ? 'failed' : 'completed', errorCode, finishedAt,
+          leaseUntil: null, ...result,
+          ...(!errorCode ? { lastSuccessfulAt: finishedAt, lastSuccessfulRowCount: result.rowCount } : {}),
+        },
       });
     }
   }

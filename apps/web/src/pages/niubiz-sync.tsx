@@ -109,14 +109,13 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
         <DialogHeader>
           <DialogTitle>Actualizar Ventas Niubiz</DialogTitle>
           <DialogDescription>
-            {sourceName}. Consulta las ventas directamente desde la API de Niubiz.
+            {sourceName}. Consulta las ventas directamente en Niubiz.
           </DialogDescription>
         </DialogHeader>
 
         {lastImport && (
           <p className="text-xs text-muted-foreground">
-            Último lote guardado: {formatStamp(lastImport.createdAt)} · {lastImport.rowCount} operaciones ·{' '}
-            {lastImport.origin === 'niubiz_api' ? 'API Niubiz' : 'Archivo Excel'}
+            Última actualización: {formatStamp(lastImport.createdAt)} · {lastImport.rowCount} operaciones
           </p>
         )}
 

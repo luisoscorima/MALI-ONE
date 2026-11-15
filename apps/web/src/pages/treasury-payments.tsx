@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, Store } from 'lucide-react';
 import type { TreasuryPaymentDto, TreasuryPaymentsDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import {
-  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -136,8 +136,7 @@ export function TreasuryPayments({
 
       {data?.lastImport && (
         <p className="text-xs text-muted-foreground">
-          Último lote guardado: {date(data.lastImport.createdAt)} · {data.lastImport.rowCount} operaciones ·{' '}
-          {data.lastImport.origin === 'niubiz_api' ? 'API Niubiz' : 'Archivo Excel'}
+          Última actualización: {date(data.lastImport.createdAt)} · {data.lastImport.rowCount} operaciones
         </p>
       )}
 
@@ -180,21 +179,12 @@ export function TreasuryPayments({
               ))}
             </select>
           </label>
-          <label className="grid gap-1.5 text-sm">
-            <span className="font-medium">Estado</span>
-            <select
-              className={selectClass}
-              value={filters.status}
-              onChange={(e) => filter('status', e.target.value)}
-            >
-              <option value="">Todos los estados</option>
-              {data?.states.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
+          <TreasuryStatusFilter
+            id="niubiz-sales-status"
+            value={filters.status}
+            states={data?.states ?? []}
+            onChange={(value) => filter('status', value)}
+          />
           <label className="grid gap-1.5 text-sm">
             <span className="font-medium">Desde</span>
             <Input type="date" value={filters.from} onChange={(e) => filter('from', e.target.value)} />
@@ -289,7 +279,7 @@ export function TreasuryPayments({
                         {p.currency} {p.amount}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{p.status}</Badge>
+                        <TreasuryStatusBadge status={p.status} />
                       </TableCell>
                       {showCard && (
                         <TableCell className="max-w-[12rem] truncate text-sm">
@@ -388,7 +378,10 @@ export function TreasuryPayments({
               <DetailRow label="Cliente" value={detail.customerName || dash} />
               <DetailRow label="Email" value={detail.customerEmail || dash} />
               <DetailRow label="Importe" value={`${detail.currency} ${detail.amount}`} />
-              <DetailRow label="Estado" value={detail.status} />
+              <div className="grid gap-1 border-b border-border pb-2">
+                <dt className="text-xs font-medium uppercase text-muted-foreground">Estado</dt>
+                <dd><TreasuryStatusBadge status={detail.status} /></dd>
+              </div>
               {detail.settledOn && (
                 <DetailRow label="Liquidación" value={dateOnly(detail.settledOn)} />
               )}
@@ -449,7 +442,7 @@ function EmptyPayments({
       <p className="text-pretty text-sm text-muted-foreground">
         {hasFilters
           ? 'No hay pagos para estos filtros.'
-          : 'Todavía no hay pagos guardados. Actualiza desde la API Niubiz.'}
+          : 'Todavía no hay pagos guardados. Actualiza desde Niubiz.'}
       </p>
       {!hasFilters && (
         <Button className="mt-4" variant="outline" onClick={onUpdate}>

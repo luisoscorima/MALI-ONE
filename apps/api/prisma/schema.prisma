@@ -221,16 +221,18 @@ model NiubizPayCashPayment {
 }
 
 model NiubizPayCashSyncState {
-  id           String    @id
-  runId        String?
-  status       String    @default("idle")
-  startedAt    DateTime?
-  finishedAt   DateTime?
-  leaseUntil   DateTime?
-  errorCode    String?
-  rowCount     Int       @default(0)
-  createdCount Int       @default(0)
-  updatedCount Int       @default(0)
+  id                     String    @id
+  runId                  String?
+  status                 String    @default("idle")
+  startedAt              DateTime?
+  finishedAt             DateTime?
+  leaseUntil             DateTime?
+  errorCode              String?
+  rowCount               Int       @default(0)
+  createdCount           Int       @default(0)
+  updatedCount           Int       @default(0)
+  lastSuccessfulAt       DateTime?
+  lastSuccessfulRowCount Int?
 }
 
 model TreasuryPaymentImport {

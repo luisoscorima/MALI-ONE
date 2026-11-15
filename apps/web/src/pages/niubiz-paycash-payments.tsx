@@ -4,7 +4,8 @@ import type { NiubizPayCashPaymentDto, NiubizPayCashPaymentsDto, NiubizPayCashSy
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { Spinner } from '@/components/feedback';
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
   Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 
 const emptyFilters = { q: '', status: '', from: '', to: '', page: 1 };
@@ -55,6 +56,12 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
   }, [filters, revision, refreshKey]);
 
   useEffect(() => {
+    let cancelled = false;
+    api.niubizPayCashStatus().then(value => { if (!cancelled) setStatus(value); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [revision, refreshKey]);
+
+  useEffect(() => {
     if (!updateOpen) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -91,6 +98,10 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
       <div>
         <h3 className="text-lg font-semibold">PagoEfectivo</h3>
         <p className="text-sm text-muted-foreground">Comercio 650177853 · CURSOSDELMALI</p>
+        {status?.lastSuccessful && <p className="mt-1 text-xs text-muted-foreground">
+          Última actualización: {formatDate(status.lastSuccessful.finishedAt)} · {status.lastSuccessful.rowCount}{' '}
+          {status.lastSuccessful.rowCount === 1 ? 'operación' : 'operaciones'}
+        </p>}
       </div>
       <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
         <RefreshCw className="size-4" aria-hidden="true" /> Actualizar PagoEfectivo
@@ -105,13 +116,8 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
         <Button type="submit">Buscar</Button>
       </form>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="grid gap-1.5 text-sm"><span className="font-medium">Estado</span>
-          <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={filters.status}
-            onChange={event => setFilter('status', event.target.value)}>
-            <option value="">Todos los estados</option>
-            {data?.states.map(value => <option key={value} value={value}>{value}</option>)}
-          </select>
-        </label>
+        <TreasuryStatusFilter id="niubiz-paycash-status" value={filters.status} states={data?.states ?? []}
+          onChange={value => setFilter('status', value)} />
         <label className="grid gap-1.5 text-sm"><span className="font-medium">Compra desde</span>
           <Input type="date" value={filters.from} onChange={event => setFilter('from', event.target.value)} />
         </label>
@@ -126,17 +132,17 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
       : data && <>
         <p className="text-sm" role="status"><span className="font-medium tabular-nums">{data.total}</span> {data.total === 1 ? 'operación guardada' : 'operaciones guardadas'}</p>
         {data.payments.length ? <div className="overflow-x-auto rounded-xl border border-border"><Table><TableHeader><TableRow>
+          <TableHead>Fecha de compra</TableHead><TableHead>Fecha de pago</TableHead>
           <TableHead>Código CIP</TableHead><TableHead>Cliente</TableHead><TableHead>Moneda</TableHead>
-          <TableHead className="text-right">Importe pedido</TableHead><TableHead>Fecha de compra</TableHead>
-          <TableHead>Fecha de pago</TableHead><TableHead>Estado</TableHead>
+          <TableHead className="text-right">Importe pedido</TableHead><TableHead>Estado</TableHead>
         </TableRow></TableHeader><TableBody>{data.payments.map(payment => <TableRow key={payment.id} className="cursor-pointer" tabIndex={0}
           onClick={() => setDetail(payment)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(payment); } }}>
+          <TableCell className="whitespace-nowrap">{formatDate(payment.purchasedAt)}</TableCell>
+          <TableCell className="whitespace-nowrap">{payment.paidAt ? formatDate(payment.paidAt) : '—'}</TableCell>
           <TableCell className="font-mono text-xs">{payment.cip}</TableCell>
           <TableCell className="max-w-[15rem] truncate">{payment.customerEmail || '—'}</TableCell>
           <TableCell>{payment.currency}</TableCell><TableCell className="text-right tabular-nums">{payment.amount}</TableCell>
-          <TableCell className="whitespace-nowrap">{formatDate(payment.purchasedAt)}</TableCell>
-          <TableCell className="whitespace-nowrap">{payment.paidAt ? formatDate(payment.paidAt) : '—'}</TableCell>
-          <TableCell><Badge variant="secondary">{payment.status}</Badge></TableCell>
+          <TableCell><TreasuryStatusBadge status={payment.status} /></TableCell>
         </TableRow>)}</TableBody></Table></div>
           : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {hasFilters ? 'No hay operaciones para estos filtros.' : 'Todavía no hay operaciones guardadas. Actualiza PagoEfectivo para consultar Niubiz.'}
@@ -174,7 +180,7 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
         <div><dt className="text-muted-foreground">Marca</dt><dd>{detail.brand}</dd></div>
         <div><dt className="text-muted-foreground">Compra</dt><dd>{formatDate(detail.purchasedAt)}</dd></div>
         <div><dt className="text-muted-foreground">Pago</dt><dd>{detail.paidAt ? formatDate(detail.paidAt) : '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Estado</dt><dd>{detail.status}</dd></div>
+        <div><dt className="text-muted-foreground">Estado</dt><dd><TreasuryStatusBadge status={detail.status} /></dd></div>
       </dl>}
     </DialogContent></Dialog>
   </section>;

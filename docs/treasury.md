@@ -70,7 +70,7 @@ La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas Niubiz** y **PagoE
 
 El portal llama `POST https://api.niubiz.pe/api.backoffice.merchant/pagoefectivo`. Con `export: false`, `page: 1` y `size: 10` devuelve la primera página y `data.count`; con `export: true`, devuelve el listado completo como JSON y el navegador crea el XLSX. El conector consulta ambos modos y exige que el número de filas exportadas coincida con el contador antes de persistir. Valida columnas, CIP únicos, importe, moneda, fechas de Lima y estado; un lote incompleto o inválido se rechaza íntegramente. Identidad única: comercio + CIP. No se confunden operaciones `Expirado` o `Por pagar` con pagos confirmados.
 
-La actualización es manual y tiene estado y bloqueo propios. Conserva el historial ya guardado cuando falla. El exportable del 15 de noviembre de 2026 contenía 2 867 CIP únicos y sirvió para validar el parser; todavía falta probar el login y la respuesta JSON desde el servidor de despliegue. Esta es una API interna del portal y puede cambiar sin aviso.
+La actualización es manual y tiene estado y bloqueo propios. La pestaña muestra la fecha y el número de operaciones de la última sincronización completada; un intento fallido no reemplaza ese resumen ni el historial guardado. El exportable del 15 de noviembre de 2026 contenía 2 867 CIP únicos y sirvió para validar el parser; todavía falta probar el login y la respuesta JSON desde el servidor de despliegue. Esta es una API interna del portal y puede cambiar sin aviso.
 
 ### Mercado Pago
 
