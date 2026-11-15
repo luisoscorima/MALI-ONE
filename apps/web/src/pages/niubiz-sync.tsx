@@ -53,10 +53,6 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
   const [busy, setBusy] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
-  const [importResult, setImportResult] = useState('');
   const seen = useRef('');
   const callback = useRef(onUpdated);
   callback.current = onUpdated;
@@ -103,35 +99,17 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
     }
   }
 
-  async function importFile() {
-    if (!file || importing) return;
-    setImporting(true);
-    setImportError('');
-    setImportResult('');
-    try {
-      const result = await api.importNiubizPayments(file);
-      setImportResult(
-        `${result.rows} operaciones: ${result.createdCount} nuevas, ${result.updatedCount} actualizadas y ${result.unchangedCount} sin cambios.`,
-      );
-      callback.current();
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'No se pudo importar.');
-    } finally {
-      setImporting(false);
-    }
-  }
-
   const run = data?.lastRun;
   const failed = run?.results.filter((r) => r.status !== 'ok') ?? [];
   const syncRunning = busy || run?.status === 'running';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Actualizar pagos</DialogTitle>
+          <DialogTitle>Actualizar Ventas Niubiz</DialogTitle>
           <DialogDescription>
-            {sourceName}. Trae operaciones por API o importa el Excel de Ventas Niubiz.
+            {sourceName}. Consulta las ventas directamente desde la API de Niubiz.
           </DialogDescription>
         </DialogHeader>
 
@@ -142,9 +120,7 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
           </p>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
-            <h3 className="font-medium">Por API Niubiz</h3>
+        <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
               Consulta los {data?.merchantCount ?? 77} comercios del conector y guarda los pagos sin
               duplicarlos. Sin fechas, actualiza los últimos 32 días.
@@ -215,40 +191,6 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
                 )}
               </div>
             )}
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
-            <h3 className="font-medium">Por archivo Excel</h3>
-            <p className="text-sm text-muted-foreground">
-              Importa el Excel original de Ventas Niubiz. Los estados se actualizarán según ese archivo.
-            </p>
-            <label className="grid gap-1.5 text-sm">
-              <span className="font-medium">Archivo XLSX (hasta 5 MB)</span>
-              <Input
-                type="file"
-                accept=".xlsx"
-                disabled={importing}
-                onChange={(e) => {
-                  setFile(e.target.files?.[0] ?? null);
-                  setImportResult('');
-                  setImportError('');
-                }}
-              />
-            </label>
-            <Button disabled={!file || importing} onClick={() => void importFile()}>
-              {importing ? 'Importando…' : 'Importar pagos'}
-            </Button>
-            {importResult && (
-              <p role="status" className="text-sm">
-                {importResult}
-              </p>
-            )}
-            {importError && (
-              <p role="alert" className="text-sm text-destructive">
-                {importError}
-              </p>
-            )}
-          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -92,37 +92,45 @@ export class MercadoPagoSyncService {
     let rowCount = 0;
     try {
       const token = await this.credentials(itemId);
-      let offset = 0;
-      for (;;) {
-        if (offset > 10000 - pageSize) throw new Error('MP_PAGINATION_LIMIT');
-        const url = new URL(`${apiBase}/v1/payments/search`);
-        Object.entries({ sort: 'date_created', criteria: 'asc', range: 'date_created',
-          begin_date: `${from}T00:00:00.000-05:00`, end_date: `${to}T23:59:59.999-05:00`, limit: String(pageSize), offset: String(offset) })
-          .forEach(([key, value]) => url.searchParams.set(key, value));
-        const response = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}` } });
-        if (response.status === 401 || response.status === 403) throw new Error('MP_AUTH');
-        if (response.status === 429) throw new Error('RATE_LIMITED');
-        if (!response.ok) throw new Error('MP_API');
-        const payload = await response.json() as { results?: MpPayment[]; paging?: { total?: number } };
-        if (!Array.isArray(payload.results)) throw new Error('MP_SCHEMA');
-        for (const payment of payload.results) {
-          if (!['PEN', 'USD'].includes(payment.currency_id) || !payment.id || !payment.date_created || !payment.date_last_updated) continue;
-          const fee = Array.isArray(payment.fee_details)
-            ? payment.fee_details.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0) : null;
-          const payerName = [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || null;
-          await this.prisma.mercadoPagoPayment.upsert({
-            where: { sourceId_paymentId: { sourceId, paymentId: String(payment.id) } },
-            create: this.mapPayment(sourceId, payment, fee, payerName),
-            update: this.mapPayment(sourceId, payment, fee, payerName),
-          });
-          rowCount++;
+      const processed = new Set<string>();
+      // A creation-date search loads new payments; an update-date search refreshes older payments
+      // whose status, refund or release changed during the requested interval.
+      for (const dateField of ['date_created', 'date_last_updated'] as const) {
+        let offset = 0;
+        for (;;) {
+          if (offset > 10000 - pageSize) throw new Error('MP_PAGINATION_LIMIT');
+          const url = new URL(`${apiBase}/v1/payments/search`);
+          Object.entries({ sort: dateField, criteria: 'asc', range: dateField,
+            begin_date: `${from}T00:00:00.000-05:00`, end_date: `${to}T23:59:59.999-05:00`, limit: String(pageSize), offset: String(offset) })
+            .forEach(([key, value]) => url.searchParams.set(key, value));
+          const response = await fetch(url, { signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}` } });
+          if (response.status === 401 || response.status === 403) throw new Error('MP_AUTH');
+          if (response.status === 429) throw new Error('RATE_LIMITED');
+          if (!response.ok) throw new Error('MP_API');
+          const payload = await response.json() as { results?: MpPayment[]; paging?: { total?: number } };
+          if (!Array.isArray(payload.results)) throw new Error('MP_SCHEMA');
+          for (const payment of payload.results) {
+            if (!['PEN', 'USD'].includes(payment.currency_id) || !payment.id || !payment.date_created || !payment.date_last_updated) continue;
+            const paymentId = String(payment.id);
+            if (processed.has(paymentId)) continue;
+            const fee = Array.isArray(payment.fee_details)
+              ? payment.fee_details.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0) : null;
+            const payerName = [payment.payer?.first_name, payment.payer?.last_name].filter(Boolean).join(' ') || null;
+            await this.prisma.mercadoPagoPayment.upsert({
+              where: { sourceId_paymentId: { sourceId, paymentId } },
+              create: this.mapPayment(sourceId, payment, fee, payerName),
+              update: this.mapPayment(sourceId, payment, fee, payerName),
+            });
+            processed.add(paymentId);
+            rowCount++;
+          }
+          offset += payload.results.length;
+          const total = Number(payload.paging?.total ?? offset);
+          await this.prisma.mercadoPagoSyncState.updateMany({ where: { sourceId, runId }, data: {
+            rowCount, leaseUntil: new Date(Date.now() + 90 * 60000),
+          } });
+          if (payload.results.length < pageSize || offset >= total) break;
         }
-        offset += payload.results.length;
-        const total = Number(payload.paging?.total ?? offset);
-        await this.prisma.mercadoPagoSyncState.updateMany({ where: { sourceId, runId }, data: {
-          rowCount, leaseUntil: new Date(Date.now() + 90 * 60000),
-        } });
-        if (payload.results.length < pageSize || offset >= total) break;
       }
       await this.prisma.adminAuditLog.create({ data: { actorId: actor.id, actorEmail: actor.email,
         action: 'TREASURY_MERCADOPAGO_SYNCED', payload: { sourceId, from, to, rowCount } } });

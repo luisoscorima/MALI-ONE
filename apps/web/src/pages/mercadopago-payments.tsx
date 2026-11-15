@@ -109,7 +109,7 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
       </>}
 
     <Dialog open={updateOpen} onOpenChange={onUpdateOpenChange}><DialogContent><DialogHeader><DialogTitle>Actualizar ventas de Mercado Pago</DialogTitle>
-      <DialogDescription>Consulta la API oficial y guarda las operaciones en esta fuente.</DialogDescription></DialogHeader>
+      <DialogDescription>Consulta pagos de esta cuenta en la API oficial, incluidos los realizados mediante links de pago. El origen por link no está identificado de forma exclusiva.</DialogDescription></DialogHeader>
       <div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1.5 text-sm"><span className="font-medium">Desde</span><Input type="date" value={range.from} onChange={e => setRange(old => ({ ...old, from: e.target.value }))} /></label>
         <label className="grid gap-1.5 text-sm"><span className="font-medium">Hasta</span><Input type="date" value={range.to} onChange={e => setRange(old => ({ ...old, to: e.target.value }))} /></label></div>
         {status && !status.configured && <p role="alert" className="text-sm text-destructive">Falta el access token en el ítem de Vaultwarden, o el acceso a la bóveda en el servidor.</p>}

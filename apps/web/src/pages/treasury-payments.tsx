@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RefreshCw, Store } from 'lucide-react';
 import type { TreasuryPaymentDto, TreasuryPaymentsDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import {
@@ -46,6 +47,7 @@ function cardLabel(p: TreasuryPaymentDto) {
 
 type Props = {
   sourceName: string;
+  refreshKey: number;
   updateOpen: boolean;
   onUpdateOpenChange: (open: boolean) => void;
   merchantsOpen: boolean;
@@ -54,6 +56,7 @@ type Props = {
 
 export function TreasuryPayments({
   sourceName,
+  refreshKey,
   updateOpen,
   onUpdateOpenChange,
   merchantsOpen,
@@ -90,7 +93,7 @@ export function TreasuryPayments({
     return () => {
       cancelled = true;
     };
-  }, [filters, revision]);
+  }, [filters, revision, refreshKey]);
 
   useEffect(() => {
     if (!merchantsOpen) return;
@@ -119,8 +122,16 @@ export function TreasuryPayments({
 
   return (
     <section aria-labelledby="payments-title" className="flex flex-col gap-5">
-      <div className="sr-only">
-        <h2 id="payments-title">Operaciones de {sourceName}</h2>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h3 id="payments-title" className="text-lg font-semibold">Ventas Niubiz</h3>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
+            <RefreshCw className="size-4" aria-hidden="true" /> Actualizar Ventas Niubiz
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => onMerchantsOpenChange(true)}>
+            <Store className="size-4" aria-hidden="true" /> Comercios
+          </Button>
+        </div>
       </div>
 
       {data?.lastImport && (
@@ -438,7 +449,7 @@ function EmptyPayments({
       <p className="text-pretty text-sm text-muted-foreground">
         {hasFilters
           ? 'No hay pagos para estos filtros.'
-          : 'Todavía no hay pagos guardados. Actualiza desde la API Niubiz o un Excel.'}
+          : 'Todavía no hay pagos guardados. Actualiza desde la API Niubiz.'}
       </p>
       {!hasFilters && (
         <Button className="mt-4" variant="outline" onClick={onUpdate}>

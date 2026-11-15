@@ -66,7 +66,7 @@ Acceso a la bóveda (URL + API key + master) permanece en `.env`. El UUID del í
 
 ### PagoEfectivo dentro de Niubiz Comercio
 
-La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas** y **PagoEfectivo**. La segunda consulta exclusivamente `650177853 · CURSOSDELMALI` con el mismo login de Niubiz; no utiliza las credenciales de la fuente independiente PagoEfectivo descrita abajo.
+La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas Niubiz** y **PagoEfectivo**. La segunda consulta exclusivamente `650177853 · CURSOSDELMALI` con el mismo login de Niubiz; no utiliza las credenciales de la fuente independiente PagoEfectivo descrita abajo.
 
 El portal llama `POST https://api.niubiz.pe/api.backoffice.merchant/pagoefectivo`. Con `export: false`, `page: 1` y `size: 10` devuelve la primera página y `data.count`; con `export: true`, devuelve el listado completo como JSON y el navegador crea el XLSX. El conector consulta ambos modos y exige que el número de filas exportadas coincida con el contador antes de persistir. Valida columnas, CIP únicos, importe, moneda, fechas de Lima y estado; un lote incompleto o inválido se rechaza íntegramente. Identidad única: comercio + CIP. No se confunden operaciones `Expirado` o `Por pagar` con pagos confirmados.
 
@@ -74,7 +74,7 @@ La actualización es manual y tiene estado y bloqueo propios. Conserva el histor
 
 ### Mercado Pago
 
-El elemento Vaultwarden de una fuente Mercado Pago lleva un solo secreto: el campo protegido `access_token` del panel (`APP_USR-…`). La sincronización usa `GET /v1/payments/search` en páginas de 50, guarda la identidad `sourceId + paymentId` y muestra importe bruto, neto, comisiones, estado, cliente, medio de pago y fechas. El campo `payload` conserva el resto de la venta, sin número de tarjeta ni documento del pagador. No hay variables de entorno de Mercado Pago. No ejecuta reembolsos ni otras acciones financieras.
+El elemento Vaultwarden de una fuente Mercado Pago lleva un solo secreto: el campo protegido `access_token` del panel (de prueba o productivo según el entorno). La Public Key, el número de aplicación y el usuario/contraseña del portal no intervienen en esta consulta. La sincronización manual usa `GET /v1/payments/search` en páginas de 50, buscando por `date_created` y por `date_last_updated` en el rango elegido; un mismo ID se guarda una sola vez por ejecución. Guarda la identidad `sourceId + paymentId` y muestra importe bruto, neto, comisiones, estado, cliente, medio de pago y fechas. El campo `payload` conserva el resto de la venta, sin número de tarjeta ni documento del pagador. No hay variables de entorno de Mercado Pago. No ejecuta reembolsos ni otras acciones financieras. La API busca pagos de la cuenta: todavía no se ha verificado una marca universal que permita mostrar exclusivamente los cobrados mediante links. Para ver cobros reales se necesita el Access Token productivo de la cuenta correspondiente; el de prueba solo sirve para pagos de prueba.
 
 El login web observado requiere contraseña y, en el primer acceso de un dispositivo, segundo factor. Un modo asistido solo es reutilizable si el perfil de navegador validado pertenece al servidor y se almacena de forma persistente y protegida. Transferir cookies del navegador personal no forma parte del diseño. Por ahora la conexión ejecutable usa la API oficial; la UI y persistencia pueden probarse sin credenciales mediante dobles de API.
 
@@ -104,9 +104,9 @@ La implementación actual incluye extracción API de los 77 comercios, login con
 En **Finanzas → Verificación de pagos** (`/treasury`):
 
 1. **Fuentes** (página) — cada card es un acceso a un portal. Al cargar se prioriza una fuente Niubiz activa si existe.
-2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar**, y en Niubiz también **Actualizar pagos** y, en Ventas, **Comercios** (modales). Niubiz muestra pestañas Ventas y PagoEfectivo.
+2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar** y, en Niubiz, **Actualizar toda la fuente**. Este último inicia las sincronizaciones independientes de Ventas Niubiz y PagoEfectivo y muestra el estado de cada una.
 3. **Operaciones** (página) — filtros y tabla; es el contenido diario de la fuente. Columnas: fecha, comercio (código + nombre), pedido, código de transacción, cliente, email, importe, estado; **Tarjeta** y **Billetera** solo si hay datos en la página. Clic en fila → modal de detalle.
-4. **Modales** — Actualizar pagos (API + Excel juntos); Comercios (lectura: N del conector + lista con operaciones); Editar fuente; Detalle de operación.
+4. **Acciones por pestaña** — **Actualizar Ventas Niubiz** consulta solo `/order`; **Actualizar PagoEfectivo** consulta solo `/pagoefectivo`. El botón **Comercios** está en Ventas Niubiz. La importación XLSX se conserva como recurso de recuperación del servidor, fuera del flujo diario de la interfaz.
 
 La sync Niubiz usa la lista canónica de 77 comercios (`niubiz-merchants.json`). No hay CRUD de inventario Niubiz en la página; fuentes sin conector siguen pudiendo registrar cuentas/comercios como configuración.
 

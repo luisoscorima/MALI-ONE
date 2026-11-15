@@ -410,11 +410,6 @@ export const api = {
   pagoEfectivoStatus: (sourceId: string) => request<import('@mali-one/shared').PagoEfectivoSyncStatusDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/status`),
   syncPagoEfectivo: (sourceId: string) => request<{ ready: true }>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/sync`, { method: 'POST', body: '{}' }),
   pagoEfectivoPayments: (sourceId: string, params: URLSearchParams) => request<import('@mali-one/shared').PagoEfectivoPaymentsDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/payments?${params}`),
-  importNiubizPayments: (file: File) => {
-    const body = new FormData();
-    body.append('file', file);
-    return request<{ rows: number; createdCount: number; updatedCount: number; unchangedCount: number }>('/api/treasury/payments/import-niubiz', { method: 'POST', body });
-  },
   treasuryOverview: () => request<import('@mali-one/shared').TreasuryOverviewDto>('/api/treasury'),
   saveTreasurySource: (body: import('@mali-one/shared').TreasurySourceInput, id?: string) =>
     request<{ id: string }>(`/api/treasury/sources${id ? `/${encodeURIComponent(id)}` : ''}`, {

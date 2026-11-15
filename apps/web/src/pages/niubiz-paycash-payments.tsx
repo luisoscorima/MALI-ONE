@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import type { NiubizPayCashPaymentDto, NiubizPayCashPaymentsDto, NiubizPayCashSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
@@ -23,9 +24,10 @@ const errorText: Record<string, string> = {
   EXPORT_INCOMPLETE: 'La cantidad recibida no coincide con el total. No se guardó el lote.',
 };
 
-export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange }: {
+export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshKey }: {
   updateOpen: boolean;
   onUpdateOpenChange: (open: boolean) => void;
+  refreshKey: number;
 }) {
   const { user } = useAuth();
   const [data, setData] = useState<NiubizPayCashPaymentsDto | null>(null);
@@ -50,7 +52,7 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange }: {
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'No se pudieron cargar las operaciones.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [filters, revision]);
+  }, [filters, revision, refreshKey]);
 
   useEffect(() => {
     if (!updateOpen) return;
@@ -85,9 +87,14 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange }: {
   const run = status?.lastRun;
 
   return <section aria-label="Operaciones PagoEfectivo de Niubiz" className="flex flex-col gap-5">
-    <div>
-      <h3 className="font-medium">PagoEfectivo</h3>
-      <p className="text-sm text-muted-foreground">Comercio 650177853 · CURSOSDELMALI</p>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 className="text-lg font-semibold">PagoEfectivo</h3>
+        <p className="text-sm text-muted-foreground">Comercio 650177853 · CURSOSDELMALI</p>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
+        <RefreshCw className="size-4" aria-hidden="true" /> Actualizar PagoEfectivo
+      </Button>
     </div>
     <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
       <form role="search" aria-label="Buscar operaciones PagoEfectivo" className="flex flex-wrap items-end gap-3"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Landmark, Pencil, Plus, RefreshCw, Store } from 'lucide-react';
+import { Landmark, Pencil, Plus, RefreshCw } from 'lucide-react';
 import type {
   TreasuryCurrency,
   TreasuryOverviewDto,
@@ -19,6 +19,7 @@ import { TreasuryPayments } from './treasury-payments';
 import { MercadoPagoPayments } from './mercadopago-payments';
 import { PagoEfectivoPayments } from './pagoefectivo-payments';
 import { NiubizPayCashPayments } from './niubiz-paycash-payments';
+import { NiubizFullUpdateDialog } from './niubiz-full-update';
 import {
   Badge,
   Button,
@@ -88,6 +89,8 @@ export function TreasuryPage() {
   const [updateOpen, setUpdateOpen] = useState(false);
   const [merchantsOpen, setMerchantsOpen] = useState(false);
   const [niubizTab, setNiubizTab] = useState<'sales' | 'paycash'>('sales');
+  const [fullUpdateOpen, setFullUpdateOpen] = useState(false);
+  const [niubizRefresh, setNiubizRefresh] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -312,17 +315,14 @@ export function TreasuryPage() {
                   <Button variant="outline" size="sm" onClick={() => openSource(selected)}>
                     <Pencil className="size-4" /> Editar
                   </Button>
-                  {showRecords && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
-                        <RefreshCw className="size-4" /> {showNiubizRecords && niubizTab === 'paycash' ? 'Actualizar PagoEfectivo' : 'Actualizar pagos'}
-                      </Button>
-                      {showNiubizRecords && niubizTab === 'sales' && (
-                        <Button variant="outline" size="sm" onClick={() => setMerchantsOpen(true)}>
-                          <Store className="size-4" /> Comercios
-                        </Button>
-                      )}
-                    </>
+                  {showNiubizRecords ? (
+                    <Button variant="outline" size="sm" onClick={() => setFullUpdateOpen(true)}>
+                      <RefreshCw className="size-4" aria-hidden="true" /> Actualizar toda la fuente
+                    </Button>
+                  ) : showRecords && (
+                    <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
+                      <RefreshCw className="size-4" aria-hidden="true" /> Actualizar pagos
+                    </Button>
                   )}
                 </div>
               </div>
@@ -333,12 +333,13 @@ export function TreasuryPage() {
                   setNiubizTab(value as 'sales' | 'paycash');
                 }} className="space-y-5">
                   <TabsList aria-label="Apartados de Niubiz Comercio">
-                    <TabsTrigger value="sales">Ventas</TabsTrigger>
+                    <TabsTrigger value="sales">Ventas Niubiz</TabsTrigger>
                     <TabsTrigger value="paycash">PagoEfectivo</TabsTrigger>
                   </TabsList>
                   <TabsContent value="sales">
                     <TreasuryPayments
                       sourceName={selected.name}
+                      refreshKey={niubizRefresh}
                       updateOpen={niubizTab === 'sales' && updateOpen}
                       onUpdateOpenChange={setUpdateOpen}
                       merchantsOpen={merchantsOpen}
@@ -347,6 +348,7 @@ export function TreasuryPage() {
                   </TabsContent>
                   <TabsContent value="paycash">
                     <NiubizPayCashPayments
+                      refreshKey={niubizRefresh}
                       updateOpen={niubizTab === 'paycash' && updateOpen}
                       onUpdateOpenChange={setUpdateOpen}
                     />
@@ -460,6 +462,13 @@ export function TreasuryPage() {
                     )}
                   </div>
                 </>
+              )}
+              {showNiubizRecords && (
+                <NiubizFullUpdateDialog
+                  open={fullUpdateOpen}
+                  onOpenChange={setFullUpdateOpen}
+                  onUpdated={() => setNiubizRefresh(value => value + 1)}
+                />
               )}
             </section>
           )}
