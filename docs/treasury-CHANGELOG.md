@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Niubiz Comercio incorpora la pestaña PagoEfectivo para `650177853 · CURSOSDELMALI`: consulta JSON directa, listado, filtros, detalle, actualización manual y estado independiente. Migración `20261115090000_niubiz_paycash`.
+- La fuente separada PagoEfectivo mantiene sus credenciales oficiales y su conector pendiente; no comparte el UUID de Niubiz.
 - Conectores BCP / otros portales.
 - Separar permisos consulta vs configuración si contabilidad lo pide.
 

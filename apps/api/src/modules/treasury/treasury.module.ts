@@ -5,6 +5,7 @@ import { TreasuryPaymentsService } from './treasury-payments.service';
 import { NiubizSyncService } from './niubiz-sync.service';
 import { MercadoPagoSyncService } from './mercadopago-sync.service';
 import { PagoEfectivoSyncService } from './pagoefectivo-sync.service';
+import { NiubizPayCashService } from './niubiz-paycash.service';
 
-@Module({ controllers: [TreasuryController], providers: [TreasuryService, TreasuryPaymentsService, NiubizSyncService, MercadoPagoSyncService, PagoEfectivoSyncService] })
+@Module({ controllers: [TreasuryController], providers: [TreasuryService, TreasuryPaymentsService, NiubizSyncService, NiubizPayCashService, MercadoPagoSyncService, PagoEfectivoSyncService] })
 export class TreasuryModule {}

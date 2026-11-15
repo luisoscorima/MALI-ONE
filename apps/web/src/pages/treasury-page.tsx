@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { TreasuryPayments } from './treasury-payments';
 import { MercadoPagoPayments } from './mercadopago-payments';
 import { PagoEfectivoPayments } from './pagoefectivo-payments';
+import { NiubizPayCashPayments } from './niubiz-paycash-payments';
 import {
   Badge,
   Button,
@@ -40,6 +41,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui';
 
 const blankSource: TreasurySourceInput = {
@@ -82,6 +87,7 @@ export function TreasuryPage() {
   const [formError, setFormError] = useState('');
   const [updateOpen, setUpdateOpen] = useState(false);
   const [merchantsOpen, setMerchantsOpen] = useState(false);
+  const [niubizTab, setNiubizTab] = useState<'sales' | 'paycash'>('sales');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,9 +315,9 @@ export function TreasuryPage() {
                   {showRecords && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setUpdateOpen(true)}>
-                        <RefreshCw className="size-4" /> Actualizar pagos
+                        <RefreshCw className="size-4" /> {showNiubizRecords && niubizTab === 'paycash' ? 'Actualizar PagoEfectivo' : 'Actualizar pagos'}
                       </Button>
-                      {showNiubizRecords && (
+                      {showNiubizRecords && niubizTab === 'sales' && (
                         <Button variant="outline" size="sm" onClick={() => setMerchantsOpen(true)}>
                           <Store className="size-4" /> Comercios
                         </Button>
@@ -322,13 +328,30 @@ export function TreasuryPage() {
               </div>
 
               {showNiubizRecords ? (
-                <TreasuryPayments
-                  sourceName={selected.name}
-                  updateOpen={updateOpen}
-                  onUpdateOpenChange={setUpdateOpen}
-                  merchantsOpen={merchantsOpen}
-                  onMerchantsOpenChange={setMerchantsOpen}
-                />
+                <Tabs value={niubizTab} onValueChange={(value) => {
+                  setUpdateOpen(false);
+                  setNiubizTab(value as 'sales' | 'paycash');
+                }} className="space-y-5">
+                  <TabsList aria-label="Apartados de Niubiz Comercio">
+                    <TabsTrigger value="sales">Ventas</TabsTrigger>
+                    <TabsTrigger value="paycash">PagoEfectivo</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="sales">
+                    <TreasuryPayments
+                      sourceName={selected.name}
+                      updateOpen={niubizTab === 'sales' && updateOpen}
+                      onUpdateOpenChange={setUpdateOpen}
+                      merchantsOpen={merchantsOpen}
+                      onMerchantsOpenChange={setMerchantsOpen}
+                    />
+                  </TabsContent>
+                  <TabsContent value="paycash">
+                    <NiubizPayCashPayments
+                      updateOpen={niubizTab === 'paycash' && updateOpen}
+                      onUpdateOpenChange={setUpdateOpen}
+                    />
+                  </TabsContent>
+                </Tabs>
               ) : showMercadoPagoRecords ? (
                 <MercadoPagoPayments
                   sourceId={selected.id}

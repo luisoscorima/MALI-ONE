@@ -25,7 +25,8 @@
 | GET/POST/PUT | `/api/treasury`, `sources`, `targets` | Inventario |
 | GET | `/api/treasury/payments` | Listado + filtros + `q` |
 | POST | `/api/treasury/payments/import-niubiz` | Import XLSX |
-| GET/POST | `/api/treasury/niubiz/status`, `niubiz/sync` | Sync API |
+| GET/POST | `/api/treasury/niubiz/status`, `niubiz/sync` | Ventas Niubiz |
+| GET/POST | `/api/treasury/niubiz/paycash/payments`, `status`, `sync` | PagoEfectivo dentro de Niubiz Comercio, solo `650177853` |
 | GET/POST | `/api/treasury/mercadopago/:sourceId/payments`, `status`, `sync` | Ventas Mercado Pago por fuente |
 | GET/POST | `/api/treasury/pagoefectivo/:sourceId/payments`, `status`, `sync` | Operaciones PagoEfectivo por fuente |
 
@@ -34,6 +35,7 @@
 - `TreasurySource`, `TreasuryTarget`
 - `TreasuryPayment` (incl. email / tarjeta enmascarada / billetera / `payload`), `TreasuryPaymentImport`
 - `NiubizSyncState`
+- `NiubizPayCashPayment`, `NiubizPayCashSyncState`
 - `MercadoPagoPayment`, `MercadoPagoSyncState`
 - `PagoEfectivoPayment`, `PagoEfectivoSyncState`
 
@@ -42,7 +44,7 @@
 | Sistema | Uso |
 |---------|-----|
 | **Vaultwarden** | Usuario/password Niubiz vía CLI Bitwarden 2026.6.0 + Node 24 |
-| **Niubiz Comercio** | Login web + API export órdenes |
+| **Niubiz Comercio** | Login web + API export de Ventas y PagoEfectivo |
 | **Mercado Pago** | API oficial de pagos; credenciales productivas desde Vaultwarden |
 | **PagoEfectivo** | Credenciales oficiales en Vaultwarden; consulta de movimientos pendiente del contrato |
 | **Chromium/Playwright** | Automatización login en imagen API |
@@ -61,6 +63,14 @@ FINANCE_VAULT_MASTER_PASSWORD=
 ```
 
 Acceso a la bóveda (URL + API key + master) permanece en `.env`. El UUID del ítem de cada portal vive en la fuente (`TreasurySource.vaultItemId`), editable en UI. **Nunca** `VITE_*` para secretos Niubiz.
+
+### PagoEfectivo dentro de Niubiz Comercio
+
+La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas** y **PagoEfectivo**. La segunda consulta exclusivamente `650177853 · CURSOSDELMALI` con el mismo login de Niubiz; no utiliza las credenciales de la fuente independiente PagoEfectivo descrita abajo.
+
+El portal llama `POST https://api.niubiz.pe/api.backoffice.merchant/pagoefectivo`. Con `export: false`, `page: 1` y `size: 10` devuelve la primera página y `data.count`; con `export: true`, devuelve el listado completo como JSON y el navegador crea el XLSX. El conector consulta ambos modos y exige que el número de filas exportadas coincida con el contador antes de persistir. Valida columnas, CIP únicos, importe, moneda, fechas de Lima y estado; un lote incompleto o inválido se rechaza íntegramente. Identidad única: comercio + CIP. No se confunden operaciones `Expirado` o `Por pagar` con pagos confirmados.
+
+La actualización es manual y tiene estado y bloqueo propios. Conserva el historial ya guardado cuando falla. El exportable del 15 de noviembre de 2026 contenía 2 867 CIP únicos y sirvió para validar el parser; todavía falta probar el login y la respuesta JSON desde el servidor de despliegue. Esta es una API interna del portal y puede cambiar sin aviso.
 
 ### Mercado Pago
 
@@ -94,7 +104,7 @@ La implementación actual incluye extracción API de los 77 comercios, login con
 En **Finanzas → Verificación de pagos** (`/treasury`):
 
 1. **Fuentes** (página) — cada card es un acceso a un portal. Al cargar se prioriza una fuente Niubiz activa si existe.
-2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar**, y en Niubiz también **Actualizar pagos** y **Comercios** (modales).
+2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar**, y en Niubiz también **Actualizar pagos** y, en Ventas, **Comercios** (modales). Niubiz muestra pestañas Ventas y PagoEfectivo.
 3. **Operaciones** (página) — filtros y tabla; es el contenido diario de la fuente. Columnas: fecha, comercio (código + nombre), pedido, código de transacción, cliente, email, importe, estado; **Tarjeta** y **Billetera** solo si hay datos en la página. Clic en fila → modal de detalle.
 4. **Modales** — Actualizar pagos (API + Excel juntos); Comercios (lectura: N del conector + lista con operaciones); Editar fuente; Detalle de operación.
 

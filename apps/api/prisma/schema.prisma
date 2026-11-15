@@ -200,6 +200,39 @@ model NiubizSyncState {
   results    Json      @default("[]")
 }
 
+/// PagoEfectivo operations shown inside Niubiz Comercio, not the separate PagoEfectivo API source.
+model NiubizPayCashPayment {
+  id            String           @id @default(cuid())
+  merchantCode  String           @db.VarChar(9)
+  cip           String           @db.VarChar(80)
+  customerEmail String?         @db.VarChar(250)
+  currency      TreasuryCurrency
+  amount        Decimal          @db.Decimal(18, 2)
+  brand         String           @db.VarChar(80)
+  purchasedAt   DateTime
+  paidAt        DateTime?
+  status        String           @db.VarChar(40)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([merchantCode, cip])
+  @@index([merchantCode, purchasedAt, id])
+  @@index([merchantCode, status])
+}
+
+model NiubizPayCashSyncState {
+  id           String    @id
+  runId        String?
+  status       String    @default("idle")
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  leaseUntil   DateTime?
+  errorCode    String?
+  rowCount     Int       @default(0)
+  createdCount Int       @default(0)
+  updatedCount Int       @default(0)
+}
+
 model TreasuryPaymentImport {
   id           String            @id @default(cuid())
   provider     TreasuryProvider

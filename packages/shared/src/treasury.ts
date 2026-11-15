@@ -130,6 +130,42 @@ export interface NiubizSyncStatusDto {
   };
 }
 
+export interface NiubizPayCashPaymentDto {
+  id: string;
+  merchantCode: string;
+  cip: string;
+  customerEmail: string | null;
+  currency: TreasuryCurrency;
+  amount: string;
+  brand: string;
+  purchasedAt: string;
+  paidAt: string | null;
+  status: string;
+}
+
+export interface NiubizPayCashPaymentsDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  states: string[];
+  payments: NiubizPayCashPaymentDto[];
+}
+
+export interface NiubizPayCashSyncStatusDto {
+  configured: boolean;
+  merchantCode: '650177853';
+  lastRun: null | {
+    runId: string | null;
+    status: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    errorCode: string | null;
+    rowCount: number;
+    createdCount: number;
+    updatedCount: number;
+  };
+}
+
 export interface MercadoPagoPaymentDto {
   id: string;
   paymentId: string;

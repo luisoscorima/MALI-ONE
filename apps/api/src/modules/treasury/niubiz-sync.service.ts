@@ -173,6 +173,14 @@ export class NiubizSyncService {
     });
   }
 
+  /** Shares the existing Niubiz Comercio login with its PagoEfectivo section. */
+  async loginForPayCash(): Promise<string> {
+    if (!vaultRuntime.every((key) => !!process.env[key])) throw new Error('LOGIN_WORKER_FAILED');
+    const vaultItemId = await this.resolveVaultItemId();
+    if (!vaultItemId) throw new Error('VAULT_ITEM');
+    return this.login(vaultItemId);
+  }
+
   private expiresSoon(token: string) {
     try {
       const exp = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString()).exp;

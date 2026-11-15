@@ -9,13 +9,25 @@ import { NiubizSyncService } from './niubiz-sync.service';
 import { Roles } from '../../core/guards/roles.decorator';
 import { MercadoPagoSyncService } from './mercadopago-sync.service';
 import { PagoEfectivoSyncService } from './pagoefectivo-sync.service';
+import { NiubizPayCashService } from './niubiz-paycash.service';
 
 @Controller('treasury')
 @RequireModule(AppModule.treasury)
 export class TreasuryController {
   constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService,
     private readonly niubiz: NiubizSyncService, private readonly mercadoPago: MercadoPagoSyncService,
-    private readonly pagoEfectivo: PagoEfectivoSyncService) {}
+    private readonly pagoEfectivo: PagoEfectivoSyncService,
+    private readonly niubizPayCash: NiubizPayCashService) {}
+
+  @Get('niubiz/paycash/status')
+  niubizPayCashStatus() { return this.niubizPayCash.status(); }
+
+  @Post('niubiz/paycash/sync')
+  @Roles('admin')
+  syncNiubizPayCash(@Req() req: { user: User }) { return this.niubizPayCash.start(req.user); }
+
+  @Get('niubiz/paycash/payments')
+  niubizPayCashPayments(@Query() query: TreasuryPaymentQueryDto) { return this.niubizPayCash.list(query); }
 
   @Get('mercadopago/:sourceId/status')
   mercadoPagoStatus(@Param('sourceId') sourceId: string) { return this.mercadoPago.status(sourceId); }
