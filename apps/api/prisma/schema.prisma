@@ -1080,6 +1080,22 @@ model MalichimpImportRun {
   @@index([fileFingerprint])
 }
 
+model MalichimpImportJob {
+  id           String    @id @default(cuid())
+  userId       String
+  status       String    @db.VarChar(20)
+  originalName String    @db.VarChar(240)
+  processed    Int       @default(0)
+  total        Int
+  runId        String?
+  error        String?   @db.VarChar(1000)
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([status])
+  @@index([userId, startedAt])
+}
+
 /// Immutable, idempotent record of an SES event received through EventBridge/SQS.
 /// It belongs to the shared email engine, not to a specific CRM module.
 model SesEventRecord {

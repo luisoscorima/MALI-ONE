@@ -2,10 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { MalichimpContactStatus, Prisma } from '@prisma/client';
+import { MalichimpContactStatus, Prisma, type MalichimpImportJob } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -32,37 +33,33 @@ type ImportPreview = {
   expiresAt: Date;
 };
 
-type ImportJob = {
-  id: string;
-  userId: string;
-  status: 'queued' | 'running' | 'completed' | 'failed';
-  originalName: string;
-  processed: number;
-  total: number;
-  runId: string | null;
-  error: string | null;
-  startedAt: Date;
-  completedAt: Date | null;
-};
-
 const PREVIEW_TTL_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class MalichimpService implements OnModuleInit {
+  private readonly logger = new Logger(MalichimpService.name);
   private readonly previews = new Map<string, ImportPreview>();
-  private readonly jobs = new Map<string, ImportJob>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailDelivery: EmailDeliveryService,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     void this.cleanupOrphanDirectories();
+    await this.prisma.malichimpImportJob.updateMany({
+      where: { status: { in: ['queued', 'running'] } },
+      data: {
+        status: 'failed',
+        error: 'La API se reinició durante la importación. Verifica la audiencia antes de volver a importar el ZIP.',
+        completedAt: new Date(),
+        processed: 0,
+      },
+    });
   }
 
   async stats() {
-    const [statuses, suppressions, tags, lastImport] = await Promise.all([
+    const [statuses, suppressions, tags, lastImport, eligible] = await Promise.all([
       this.prisma.malichimpContact.groupBy({
         by: ['status'],
         _count: { _all: true },
@@ -80,6 +77,14 @@ export class MalichimpService implements OnModuleInit {
           completedAt: true,
         },
       }),
+      this.prisma.$queryRaw<[{ count: bigint }]>(Prisma.sql`
+        SELECT COUNT(*) AS count FROM "MalichimpContact" contact
+        WHERE contact."status" = 'subscribed'::"MalichimpContactStatus"
+          AND NOT EXISTS (
+            SELECT 1 FROM "MalichimpSuppression" suppression
+            WHERE suppression."email" = contact."email"
+          )
+      `),
     ]);
 
     const byStatus = Object.fromEntries(
@@ -89,7 +94,7 @@ export class MalichimpService implements OnModuleInit {
 
     return {
       total: Object.values(byStatus).reduce((sum, count) => sum + count, 0),
-      eligible: byStatus.subscribed,
+      eligible: Number(eligible[0].count),
       byStatus,
       suppressions,
       tags,
@@ -207,38 +212,46 @@ export class MalichimpService implements OnModuleInit {
     if (!preview || preview.userId !== userId) {
       throw new NotFoundException('La vista previa expiró; vuelve a subir el ZIP');
     }
-    const busy = [...this.jobs.values()].some(
-      (job) => job.status === 'queued' || job.status === 'running',
-    );
+    const busy = await this.prisma.malichimpImportJob.count({
+      where: { status: { in: ['queued', 'running'] } },
+    });
     if (busy) throw new ConflictException('Ya hay una importación en curso');
 
+    let job: MalichimpImportJob;
+    try {
+      job = await this.prisma.malichimpImportJob.create({
+        data: {
+          userId,
+          status: 'queued',
+          originalName: preview.originalName,
+          total: preview.report.totalUnique,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Ya hay una importación en curso');
+      }
+      throw error;
+    }
     this.previews.delete(previewId);
-    const job: ImportJob = {
-      id: randomUUID(),
-      userId,
-      status: 'queued',
-      originalName: preview.originalName,
-      processed: 0,
-      total: preview.report.totalUnique,
-      runId: null,
-      error: null,
-      startedAt: new Date(),
-      completedAt: null,
-    };
-    this.jobs.set(job.id, job);
-    void this.runImport(job, preview);
+    void this.runImport(job, preview).catch((error: unknown) => {
+      this.logger.error('No se pudo finalizar el trabajo de importación', error);
+    });
     return this.serializeJob(job);
   }
 
-  getImportJob(userId: string, jobId: string) {
-    const job = this.jobs.get(jobId);
+  async getImportJob(userId: string, jobId: string) {
+    const job = await this.prisma.malichimpImportJob.findUnique({ where: { id: jobId } });
     if (!job || job.userId !== userId) throw new NotFoundException('Importación no encontrada');
     return this.serializeJob(job);
   }
 
-  private async runImport(job: ImportJob, preview: ImportPreview) {
-    job.status = 'running';
+  private async runImport(job: MalichimpImportJob, preview: ImportPreview) {
     try {
+      await this.prisma.malichimpImportJob.update({
+        where: { id: job.id },
+        data: { status: 'running' },
+      });
       const result = await applyMalichimpFiles(
         this.prisma,
         preview.files,
@@ -246,24 +259,39 @@ export class MalichimpService implements OnModuleInit {
         {
           sourceKey: preview.originalName,
           sourceDirectory: 'temporary_ui_upload',
-          onProgress: (processed) => {
-            job.processed = processed;
+          onProgress: async (processed) => {
+            await this.prisma.malichimpImportJob.update({
+              where: { id: job.id },
+              data: { processed },
+            });
           },
         },
       );
-      job.processed = result.imported;
-      job.runId = result.runId;
-      job.status = 'completed';
+      await this.prisma.malichimpImportJob.update({
+        where: { id: job.id },
+        data: {
+          processed: result.imported,
+          runId: result.runId,
+          status: 'completed',
+          completedAt: new Date(),
+        },
+      });
     } catch (error) {
-      job.status = 'failed';
-      job.error = error instanceof Error ? error.message.slice(0, 1000) : String(error);
+      await this.prisma.malichimpImportJob.update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          processed: 0,
+          error: error instanceof Error ? error.message.slice(0, 1000) : String(error),
+          completedAt: new Date(),
+        },
+      });
     } finally {
-      job.completedAt = new Date();
       await rm(preview.directory, { recursive: true, force: true });
     }
   }
 
-  private serializeJob(job: ImportJob) {
+  private serializeJob(job: MalichimpImportJob) {
     return {
       ...job,
       progress: job.total ? Math.round((job.processed / job.total) * 100) : 0,

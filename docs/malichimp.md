@@ -35,7 +35,9 @@ Un administrador abre `/admin/malichimp` y selecciona **Importar ZIP de Mailchim
 4. El administrador confirma explícitamente y observa el progreso.
 5. El ZIP y los CSV temporales se eliminan al finalizar; si no se confirma, expiran en 30 minutos.
 
-La importación corre en segundo plano y es idempotente. Un ZIP ya importado muestra una advertencia, pero puede reaplicarse sin duplicar contactos.
+La importación corre en segundo plano y es idempotente. Los cambios de cada ZIP se confirman en una sola transacción: si falla, no se aplican lotes parciales. El estado del trabajo se guarda en PostgreSQL y la UI lo recupera tras recargar la página. Un ZIP ya importado muestra una advertencia, pero puede reaplicarse sin duplicar contactos.
+
+Las supresiones originadas por SES prevalecen sobre la importación de Mailchimp. El contador de elegibles excluye las direcciones suprimidas.
 
 El Nginx incluido acepta hasta 100 MB. Si Nginx Proxy Manager aplica un límite propio en EC2, su host proxy también debe configurar `client_max_body_size 100m;`.
 

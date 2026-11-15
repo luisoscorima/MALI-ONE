@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- La importación no reemplaza supresiones de SES y se revierte completa si falla un lote.
+- El contador de elegibles excluye las direcciones suprimidas.
+- Los trabajos de importación persisten en PostgreSQL y la UI muestra el estado fallido sin mantener el indicador de carga.
+
 ### Added
 
 - Base independiente de contactos, etiquetas, supresiones y auditoría de importaciones.

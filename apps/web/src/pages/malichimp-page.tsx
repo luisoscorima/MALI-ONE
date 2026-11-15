@@ -48,6 +48,7 @@ import {
 } from '@/components/ui';
 
 const nf = new Intl.NumberFormat('es-PE');
+const importJobStorageKey = 'malichimp-import-job-id';
 
 const statusMeta: Record<
   MalichimpContactStatus,
@@ -96,6 +97,19 @@ export function MalichimpPage() {
   const [importJob, setImportJob] = useState<MalichimpImportJobDto | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
+
+  useEffect(() => {
+    const jobId = window.sessionStorage.getItem(importJobStorageKey);
+    if (!jobId) return;
+    void api.getMalichimpImportJob(jobId)
+      .then((job) => {
+        setImportJob(job);
+        if (job.status === 'queued' || job.status === 'running' || job.status === 'failed') {
+          setImportOpen(true);
+        }
+      })
+      .catch(() => window.sessionStorage.removeItem(importJobStorageKey));
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -209,7 +223,9 @@ export function MalichimpPage() {
     setImportBusy(true);
     setImportError('');
     try {
-      setImportJob(await api.applyMalichimpImport(importPreview.previewId));
+      const job = await api.applyMalichimpImport(importPreview.previewId);
+      window.sessionStorage.setItem(importJobStorageKey, job.id);
+      setImportJob(job);
     } catch (reason) {
       setImportError(reason instanceof Error ? reason.message : 'No se pudo iniciar la importación');
     } finally {
@@ -407,7 +423,7 @@ export function MalichimpPage() {
             </div>
           ) : null}
 
-          {importJob ? (
+      {importJob ? (
             <div className="space-y-4" aria-live="polite">
               {importJob.status === 'completed' ? (
                 <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -416,6 +432,10 @@ export function MalichimpPage() {
                     <p className="font-medium">Importación completada</p>
                     <p className="text-sm text-muted-foreground">{nf.format(importJob.processed)} contactos procesados.</p>
                   </div>
+                </div>
+              ) : importJob.status === 'failed' ? (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm" role="status">
+                  La importación falló. Revisa el error antes de volver a subir el ZIP.
                 </div>
               ) : (
                 <div className="space-y-3">

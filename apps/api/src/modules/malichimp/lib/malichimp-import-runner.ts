@@ -101,8 +101,7 @@ function contactValues(row: MalichimpRow) {
   )`;
 }
 
-async function importBatch(prisma: PrismaClient, rows: MalichimpRow[]) {
-  await prisma.$transaction(async (tx) => {
+async function importBatch(tx: Prisma.TransactionClient, rows: MalichimpRow[]) {
     await tx.$executeRaw(Prisma.sql`
       INSERT INTO "MalichimpContact" (
         "id", "email", "firstName", "lastName", "phone", "institutionName",
@@ -199,6 +198,7 @@ async function importBatch(prisma: PrismaClient, rows: MalichimpRow[]) {
           "occurredAt" = EXCLUDED."occurredAt",
           "metadata" = EXCLUDED."metadata",
           "updatedAt" = NOW()
+        WHERE "MalichimpSuppression"."source" = 'mailchimp_import'
       `);
     }
 
@@ -210,7 +210,6 @@ async function importBatch(prisma: PrismaClient, rows: MalichimpRow[]) {
         where: { email: { in: deliverable }, source: 'mailchimp_import' },
       });
     }
-  });
 }
 
 export async function applyMalichimpFiles(
@@ -221,7 +220,7 @@ export async function applyMalichimpFiles(
     sourceKey: string;
     sourceDirectory: string;
     batchSize?: number;
-    onProgress?: (processed: number, total: number) => void;
+    onProgress?: (processed: number, total: number) => void | Promise<void>;
   },
 ) {
   if (report.errors.length) {
@@ -238,21 +237,22 @@ export async function applyMalichimpFiles(
   });
 
   let processed = 0;
-  for (const file of files) {
-    const records = await readCsvRecords(file.filePath);
-    for (let index = 0; index < records.length; index += batchSize) {
-      const rows = records
-        .slice(index, index + batchSize)
-        .map((record) => mapMailchimpRecord(record, file.status));
-      await importBatch(prisma, rows);
-      processed += rows.length;
-      options.onProgress?.(processed, report.totalUnique);
+  await prisma.$transaction(async (tx) => {
+    for (const file of files) {
+      const records = await readCsvRecords(file.filePath);
+      for (let index = 0; index < records.length; index += batchSize) {
+        const rows = records
+          .slice(index, index + batchSize)
+          .map((record) => mapMailchimpRecord(record, file.status));
+        await importBatch(tx, rows);
+        processed += rows.length;
+        await options.onProgress?.(processed, report.totalUnique);
+      }
     }
-  }
-
-  await prisma.malichimpImportRun.update({
-    where: { id: run.id },
-    data: { completedAt: new Date() },
-  });
+    await tx.malichimpImportRun.update({
+      where: { id: run.id },
+      data: { completedAt: new Date() },
+    });
+  }, { maxWait: 30_000, timeout: 30 * 60 * 1000 });
   return { runId: run.id, imported: processed };
 }
