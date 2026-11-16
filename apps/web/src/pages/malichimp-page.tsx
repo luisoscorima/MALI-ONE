@@ -6,21 +6,24 @@ import {
   FileArchive,
   Loader2,
   Search,
+  Send,
   Upload,
+  Users,
 } from 'lucide-react';
 import type {
   MalichimpContactDto,
   MalichimpContactStatus,
+  MalichimpGroupDto,
   MalichimpImportJobDto,
   MalichimpImportPreviewDto,
   MalichimpStatsDto,
-  MalichimpTagDto,
 } from '@mali-one/shared';
 import { AlertBanner, PageLoading } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
+import { MalichimpCampaigns } from '@/components/malichimp-campaigns';
 import {
   Badge,
   Button,
@@ -36,7 +39,9 @@ import {
   Label,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Table,
@@ -45,6 +50,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui';
 
 const nf = new Intl.NumberFormat('es-PE');
@@ -78,7 +87,7 @@ export function MalichimpPage() {
   const { user } = useAuth();
   const toast = useToast();
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
-  const [tags, setTags] = useState<MalichimpTagDto[]>([]);
+  const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [contacts, setContacts] = useState<MalichimpContactDto[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -86,7 +95,7 @@ export function MalichimpPage() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [status, setStatus] = useState<'all' | MalichimpContactStatus>('all');
-  const [tag, setTag] = useState('all');
+  const [groupOptionId, setGroupOptionId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -116,30 +125,30 @@ export function MalichimpPage() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  useEffect(() => setPage(1), [debouncedQuery, status, tag]);
+  useEffect(() => setPage(1), [debouncedQuery, status, groupOptionId]);
 
   const loadContacts = useCallback(async () => {
     const result = await api.listMalichimpContacts({
       q: debouncedQuery || undefined,
       status: status === 'all' ? undefined : status,
-      tag: tag === 'all' ? undefined : tag,
+      groupOptionId: groupOptionId === 'all' ? undefined : groupOptionId,
       page,
       pageSize: 50,
     });
     setContacts(result.items);
     setTotal(result.total);
     setPages(result.pages);
-  }, [debouncedQuery, page, status, tag]);
+  }, [debouncedQuery, groupOptionId, page, status]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.getMalichimpStats(), api.listMalichimpTags(), loadContacts()])
-      .then(([nextStats, nextTags]) => {
+    Promise.all([api.getMalichimpStats(), api.listMalichimpGroups(), loadContacts()])
+      .then(([nextStats, nextGroups]) => {
         if (!active) return;
         setStats(nextStats);
-        setTags(nextTags);
+        setGroups(nextGroups);
       })
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : 'No se pudo cargar MALICHIMP');
@@ -239,10 +248,10 @@ export function MalichimpPage() {
     <div className="space-y-5">
       <PageHeader
         title="MALICHIMP"
-        description="Audiencia de correo separada del CRM de WhatsApp. Solo los contactos suscritos serán elegibles para boletines."
+        description="Audiencia de correo separada del CRM de WhatsApp y organizada por grupos de Mailchimp."
         actions={user?.role === 'admin' ? (
           <Button type="button" onClick={openImport}>
-            <Upload className="mr-1 size-4" />
+            <Upload className="mr-1 size-4" aria-hidden />
             Importar ZIP de Mailchimp
           </Button>
         ) : undefined}
@@ -262,14 +271,21 @@ export function MalichimpPage() {
           <StatCard label="Total importado" value={stats.total} hint="Todos los estados de Mailchimp" />
           <StatCard label="Suprimidos" value={stats.suppressions} hint="Bajas y correos limpiados" />
           <StatCard
-            label="Etiquetas"
-            value={stats.tags}
-            hint={`Segmentación recuperada · SES ${stats.delivery.configured ? 'configurado' : 'pendiente'}`}
+            label="Opciones de grupo"
+            value={stats.groupOptions}
+            hint={`${nf.format(stats.groups)} grupos · SES ${stats.delivery.configured ? 'configurado' : 'pendiente'}`}
           />
         </div>
       ) : null}
 
-      <Card className="gap-0 py-0">
+      <Tabs defaultValue="audience" className="gap-4">
+        <TabsList aria-label="Secciones de MALICHIMP">
+          <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
+          <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="audience">
+          <Card className="gap-0 py-0">
         <div className="grid gap-3 border-b p-4 md:grid-cols-[minmax(240px,1fr)_200px_240px]">
           <label className="relative block">
             <span className="sr-only">Buscar contacto</span>
@@ -290,14 +306,19 @@ export function MalichimpPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={tag} onValueChange={setTag}>
-            <SelectTrigger aria-label="Filtrar por etiqueta"><SelectValue placeholder="Todas las etiquetas" /></SelectTrigger>
+          <Select value={groupOptionId} onValueChange={setGroupOptionId}>
+            <SelectTrigger aria-label="Filtrar por opción de grupo"><SelectValue placeholder="Todos los grupos" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas las etiquetas</SelectItem>
-              {tags.map((item) => (
-                <SelectItem key={item.id} value={item.normalizedName}>
-                  {item.name}{item.contacts !== undefined ? ` (${nf.format(item.contacts)})` : ''}
-                </SelectItem>
+              <SelectItem value="all">Todos los grupos</SelectItem>
+              {groups.filter((group) => group.options.length).map((group) => (
+                <SelectGroup key={group.id}>
+                  <SelectLabel>{group.name}</SelectLabel>
+                  {group.options.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {option.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -310,7 +331,7 @@ export function MalichimpPage() {
                 <TableHead>Contacto</TableHead>
                 <TableHead>Institución</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Etiquetas</TableHead>
+                <TableHead>Grupos</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -327,11 +348,13 @@ export function MalichimpPage() {
                     <TableCell><Badge variant={meta.variant}>{meta.label}</Badge></TableCell>
                     <TableCell className="min-w-56">
                       <div className="flex max-w-md flex-wrap gap-1">
-                        {contact.tags.slice(0, 3).map((item) => (
-                          <Badge key={item.id} variant="outline">{item.name}</Badge>
+                        {contact.groupOptions.slice(0, 3).map((option) => (
+                          <Badge key={option.id} variant="outline" title={option.group.name}>
+                            {option.group.name}: {option.name}
+                          </Badge>
                         ))}
-                        {contact.tags.length > 3 ? <Badge variant="secondary">+{contact.tags.length - 3}</Badge> : null}
-                        {!contact.tags.length ? <span className="text-muted-foreground">—</span> : null}
+                        {contact.groupOptions.length > 3 ? <Badge variant="secondary">+{contact.groupOptions.length - 3}</Badge> : null}
+                        {!contact.groupOptions.length ? <span className="text-muted-foreground">Sin grupo</span> : null}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -355,7 +378,17 @@ export function MalichimpPage() {
             </Button>
           </div>
         </div>
-      </Card>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="campaigns">
+          <MalichimpCampaigns
+            groups={groups}
+            deliveryConfigured={stats?.delivery.configured ?? false}
+            isAdmin={user?.role === 'admin'}
+          />
+        </TabsContent>
+      </Tabs>
 
       <Dialog
         open={importOpen}
@@ -405,7 +438,7 @@ export function MalichimpPage() {
                 <StatCard label="Total" value={importPreview.report.totalUnique} hint="Contactos únicos" />
                 <StatCard label="Elegibles" value={importPreview.report.eligibleContacts} hint="Suscritos" />
                 <StatCard label="Suprimidos" value={importPreview.report.suppressions} hint="Bajas y limpiados" />
-                <StatCard label="Etiquetas" value={importPreview.report.tags} hint="Segmentos" />
+                <StatCard label="Opciones de grupo" value={importPreview.report.groupOptions} hint={`${nf.format(importPreview.report.groups)} grupos`} />
               </div>
               {importPreview.previouslyImported ? (
                 <AlertBanner variant="info">
@@ -416,6 +449,7 @@ export function MalichimpPage() {
                 <p className="font-medium">Al confirmar:</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
                   <li>Se crearán o actualizarán los contactos del ZIP.</li>
+                  <li>Se reconstruirán sus opciones de grupo para segmentar boletines.</li>
                   <li>Las bajas y direcciones limpiadas permanecerán suprimidas.</li>
                   <li>El ZIP temporal será eliminado al terminar.</li>
                 </ul>

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
@@ -14,6 +15,10 @@ import { AppModule, User, UserRole } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { Roles } from '../../core/guards/roles.decorator';
 import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
+import {
+  CreateMalichimpCampaignDto,
+  MalichimpAudienceDto,
+} from './dto/malichimp-campaign.dto';
 import { MalichimpService } from './malichimp.service';
 
 @Controller('malichimp')
@@ -34,6 +39,35 @@ export class MalichimpController {
   @Get('tags')
   tags() {
     return this.malichimp.listTags();
+  }
+
+  @Get('groups')
+  groups() {
+    return this.malichimp.listGroups();
+  }
+
+  @Get('newsletters')
+  newsletters() {
+    return this.malichimp.listPublishedNewsletters();
+  }
+
+  @Get('campaigns')
+  campaigns() {
+    return this.malichimp.listCampaigns();
+  }
+
+  @Post('campaigns/preview')
+  previewCampaign(@Body() body: MalichimpAudienceDto) {
+    return this.malichimp.previewAudience(body);
+  }
+
+  @Post('campaigns')
+  @Roles(UserRole.admin)
+  createCampaign(
+    @Req() req: { user: User },
+    @Body() body: CreateMalichimpCampaignDto,
+  ) {
+    return this.malichimp.createCampaign(req.user.id, body);
   }
 
   @Post('imports/preview')

@@ -8,6 +8,14 @@ import type {
 
 export type CsvRecord = Record<string, string>;
 
+export type MalichimpGroupMembership = {
+  groupName: string;
+  groupNormalizedName: string;
+  groupSortOrder: number;
+  optionName: string;
+  optionNormalizedName: string;
+};
+
 export type MalichimpRow = {
   email: string;
   firstName: string | null;
@@ -25,6 +33,7 @@ export type MalichimpRow = {
   statusChangedAt: Date | null;
   attributes: Record<string, string> | null;
   tags: Array<{ name: string; normalizedName: string }>;
+  groups: MalichimpGroupMembership[];
   suppression: {
     reason: MalichimpSuppressionReason;
     occurredAt: Date | null;
@@ -42,20 +51,24 @@ export const IMPORT_FILES: Array<{
   { prefix: 'nonsubscribed_email_audience_export_', status: 'nonsubscribed' },
 ];
 
+export const MAILCHIMP_GROUP_FIELDS = [
+  { source: 'Dirección y Gerencia', target: 'direccion_gerencia' },
+  { source: 'Curadurías', target: 'curadurias' },
+  { source: 'Curaduría Educativa', target: 'curaduria_educativa' },
+  { source: 'Prensa', target: 'prensa' },
+  { source: 'Auditorio', target: 'auditorio' },
+  { source: 'Marketing', target: 'marketing' },
+  { source: 'Educación-Talleres', target: 'educacion_talleres' },
+  { source: 'Instituciones', target: 'instituciones' },
+  { source: 'Comunidad MALI', target: 'comunidad_mali' },
+  { source: 'APOYO', target: 'apoyo' },
+  { source: 'Comunidad MALI Internacional', target: 'comunidad_mali_internacional' },
+  { source: 'Biblioteca y Archivo', target: 'biblioteca_archivo' },
+  { source: 'Me gustaría recibir información sobre:', target: 'intereses' },
+] as const;
+
 const ATTRIBUTE_FIELDS: Record<string, string> = {
-  'Dirección y Gerencia': 'direccion_gerencia',
-  Curadurías: 'curadurias',
-  'Curaduría Educativa': 'curaduria_educativa',
-  Prensa: 'prensa',
-  Auditorio: 'auditorio',
-  Marketing: 'marketing',
-  'Educación-Talleres': 'educacion_talleres',
-  Instituciones: 'instituciones',
-  'Comunidad MALI': 'comunidad_mali',
-  APOYO: 'apoyo',
-  'Comunidad MALI Internacional': 'comunidad_mali_internacional',
-  'Biblioteca y Archivo': 'biblioteca_archivo',
-  'Me gustaría recibir información sobre:': 'intereses',
+  ...Object.fromEntries(MAILCHIMP_GROUP_FIELDS.map(({ source, target }) => [source, target])),
   'Institución Museal': 'institucion_museal',
   'Tipo de museo según colecciones': 'tipo_museo_colecciones',
   'Institución rectora': 'institucion_rectoria',
@@ -261,6 +274,19 @@ export function buildTags(raw: string | undefined) {
   return [...unique].map(([normalizedName, name]) => ({ name, normalizedName }));
 }
 
+export function buildGroups(record: CsvRecord): MalichimpGroupMembership[] {
+  return MAILCHIMP_GROUP_FIELDS.flatMap(({ source }, groupSortOrder) => {
+    const groupNormalizedName = normalizeTagName(source);
+    return buildTags(record[source]).map((option) => ({
+      groupName: source,
+      groupNormalizedName,
+      groupSortOrder,
+      optionName: option.name,
+      optionNormalizedName: option.normalizedName,
+    }));
+  });
+}
+
 function suppressionFor(
   status: MalichimpContactStatus,
   record: CsvRecord,
@@ -315,6 +341,7 @@ export function mapMailchimpRecord(
       parseMailchimpDate(record.CLEAN_TIME),
     attributes: buildAttributes(record),
     tags: buildTags(record.TAGS),
+    groups: buildGroups(record),
     suppression: suppressionFor(status, record),
   };
 }

@@ -13,7 +13,7 @@ export class MalichimpContactsQueryDto {
 
   @IsOptional()
   @IsString()
-  tag?: string;
+  groupOptionId?: string;
 
   @IsOptional()
   @Type(() => Number)

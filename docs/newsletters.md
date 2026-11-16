@@ -9,8 +9,9 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 ## Cómo funciona
 
 1. Crear/editar newsletter (draft/published).
-2. URL pública sirve HTML; tracking opens/clicks vía tokens `/mail/o|c/:token` cuando hay campaña.
-3. MALICHIMP será el consumidor del boletín para campañas de correo; el transporte SES es infraestructura compartida.
+2. La URL pública sirve el HTML publicado.
+3. MALICHIMP, Comunicación Interna u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
+4. Tracking, bajas y transporte se añaden fuera de Boletines en `core/email-delivery` y en el módulo dueño de la audiencia.
 
 ## Código
 
@@ -25,16 +26,19 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 ## API
 
 Admin: `/api/newsletters` CRUD.
-Público: `GET /n/:slug`, `GET /mail/o/:token`, `GET /mail/c/:token`.
+Público: `GET /n/:slug`.
+
+Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
 
 ## Datos (Prisma)
 
 - `Newsletter`
-- Los modelos históricos `EmailCampaign`, `EmailSend` y `EmailEvent` se conservan mientras se rediseña el flujo independiente de campañas.
+- Una campaña referencia el boletín para auditoría, pero envía `subjectSnapshot` y `htmlSnapshot`. Un boletín usado por campañas no puede eliminarse.
 
 ## Conexiones externas
 
-| **MALICHIMP** | Audiencia futura para campañas |
+| **MALICHIMP** | Audiencia y campañas de correo masivo |
+| **Comunicación Interna** | Audiencia activa de Google Workspace |
 | Públicos | HTML del boletín |
 
 ## Variables de entorno

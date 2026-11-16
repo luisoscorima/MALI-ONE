@@ -38,6 +38,33 @@ export interface MalichimpTagDto {
   contacts?: number;
 }
 
+export interface MalichimpGroupOptionDto {
+  id: string;
+  name: string;
+  normalizedName: string;
+  contacts: number;
+}
+
+export interface MalichimpGroupDto {
+  id: string;
+  name: string;
+  normalizedName: string;
+  sortOrder: number;
+  contacts: number;
+  options: MalichimpGroupOptionDto[];
+}
+
+export interface MalichimpContactGroupOptionDto {
+  id: string;
+  name: string;
+  normalizedName: string;
+  group: {
+    id: string;
+    name: string;
+    normalizedName: string;
+  };
+}
+
 export interface MalichimpContactDto {
   id: string;
   email: string;
@@ -58,6 +85,7 @@ export interface MalichimpContactDto {
   createdAt: string;
   updatedAt: string;
   tags: MalichimpTagDto[];
+  groupOptions: MalichimpContactGroupOptionDto[];
 }
 
 export interface MalichimpStatsDto {
@@ -66,6 +94,8 @@ export interface MalichimpStatsDto {
   byStatus: Record<MalichimpContactStatus, number>;
   suppressions: number;
   tags: number;
+  groups: number;
+  groupOptions: number;
   delivery: {
     provider: 'aws_ses';
     configured: boolean;
@@ -90,6 +120,8 @@ export interface MalichimpImportReportDto {
   retainedContacts: number;
   suppressions: number;
   tags: number;
+  groups: number;
+  groupOptions: number;
   errors: string[];
   fingerprint: string;
 }
@@ -112,6 +144,45 @@ export interface MalichimpImportJobDto {
   runId: string | null;
   error: string | null;
   startedAt: string;
+  completedAt: string | null;
+}
+
+export interface MalichimpAudienceFilterDto {
+  groupOptionIds: string[];
+}
+
+export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto {
+  subscribed: number;
+  eligible: number;
+  excluded: number;
+  sample: Array<{ id: string; email: string; name: string | null }>;
+}
+
+export interface CreateMalichimpCampaignDto extends MalichimpAudienceFilterDto {
+  name: string;
+  newsletterId: string;
+  replyTo: string;
+  scheduledAt?: string;
+}
+
+export interface MalichimpCampaignDto {
+  id: string;
+  name: string;
+  newsletterId: string;
+  newsletterTitle: string;
+  subject: string;
+  status: EmailCampaignStatus;
+  totalRecipients: number;
+  sent: number;
+  failed: number;
+  suppressed: number;
+  delivered: number;
+  bounced: number;
+  complaints: number;
+  opened: number;
+  clicked: number;
+  scheduledAt: string | null;
+  createdAt: string;
   completedAt: string | null;
 }
 
@@ -148,6 +219,7 @@ export interface InternalCampaignDto {
   totalRecipients: number;
   sent: number;
   failed: number;
+  suppressed: number;
   delivered: number;
   bounced: number;
   complaints: number;

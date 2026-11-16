@@ -85,6 +85,7 @@ AWS_SES_CONFIGURATION_SET=mali-one-newsletters
 AWS_SES_EVENTS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/mali-one-ses-events
 SES_FROM_EMAIL=boletines@mali.pe
 SES_FROM_NAME=MALI
+SES_SEND_RATE_PER_SECOND=8
 ```
 
 Eliminar del entorno de producción:

@@ -5,8 +5,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  EmailEventType,
-  EmailSendStatus,
   NewsletterStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -14,11 +12,6 @@ import {
   CreateNewsletterDto,
   UpdateNewsletterDto,
 } from './dto/newsletter.dto';
-
-const PIXEL_GIF = Buffer.from(
-  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-  'base64',
-);
 
 @Injectable()
 export class NewslettersService {
@@ -43,7 +36,7 @@ export class NewslettersService {
     });
   }
 
-  /** Published newsletters available to send from CRM PAM. */
+  /** Published content available to any authorized campaign module. */
   listPublished() {
     return this.prisma.newsletter.findMany({
       where: { status: NewsletterStatus.published },
@@ -129,96 +122,17 @@ export class NewslettersService {
   }
 
   async remove(id: string) {
-    await this.get(id);
+    const newsletter = await this.prisma.newsletter.findUnique({
+      where: { id },
+      include: { _count: { select: { campaigns: true } } },
+    });
+    if (!newsletter) throw new NotFoundException('Boletín no encontrado');
+    if (newsletter._count.campaigns) {
+      throw new BadRequestException(
+        'Este boletín ya fue usado en una campaña y debe conservarse como historial',
+      );
+    }
     await this.prisma.newsletter.delete({ where: { id } });
     return { ok: true };
-  }
-
-  async recordOpen(openToken: string, userAgent?: string) {
-    const send = await this.prisma.emailSend.findUnique({
-      where: { openToken },
-    });
-    if (!send || send.status !== EmailSendStatus.sent) {
-      return { tracked: false };
-    }
-
-    const already = await this.prisma.emailEvent.findFirst({
-      where: { sendId: send.id, type: EmailEventType.open },
-      select: { id: true },
-    });
-
-    await this.prisma.emailEvent.create({
-      data: {
-        campaignId: send.campaignId,
-        sendId: send.id,
-        type: EmailEventType.open,
-        userAgent: userAgent?.slice(0, 500) ?? null,
-      },
-    });
-
-    if (!already) {
-      await this.prisma.emailCampaign.update({
-        where: { id: send.campaignId },
-        data: { openCount: { increment: 1 } },
-      });
-    }
-
-    return { tracked: true };
-  }
-
-  async recordClick(openToken: string, url: string, userAgent?: string) {
-    const send = await this.prisma.emailSend.findUnique({
-      where: { openToken },
-    });
-    if (!send) return { tracked: false, url };
-
-    let target = url;
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        target = this.appUrl;
-      }
-    } catch {
-      target = this.appUrl;
-    }
-
-    await this.prisma.emailEvent.create({
-      data: {
-        campaignId: send.campaignId,
-        sendId: send.id,
-        type: EmailEventType.click,
-        url: target.slice(0, 2000),
-        userAgent: userAgent?.slice(0, 500) ?? null,
-      },
-    });
-    await this.prisma.emailCampaign.update({
-      where: { id: send.campaignId },
-      data: { clickCount: { increment: 1 } },
-    });
-
-    return { tracked: true, url: target };
-  }
-
-  getPixelBuffer(): Buffer {
-    return PIXEL_GIF;
-  }
-
-  injectTracking(html: string, openToken: string): string {
-    const pixelUrl = `${this.appUrl}/mail/o/${openToken}.gif`;
-    const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" />`;
-
-    let out = html;
-    out = out.replace(
-      /href=(["'])(https?:\/\/[^"']+)\1/gi,
-      (_m, q: string, href: string) => {
-        const tracked = `${this.appUrl}/mail/c/${openToken}?u=${encodeURIComponent(href)}`;
-        return `href=${q}${tracked}${q}`;
-      },
-    );
-
-    if (/<\/body>/i.test(out)) {
-      return out.replace(/<\/body>/i, `${pixel}</body>`);
-    }
-    return `${out}${pixel}`;
   }
 }

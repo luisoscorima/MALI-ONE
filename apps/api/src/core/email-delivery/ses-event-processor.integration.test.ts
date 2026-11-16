@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MalichimpSuppressionReason, SesEventType } from '@prisma/client';
+import { EmailGlobalSuppressionReason, SesEventType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SesEventProcessorService } from './ses-event-processor.service';
 
@@ -39,7 +39,7 @@ test(
 
     try {
       await prisma.sesEventRecord.deleteMany();
-      await prisma.malichimpSuppression.deleteMany();
+      await prisma.emailGlobalSuppression.deleteMany();
 
       const bounce = event('bounce-1', 'Email Bounced', 'Person@Example.com', {
         bounce: {
@@ -55,10 +55,10 @@ test(
         SesEventType.bounce,
       );
       assert.equal(
-        (await prisma.malichimpSuppression.findUniqueOrThrow({
+        (await prisma.emailGlobalSuppression.findUniqueOrThrow({
           where: { email: 'person@example.com' },
         })).reason,
-        MalichimpSuppressionReason.ses_bounce,
+        EmailGlobalSuppressionReason.bounce,
       );
 
       await processor.process(
@@ -67,10 +67,10 @@ test(
         }),
       );
       assert.equal(
-        (await prisma.malichimpSuppression.findUniqueOrThrow({
+        (await prisma.emailGlobalSuppression.findUniqueOrThrow({
           where: { email: 'optout@example.com' },
         })).reason,
-        MalichimpSuppressionReason.ses_unsubscribe,
+        EmailGlobalSuppressionReason.unsubscribe,
       );
 
       await processor.process(
@@ -79,17 +79,17 @@ test(
         }),
       );
       assert.equal(
-        await prisma.malichimpSuppression.count({
+        await prisma.emailGlobalSuppression.count({
           where: { email: 'optout@example.com' },
         }),
         0,
       );
 
-      await prisma.malichimpSuppression.create({
+      await prisma.emailGlobalSuppression.create({
         data: {
           email: 'protected@example.com',
-          reason: MalichimpSuppressionReason.mailchimp_cleaned,
-          source: 'mailchimp_export',
+          reason: EmailGlobalSuppressionReason.manual,
+          source: 'manual',
         },
       });
       await processor.process(
@@ -98,10 +98,10 @@ test(
         }),
       );
       assert.equal(
-        (await prisma.malichimpSuppression.findUniqueOrThrow({
+        (await prisma.emailGlobalSuppression.findUniqueOrThrow({
           where: { email: 'protected@example.com' },
         })).reason,
-        MalichimpSuppressionReason.mailchimp_cleaned,
+        EmailGlobalSuppressionReason.manual,
       );
     } finally {
       await prisma.$disconnect();

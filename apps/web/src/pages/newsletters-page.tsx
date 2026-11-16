@@ -193,7 +193,7 @@ export function NewslettersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Boletines"
-        description="Bloques al estilo Mailchimp MALI: texto|imagen, imagen|texto, colores y CTAs. El envío masivo se hace desde CRM PAM."
+        description="Diseña y publica contenido reutilizable. Las audiencias y los envíos se administran desde el módulo que consume cada boletín."
         actions={
           mode === 'closed' ? (
             <Button type="button" onClick={openCreate}>

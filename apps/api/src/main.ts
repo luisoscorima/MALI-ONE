@@ -27,6 +27,8 @@ async function bootstrap() {
       { path: 'n/:slug', method: RequestMethod.GET },
       { path: 'mail/o/:token', method: RequestMethod.GET },
       { path: 'mail/c/:token', method: RequestMethod.GET },
+      { path: 'mail/unsubscribe/:token', method: RequestMethod.GET },
+      { path: 'mail/unsubscribe/:token', method: RequestMethod.POST },
     ],
   });
   app.use(cookieParser());

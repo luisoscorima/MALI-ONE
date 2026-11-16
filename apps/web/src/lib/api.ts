@@ -357,17 +357,20 @@ export const api = {
   listMalichimpTags: () =>
     request<import('@mali-one/shared').MalichimpTagDto[]>('/api/malichimp/tags'),
 
+  listMalichimpGroups: () =>
+    request<import('@mali-one/shared').MalichimpGroupDto[]>('/api/malichimp/groups'),
+
   listMalichimpContacts: (filters: {
     q?: string;
     status?: import('@mali-one/shared').MalichimpContactStatus;
-    tag?: string;
+    groupOptionId?: string;
     page?: number;
     pageSize?: number;
   } = {}) => {
     const params = new URLSearchParams();
     if (filters.q) params.set('q', filters.q);
     if (filters.status) params.set('status', filters.status);
-    if (filters.tag) params.set('tag', filters.tag);
+    if (filters.groupOptionId) params.set('groupOptionId', filters.groupOptionId);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
     return request<{
@@ -398,6 +401,30 @@ export const api = {
     request<import('@mali-one/shared').MalichimpImportJobDto>(
       `/api/malichimp/imports/jobs/${encodeURIComponent(jobId)}`,
     ),
+
+  listMalichimpNewsletters: () =>
+    request<import('@mali-one/shared').NewsletterDto[]>(
+      '/api/malichimp/newsletters',
+    ),
+
+  listMalichimpCampaigns: () =>
+    request<import('@mali-one/shared').MalichimpCampaignDto[]>(
+      '/api/malichimp/campaigns',
+    ),
+
+  previewMalichimpAudience: (
+    body: import('@mali-one/shared').MalichimpAudienceFilterDto,
+  ) => request<import('@mali-one/shared').MalichimpAudiencePreviewDto>(
+    '/api/malichimp/campaigns/preview',
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
+
+  createMalichimpCampaign: (
+    body: import('@mali-one/shared').CreateMalichimpCampaignDto,
+  ) => request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(
+    '/api/malichimp/campaigns',
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
     niubizStatus: () => request<import('@mali-one/shared').NiubizSyncStatusDto>('/api/treasury/niubiz/status'),
     syncNiubiz: (range: { from?: string; to?: string }) => request<{ runId: string }>('/api/treasury/niubiz/sync', { method: 'POST', body: JSON.stringify(range) }),
   niubizPayCashStatus: () => request<import('@mali-one/shared').NiubizPayCashSyncStatusDto>('/api/treasury/niubiz/paycash/status'),

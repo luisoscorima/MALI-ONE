@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildGroups,
   buildTags,
   cleanImportedText,
   decodeCsvBuffer,
@@ -38,6 +39,7 @@ test('mapea campos, etiquetas y una baja como supresión', () => {
       UNSUB_REASON: 'User unsubscribed',
       UNSUB_TIME: '2026-11-05 10:00:00',
       Departamento: 'Lima',
+      'Dirección y Gerencia': 'Consejo, PAT, consejo',
     },
     'unsubscribed',
   );
@@ -45,7 +47,17 @@ test('mapea campos, etiquetas y una baja como supresión', () => {
   assert.equal(row.email, 'persona@ejemplo.com');
   assert.equal(row.institutionName, 'MALI');
   assert.deepEqual(row.tags.map((tag) => tag.normalizedName), ['vip', 'socios']);
-  assert.deepEqual(row.attributes, { departamento: 'Lima' });
+  assert.deepEqual(row.attributes, {
+    direccion_gerencia: 'Consejo, PAT, consejo',
+    departamento: 'Lima',
+  });
+  assert.deepEqual(
+    row.groups.map((group) => [group.groupName, group.optionName]),
+    [
+      ['Dirección y Gerencia', 'Consejo'],
+      ['Dirección y Gerencia', 'PAT'],
+    ],
+  );
   assert.equal(row.suppression?.reason, 'mailchimp_unsubscribed');
 });
 
@@ -69,6 +81,26 @@ test('limpia comillas, repara y deduplica etiquetas del export de Mailchimp', ()
   assert.deepEqual(
     tags.map((tag) => tag.name),
     ['FORMACIÓN CULTURAL', 'ExtensiónProfesional'],
+  );
+});
+
+test('convierte las columnas de grupos en opciones normalizadas y ordenadas', () => {
+  const groups = buildGroups({
+    Marketing: 'Eventos, Socios',
+    'Me gustaría recibir información sobre:': 'Cursos, Exposiciones',
+  });
+  assert.deepEqual(
+    groups.map((group) => ({
+      group: group.groupNormalizedName,
+      option: group.optionNormalizedName,
+      order: group.groupSortOrder,
+    })),
+    [
+      { group: 'marketing', option: 'eventos', order: 5 },
+      { group: 'marketing', option: 'socios', order: 5 },
+      { group: 'me gustaría recibir información sobre:', option: 'cursos', order: 12 },
+      { group: 'me gustaría recibir información sobre:', option: 'exposiciones', order: 12 },
+    ],
   );
 });
 

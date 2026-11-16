@@ -205,7 +205,7 @@ model NiubizPayCashPayment {
   id            String           @id @default(cuid())
   merchantCode  String           @db.VarChar(9)
   cip           String           @db.VarChar(80)
-  customerEmail String?         @db.VarChar(250)
+  customerEmail String?          @db.VarChar(250)
   currency      TreasuryCurrency
   amount        Decimal          @db.Decimal(18, 2)
   brand         String           @db.VarChar(80)
@@ -852,6 +852,7 @@ enum EmailSendStatus {
   pending
   sent
   failed
+  suppressed
 }
 
 enum EmailEventType {
@@ -869,9 +870,17 @@ enum MalichimpContactStatus {
 enum MalichimpSuppressionReason {
   mailchimp_unsubscribed
   mailchimp_cleaned
+  malichimp_unsubscribe
   ses_bounce
   ses_complaint
   ses_unsubscribe
+  manual
+}
+
+enum EmailGlobalSuppressionReason {
+  bounce
+  complaint
+  unsubscribe
   manual
 }
 
@@ -935,9 +944,18 @@ model LandingPage {
 model EmailCampaign {
   id                      String              @id @default(cuid())
   newsletterId            String
-  newsletter              Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  newsletter              Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Restrict)
   name                    String
   replyToEmail            String?
+  /// Immutable content captured when the campaign is created.
+  subjectSnapshot         String              @db.VarChar(300)
+  htmlSnapshot            String              @db.Text
+  fromName                String?             @db.VarChar(160)
+  fromEmail               String?             @db.VarChar(320)
+  /// Optional public route owned by the audience module, without coupling the dispatcher to it.
+  unsubscribePath         String?             @db.VarChar(200)
+  /// Explicit opt-in prevents legacy campaigns from being picked up by the shared dispatcher.
+  managedByDispatcher     Boolean             @default(false)
   status                  EmailCampaignStatus @default(draft)
   audienceArea            String              @default("pam")
   /// Legacy singular; prefer audienceSegments.
@@ -968,22 +986,34 @@ model EmailCampaign {
 }
 
 model EmailSend {
-  id           String          @id @default(cuid())
-  campaignId   String
-  campaign     EmailCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  email        String
-  contactId    Int?
-  name         String?
-  status       EmailSendStatus @default(pending)
-  openToken    String          @unique @default(cuid())
-  sesMessageId String?
-  error        String?
-  sentAt       DateTime?
-  createdAt    DateTime        @default(now())
-  events       EmailEvent[]
+  id              String          @id @default(cuid())
+  campaignId      String
+  campaign        EmailCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email           String
+  contactId       Int?
+  /// Identifier in the audience module; intentionally has no cross-module foreign key.
+  sourceContactId String?         @db.VarChar(120)
+  name            String?
+  status          EmailSendStatus @default(pending)
+  openToken       String          @unique @default(cuid())
+  sesMessageId    String?
+  error           String?
+  attemptCount    Int             @default(0)
+  claimedAt       DateTime?
+  nextAttemptAt   DateTime?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  bouncedAt       DateTime?
+  complainedAt    DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  events          EmailEvent[]
 
   @@index([campaignId])
   @@index([email])
+  @@index([status, nextAttemptAt])
+  @@index([sesMessageId])
 }
 
 model EmailEvent {
@@ -1024,6 +1054,7 @@ model MalichimpContact {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
   tags            MalichimpContactTag[]
+  groupOptions    MalichimpContactGroupOption[]
 
   @@index([status])
   @@index([lastName, firstName])
@@ -1052,6 +1083,45 @@ model MalichimpContactTag {
   @@index([tagId])
 }
 
+/// A Mailchimp group category (for example, "Dirección y Gerencia").
+model MalichimpGroup {
+  id             String                 @id @default(cuid())
+  name           String                 @db.VarChar(200)
+  normalizedName String                 @unique @db.VarChar(200)
+  sortOrder      Int                    @default(0)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  options        MalichimpGroupOption[]
+
+  @@index([sortOrder, name])
+}
+
+/// A selectable option inside a Mailchimp group category (for example, "Consejo").
+model MalichimpGroupOption {
+  id             String                         @id @default(cuid())
+  groupId        String
+  group          MalichimpGroup                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name           String                         @db.VarChar(200)
+  normalizedName String                         @db.VarChar(200)
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+  contacts       MalichimpContactGroupOption[]
+
+  @@unique([groupId, normalizedName])
+  @@index([groupId, name])
+}
+
+model MalichimpContactGroupOption {
+  contactId String
+  optionId  String
+  contact   MalichimpContact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  option    MalichimpGroupOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  createdAt DateTime             @default(now())
+
+  @@id([contactId, optionId])
+  @@index([optionId])
+}
+
 /// Addresses that must never receive a campaign, regardless of segment membership.
 model MalichimpSuppression {
   id         String                     @id @default(cuid())
@@ -1062,6 +1132,22 @@ model MalichimpSuppression {
   metadata   Json?
   createdAt  DateTime                   @default(now())
   updatedAt  DateTime                   @updatedAt
+
+  @@index([reason])
+  @@index([updatedAt])
+}
+
+/// Provider-level safety list shared by every email-producing module.
+/// Business opt-outs remain in their owning audience module.
+model EmailGlobalSuppression {
+  id         String                       @id @default(cuid())
+  email      String                       @unique @db.VarChar(320)
+  reason     EmailGlobalSuppressionReason
+  source     String                       @db.VarChar(80)
+  occurredAt DateTime?
+  metadata   Json?
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
 
   @@index([reason])
   @@index([updatedAt])

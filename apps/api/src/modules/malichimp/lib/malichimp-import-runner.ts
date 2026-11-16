@@ -8,9 +8,11 @@ import {
 } from '@prisma/client';
 import {
   IMPORT_FILES,
+  MAILCHIMP_GROUP_FIELDS,
   fingerprintFiles,
   isBasicEmail,
   mapMailchimpRecord,
+  normalizeTagName,
   readCsvRecords,
   type MalichimpRow,
 } from './malichimp-import';
@@ -27,6 +29,8 @@ export type MalichimpImportReport = {
   retainedContacts: number;
   suppressions: number;
   tags: number;
+  groups: number;
+  groupOptions: number;
   errors: string[];
   fingerprint: string;
 };
@@ -53,6 +57,8 @@ export async function inspectMalichimpFiles(
 ): Promise<MalichimpImportReport> {
   const emails = new Map<string, MalichimpContactStatus>();
   const tags = new Set<string>();
+  const groups = new Set<string>();
+  const groupOptions = new Set<string>();
   const counts: Record<string, number> = {};
   const errors: string[] = [];
 
@@ -72,6 +78,12 @@ export async function inspectMalichimpFiles(
         emails.set(row.email, file.status);
       }
       row.tags.forEach((tag) => tags.add(tag.normalizedName));
+      row.groups.forEach((membership) => {
+        groups.add(membership.groupNormalizedName);
+        groupOptions.add(
+          `${membership.groupNormalizedName}\u0000${membership.optionNormalizedName}`,
+        );
+      });
     }
   }
 
@@ -85,6 +97,8 @@ export async function inspectMalichimpFiles(
       (counts.nonsubscribed ?? 0),
     suppressions: (counts.unsubscribed ?? 0) + (counts.cleaned ?? 0),
     tags: tags.size,
+    groups: groups.size,
+    groupOptions: groupOptions.size,
     errors,
     fingerprint: await fingerprintFiles(files.map((file) => file.filePath)),
   };
@@ -135,9 +149,14 @@ async function importBatch(tx: Prisma.TransactionClient, rows: MalichimpRow[]) {
       contacts.map((contact) => [contact.email, contact.id]),
     );
     if (contactIds.length) {
-      await tx.malichimpContactTag.deleteMany({
-        where: { contactId: { in: contactIds } },
-      });
+      await Promise.all([
+        tx.malichimpContactTag.deleteMany({
+          where: { contactId: { in: contactIds } },
+        }),
+        tx.malichimpContactGroupOption.deleteMany({
+          where: { contactId: { in: contactIds } },
+        }),
+      ]);
     }
 
     const uniqueTags = new Map<string, string>();
@@ -173,6 +192,85 @@ async function importBatch(tx: Prisma.TransactionClient, rows: MalichimpRow[]) {
           data: links,
           skipDuplicates: true,
         });
+      }
+    }
+
+    const uniqueGroups = new Map<
+      string,
+      { name: string; sortOrder: number }
+    >();
+    rows.forEach((row) => row.groups.forEach((membership) => {
+      uniqueGroups.set(membership.groupNormalizedName, {
+        name: membership.groupName,
+        sortOrder: membership.groupSortOrder,
+      });
+    }));
+    if (uniqueGroups.size) {
+      await tx.malichimpGroup.createMany({
+        data: [...uniqueGroups].map(([normalizedName, group]) => ({
+          id: randomUUID(),
+          name: group.name,
+          normalizedName,
+          sortOrder: group.sortOrder,
+        })),
+        skipDuplicates: true,
+      });
+      const importedGroups = await tx.malichimpGroup.findMany({
+        where: { normalizedName: { in: [...uniqueGroups.keys()] } },
+        select: { id: true, normalizedName: true },
+      });
+      const groupIdByName = new Map(
+        importedGroups.map((group) => [group.normalizedName, group.id]),
+      );
+      const uniqueOptions = new Map<
+        string,
+        { groupId: string; name: string; normalizedName: string }
+      >();
+      rows.forEach((row) => row.groups.forEach((membership) => {
+        const groupId = groupIdByName.get(membership.groupNormalizedName);
+        if (!groupId) return;
+        uniqueOptions.set(`${groupId}\u0000${membership.optionNormalizedName}`, {
+          groupId,
+          name: membership.optionName,
+          normalizedName: membership.optionNormalizedName,
+        });
+      }));
+      if (uniqueOptions.size) {
+        await tx.malichimpGroupOption.createMany({
+          data: [...uniqueOptions.values()].map((option) => ({
+            id: randomUUID(),
+            ...option,
+          })),
+          skipDuplicates: true,
+        });
+        const importedOptions = await tx.malichimpGroupOption.findMany({
+          where: { groupId: { in: importedGroups.map((group) => group.id) } },
+          select: { id: true, groupId: true, normalizedName: true },
+        });
+        const optionIdByKey = new Map(
+          importedOptions.map((option) => [
+            `${option.groupId}\u0000${option.normalizedName}`,
+            option.id,
+          ]),
+        );
+        const links = rows.flatMap((row) => {
+          const contactId = contactIdByEmail.get(row.email);
+          if (!contactId) return [];
+          return row.groups.flatMap((membership) => {
+            const groupId = groupIdByName.get(membership.groupNormalizedName);
+            if (!groupId) return [];
+            const optionId = optionIdByKey.get(
+              `${groupId}\u0000${membership.optionNormalizedName}`,
+            );
+            return optionId ? [{ contactId, optionId }] : [];
+          });
+        });
+        if (links.length) {
+          await tx.malichimpContactGroupOption.createMany({
+            data: links,
+            skipDuplicates: true,
+          });
+        }
       }
     }
 
@@ -238,6 +336,15 @@ export async function applyMalichimpFiles(
 
   let processed = 0;
   await prisma.$transaction(async (tx) => {
+    await tx.malichimpGroup.createMany({
+      data: MAILCHIMP_GROUP_FIELDS.map(({ source }, sortOrder) => ({
+        id: randomUUID(),
+        name: source,
+        normalizedName: normalizeTagName(source),
+        sortOrder,
+      })),
+      skipDuplicates: true,
+    });
     for (const file of files) {
       const records = await readCsvRecords(file.filePath);
       for (let index = 0; index < records.length; index += batchSize) {

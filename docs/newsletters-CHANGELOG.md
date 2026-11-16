@@ -4,6 +4,9 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Las campañas guardan snapshots del asunto y HTML; editar un boletín no altera envíos ya creados.
+- Tracking y eventos de entrega pasan a `core/email-delivery` para poder reutilizarse desde cualquier módulo.
+- Se impide eliminar un boletín que forma parte del historial de campañas.
 - Se desacopla el editor de CRM PAM; audiencia MALICHIMP y transporte SES quedan como responsabilidades independientes.
 - Se aclara que el SMTP PAM no forma parte del flujo de boletines/SES.
 
