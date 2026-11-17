@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppModule, AppUserDto } from '@mali-one/shared';
 import { APP_MODULES } from '@/lib/app-modules';
 import { api } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/contexts/toast-context';
-import { AlertBanner, EmptyState, Spinner, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, Spinner } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import {
   Badge,
@@ -11,30 +12,25 @@ import {
   Card,
   Checkbox,
   Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Label,
+  Skeleton,
 } from '@/components/ui';
 
 type DraftModules = Record<string, AppModule[]>;
 
-const stickyUser =
-  'sticky left-0 z-20 w-56 min-w-56 border-r border-border/60 bg-card p-4';
-const stickyRole =
-  'sticky left-56 z-20 border-r border-border/60 bg-card p-4';
-const stickyActions =
-  'sticky right-0 z-20 border-l border-border/60 bg-card p-4';
+function modulesEqual(a: AppModule[], b: AppModule[]) {
+  if (a.length !== b.length) return false;
+  return a.every((module) => b.includes(module));
+}
 
 export function AppUsersPage() {
   const toast = useToast();
   const [users, setUsers] = useState<AppUserDto[]>([]);
   const [query, setQuery] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<DraftModules>({});
   const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const loadUsers = useCallback(async () => {
@@ -46,6 +42,10 @@ export function AppUsersPage() {
       setDrafts(
         Object.fromEntries(data.map((user) => [user.id, [...user.modules]])),
       );
+      setSelectedId((current) => {
+        if (current && data.some((user) => user.id === current)) return current;
+        return data[0]?.id ?? null;
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al cargar usuarios';
       setError(msg);
@@ -59,122 +59,157 @@ export function AppUsersPage() {
     void loadUsers();
   }, [loadUsers]);
 
-  function toggleModule(userId: string, module: AppModule) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredUsers = useMemo(
+    () =>
+      normalizedQuery
+        ? users.filter(
+            (user) =>
+              user.name.toLowerCase().includes(normalizedQuery) ||
+              user.email.toLowerCase().includes(normalizedQuery),
+          )
+        : users,
+    [users, normalizedQuery],
+  );
+
+  useEffect(() => {
+    if (filteredUsers.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !filteredUsers.some((user) => user.id === selectedId)) {
+      setSelectedId(filteredUsers[0].id);
+    }
+  }, [filteredUsers, selectedId]);
+
+  const selectedUser =
+    filteredUsers.find((user) => user.id === selectedId) ?? null;
+  const selectedDraft = selectedUser
+    ? (drafts[selectedUser.id] ?? selectedUser.modules)
+    : [];
+  const selectedIsAdmin = selectedUser?.role === 'admin';
+  const selectedHasChanges = selectedUser
+    ? !selectedIsAdmin &&
+      !modulesEqual(selectedDraft, selectedUser.modules)
+    : false;
+
+  function userHasChanges(user: AppUserDto) {
+    if (user.role === 'admin') return false;
+    return !modulesEqual(drafts[user.id] ?? user.modules, user.modules);
+  }
+
+  function toggleModule(module: AppModule) {
+    if (!selectedUser || selectedIsAdmin) return;
     setDrafts((prev) => {
-      const current = prev[userId] ?? [];
+      const current = prev[selectedUser.id] ?? [];
       const next = current.includes(module)
         ? current.filter((item) => item !== module)
         : [...current, module];
-      return { ...prev, [userId]: next };
+      return { ...prev, [selectedUser.id]: next };
     });
   }
 
-  function hasChanges(user: AppUserDto) {
-    const draft = drafts[user.id] ?? [];
-    if (draft.length !== user.modules.length) return true;
-    return draft.some((module) => !user.modules.includes(module));
-  }
-
-  async function saveModules(user: AppUserDto) {
-    setSavingId(user.id);
+  async function saveModules() {
+    if (!selectedUser || selectedIsAdmin || !selectedHasChanges) return;
+    setSaving(true);
     setError('');
     try {
       const updated = await api.updateAppUserModules(
-        user.id,
-        drafts[user.id] ?? [],
+        selectedUser.id,
+        drafts[selectedUser.id] ?? [],
       );
       setUsers((prev) =>
         prev.map((item) => (item.id === updated.id ? updated : item)),
       );
       setDrafts((prev) => ({ ...prev, [updated.id]: [...updated.modules] }));
-      toast.success(`Accesos actualizados para ${user.email}`);
+      toast.success(`Accesos actualizados para ${selectedUser.email}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error al guardar';
       setError(msg);
       toast.error(msg);
     } finally {
-      setSavingId(null);
+      setSaving(false);
     }
   }
-
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredUsers = normalizedQuery
-    ? users.filter(
-        (user) =>
-          user.name.toLowerCase().includes(normalizedQuery) ||
-          user.email.toLowerCase().includes(normalizedQuery),
-      )
-    : users;
 
   return (
     <div>
       <PageHeader
         title="Accesos MALI ONE"
         description="Los usuarios con cuenta @mali.pe inician sesión automáticamente. Aquí defines qué módulos ven en el menú. El administrador del sistema siempre tiene acceso completo."
+        actions={
+          selectedUser && !selectedIsAdmin ? (
+            <Button
+              disabled={!selectedHasChanges || saving}
+              onClick={() => void saveModules()}
+            >
+              {saving ? (
+                <span className="flex items-center gap-2">
+                  <Spinner className="h-4 w-4" /> Guardando...
+                </span>
+              ) : (
+                'Guardar'
+              )}
+            </Button>
+          ) : null
+        }
       />
 
       {error && (
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
 
-      <Card className="mb-6 p-4">
-        <Input
-          placeholder="Buscar por nombre o email..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
+        <Card className="overflow-hidden p-0">
+          <div className="border-b border-border/60 p-3">
+            <Input
+              placeholder="Buscar por nombre o email..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Buscar usuarios"
+            />
+          </div>
 
-      <Card className="overflow-hidden p-0">
-        <Table className="min-w-max w-full">
-          <TableHeader>
-            <TableRow className="text-muted">
-              <TableHead className={stickyUser}>Usuario</TableHead>
-              <TableHead className={stickyRole}>Rol</TableHead>
-              {APP_MODULES.map((mod) => (
-                <TableHead
-                  key={mod.id}
-                  title={mod.label}
-                  className="h-auto max-w-[2.5rem] whitespace-normal px-1.5 py-3 text-center align-bottom"
-                >
-                  <span className="inline-block max-h-36 overflow-hidden text-ellipsis text-xs font-medium leading-tight [writing-mode:vertical-rl]">
-                    {mod.label}
-                  </span>
-                </TableHead>
-              ))}
-              <TableHead className={stickyActions}>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          {loading ? (
-            <TableBody>
-              <TableSkeleton rows={5} cols={3 + APP_MODULES.length} />
-            </TableBody>
-          ) : filteredUsers.length === 0 ? (
-            <TableBody>
-              <TableRow>
-                <TableCell colSpan={3 + APP_MODULES.length}>
-                  <EmptyState
-                    title={normalizedQuery ? 'Sin coincidencias' : 'Aún no hay usuarios'}
-                    description={
-                      normalizedQuery
-                        ? 'Prueba con otro término de búsqueda.'
-                        : 'Los usuarios aparecerán aquí después de su primer inicio de sesión con Google.'
-                    }
-                  />
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          ) : (
-            <TableBody>
-              {filteredUsers.map((user) => {
-                const isAdmin = user.role === 'admin';
-                const draft = drafts[user.id] ?? user.modules;
-                const changed = hasChanges(user);
+          <div className="max-h-[min(70vh,40rem)] overflow-y-auto">
+            {loading ? (
+              <div className="space-y-2 p-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <EmptyState
+                title={normalizedQuery ? 'Sin coincidencias' : 'Aún no hay usuarios'}
+                description={
+                  normalizedQuery
+                    ? 'Prueba con otro término de búsqueda.'
+                    : 'Los usuarios aparecerán aquí después de su primer inicio de sesión con Google.'
+                }
+              />
+            ) : (
+              <ul className="p-2" role="listbox" aria-label="Usuarios">
+                {filteredUsers.map((user) => {
+                  const isSelected = user.id === selectedId;
+                  const isAdmin = user.role === 'admin';
+                  const dirty = userHasChanges(user);
+                  const moduleCount = isAdmin
+                    ? APP_MODULES.length
+                    : (drafts[user.id] ?? user.modules).length;
 
-                return (
-                  <TableRow key={user.id} className="border-border/60">
-                    <TableCell className={stickyUser}>
-                      <div className="flex min-w-0 items-center gap-3">
+                  return (
+                    <li key={user.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => setSelectedId(user.id)}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors',
+                          isSelected
+                            ? 'bg-primary/10 text-foreground'
+                            : 'hover:bg-muted/60',
+                        )}
+                      >
                         {user.picture ? (
                           <img
                             src={user.picture}
@@ -186,57 +221,151 @@ export function AppUsersPage() {
                             {user.name[0]}
                           </div>
                         )}
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{user.name}</p>
-                          <p className="truncate text-muted">{user.email}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium">{user.name}</p>
+                            {dirty ? (
+                              <span
+                                className="size-1.5 shrink-0 rounded-full bg-amber-500"
+                                title="Cambios sin guardar"
+                                aria-label="Cambios sin guardar"
+                              />
+                            ) : null}
+                          </div>
+                          <p className="truncate text-xs text-muted">{user.email}</p>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className={stickyRole}>
-                      {isAdmin ? (
-                        <Badge variant="secondary" className="bg-primary/15 text-primary">
-                          Administrador
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">Operador</Badge>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              isAdmin && 'bg-primary/15 text-primary',
+                            )}
+                          >
+                            {isAdmin ? 'Admin' : 'Operador'}
+                          </Badge>
+                          <span className="text-[11px] text-muted">
+                            {isAdmin ? 'Total' : `${moduleCount} mód.`}
+                          </span>
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden p-0">
+          {loading ? (
+            <div className="space-y-3 p-6">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-72" />
+              <div className="space-y-2 pt-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ) : !selectedUser ? (
+            <EmptyState
+              title="Selecciona un usuario"
+              description="Elige alguien de la lista para ver y editar sus módulos."
+            />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="truncate text-lg font-semibold tracking-tight">
+                      {selectedUser.name}
+                    </h3>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        selectedIsAdmin && 'bg-primary/15 text-primary',
                       )}
-                    </TableCell>
-                    {APP_MODULES.map((mod) => (
-                      <TableCell key={mod.id} className="px-1.5 py-4 text-center">
+                    >
+                      {selectedIsAdmin ? 'Administrador' : 'Operador'}
+                    </Badge>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm text-muted">
+                    {selectedUser.email}
+                  </p>
+                </div>
+                {selectedIsAdmin ? (
+                  <p className="text-sm text-muted">Acceso total a todos los módulos</p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    {selectedDraft.length} de {APP_MODULES.length} módulos
+                    {selectedHasChanges ? ' · sin guardar' : ''}
+                  </p>
+                )}
+              </div>
+
+              <ul className="divide-y divide-border/60">
+                {APP_MODULES.map((mod) => {
+                  const checked = selectedIsAdmin
+                    ? true
+                    : selectedDraft.includes(mod.id);
+                  const inputId = `module-${selectedUser.id}-${mod.id}`;
+
+                  return (
+                    <li key={mod.id}>
+                      <label
+                        htmlFor={inputId}
+                        className={cn(
+                          'flex cursor-pointer items-start gap-3 px-5 py-3.5 transition-colors',
+                          selectedIsAdmin
+                            ? 'cursor-default opacity-80'
+                            : 'hover:bg-muted/40',
+                        )}
+                      >
                         <Checkbox
-                          checked={isAdmin ? true : draft.includes(mod.id)}
-                          disabled={isAdmin || savingId === user.id}
-                          onCheckedChange={() => toggleModule(user.id, mod.id)}
-                          aria-label={`${mod.label} para ${user.email}`}
+                          id={inputId}
+                          checked={checked}
+                          disabled={selectedIsAdmin || saving}
+                          onCheckedChange={() => toggleModule(mod.id)}
+                          className="mt-0.5"
+                          aria-label={mod.label}
                         />
-                      </TableCell>
-                    ))}
-                    <TableCell className={stickyActions}>
-                      {isAdmin ? (
-                        <span className="text-xs text-muted">Acceso total</span>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          disabled={!changed || savingId === user.id}
-                          onClick={() => void saveModules(user)}
-                        >
-                          {savingId === user.id ? (
-                            <span className="flex items-center gap-2">
-                              <Spinner className="h-4 w-4" /> Guardando...
-                            </span>
-                          ) : (
-                            'Guardar'
-                          )}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
+                        <span className="min-w-0 flex-1">
+                          <Label
+                            htmlFor={inputId}
+                            className="cursor-pointer text-sm font-medium leading-snug"
+                          >
+                            {mod.label}
+                          </Label>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {mod.description}
+                          </p>
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {!selectedIsAdmin ? (
+                <div className="sticky bottom-0 flex justify-end border-t border-border/60 bg-card px-5 py-3">
+                  <Button
+                    disabled={!selectedHasChanges || saving}
+                    onClick={() => void saveModules()}
+                  >
+                    {saving ? (
+                      <span className="flex items-center gap-2">
+                        <Spinner className="h-4 w-4" /> Guardando...
+                      </span>
+                    ) : (
+                      'Guardar cambios'
+                    )}
+                  </Button>
+                </div>
+              ) : null}
+            </>
           )}
-        </Table>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 }
