@@ -52,6 +52,7 @@ import {
 import { api } from '@/lib/api';
 import {
   isFloatingLayerBlockingDismiss,
+  notifyFloatingLayerOpen,
   withNativeFilePickerGuard,
 } from '@/lib/floating-layer';
 import { useToast } from '@/contexts/toast-context';
