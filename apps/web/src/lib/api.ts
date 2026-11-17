@@ -1618,6 +1618,16 @@ export const api = {
       '/api/internal-communications/campaigns',
     ),
 
+  getInternalCampaign: (id: string) =>
+    request<import('@mali-one/shared').InternalCampaignDetailDto>(
+      `/api/internal-communications/campaigns/${encodeURIComponent(id)}`,
+    ),
+
+  getInternalCampaignStats: (id: string, days = 30) =>
+    request<import('@mali-one/shared').MalichimpCampaignStatsDto>(
+      `/api/internal-communications/campaigns/${encodeURIComponent(id)}/stats?days=${encodeURIComponent(String(days))}`,
+    ),
+
   createInternalCampaign: (
     body: import('@mali-one/shared').CreateInternalCampaignDto,
   ) =>

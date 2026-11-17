@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
+  ExternalLink,
   Eye,
   Loader2,
   Plus,
@@ -16,10 +17,12 @@ import type {
   EmailSenderDto,
   InternalAudienceDto,
   InternalAudienceMemberDto,
+  InternalCampaignDetailDto,
   InternalCampaignDto,
   NewsletterDto,
 } from '@mali-one/shared';
-import { AlertBanner, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, Spinner, TableSkeleton } from '@/components/feedback';
+import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import {
@@ -51,6 +54,12 @@ import {
   TableRow,
 } from '@/components/ui';
 
+const MalichimpCampaignStatsPanel = lazy(() =>
+  import('@/components/malichimp-campaign-stats-panel').then((m) => ({
+    default: m.MalichimpCampaignStatsPanel,
+  })),
+);
+
 const nf = new Intl.NumberFormat('es-PE');
 const df = new Intl.DateTimeFormat('es-PE', {
   dateStyle: 'medium',
@@ -75,6 +84,118 @@ const statusLabel: Record<InternalCampaignDto['status'], string> = {
   completed: 'Completada',
   failed: 'Fallida',
 };
+
+function NewsletterSearchSelect({
+  id,
+  label,
+  newsletters,
+  value,
+  onChange,
+  placeholder = 'Seleccionar',
+}: {
+  id: string;
+  label: string;
+  newsletters: NewsletterDto[];
+  value: string;
+  onChange: (id: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const selected = newsletters.find((newsletter) => newsletter.id === value) ?? null;
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return newsletters;
+    return newsletters.filter((newsletter) => {
+      const haystack = `${newsletter.title} ${newsletter.subject} ${newsletter.slug}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [newsletters, query]);
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Popover
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setQuery('');
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            className="h-auto min-h-10 w-full justify-between px-3 py-2 font-normal"
+            aria-expanded={open}
+            aria-label={label}
+          >
+            <span className="truncate text-left">
+              {selected ? selected.title : placeholder}
+            </span>
+            <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] max-h-80 flex-col gap-2 overflow-hidden p-2"
+        >
+          <div className="relative shrink-0">
+            <Search
+              className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar por título o asunto"
+              className="pl-8"
+              aria-label={`Buscar ${label}`}
+            />
+          </div>
+          <div
+            className="min-h-0 max-h-64 flex-1 space-y-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y"
+            onWheel={(event) => event.stopPropagation()}
+          >
+            {filtered.length ? (
+              filtered.map((newsletter) => {
+                const active = newsletter.id === value;
+                return (
+                  <button
+                    key={newsletter.id}
+                    type="button"
+                    className={`flex w-full min-w-0 flex-col items-stretch gap-0.5 overflow-hidden rounded-md px-2 py-2 text-left text-sm hover:bg-muted/60 ${
+                      active ? 'bg-muted' : ''
+                    }`}
+                    onClick={() => {
+                      onChange(newsletter.id);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                  >
+                    <span className="block w-full truncate font-medium">
+                      {newsletter.title}
+                    </span>
+                    {newsletter.subject ? (
+                      <span className="block w-full truncate text-xs text-muted-foreground">
+                        {newsletter.subject}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })
+            ) : (
+              <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                Sin coincidencias
+              </p>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
 
 function OrgUnitMultiSelect({
   id,
@@ -216,6 +337,12 @@ export function WorkspaceInternalCampaigns() {
   const [newsletterId, setNewsletterId] = useState('');
   const [name, setName] = useState('');
   const [recipientQuery, setRecipientQuery] = useState('');
+  const [campaignPreview, setCampaignPreview] =
+    useState<InternalCampaignDetailDto | null>(null);
+  const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
+  const [statsCampaign, setStatsCampaign] = useState<InternalCampaignDto | null>(
+    null,
+  );
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -323,6 +450,21 @@ export function WorkspaceInternalCampaigns() {
   function openCampaign() {
     resetForm();
     setOpen(true);
+  }
+
+  async function openCampaignPreview(id: string) {
+    setPreviewCampaignId(id);
+    try {
+      setCampaignPreview(await api.getInternalCampaign(id));
+    } catch (reason) {
+      toast.error(
+        reason instanceof Error
+          ? reason.message
+          : 'No se pudo cargar la vista previa',
+      );
+    } finally {
+      setPreviewCampaignId(null);
+    }
   }
 
   async function calculateAudience() {
@@ -462,6 +604,7 @@ export function WorkspaceInternalCampaigns() {
                 <TableHead>Omitidos</TableHead>
                 <TableHead>Aperturas</TableHead>
                 <TableHead>Clics</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -494,18 +637,67 @@ export function WorkspaceInternalCampaigns() {
                   <TableCell>{nf.format(campaign.delivered)}</TableCell>
                   <TableCell>{nf.format(campaign.bounced)}</TableCell>
                   <TableCell>{nf.format(campaign.suppressed)}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {nf.format(campaign.opened)}
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="tabular-nums underline-offset-2 hover:underline"
+                      onClick={() => setStatsCampaign(campaign)}
+                    >
+                      {nf.format(campaign.opened)}
+                    </button>
                   </TableCell>
-                  <TableCell className="tabular-nums">
-                    {nf.format(campaign.clicked)}
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="tabular-nums underline-offset-2 hover:underline"
+                      onClick={() => setStatsCampaign(campaign)}
+                    >
+                      {nf.format(campaign.clicked)}
+                    </button>
+                  </TableCell>
+                  <TableCell className="min-w-[16rem]">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <IconActionButton
+                        label="Estadísticas"
+                        onClick={() => setStatsCampaign(campaign)}
+                      >
+                        <BarChart3 className="size-4" />
+                      </IconActionButton>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openCampaignPreview(campaign.id)}
+                        disabled={previewCampaignId === campaign.id}
+                      >
+                        {previewCampaignId === campaign.id ? (
+                          <Loader2
+                            className="size-4 animate-spin motion-reduce:animate-none"
+                            aria-hidden
+                          />
+                        ) : (
+                          <Eye className="size-4" aria-hidden />
+                        )}
+                        Vista previa
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" asChild>
+                        <a
+                          href={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <ExternalLink className="size-4" aria-hidden />
+                          Ver
+                        </a>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
               {!campaigns.length ? (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={9}
                     className="h-32 text-center text-muted-foreground"
                   >
                     <BarChart3 className="mx-auto mb-2 size-6" aria-hidden />
@@ -739,21 +931,14 @@ export function WorkspaceInternalCampaigns() {
                     Elige el boletín publicado. El asunto se toma del boletín.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Boletín publicado</Label>
-                  <Select value={newsletterId} onValueChange={setNewsletterId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {newsletters.map((newsletter) => (
-                        <SelectItem key={newsletter.id} value={newsletter.id}>
-                          {newsletter.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <NewsletterSearchSelect
+                  id="internal-newsletter"
+                  label="Boletín publicado"
+                  newsletters={newsletters}
+                  value={newsletterId}
+                  onChange={setNewsletterId}
+                  placeholder="Seleccionar"
+                />
                 {selectedNewsletter ? (
                   <p className="text-sm text-muted-foreground">
                     Asunto:{' '}
@@ -893,6 +1078,90 @@ export function WorkspaceInternalCampaigns() {
               )}
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(campaignPreview)}
+        onOpenChange={(value) => {
+          if (!value) setCampaignPreview(null);
+        }}
+      >
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-5xl overflow-y-auto p-0">
+          {campaignPreview ? (
+            <>
+              <DialogHeader className="shrink-0 border-b px-5 pt-5 pb-4 sm:px-6">
+                <DialogTitle>Vista previa: {campaignPreview.name}</DialogTitle>
+                <DialogDescription>
+                  Muestra el HTML congelado para esta campaña, aunque el boletín
+                  original haya cambiado.
+                </DialogDescription>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 pt-2 text-sm text-muted-foreground">
+                  <span>
+                    <strong className="text-foreground">Asunto:</strong>{' '}
+                    {campaignPreview.subject}
+                  </span>
+                  <span>
+                    <strong className="text-foreground">De:</strong>{' '}
+                    {campaignPreview.fromName} &lt;{campaignPreview.fromEmail}
+                    &gt;
+                  </span>
+                </div>
+              </DialogHeader>
+              <iframe
+                title={`Vista previa de ${campaignPreview.name}`}
+                srcDoc={campaignPreview.previewHtml}
+                sandbox=""
+                referrerPolicy="no-referrer"
+                className="h-[min(70vh,720px)] w-full bg-white"
+              />
+              <DialogFooter className="border-t bg-background px-5 py-4 sm:px-6">
+                <Button type="button" variant="outline" asChild>
+                  <a
+                    href={`/api/internal-communications/campaigns/${encodeURIComponent(campaignPreview.id)}/view`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <ExternalLink className="size-4" aria-hidden />
+                    Ver en navegador
+                  </a>
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(statsCampaign)}
+        onOpenChange={(openDialog) => {
+          if (!openDialog) setStatsCampaign(null);
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),48rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+          <DialogHeader className="shrink-0 border-b px-4 py-4">
+            <DialogTitle>Estadísticas de la campaña</DialogTitle>
+            <DialogDescription>
+              Totales de envío y actividad de aperturas/clics por día
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
+            {statsCampaign ? (
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted">
+                    <Spinner /> Cargando estadísticas...
+                  </div>
+                }
+              >
+                <MalichimpCampaignStatsPanel
+                  campaignId={statsCampaign.id}
+                  campaignName={statsCampaign.name}
+                  loadStats={api.getInternalCampaignStats}
+                />
+              </Suspense>
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

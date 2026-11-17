@@ -359,6 +359,23 @@ export interface InternalCampaignDto {
   completedAt: string | null;
 }
 
+export interface InternalCampaignDetailDto {
+  id: string;
+  name: string;
+  newsletterId: string;
+  newsletterTitle: string;
+  subject: string;
+  previewHtml: string;
+  status: InternalCampaignStatus | EmailCampaignStatus;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  orgUnitPaths: string[];
+  excludeOrgUnitPaths: string[];
+  totalRecipients: number;
+  createdAt: string;
+}
+
 export interface CreateInternalCampaignDto {
   name: string;
   newsletterId: string;

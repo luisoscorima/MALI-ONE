@@ -23,11 +23,16 @@ const pf = new Intl.NumberFormat('es-PE', {
 interface MalichimpCampaignStatsPanelProps {
   campaignId: string;
   campaignName: string;
+  loadStats?: (
+    campaignId: string,
+    days: number,
+  ) => Promise<MalichimpCampaignStatsDto>;
 }
 
 export function MalichimpCampaignStatsPanel({
   campaignId,
   campaignName,
+  loadStats = api.getMalichimpCampaignStats,
 }: MalichimpCampaignStatsPanelProps) {
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
@@ -46,8 +51,7 @@ export function MalichimpCampaignStatsPanel({
 
     setLoading(true);
     setError('');
-    void api
-      .getMalichimpCampaignStats(campaignId, days)
+    void loadStats(campaignId, days)
       .then((data) => {
         if (!cancelled) {
           setCachedMalichimpCampaignStats(campaignId, days, data);
@@ -68,7 +72,7 @@ export function MalichimpCampaignStatsPanel({
     return () => {
       cancelled = true;
     };
-  }, [campaignId, days]);
+  }, [campaignId, days, loadStats]);
 
   if (loading) {
     return (
