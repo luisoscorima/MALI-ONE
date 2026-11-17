@@ -7,6 +7,7 @@ import {
   NEWSLETTER_BRAND_LABELS,
 } from '@mali-one/shared';
 import {
+  NEWSLETTER_FIRST_NAME_MERGE_TAG,
   NewsletterEditor,
   type NewsletterEditorHandle,
 } from '@/components/newsletter-editor';
@@ -318,7 +319,22 @@ export function NewslettersPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="subject">Asunto del correo</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="subject">Asunto del correo</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() =>
+                    setSubject((current) =>
+                      `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
+                    )
+                  }
+                >
+                  + {NEWSLETTER_FIRST_NAME_MERGE_TAG}
+                </Button>
+              </div>
               <Input
                 id="subject"
                 value={subject}
@@ -342,16 +358,40 @@ export function NewslettersPage() {
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            En el panel izquierdo usa la categoría <strong>MALI</strong>:
-            cabecera, columnas, color por marca (Museo / Cursos / Extensión),
-            CTA entradas u outline, redes y pie
-            {brand
-              ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
-              : '.'}{' '}
-            Selecciona un elemento y cambia color / alineación en Estilos a la
-            derecha.
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              En el panel izquierdo usa la categoría <strong>MALI</strong>:
+              cabecera, columnas, color por marca (Museo / Cursos / Extensión),
+              CTA entradas u outline, redes y pie
+              {brand
+                ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
+                : '.'}{' '}
+              Selecciona un elemento y cambia color / alineación en Estilos a la
+              derecha. Para el saludo personalizado al enviar, usa{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                {NEWSLETTER_FIRST_NAME_MERGE_TAG}
+              </code>
+              ; si el contacto no tiene nombre, se envía como estimado(a).
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                const ok = editorRef.current?.insertFirstNameMergeTag();
+                if (ok) {
+                  toast.success(
+                    `Se insertó ${NEWSLETTER_FIRST_NAME_MERGE_TAG} en el boletín`,
+                  );
+                } else {
+                  toast.error('No se pudo insertar la variable en el editor');
+                }
+              }}
+            >
+              Insertar {NEWSLETTER_FIRST_NAME_MERGE_TAG}
+            </Button>
+          </div>
 
           <NewsletterEditor
             key={`${editorKey}-${brand ?? 'none'}`}

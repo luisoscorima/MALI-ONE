@@ -22,9 +22,39 @@ export type NewsletterEditorExport = {
   designJson: string;
 };
 
+export const NEWSLETTER_FIRST_NAME_MERGE_TAG = '{{first_name}}';
+
 export type NewsletterEditorHandle = {
   getExport: () => NewsletterEditorExport;
+  /** Inserts {{first_name}} at the caret, into the selection, or as a greeting block. */
+  insertFirstNameMergeTag: () => boolean;
 };
+
+function insertFirstNameMergeTag(editor: Editor): boolean {
+  const tag = NEWSLETTER_FIRST_NAME_MERGE_TAG;
+  const frame = editor.Canvas.getFrameEl();
+  const doc = frame?.contentDocument;
+  if (doc) {
+    const active = doc.activeElement as HTMLElement | null;
+    if (active?.isContentEditable) {
+      const ok = doc.execCommand('insertText', false, tag);
+      if (ok) return true;
+    }
+  }
+
+  const selected = editor.getSelected();
+  if (selected) {
+    selected.append(`<span>${tag}</span>`);
+    return true;
+  }
+
+  const wrapper = editor.getWrapper();
+  if (!wrapper) return false;
+  wrapper.append(
+    `<div data-gjs-type="text" style="font-family:${FONT};font-size:14px;color:${MALI_BLACK};padding:8px 0">Hola ${tag},</div>`,
+  );
+  return true;
+}
 
 /**
  * Brand chrome logos (absolute: required inside email HTML).
@@ -525,6 +555,11 @@ export const NewsletterEditor = forwardRef<
         designJson: JSON.stringify(editor.getProjectData()),
       };
     },
+    insertFirstNameMergeTag: () => {
+      const editor = editorRef.current;
+      if (!editor) return false;
+      return insertFirstNameMergeTag(editor);
+    },
   }));
 
   useEffect(() => {
@@ -625,10 +660,24 @@ export const NewsletterEditor = forwardRef<
     editor.Commands.add('set-device-mobile', {
       run: (ed) => ed.setDevice('Móvil'),
     });
+    editor.Commands.add('insert-merge-first-name', {
+      run: (ed) => {
+        insertFirstNameMergeTag(ed);
+      },
+    });
     panels.removeButton('devices-c', 'set-device-tablet');
     for (const id of ['gjs-toggle-images', 'canvas-clear'] as const) {
       panels.removeButton('options', id);
     }
+    panels.addButton('options', {
+      id: 'insert-merge-first-name',
+      className: 'gjs-pn-btn',
+      command: 'insert-merge-first-name',
+      label: '{{fn}}',
+      attributes: {
+        title: `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG} (nombre del contacto al enviar)`,
+      },
+    });
     for (const [panel, id, title] of [
       ['devices-c', 'set-device-desktop', 'Escritorio'],
       ['devices-c', 'set-device-mobile', 'Móvil'],
@@ -642,6 +691,11 @@ export const NewsletterEditor = forwardRef<
         'options',
         'gjs-open-import-template',
         'Importar HTML (reemplaza todo el boletín)',
+      ],
+      [
+        'options',
+        'insert-merge-first-name',
+        `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
       ],
     ] as const) {
       const btn = panels.getButton(panel, id);
