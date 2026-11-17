@@ -74,8 +74,19 @@ test('removes Spanish preference leftovers after copyright', () => {
   );
   assert.doesNotMatch(html, /Eres parte del MALI/i);
   assert.doesNotMatch(html, /Quieres hacer cambios/i);
-  assert.doesNotMatch(html, /Puedes\s+o/i);
-  assert.doesNotMatch(html, /You can\s+or/i);
+  assert.doesNotMatch(html, /Puedes(?:\s|&nbsp;)+o/i);
+  assert.doesNotMatch(html, /You can(?:\s|&nbsp;)+or/i);
+});
+
+test('removes Puedes leftovers that use &nbsp;', () => {
+  const html = scrubMailchimpNewsletterHtml(
+    `<em>© 2026 MALI — Museo de Arte de Lima. Todos los derechos reservados.</em><br>
+     <p dir="ltr" style="color:#222"></p>
+     Puedes&nbsp;&nbsp;o&nbsp;.`,
+    opts,
+  );
+  assert.doesNotMatch(html, /Puedes/i);
+  assert.doesNotMatch(html, /&nbsp;&nbsp;o&nbsp;\./i);
 });
 
 test('normalizes English copyright to Spanish with current year', () => {

@@ -25,6 +25,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -46,6 +47,7 @@ export function NewslettersPage() {
   const [error, setError] = useState('');
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const [mode, setMode] = useState<EditorMode>('closed');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -186,17 +188,28 @@ export function NewslettersPage() {
     }
   }
 
-  async function togglePublish(n: NewsletterDto) {
+  async function togglePublish(n: NewsletterDto, publish: boolean) {
+    if (!publish) {
+      const ok = await confirm({
+        title: `¿Despublicar “${n.title}”?`,
+        description: 'La URL pública dejará de estar disponible.',
+        confirmLabel: 'Despublicar',
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
+
+    setTogglingId(n.id);
     try {
       await api.updateNewsletter(n.id, {
-        status: n.status === 'published' ? 'draft' : 'published',
+        status: publish ? 'published' : 'draft',
       });
       await load();
-      toast.success(
-        n.status === 'published' ? 'Pasó a borrador' : 'Boletín publicado',
-      );
+      toast.success(publish ? 'Boletín publicado' : 'Pasó a borrador');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al actualizar');
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -361,10 +374,10 @@ export function NewslettersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[220px] max-w-[220px]">Título</TableHead>
-              <TableHead>Slug</TableHead>
+              <TableHead className="w-[320px] max-w-[320px]">Título</TableHead>
+              <TableHead className="w-[200px] max-w-[200px]">Slug</TableHead>
               <TableHead className="w-[140px]">Marca</TableHead>
-              <TableHead className="w-[100px]">Estado</TableHead>
+              <TableHead className="w-[150px]">Estado</TableHead>
               <TableHead className="w-[1%] whitespace-nowrap text-right">
                 Acciones
               </TableHead>
@@ -373,7 +386,7 @@ export function NewslettersPage() {
           <TableBody>
             {newsletters.map((n) => (
               <TableRow key={n.id}>
-                <TableCell className="max-w-[220px]">
+                <TableCell className="max-w-[320px]">
                   <div className="truncate font-medium" title={n.title}>
                     {n.title}
                   </div>
@@ -384,13 +397,32 @@ export function NewslettersPage() {
                     {n.subject}
                   </div>
                 </TableCell>
-                <TableCell className="max-w-[240px] truncate font-mono text-sm" title={n.slug}>
+                <TableCell className="max-w-[200px] truncate font-mono text-sm" title={n.slug}>
                   {n.slug}
                 </TableCell>
                 <TableCell>
                   {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
                 </TableCell>
-                <TableCell>{n.status}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      size="sm"
+                      checked={n.status === 'published'}
+                      disabled={togglingId === n.id}
+                      aria-label={
+                        n.status === 'published'
+                          ? `Despublicar ${n.title}`
+                          : `Publicar ${n.title}`
+                      }
+                      onCheckedChange={(checked) =>
+                        void togglePublish(n, checked)
+                      }
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {n.status === 'published' ? 'Publicado' : 'Borrador'}
+                    </span>
+                  </div>
+                </TableCell>
                 <TableCell className="space-x-1 text-right">
                   <Button
                     size="sm"
@@ -399,13 +431,6 @@ export function NewslettersPage() {
                     title="Editar"
                   >
                     <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void togglePublish(n)}
-                  >
-                    {n.status === 'published' ? 'Despublicar' : 'Publicar'}
                   </Button>
                   {n.status === 'published' ? (
                     <>

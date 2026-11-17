@@ -117,6 +117,9 @@ function rewriteSocialIconCdn(html: string, appUrl: string): string {
   );
 }
 
+/** Spaces + HTML nbsp variants used in Mailchimp footers. */
+const WS = '(?:\\s|&nbsp;|&#160;|&#x0*a0;)+';
+
 function stripMailchimpComplianceCopy(html: string): string {
   let out = html;
   // Permission / preference reminders (ES + EN), including orphans after link removal.
@@ -127,24 +130,35 @@ function stripMailchimpComplianceCopy(html: string): string {
   );
   out = out.replace(/Want to change how you receive these emails\??/gi, '');
   out = out.replace(
-    /You can\s+(?:update your preferences|actualizar tus preferencias)\s+or\s+(?:unsubscribe from this list|cancelar tu suscripci[oó]n)\.?/gi,
+    new RegExp(
+      `You can${WS}(?:update your preferences|actualizar tus preferencias)${WS}or${WS}(?:unsubscribe from this list|cancelar tu suscripci[oó]n)\\.?`,
+      'gi',
+    ),
     '',
   );
   out = out.replace(
-    /Puedes\s+(?:update your preferences|actualizar tus preferencias)\s+o\s+(?:unsubscribe from this list|cancelar tu suscripci[oó]n)\.?/gi,
+    new RegExp(
+      `Puedes${WS}(?:update your preferences|actualizar tus preferencias)${WS}o${WS}(?:unsubscribe from this list|cancelar tu suscripci[oó]n)\\.?`,
+      'gi',
+    ),
     '',
   );
   out = out.replace(/update your preferences/gi, '');
   out = out.replace(/actualizar tus preferencias/gi, '');
   out = out.replace(/unsubscribe from this list/gi, '');
   out = out.replace(/cancelar tu suscripci[oó]n/gi, '');
-  // Leftovers like "Puedes  o ." / "You can or ." after anchors were dropped.
-  out = out.replace(/You can\s+or\s*\.?/gi, '');
-  out = out.replace(/Puedes\s+o\s*\.?/gi, '');
+  // Leftovers like "Puedes&nbsp;&nbsp;o&nbsp;." / "You can or ." after anchors were dropped.
+  out = out.replace(new RegExp(`You can${WS}or(?:${WS})?\\.?`, 'gi'), '');
+  out = out.replace(new RegExp(`Puedes${WS}o(?:${WS})?\\.?`, 'gi'), '');
   out = out.replace(/why did I get this\?/gi, '');
   out = out.replace(/Email Marketing Powered by Mailchimp/gi, '');
   out = out.replace(
     /https:\/\/cdn-images\.mailchimp\.com\/monkey_rewards\/[^"'\\\s>]+/gi,
+    '',
+  );
+  // Empty paragraphs left behind in the footer cell.
+  out = out.replace(
+    /<p\b[^>]*>\s*(?:&nbsp;|\s)*<\/p>/gi,
     '',
   );
   return out;
