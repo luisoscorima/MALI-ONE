@@ -10,7 +10,7 @@ CRUD de cuentas `@mali.pe` vía Google Admin SDK (Directory API) con Domain-Wide
 
 1. API autentica con SA JSON e impersona `GOOGLE_ADMIN_IMPERSONATE`.
 2. Operadores con `workspace_users` listan, crean, editan, resetean password y cierran sesiones.
-3. En la pestaña **Campañas internas** eligen OU (include/exclude), ventana de actividad (1–90 días, default 30), boletín publicado y remitente del catálogo; al confirmar se congelan destinatarios en `EmailCampaign`/`EmailSend` y el dispatcher SES envía sin tope fijo de 200.
+3. En la pestaña **Campañas internas** el flujo es el mismo patrón que MALICHIMP: OU (include/exclude), actividad (1–90 días), remitente, boletín (publicado o borrador nuevo), asunto, y enviar ahora o programar. También hay miniatura en fila, duplicar y continuar borradores.
 
 ## Código
 
@@ -33,8 +33,10 @@ Campañas internas (`/api/internal-communications`, permiso `workspace_users`):
 
 - `GET /audience?activeDays=`
 - `POST /audience/preview` — `{ orgUnitPaths?, excludeOrgUnitPaths?, activeDays? }`
-- `GET /newsletters`, `GET /campaigns`
-- `POST /campaigns` — `{ name, newsletterId, fromEmail, replyTo, orgUnitPaths, excludeOrgUnitPaths?, activeDays? }`
+- `GET /newsletters`, `GET /newsletters/:id`, `POST /newsletters/draft`
+- `GET /campaigns`, `GET /campaigns/:id`, `GET /campaigns/:id/view`, `GET /campaigns/:id/stats`
+- `POST /campaigns` — `{ name, newsletterId, draftNewsletterId?, subject, fromEmail, replyTo, orgUnitPaths, excludeOrgUnitPaths?, activeDays?, scheduledAt? }`
+- `POST /campaigns/:id/duplicate`, `POST /campaigns/:id/send`
 
 ## Datos (Prisma)
 

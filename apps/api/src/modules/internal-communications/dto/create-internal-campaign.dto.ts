@@ -1,10 +1,12 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsEmail,
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -19,6 +21,18 @@ export class CreateInternalCampaignDto {
 
   @IsString()
   newsletterId!: string;
+
+  /** Allows confirming a campaign with a draft newsletter created from Campañas internas. */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  draftNewsletterId?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(300)
+  @Matches(/^[^\r\n]+$/)
+  subject!: string;
 
   @IsEmail()
   @MaxLength(254)
@@ -50,6 +64,25 @@ export class CreateInternalCampaignDto {
   @Min(1)
   @Max(90)
   activeDays?: number;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+}
+
+export class CreateInternalNewsletterDraftDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(200)
+  @Matches(/^[^\r\n]+$/)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  @Matches(/^[^\r\n]+$/)
+  subject?: string;
 }
 
 export class PreviewInternalAudienceDto {

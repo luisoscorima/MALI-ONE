@@ -332,11 +332,7 @@ export interface InternalAudienceDto {
   note: string;
 }
 
-export type InternalCampaignStatus =
-  | 'queued'
-  | 'sending'
-  | 'completed'
-  | 'failed';
+export type InternalCampaignStatus = EmailCampaignStatus;
 
 export interface InternalCampaignDto {
   id: string;
@@ -355,6 +351,7 @@ export interface InternalCampaignDto {
   complaints: number;
   opened: number;
   clicked: number;
+  scheduledAt: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -364,27 +361,38 @@ export interface InternalCampaignDetailDto {
   name: string;
   newsletterId: string;
   newsletterTitle: string;
+  newsletter: NewsletterDto;
   subject: string;
   previewHtml: string;
-  status: InternalCampaignStatus | EmailCampaignStatus;
+  status: InternalCampaignStatus;
   fromName: string;
   fromEmail: string;
   replyTo: string;
   orgUnitPaths: string[];
   excludeOrgUnitPaths: string[];
   totalRecipients: number;
+  scheduledAt: string | null;
   createdAt: string;
 }
 
 export interface CreateInternalCampaignDto {
   name: string;
   newsletterId: string;
+  /** Draft newsletter created from Campañas internas; must match newsletterId. */
+  draftNewsletterId?: string;
+  subject: string;
   replyTo: string;
   fromEmail: string;
   fromName?: string;
   orgUnitPaths: string[];
   excludeOrgUnitPaths?: string[];
   activeDays?: number;
+  scheduledAt?: string;
+}
+
+export interface CreateInternalNewsletterDraftDto {
+  title: string;
+  subject?: string;
 }
 
 export * from './treasury';

@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Paridad con MALICHIMP: miniatura en fila, duplicar, programar envío, crear borrador de boletín, continuar borradores.
 - Campañas internas (antes Comunicación interna) viven en `/admin/users?tab=campanas`; permiso absorbido en `workspace_users`.
 - Audiencia por OU (include/exclude) + activos recientes; sin tope 200; remitente desde catálogo `EmailSender`.
 - Redirect legacy `/admin/comunicacion-interna` → `?tab=campanas`.

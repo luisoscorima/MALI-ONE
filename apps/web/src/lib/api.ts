@@ -1613,6 +1613,19 @@ export const api = {
       '/api/internal-communications/newsletters',
     ),
 
+  getInternalNewsletter: (id: string) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/internal-communications/newsletters/${encodeURIComponent(id)}`,
+    ),
+
+  createInternalNewsletterDraft: (
+    body: import('@mali-one/shared').CreateInternalNewsletterDraftDto,
+  ) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      '/api/internal-communications/newsletters/draft',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   listInternalCampaigns: () =>
     request<import('@mali-one/shared').InternalCampaignDto[]>(
       '/api/internal-communications/campaigns',
@@ -1628,11 +1641,26 @@ export const api = {
       `/api/internal-communications/campaigns/${encodeURIComponent(id)}/stats?days=${encodeURIComponent(String(days))}`,
     ),
 
+  duplicateInternalCampaign: (id: string) =>
+    request<import('@mali-one/shared').InternalCampaignDetailDto>(
+      `/api/internal-communications/campaigns/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST', body: '{}' },
+    ),
+
   createInternalCampaign: (
     body: import('@mali-one/shared').CreateInternalCampaignDto,
   ) =>
-    request<{ id: string; status: string; totalRecipients: number }>(
+    request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(
       '/api/internal-communications/campaigns',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  sendInternalDraftCampaign: (
+    id: string,
+    body: import('@mali-one/shared').CreateInternalCampaignDto,
+  ) =>
+    request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(
+      `/api/internal-communications/campaigns/${encodeURIComponent(id)}/send`,
       { method: 'POST', body: JSON.stringify(body) },
     ),
 

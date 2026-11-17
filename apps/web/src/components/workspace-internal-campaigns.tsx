@@ -5,9 +5,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
+  Copy,
   ExternalLink,
   Eye,
   Loader2,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -24,6 +26,7 @@ import type {
 import { AlertBanner, Spinner, TableSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import {
   Badge,
@@ -73,17 +76,28 @@ const CAMPAIGN_STEPS = [
   { id: 'to', label: 'Para', hint: 'Unidades organizativas' },
   { id: 'from', label: 'De', hint: 'Remitente' },
   { id: 'content', label: 'Contenido', hint: 'Boletín' },
-  { id: 'send', label: 'Envío', hint: 'Revisar y enviar' },
+  { id: 'send', label: 'Envío', hint: 'Programar o enviar' },
 ] as const;
 
 type CampaignStepId = (typeof CAMPAIGN_STEPS)[number]['id'];
 
 const statusLabel: Record<InternalCampaignDto['status'], string> = {
+  draft: 'Borrador',
+  scheduled: 'Programada',
   queued: 'En cola',
   sending: 'Enviando',
   completed: 'Completada',
   failed: 'Fallida',
 };
+
+function limaDateTimeToIso(value: string): string {
+  return new Date(`${value}:00-05:00`).toISOString();
+}
+
+function minimumLimaDateTime(): string {
+  const lima = new Date(Date.now() - 5 * 60 * 60 * 1_000);
+  return lima.toISOString().slice(0, 16);
+}
 
 function NewsletterSearchSelect({
   id,
@@ -315,6 +329,7 @@ function OrgUnitMultiSelect({
 
 export function WorkspaceInternalCampaigns() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [audience, setAudience] = useState<InternalAudienceDto | null>(null);
   const [preview, setPreview] = useState<InternalAudienceDto | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -335,7 +350,17 @@ export function WorkspaceInternalCampaigns() {
   const [replyTo, setReplyTo] = useState(DEFAULT_REPLY_TO);
   const [showAdvancedSender, setShowAdvancedSender] = useState(false);
   const [newsletterId, setNewsletterId] = useState('');
+  const [subject, setSubject] = useState('');
   const [name, setName] = useState('');
+  const [draftNewsletterId, setDraftNewsletterId] = useState<string | null>(null);
+  const [attachedNewsletter, setAttachedNewsletter] = useState<NewsletterDto | null>(null);
+  const [draftCampaignId, setDraftCampaignId] = useState<string | null>(null);
+  const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
+  const [scheduledAt, setScheduledAt] = useState('');
+  const [creatingNewsletter, setCreatingNewsletter] = useState(false);
+  const [refreshingContent, setRefreshingContent] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [campaignPreview, setCampaignPreview] =
     useState<InternalCampaignDetailDto | null>(null);
@@ -387,7 +412,16 @@ export function WorkspaceInternalCampaigns() {
   }, []);
 
   const orgUnits = audience?.orgUnits ?? [];
-  const selectedNewsletter = newsletters.find((item) => item.id === newsletterId) ?? null;
+  const selectableNewsletters = useMemo(
+    () => newsletters.filter((item) => item.status === 'published'),
+    [newsletters],
+  );
+  const selectedNewsletter =
+    (attachedNewsletter && attachedNewsletter.id === newsletterId
+      ? attachedNewsletter
+      : null)
+    || newsletters.find((item) => item.id === newsletterId)
+    || null;
 
   const filteredRecipients = useMemo(() => {
     const members = preview?.members ?? [];
@@ -401,6 +435,9 @@ export function WorkspaceInternalCampaigns() {
   }, [preview, recipientQuery]);
 
   const stepIndex = CAMPAIGN_STEPS.findIndex((step) => step.id === formStep);
+  const scheduleReady = scheduleMode === 'now' || Boolean(
+    scheduledAt && new Date(limaDateTimeToIso(scheduledAt)).getTime() > Date.now(),
+  );
 
   const stepReady: Record<CampaignStepId, boolean> = {
     to: includePaths.length > 0 && Boolean(preview && preview.members.length > 0),
@@ -408,8 +445,8 @@ export function WorkspaceInternalCampaigns() {
       maliPeEmailPattern.test(fromEmail) &&
       maliPeEmailPattern.test(replyTo.trim()) &&
       Boolean(fromName.trim()),
-    content: Boolean(newsletterId),
-    send: true,
+    content: Boolean(newsletterId) && Boolean(subject.trim()),
+    send: scheduleReady,
   };
 
   const stepBlockReason: Partial<Record<CampaignStepId, string>> = {
@@ -429,7 +466,14 @@ export function WorkspaceInternalCampaigns() {
           : !fromName.trim()
             ? 'Indica el nombre visible'
             : undefined,
-    content: !newsletterId ? 'Selecciona un boletín publicado' : undefined,
+    content: !newsletterId
+      ? 'Selecciona un boletín o crea uno nuevo'
+      : !subject.trim()
+        ? 'Indica el asunto del correo'
+        : undefined,
+    send: scheduleMode === 'scheduled' && !scheduleReady
+      ? 'Elige una fecha y hora futuras en Lima'
+      : undefined,
   };
 
   const campaignReady =
@@ -447,13 +491,131 @@ export function WorkspaceInternalCampaigns() {
     setReplyTo(DEFAULT_REPLY_TO);
     setShowAdvancedSender(false);
     setNewsletterId('');
+    setSubject('');
     setName('');
+    setDraftNewsletterId(null);
+    setAttachedNewsletter(null);
+    setDraftCampaignId(null);
+    setScheduleMode('now');
+    setScheduledAt('');
     setBusy(false);
   }
 
   function openCampaign() {
     resetForm();
     setOpen(true);
+  }
+
+  function selectNewsletter(id: string) {
+    setNewsletterId(id);
+    setDraftNewsletterId(null);
+    setAttachedNewsletter(null);
+    const next = newsletters.find((item) => item.id === id);
+    if (next) {
+      setSubject((current) => current.trim() || next.subject);
+      setName((current) => current.trim() || next.title);
+    }
+  }
+
+  async function createNewNewsletterDraft() {
+    const title = (name.trim() || `Boletín ${new Date().toLocaleString('es-PE')}`).trim();
+    if (title.length < 3) {
+      toast.error('Indica un nombre de al menos 3 caracteres');
+      return;
+    }
+    setCreatingNewsletter(true);
+    try {
+      const created = await api.createInternalNewsletterDraft({
+        title,
+        subject: subject.trim() || title,
+      });
+      setAttachedNewsletter(created);
+      setDraftNewsletterId(created.id);
+      setNewsletterId(created.id);
+      setSubject((current) => current.trim() || created.subject);
+      setName((current) => current.trim() || created.title);
+      toast.success('Borrador creado en Boletines');
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo crear el boletín');
+    } finally {
+      setCreatingNewsletter(false);
+    }
+  }
+
+  async function refreshAttachedNewsletter() {
+    const newsletterToRefresh = draftNewsletterId || attachedNewsletter?.id || newsletterId;
+    if (!newsletterToRefresh) return;
+    setRefreshingContent(true);
+    try {
+      if (draftCampaignId) {
+        const detail = await api.getInternalCampaign(draftCampaignId);
+        setAttachedNewsletter(detail.newsletter);
+        setSubject((current) => current.trim() || detail.subject);
+      } else {
+        setAttachedNewsletter(await api.getInternalNewsletter(newsletterToRefresh));
+      }
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo actualizar el contenido');
+    } finally {
+      setRefreshingContent(false);
+    }
+  }
+
+  async function hydrateDraftCampaign(detail: InternalCampaignDetailDto) {
+    setDraftCampaignId(detail.id);
+    setAttachedNewsletter(detail.newsletter);
+    setDraftNewsletterId(detail.newsletter.status === 'draft' ? detail.newsletterId : null);
+    setName(detail.name);
+    setNewsletterId(detail.newsletterId);
+    setSubject(detail.subject);
+    setFromName(detail.fromName);
+    setFromEmail(detail.fromEmail);
+    setReplyTo(detail.replyTo);
+    setIncludePaths(detail.orgUnitPaths);
+    setExcludePaths(detail.excludeOrgUnitPaths);
+    setScheduleMode('now');
+    setScheduledAt('');
+    setShowAdvancedSender(detail.replyTo !== detail.fromEmail);
+    setFormStep('to');
+    setOpen(true);
+    setPreviewBusy(true);
+    try {
+      setPreview(await api.previewInternalAudience({
+        activeDays,
+        orgUnitPaths: detail.orgUnitPaths,
+        excludeOrgUnitPaths: detail.excludeOrgUnitPaths,
+      }));
+    } catch (reason) {
+      setPreview(null);
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo recalcular la audiencia');
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
+  async function continueDraft(campaignId: string) {
+    setOpeningDraftId(campaignId);
+    try {
+      await hydrateDraftCampaign(await api.getInternalCampaign(campaignId));
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo abrir el borrador');
+    } finally {
+      setOpeningDraftId(null);
+    }
+  }
+
+  async function duplicateCampaign(campaignId: string) {
+    setDuplicatingId(campaignId);
+    try {
+      const draft = await api.duplicateInternalCampaign(campaignId);
+      await load(true);
+      toast.success('Campaña duplicada como borrador');
+      await hydrateDraftCampaign(draft);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo duplicar la campaña');
+    } finally {
+      setDuplicatingId(null);
+    }
   }
 
   async function openCampaignPreview(id: string) {
@@ -510,25 +672,47 @@ export function WorkspaceInternalCampaigns() {
   }
 
   async function submitCampaign() {
-    if (!campaignReady) return;
+    if (!campaignReady || !preview?.members.length) return;
+    const when = scheduleMode === 'scheduled' && scheduledAt
+      ? `programada para ${df.format(new Date(limaDateTimeToIso(scheduledAt)))}`
+      : 'envío inmediato';
+    const ok = await confirm({
+      title: scheduleMode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
+      description: `Se creará la campaña (${when}) hacia ${nf.format(preview.members.length)} destinatarios.`,
+      confirmLabel: scheduleMode === 'scheduled' ? 'Programar' : 'Enviar',
+    });
+    if (!ok) return;
+
     setBusy(true);
     try {
       const campaignName =
         name.trim() ||
         selectedNewsletter?.title ||
         `Campaña interna ${df.format(new Date())}`;
-      const result = await api.createInternalCampaign({
+      const payload = {
         name: campaignName.slice(0, 160),
         newsletterId,
+        ...(draftNewsletterId && draftNewsletterId === newsletterId
+          ? { draftNewsletterId }
+          : {}),
+        subject: subject.trim(),
         replyTo: replyTo.trim().toLowerCase(),
         fromEmail: fromEmail.trim().toLowerCase(),
         fromName: fromName.trim(),
         orgUnitPaths: includePaths,
         excludeOrgUnitPaths: excludePaths,
         activeDays,
-      });
+        ...(scheduleMode === 'scheduled' && scheduledAt
+          ? { scheduledAt: limaDateTimeToIso(scheduledAt) }
+          : {}),
+      };
+      const result = draftCampaignId
+        ? await api.sendInternalDraftCampaign(draftCampaignId, payload)
+        : await api.createInternalCampaign(payload);
       toast.success(
-        `Campaña encolada para ${nf.format(result.totalRecipients)} personas`,
+        result.status === 'scheduled'
+          ? `Campaña programada para ${nf.format(result.totalRecipients)} personas`
+          : `Campaña encolada para ${nf.format(result.totalRecipients)} personas`,
       );
       setOpen(false);
       resetForm();
@@ -642,6 +826,11 @@ export function WorkspaceInternalCampaigns() {
                       {campaign.newsletterTitle} ·{' '}
                       {df.format(new Date(campaign.createdAt))}
                     </p>
+                    {campaign.scheduledAt ? (
+                      <p className="text-xs text-muted-foreground">
+                        Programada: {df.format(new Date(campaign.scheduledAt))}
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -681,7 +870,7 @@ export function WorkspaceInternalCampaigns() {
                       {nf.format(campaign.clicked)}
                     </button>
                   </TableCell>
-                  <TableCell className="min-w-[10rem]">
+                  <TableCell className="min-w-[16rem]">
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <IconActionButton
                         label="Estadísticas"
@@ -689,6 +878,21 @@ export function WorkspaceInternalCampaigns() {
                       >
                         <BarChart3 className="size-4" />
                       </IconActionButton>
+                      {campaign.status === 'draft' ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void continueDraft(campaign.id)}
+                          disabled={openingDraftId === campaign.id}
+                        >
+                          {openingDraftId === campaign.id ? (
+                            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                          ) : (
+                            <Pencil className="size-4" aria-hidden />
+                          )}
+                          Continuar
+                        </Button>
+                      ) : null}
                       <Button type="button" size="sm" variant="outline" asChild>
                         <a
                           href={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
@@ -698,6 +902,20 @@ export function WorkspaceInternalCampaigns() {
                           <ExternalLink className="size-4" aria-hidden />
                           Ver
                         </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void duplicateCampaign(campaign.id)}
+                        disabled={duplicatingId === campaign.id}
+                      >
+                        {duplicatingId === campaign.id ? (
+                          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                        ) : (
+                          <Copy className="size-4" aria-hidden />
+                        )}
+                        Duplicar
                       </Button>
                     </div>
                   </TableCell>
@@ -728,7 +946,9 @@ export function WorkspaceInternalCampaigns() {
       >
         <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b px-5 pt-5 pb-4 sm:px-6">
-            <DialogTitle>Nueva campaña interna</DialogTitle>
+            <DialogTitle>
+              {draftCampaignId ? 'Continuar campaña' : 'Nueva campaña interna'}
+            </DialogTitle>
             <DialogDescription>
               Paso {stepIndex + 1} de {CAMPAIGN_STEPS.length}:{' '}
               {CAMPAIGN_STEPS[stepIndex]?.hint}
@@ -937,26 +1157,75 @@ export function WorkspaceInternalCampaigns() {
                 <div className="space-y-1">
                   <h3 className="text-base font-medium">Contenido</h3>
                   <p className="text-sm text-muted-foreground">
-                    Elige el boletín publicado. El asunto se toma del boletín.
+                    Elige un boletín publicado o crea un borrador nuevo en Boletines.
                   </p>
                 </div>
-                <NewsletterSearchSelect
-                  id="internal-newsletter"
-                  label="Boletín publicado"
-                  newsletters={newsletters}
-                  value={newsletterId}
-                  onChange={setNewsletterId}
-                  placeholder="Seleccionar"
-                />
-                {selectedNewsletter ? (
-                  <p className="text-sm text-muted-foreground">
-                    Asunto:{' '}
-                    <span className="text-foreground">
-                      {selectedNewsletter.subject}
-                    </span>
-                  </p>
-                ) : null}
+                {draftNewsletterId && selectedNewsletter?.id === draftNewsletterId ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                    <Badge variant="secondary">Borrador en Boletines</Badge>
+                    <span className="font-medium">{selectedNewsletter.title}</span>
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <a
+                        href={`/admin/newsletters?edit=${encodeURIComponent(selectedNewsletter.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Pencil className="size-4" aria-hidden />
+                        Editar
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void refreshAttachedNewsletter()}
+                      disabled={refreshingContent}
+                    >
+                      {refreshingContent ? (
+                        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : (
+                        <RefreshCw className="size-4" aria-hidden />
+                      )}
+                      Actualizar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <NewsletterSearchSelect
+                      id="internal-newsletter"
+                      label="Boletín publicado"
+                      newsletters={selectableNewsletters}
+                      value={newsletterId}
+                      onChange={selectNewsletter}
+                      placeholder="Seleccionar"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void createNewNewsletterDraft()}
+                      disabled={creatingNewsletter}
+                    >
+                      {creatingNewsletter ? (
+                        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : (
+                        <Plus className="size-4" aria-hidden />
+                      )}
+                      {creatingNewsletter ? 'Creando…' : 'Crear boletín nuevo'}
+                    </Button>
+                  </div>
+                )}
                 <div className="space-y-2 border-t border-border/60 pt-5">
+                  <Label htmlFor="internal-subject">Asunto del correo</Label>
+                  <Input
+                    id="internal-subject"
+                    value={subject}
+                    onChange={(event) => setSubject(event.target.value)}
+                    placeholder="Asunto que verán los destinatarios"
+                    maxLength={300}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="internal-campaign-name">
                     Nombre del envío (opcional)
                   </Label>
@@ -979,7 +1248,7 @@ export function WorkspaceInternalCampaigns() {
                 <div className="space-y-1">
                   <h3 className="text-base font-medium">Envío</h3>
                   <p className="text-sm text-muted-foreground">
-                    Revisa el resumen y confirma el envío inmediato.
+                    Revisa el resumen y envía ahora o programa para más tarde.
                   </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11.5rem]">
@@ -996,7 +1265,7 @@ export function WorkspaceInternalCampaigns() {
                     </p>
                     <p>
                       <span className="text-muted-foreground">Asunto:</span>{' '}
-                      {selectedNewsletter?.subject || '—'}
+                      {subject.trim() || '—'}
                     </p>
                     <p>
                       <span className="text-muted-foreground">Contenido:</span>{' '}
@@ -1030,6 +1299,38 @@ export function WorkspaceInternalCampaigns() {
                     </div>
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="internal-schedule-mode"
+                      checked={scheduleMode === 'now'}
+                      onChange={() => setScheduleMode('now')}
+                    />
+                    Enviar ahora
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="internal-schedule-mode"
+                      checked={scheduleMode === 'scheduled'}
+                      onChange={() => setScheduleMode('scheduled')}
+                    />
+                    Programar envío
+                  </label>
+                </div>
+                {scheduleMode === 'scheduled' ? (
+                  <div className="max-w-xs space-y-2">
+                    <Label htmlFor="internal-scheduled-at">Fecha y hora en Lima</Label>
+                    <Input
+                      id="internal-scheduled-at"
+                      type="datetime-local"
+                      value={scheduledAt}
+                      min={minimumLimaDateTime()}
+                      onChange={(event) => setScheduledAt(event.target.value)}
+                    />
+                  </div>
+                ) : null}
                 {campaignReady ? (
                   <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <CheckCircle2
@@ -1040,8 +1341,9 @@ export function WorkspaceInternalCampaigns() {
                   </span>
                 ) : (
                   <span className="text-xs text-muted-foreground">
-                    {Object.values(stepBlockReason).find(Boolean) ||
-                      'Completa los pasos anteriores'}
+                    {stepBlockReason.send
+                      || Object.values(stepBlockReason).find(Boolean)
+                      || 'Completa los pasos anteriores'}
                   </span>
                 )}
               </div>
@@ -1073,7 +1375,11 @@ export function WorkspaceInternalCampaigns() {
                   ) : (
                     <Send className="size-4" aria-hidden />
                   )}
-                  {busy ? 'Preparando…' : 'Enviar'}
+                  {busy
+                    ? 'Preparando…'
+                    : scheduleMode === 'scheduled'
+                      ? 'Programar'
+                      : 'Enviar'}
                 </Button>
               ) : (
                 <Button

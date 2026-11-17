@@ -13,6 +13,7 @@ import type { Response } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
 import {
   CreateInternalCampaignDto,
+  CreateInternalNewsletterDraftDto,
   PreviewInternalAudienceDto,
 } from './dto/create-internal-campaign.dto';
 import { InternalCommunicationsService } from './internal-communications.service';
@@ -45,6 +46,19 @@ export class InternalCommunicationsController {
   @Get('newsletters')
   newsletters() {
     return this.communications.newsletters();
+  }
+
+  @Get('newsletters/:id')
+  newsletter(@Param('id') id: string) {
+    return this.communications.getCampaignNewsletter(id);
+  }
+
+  @Post('newsletters/draft')
+  createNewsletterDraft(
+    @Req() req: { user: User },
+    @Body() body: CreateInternalNewsletterDraftDto,
+  ) {
+    return this.communications.createNewsletterDraft(req.user.id, body);
   }
 
   @Get('campaigns')
@@ -87,5 +101,21 @@ export class InternalCommunicationsController {
   @Post('campaigns')
   createCampaign(@Req() req: { user: User }, @Body() body: CreateInternalCampaignDto) {
     return this.communications.createCampaign(req.user.id, body);
+  }
+
+  @Post('campaigns/:id/duplicate')
+  duplicateCampaign(
+    @Req() req: { user: User },
+    @Param('id') id: string,
+  ) {
+    return this.communications.duplicateCampaign(req.user.id, id);
+  }
+
+  @Post('campaigns/:id/send')
+  sendDraftCampaign(
+    @Param('id') id: string,
+    @Body() body: CreateInternalCampaignDto,
+  ) {
+    return this.communications.sendDraftCampaign(id, body);
   }
 }
