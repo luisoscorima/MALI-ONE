@@ -870,8 +870,8 @@ export function WorkspaceInternalCampaigns() {
                       {nf.format(campaign.clicked)}
                     </button>
                   </TableCell>
-                  <TableCell className="min-w-[16rem]">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                  <TableCell>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
                       <IconActionButton
                         label="Estadísticas"
                         onClick={() => setStatsCampaign(campaign)}
@@ -879,9 +879,8 @@ export function WorkspaceInternalCampaigns() {
                         <BarChart3 className="size-4" />
                       </IconActionButton>
                       {campaign.status === 'draft' ? (
-                        <Button
-                          type="button"
-                          size="sm"
+                        <IconActionButton
+                          label="Continuar"
                           onClick={() => void continueDraft(campaign.id)}
                           disabled={openingDraftId === campaign.id}
                         >
@@ -890,23 +889,16 @@ export function WorkspaceInternalCampaigns() {
                           ) : (
                             <Pencil className="size-4" aria-hidden />
                           )}
-                          Continuar
-                        </Button>
+                        </IconActionButton>
                       ) : null}
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <a
-                          href={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="size-4" aria-hidden />
-                          Ver
-                        </a>
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
+                      <IconActionButton
+                        label="Ver"
+                        href={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
+                      >
+                        <ExternalLink className="size-4" aria-hidden />
+                      </IconActionButton>
+                      <IconActionButton
+                        label="Duplicar"
                         onClick={() => void duplicateCampaign(campaign.id)}
                         disabled={duplicatingId === campaign.id}
                       >
@@ -915,8 +907,7 @@ export function WorkspaceInternalCampaigns() {
                         ) : (
                           <Copy className="size-4" aria-hidden />
                         )}
-                        Duplicar
-                      </Button>
+                      </IconActionButton>
                     </div>
                   </TableCell>
                 </TableRow>

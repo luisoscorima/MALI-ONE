@@ -989,8 +989,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       {nf.format(campaign.clicked)}
                     </button>
                   </TableCell>
-                  <TableCell className="min-w-[16rem]">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                  <TableCell>
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
                       <IconActionButton
                         label="Estadísticas"
                         onClick={() => setStatsCampaign(campaign)}
@@ -998,9 +998,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                         <BarChart3 className="size-4" />
                       </IconActionButton>
                       {campaign.status === 'draft' && isAdmin ? (
-                        <Button
-                          type="button"
-                          size="sm"
+                        <IconActionButton
+                          label="Continuar"
                           onClick={() => void continueDraft(campaign.id)}
                           disabled={openingDraftId === campaign.id}
                         >
@@ -1009,24 +1008,17 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                           ) : (
                             <Pencil className="size-4" aria-hidden />
                           )}
-                          Continuar
-                        </Button>
+                        </IconActionButton>
                       ) : null}
-                      <Button type="button" size="sm" variant="outline" asChild>
-                        <a
-                          href={`/api/malichimp/campaigns/${encodeURIComponent(campaign.id)}/view`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="size-4" aria-hidden />
-                          Ver
-                        </a>
-                      </Button>
+                      <IconActionButton
+                        label="Ver"
+                        href={`/api/malichimp/campaigns/${encodeURIComponent(campaign.id)}/view`}
+                      >
+                        <ExternalLink className="size-4" aria-hidden />
+                      </IconActionButton>
                       {isAdmin ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
+                        <IconActionButton
+                          label="Duplicar"
                           onClick={() => void duplicateCampaign(campaign.id)}
                           disabled={duplicatingId === campaign.id}
                         >
@@ -1035,8 +1027,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                           ) : (
                             <Copy className="size-4" aria-hidden />
                           )}
-                          Duplicar
-                        </Button>
+                        </IconActionButton>
                       ) : null}
                     </div>
                   </TableCell>
