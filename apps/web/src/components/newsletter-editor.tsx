@@ -626,7 +626,7 @@ export const NewsletterEditor = forwardRef<
       run: (ed) => ed.setDevice('Móvil'),
     });
     panels.removeButton('devices-c', 'set-device-tablet');
-    for (const id of ['toggle-images', 'canvas-clear'] as const) {
+    for (const id of ['gjs-toggle-images', 'canvas-clear'] as const) {
       panels.removeButton('options', id);
     }
     for (const [panel, id, title] of [
