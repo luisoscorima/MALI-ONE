@@ -26,6 +26,7 @@
 
 ### Changed
 
+- Nueva campaña usa un panel numerado compacto (estilo CRM PAM): incluir/excluir con desplegables, preview tabular, boletín publicado, radios Ahora/Programar y confirmación antes de enviar.
 - El diálogo de importación ofrece XLSX (lotes nuevos) y ZIP (sincronización Mailchimp).
 - Las campañas exigen un remitente del catálogo; `fromEmail` y `replyTo` deben ser `@mali.pe`.
 - `SES_FROM_EMAIL` queda solo como fallback del transporte.

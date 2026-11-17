@@ -147,7 +147,6 @@ export function MalichimpPage() {
   const [importError, setImportError] = useState('');
   const [xlsxFile, setXlsxFile] = useState<File | null>(null);
   const [xlsxGroupOptionIds, setXlsxGroupOptionIds] = useState<string[]>([]);
-  const [xlsxConsentConfirmed, setXlsxConsentConfirmed] = useState(false);
   const [xlsxPreview, setXlsxPreview] =
     useState<MalichimpXlsxImportPreviewDto | null>(null);
   const [xlsxResult, setXlsxResult] =
@@ -249,7 +248,6 @@ export function MalichimpPage() {
     setImportJob(null);
     setXlsxFile(null);
     setXlsxGroupOptionIds([]);
-    setXlsxConsentConfirmed(false);
     setXlsxPreview(null);
     setXlsxResult(null);
     setImportError('');
@@ -340,7 +338,7 @@ export function MalichimpPage() {
   }
 
   async function previewXlsxImport() {
-    if (!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsentConfirmed) return;
+    if (!xlsxFile || !xlsxGroupOptionIds.length) return;
     setImportBusy(true);
     setImportError('');
     try {
@@ -689,7 +687,7 @@ export function MalichimpPage() {
                             <div>
                               <Label htmlFor="malichimp-xlsx">Nuevos contactos</Label>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                Usa la plantilla o un XLSX con una columna Correo. Máximo 10 MB y 10 000 contactos.
+                                Plantilla simple: encabezados + fila de ejemplo (reemplázala). También vale cualquier XLSX con columna Correo. Máx. 10 MB / 10 000 contactos.
                               </p>
                             </div>
                             <Button asChild type="button" variant="outline" size="sm">
@@ -746,22 +744,9 @@ export function MalichimpPage() {
                       </p>
                     </div>
 
-                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm">
-                      <Checkbox
-                        checked={xlsxConsentConfirmed}
-                        onCheckedChange={(checked) => {
-                          setXlsxConsentConfirmed(checked === true);
-                          setXlsxPreview(null);
-                          setXlsxResult(null);
-                        }}
-                      />
-                      <span>
-                        Confirmo que estos contactos autorizaron recibir comunicaciones por correo.
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          Las bajas, correos limpiados y supresiones de SES nunca serán reactivados.
-                        </span>
-                      </span>
-                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Las bajas, correos limpiados y supresiones de SES nunca serán reactivados.
+                    </p>
                   </>
                 ) : null}
 
@@ -798,7 +783,6 @@ export function MalichimpPage() {
                       </div>
                       <ul className="mt-3 list-disc space-y-1 pl-5 text-muted-foreground">
                         <li>La importación agregará información, pero no borrará datos ni grupos existentes.</li>
-                        <li>Los contactos sin suscripción podrán activarse porque confirmaste su autorización.</li>
                         <li>Las bajas, direcciones limpiadas y supresiones permanecerán bloqueadas.</li>
                       </ul>
                     </div>
@@ -853,7 +837,7 @@ export function MalichimpPage() {
                     <Button
                       type="button"
                       onClick={() => void previewXlsxImport()}
-                      disabled={!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsentConfirmed || importBusy}
+                      disabled={!xlsxFile || !xlsxGroupOptionIds.length || importBusy}
                     >
                       {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
                       {importBusy ? 'Validando…' : 'Validar XLSX'}

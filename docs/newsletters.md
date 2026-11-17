@@ -32,8 +32,9 @@ Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
 
 ## Datos (Prisma)
 
-- `Newsletter`
+- `Newsletter` (incluye `brand` opcional: `museo`, `cursos_arte`, `extension_profesional`)
 - Una campaña referencia el boletín para auditoría, pero envía `subjectSnapshot` y `htmlSnapshot`. Un boletín usado por campañas no puede eliminarse.
+- Import Mailchimp: `pnpm --filter @mali-one/api prisma:seed:mailchimp-newsletters`
 
 ## Conexiones externas
 

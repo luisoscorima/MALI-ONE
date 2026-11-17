@@ -29,17 +29,18 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 
 ## Campañas
 
-1. En **Nueva campaña**, el administrador elige **Usar existente** (boletín publicado) o **Crear nuevo** (borrador en la biblioteca de Boletines). El editor sigue siendo el módulo Boletines.
-2. Debe seleccionar una o más opciones de grupo para incluir. Opcionalmente puede seleccionar otras opciones para excluir; la exclusión siempre prevalece. Cada correo se deduplica.
-3. La API muestra coincidencias, exclusiones, destinatarios finales y una muestra antes de confirmar. No existe un envío accidental a “todos”: al menos una inclusión es obligatoria.
-4. El remitente se elige del catálogo compartido administrado en la pestaña **Remitentes**. El nombre visible y el asunto pueden ajustarse por campaña. `fromEmail` y `replyTo` deben ser `@mali.pe`.
-5. El envío puede salir inmediatamente o quedar programado. Una fecha programada vencida se rechaza para evitar un envío inmediato accidental.
-6. Al confirmar se congelan asunto, HTML, remitente, inclusiones, exclusiones y destinatarios. Editar después el boletín o los grupos no altera la campaña.
-7. Desde la tabla se puede previsualizar el snapshot y abrirlo en el navegador. En borradores (duplicados o creados nuevos), la vista muestra la versión actual del boletín asociado hasta que se confirma el envío.
-8. **Duplicar** crea una nueva campaña en borrador y una copia editable del boletín en la biblioteca. Copia remitente, asunto e inclusiones/exclusiones; limpia programación, destinatarios materializados y métricas. La audiencia se recalcula y los `EmailSend` solo nacen al confirmar el borrador.
-9. `EmailCampaignDispatcherService` procesa lotes persistidos, respeta la tasa configurada y reintenta fallos temporales hasta tres veces.
-10. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
-11. El footer enlaza a `/mail/unsubscribe/{token}`. El GET pide confirmación y el POST aplica la baja solo en MALICHIMP, evitando que los escáneres de enlaces cancelen suscripciones automáticamente.
+1. En **Nueva campaña** el flujo es un panel numerado compacto (estilo del envío histórico de CRM PAM): incluir opciones → excluir (opcional) → vista previa → boletín/asunto → enviar o programar.
+2. Debe seleccionar una o más opciones de grupo para **incluir** (desplegable multi-select). **Excluir** es un segundo desplegable opcional; la exclusión siempre prevalece. Cada correo se deduplica. No existe un envío accidental a “todos”.
+3. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar.
+4. El camino feliz usa un **boletín publicado**. Si no hay publicados, se puede crear un borrador en Boletines. El asunto se propone desde el boletín; el nombre interno del envío es opcional (fallback al título o `Envío {fecha}`).
+5. El remitente se prellena desde el catálogo de la pestaña **Remitentes**; el reply-to vive en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
+6. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita antes de crear. Una fecha programada vencida se rechaza.
+7. Al confirmar se congelan asunto, HTML, remitente, inclusiones, exclusiones y destinatarios. Editar después el boletín o los grupos no altera la campaña.
+8. Desde la tabla se puede previsualizar el snapshot y abrirlo en el navegador. En borradores (duplicados), la vista muestra la versión actual del boletín asociado hasta confirmar.
+9. **Duplicar** crea una nueva campaña en borrador y una copia editable del boletín. Copia remitente, asunto e inclusiones/exclusiones; limpia programación, destinatarios materializados y métricas.
+10. `EmailCampaignDispatcherService` procesa lotes persistidos, respeta la tasa configurada y reintenta fallos temporales hasta tres veces.
+11. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
+12. El footer enlaza a `/mail/unsubscribe/{token}`. El GET pide confirmación y el POST aplica la baja solo en MALICHIMP.
 
 El mismo dispatcher ya atiende Comunicación Interna y queda disponible para otros módulos. Los consumidores crean campañas con snapshots; nunca entregan al motor una consulta a sus tablas de contactos.
 
@@ -49,12 +50,11 @@ El mismo dispatcher ya atiende Comunicación Interna y queda disponible para otr
 
 Un administrador abre `/admin/malichimp` → **Importar contactos** → pestaña **XLSX de contactos**:
 
-1. Descarga la plantilla en `/plantillas/plantilla-contactos-malichimp.xlsx` o sube un XLSX con una columna de correo (acepta alias como `Correo`, `Email`, `Email address`).
+1. Descarga la plantilla en `/plantillas/plantilla-contactos-malichimp.xlsx` (fila 1: encabezados; fila 2: ejemplo a reemplazar) o sube un XLSX con una columna de correo (acepta alias como `Correo`, `Email`, `Email address`).
 2. Límite: 10 MB y 10 000 contactos por lote.
 3. Selecciona una o más opciones de grupo que se agregarán a cada contacto importable sin quitar membresías previas.
-4. Confirma explícitamente que los contactos autorizaron recibir correo.
-5. La API muestra preview (nuevos, existentes, bloqueados, muestra) sin escribir PostgreSQL.
-6. Al confirmar, crea o completa perfiles en una sola transacción, añade membresías y registra `MalichimpImportJob` + `MalichimpImportRun` (incluye huella del archivo, admin y marca de consentimiento).
+4. La API muestra preview (nuevos, existentes, bloqueados, muestra) sin escribir PostgreSQL.
+5. Al confirmar, crea o completa perfiles en una sola transacción, añade membresías y registra `MalichimpImportJob` + `MalichimpImportRun` (incluye huella del archivo, admin y marca de consentimiento).
 
 Comportamiento:
 

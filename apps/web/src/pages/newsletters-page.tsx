@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import type { NewsletterDto } from '@mali-one/shared';
+import type { NewsletterBrand, NewsletterDto } from '@mali-one/shared';
+import {
+  NEWSLETTER_BRANDS,
+  NEWSLETTER_BRAND_LABELS,
+} from '@mali-one/shared';
 import {
   NewsletterEditor,
   type NewsletterEditorHandle,
@@ -53,6 +57,7 @@ export function NewslettersPage() {
   const [slug, setSlug] = useState('');
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
+  const [brand, setBrand] = useState<NewsletterBrand | null>(null);
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
 
   const load = useCallback(async () => {
@@ -75,6 +80,7 @@ export function NewslettersPage() {
     setSlug('');
     setTitle('');
     setSubject('');
+    setBrand(null);
     setStatus('draft');
     setEditingId(null);
     setInitialDesignJson(null);
@@ -94,6 +100,7 @@ export function NewslettersPage() {
       setSlug(n.slug);
       setTitle(n.title);
       setSubject(n.subject);
+      setBrand(n.brand ?? null);
       setStatus(n.status === 'published' ? 'published' : 'draft');
       setInitialDesignJson(n.designJson ?? null);
       setInitialHtml(n.htmlBody);
@@ -140,6 +147,7 @@ export function NewslettersPage() {
           subject: subject.trim(),
           htmlBody: exported.htmlBody,
           designJson: exported.designJson,
+          brand,
           status,
         });
         toast.success('Boletín creado');
@@ -149,6 +157,7 @@ export function NewslettersPage() {
           subject: subject.trim(),
           htmlBody: exported.htmlBody,
           designJson: exported.designJson,
+          brand,
           status,
         });
         toast.success('Boletín actualizado');
@@ -238,7 +247,7 @@ export function NewslettersPage() {
           <h3 className="font-semibold">
             {mode === 'create' ? 'Nuevo boletín' : 'Editar boletín'}
           </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1">
               <Label htmlFor="slug">Slug (URL /n/…)</Label>
               <Input
@@ -265,6 +274,29 @@ export function NewslettersPage() {
               </Select>
             </div>
             <div className="space-y-1">
+              <Label>Marca (opcional)</Label>
+              <Select
+                value={brand ?? 'none'}
+                onValueChange={(v) => {
+                  const next = v === 'none' ? null : (v as NewsletterBrand);
+                  setBrand(next);
+                  if (mode === 'create') setEditorKey((k) => k + 1);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin marca" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin marca</SelectItem>
+                  {NEWSLETTER_BRANDS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {NEWSLETTER_BRAND_LABELS[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="title">Título</Label>
               <Input
                 id="title"
@@ -284,15 +316,20 @@ export function NewslettersPage() {
 
           <p className="text-xs text-muted-foreground">
             En el panel izquierdo usa la categoría <strong>MALI</strong>: Texto |
-            Imagen, Imagen | Texto, bloque de color, barra CTA. Selecciona un
-            elemento y cambia color / alineación en Estilos a la derecha.
+            Imagen, Imagen | Texto, bloque de color, barra CTA
+            {brand
+              ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
+              : '.'}{' '}
+            Selecciona un elemento y cambia color / alineación en Estilos a la
+            derecha.
           </p>
 
           <NewsletterEditor
-            key={editorKey}
+            key={`${editorKey}-${brand ?? 'none'}`}
             ref={editorRef}
             initialDesignJson={initialDesignJson}
             initialHtml={initialHtml}
+            brand={brand}
           />
         </div>
       ) : null}
@@ -310,6 +347,7 @@ export function NewslettersPage() {
             <TableRow>
               <TableHead>Título</TableHead>
               <TableHead>Slug</TableHead>
+              <TableHead>Marca</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -322,6 +360,9 @@ export function NewslettersPage() {
                   <div className="text-xs text-muted-foreground">{n.subject}</div>
                 </TableCell>
                 <TableCell className="font-mono text-sm">{n.slug}</TableCell>
+                <TableCell>
+                  {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
+                </TableCell>
                 <TableCell>{n.status}</TableCell>
                 <TableCell className="space-x-1 text-right">
                   <Button

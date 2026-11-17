@@ -51,6 +51,12 @@ export class S3Service {
     return `qr-logos/${linkId}/${randomUUID()}-${safeName}`;
   }
 
+  buildNewsletterAssetKey(slugOrBrand: string, fileName: string): string {
+    const scope = slugOrBrand.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    return `newsletters/${scope}/${randomUUID()}-${safeName}`;
+  }
+
   getPublicUrl(key: string): string {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }

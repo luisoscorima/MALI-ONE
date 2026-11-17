@@ -214,7 +214,7 @@ async function request<T>(
   if (!res.ok) {
     if (res.status === 504 || res.status === 502 || res.status === 524) {
       throw new Error(
-        'La solicitud tardó demasiado (timeout del proxy). Si es Kardex, espera unos segundos y vuelve a intentar: el servidor puede seguir procesando en segundo plano.',
+        'La solicitud tardó demasiado. Inténtalo de nuevo en unos segundos.',
       );
     }
     const error = await res.json().catch(() => ({ message: res.statusText })) as {

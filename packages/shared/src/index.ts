@@ -1,4 +1,17 @@
 import { GESTION_CULTURAL_MODULES, GESTION_CULTURAL_FACULTY } from './gestion-cultural-content';
+import type {
+  NewsletterBrand,
+  NewsletterBrandAssets,
+} from './newsletter-brand';
+
+export {
+  NEWSLETTER_BRANDS,
+  NEWSLETTER_BRAND_LABELS,
+  buildNewsletterBrandFooter,
+  buildNewsletterBrandHeader,
+  wrapNewsletterWithBrandChrome,
+} from './newsletter-brand';
+export type { NewsletterBrand, NewsletterBrandAssets };
 
 export type UserRole = 'admin' | 'operator';
 
@@ -1310,6 +1323,8 @@ export interface NewsletterDto {
   htmlBody: string;
   /** GrapesJS project JSON for re-editing. */
   designJson?: string | null;
+  /** Optional brand selects header + footer chrome. */
+  brand?: NewsletterBrand | null;
   status: NewsletterStatus;
   createdAt: string;
   updatedAt: string;
@@ -1322,6 +1337,7 @@ export interface CreateNewsletterDto {
   subject: string;
   htmlBody: string;
   designJson?: string | null;
+  brand?: NewsletterBrand | null;
   status?: NewsletterStatus;
 }
 
@@ -1330,6 +1346,7 @@ export interface UpdateNewsletterDto {
   subject?: string;
   htmlBody?: string;
   designJson?: string | null;
+  brand?: NewsletterBrand | null;
   status?: NewsletterStatus;
 }
 

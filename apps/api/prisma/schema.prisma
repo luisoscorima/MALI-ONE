@@ -833,6 +833,13 @@ enum NewsletterStatus {
   published
 }
 
+/// Optional visual brand for header/footer chrome in Boletines.
+enum NewsletterBrand {
+  museo
+  cursos_arte
+  extension_profesional
+}
+
 enum LandingStatus {
   draft
   published
@@ -905,6 +912,8 @@ model Newsletter {
   htmlBody    String           @db.Text
   /// GrapesJS project JSON for re-editing the visual design.
   designJson  String?          @db.Text
+  /// Optional brand selects the matching header + footer chrome.
+  brand       NewsletterBrand?
   status      NewsletterStatus @default(draft)
   createdById String
   createdBy   User             @relation(fields: [createdById], references: [id])
@@ -914,6 +923,7 @@ model Newsletter {
 
   @@index([createdById])
   @@index([status])
+  @@index([brand])
 }
 
 model LandingPage {

@@ -5,7 +5,14 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+
+const NEWSLETTER_BRANDS = [
+  'museo',
+  'cursos_arte',
+  'extension_profesional',
+] as const;
 
 export class CreateNewsletterDto {
   @IsString()
@@ -35,6 +42,11 @@ export class CreateNewsletterDto {
   designJson?: string | null;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn([...NEWSLETTER_BRANDS])
+  brand?: (typeof NEWSLETTER_BRANDS)[number] | null;
+
+  @IsOptional()
   @IsIn(['draft', 'published'])
   status?: 'draft' | 'published';
 }
@@ -60,6 +72,11 @@ export class UpdateNewsletterDto {
   @IsOptional()
   @IsString()
   designJson?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn([...NEWSLETTER_BRANDS])
+  brand?: (typeof NEWSLETTER_BRANDS)[number] | null;
 
   @IsOptional()
   @IsIn(['draft', 'published'])

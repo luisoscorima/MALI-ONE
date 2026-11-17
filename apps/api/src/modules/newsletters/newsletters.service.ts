@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  NewsletterBrand,
   NewsletterStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -88,6 +89,12 @@ export class NewslettersService {
           subject: dto.subject.trim(),
           htmlBody: dto.htmlBody,
           designJson: dto.designJson ?? null,
+          brand:
+            dto.brand === undefined
+              ? undefined
+              : dto.brand === null
+                ? null
+                : (dto.brand as NewsletterBrand),
           status: (dto.status as NewsletterStatus) ?? NewsletterStatus.draft,
           createdById: userId,
         },
@@ -115,6 +122,12 @@ export class NewslettersService {
         ...(dto.htmlBody !== undefined ? { htmlBody: dto.htmlBody } : {}),
         ...(dto.designJson !== undefined
           ? { designJson: dto.designJson }
+          : {}),
+        ...(dto.brand !== undefined
+          ? {
+              brand:
+                dto.brand === null ? null : (dto.brand as NewsletterBrand),
+            }
           : {}),
         ...(dto.status !== undefined
           ? { status: dto.status as NewsletterStatus }

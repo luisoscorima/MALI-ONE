@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Campo opcional `brand` (`museo` | `cursos_arte` | `extension_profesional`) para header/footer por marca.
+- Seed/import de campañas Mailchimp públicas con rehost de imágenes a S3 (`newsletters/…`).
 - Las campañas guardan snapshots del asunto y HTML; editar un boletín no altera envíos ya creados.
 - Tracking y eventos de entrega pasan a `core/email-delivery` para poder reutilizarse desde cualquier módulo.
 - Se impide eliminar un boletín que forma parte del historial de campañas.

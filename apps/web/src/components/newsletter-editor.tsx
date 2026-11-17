@@ -7,6 +7,13 @@ import {
 import grapesjs, { type Editor } from 'grapesjs';
 import newsletterPlugin from 'grapesjs-preset-newsletter';
 import es from 'grapesjs/locale/es';
+import type { NewsletterBrand } from '@mali-one/shared';
+import {
+  NEWSLETTER_BRAND_LABELS,
+  buildNewsletterBrandFooter,
+  buildNewsletterBrandHeader,
+  wrapNewsletterWithBrandChrome,
+} from '@mali-one/shared';
 import 'grapesjs/dist/css/grapes.min.css';
 
 export type NewsletterEditorExport = {
@@ -18,9 +25,25 @@ export type NewsletterEditorHandle = {
   getExport: () => NewsletterEditorExport;
 };
 
+/**
+ * Brand chrome logos (absolute: required inside email HTML).
+ * Served from the web origin because mali-one-files blocks anonymous GetObject
+ * despite S3_PUBLIC_READ. Copies also live under s3://mali-one-files/newsletters/brands/.
+ */
+const BRAND_LOGO_ORIGIN =
+  (typeof window !== 'undefined' && window.location?.origin) ||
+  'https://dev.mali.pe';
+
+export const NEWSLETTER_BRAND_LOGO_URLS: Record<NewsletterBrand, string> = {
+  cursos_arte: `${BRAND_LOGO_ORIGIN}/newsletter-brands/cursos_arte-logo.png`,
+  extension_profesional: `${BRAND_LOGO_ORIGIN}/newsletter-brands/extension_profesional-logo.png`,
+  museo: `${BRAND_LOGO_ORIGIN}/newsletter-brands/museo-logo.png`,
+};
+
 type NewsletterEditorProps = {
   initialDesignJson?: string | null;
   initialHtml?: string | null;
+  brand?: NewsletterBrand | null;
   className?: string;
 };
 
@@ -200,7 +223,7 @@ const MALI_STARTER_HTML = `
 </table>
 `.trim();
 
-function registerMaliBlocks(editor: Editor) {
+function registerMaliBlocks(editor: Editor, brand?: NewsletterBrand | null) {
   const bm = editor.BlockManager;
   const cat = 'MALI';
 
@@ -259,6 +282,22 @@ function registerMaliBlocks(editor: Editor) {
     },
   ];
 
+  if (brand) {
+    const logoUrl = NEWSLETTER_BRAND_LOGO_URLS[brand];
+    items.unshift(
+      {
+        id: `mali-brand-header-${brand}`,
+        label: `Header ${NEWSLETTER_BRAND_LABELS[brand]}`,
+        content: buildNewsletterBrandHeader(brand, { logoUrl }),
+      },
+      {
+        id: `mali-brand-footer-${brand}`,
+        label: `Footer ${NEWSLETTER_BRAND_LABELS[brand]}`,
+        content: buildNewsletterBrandFooter(brand),
+      },
+    );
+  }
+
   for (const item of items) {
     bm.add(item.id, {
       label: item.label,
@@ -273,6 +312,7 @@ function loadInitialContent(
   editor: Editor,
   designJson?: string | null,
   html?: string | null,
+  brand?: NewsletterBrand | null,
 ) {
   if (designJson?.trim()) {
     try {
@@ -286,6 +326,16 @@ function loadInitialContent(
     editor.setComponents(html);
     return;
   }
+  if (brand) {
+    editor.setComponents(
+      wrapNewsletterWithBrandChrome(
+        `<table style="width:100%;margin:0;padding:0;border-collapse:collapse" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding:24px 16px;font-family:${FONT};color:${MALI_BLACK};font-size:14px;line-height:1.55"><p style="margin:0">Escribe aquí el contenido del boletín.</p></td></tr></tbody></table>`,
+        brand,
+        { logoUrl: NEWSLETTER_BRAND_LOGO_URLS[brand] },
+      ),
+    );
+    return;
+  }
   editor.setComponents(MALI_STARTER_HTML);
 }
 
@@ -293,7 +343,7 @@ export const NewsletterEditor = forwardRef<
   NewsletterEditorHandle,
   NewsletterEditorProps
 >(function NewsletterEditor(
-  { initialDesignJson, initialHtml, className },
+  { initialDesignJson, initialHtml, brand = null, className },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -407,8 +457,8 @@ export const NewsletterEditor = forwardRef<
       },
     });
 
-    registerMaliBlocks(editor);
-    loadInitialContent(editor, initialDesignJson, initialHtml);
+    registerMaliBlocks(editor, brand);
+    loadInitialContent(editor, initialDesignJson, initialHtml, brand);
     editorRef.current = editor;
 
     return () => {
