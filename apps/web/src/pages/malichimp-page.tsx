@@ -376,7 +376,7 @@ export function MalichimpPage() {
     <div className="space-y-5">
       <PageHeader
         title="MALICHIMP"
-        description="Audiencia de correo separada del CRM de WhatsApp y organizada por grupos de Mailchimp."
+        description="Audiencia de correo organizada por grupos de Mailchimp."
         actions={user?.role === 'admin' ? (
           <Button type="button" onClick={openImport}>
             <Upload className="mr-1 size-4" aria-hidden />
@@ -389,7 +389,7 @@ export function MalichimpPage() {
 
       {stats && !stats.delivery.configured ? (
         <AlertBanner variant="info">
-          La audiencia está lista, pero el motor SES compartido aún no tiene credenciales en este entorno. No se habilitarán envíos.
+          La audiencia está lista, pero los envíos no están disponibles en este entorno.
         </AlertBanner>
       ) : null}
 
@@ -750,7 +750,7 @@ export function MalichimpPage() {
                     </div>
 
                     <p className="text-xs text-muted-foreground">
-                      Las bajas, correos limpiados y supresiones de SES nunca serán reactivados.
+                      Las bajas, correos limpiados y supresiones nunca serán reactivados.
                     </p>
                   </>
                 ) : null}

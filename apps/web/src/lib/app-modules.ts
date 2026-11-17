@@ -64,7 +64,7 @@ export const APP_MODULES: {
   {
     id: 'malichimp',
     label: 'MALICHIMP',
-    description: 'Contactos, segmentos y supresiones para boletines por Amazon SES.',
+    description: 'Contactos, segmentos y supresiones para boletines.',
   },
   {
     id: 'internal_communications',
