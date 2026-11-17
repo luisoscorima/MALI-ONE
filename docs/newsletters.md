@@ -35,6 +35,11 @@ Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
 - `Newsletter` (incluye `brand` opcional: `museo`, `cursos_arte`, `extension_profesional`)
 - Una campaña referencia el boletín para auditoría, pero envía `subjectSnapshot` y `htmlSnapshot`. Un boletín usado por campañas no puede eliminarse.
 - Import Mailchimp: `pnpm --filter @mali-one/api prisma:seed:mailchimp-newsletters`
+- Assets del import van a `s3://mali-one-files/newsletters/…`. El rol EC2 puede
+  subirlos; la URL anónima S3 solo funciona si hay bucket policy pública (ver
+  [aws-runtime-role.md](./aws-runtime-role.md)). Mientras tanto el HTML puede
+  conservar `mcusercontent.com` y los logos de marca se sirven en
+  `/newsletter-brands/`.
 
 ## Conexiones externas
 

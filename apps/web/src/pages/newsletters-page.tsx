@@ -334,32 +334,43 @@ export function NewslettersPage() {
         </div>
       ) : null}
 
-      {loading ? (
+      {mode === 'closed' && loading ? (
         <TableSkeleton rows={4} />
-      ) : newsletters.length === 0 && mode === 'closed' ? (
+      ) : mode === 'closed' && newsletters.length === 0 ? (
         <EmptyState
           title="Sin boletines"
           description="Crea el primero con el editor visual drag & drop."
         />
-      ) : newsletters.length > 0 ? (
+      ) : mode === 'closed' && newsletters.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Título</TableHead>
+              <TableHead className="w-[220px] max-w-[220px]">Título</TableHead>
               <TableHead>Slug</TableHead>
-              <TableHead>Marca</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="w-[140px]">Marca</TableHead>
+              <TableHead className="w-[100px]">Estado</TableHead>
+              <TableHead className="w-[1%] whitespace-nowrap text-right">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {newsletters.map((n) => (
               <TableRow key={n.id}>
-                <TableCell>
-                  <div className="font-medium">{n.title}</div>
-                  <div className="text-xs text-muted-foreground">{n.subject}</div>
+                <TableCell className="max-w-[220px]">
+                  <div className="truncate font-medium" title={n.title}>
+                    {n.title}
+                  </div>
+                  <div
+                    className="truncate text-xs text-muted-foreground"
+                    title={n.subject}
+                  >
+                    {n.subject}
+                  </div>
                 </TableCell>
-                <TableCell className="font-mono text-sm">{n.slug}</TableCell>
+                <TableCell className="max-w-[240px] truncate font-mono text-sm" title={n.slug}>
+                  {n.slug}
+                </TableCell>
                 <TableCell>
                   {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
                 </TableCell>

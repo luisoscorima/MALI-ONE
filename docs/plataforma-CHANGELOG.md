@@ -4,7 +4,9 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- _(vacío — registrar aquí cada cambio evolutivo)_
+- Se documentan las políticas reales de `mali-one-ec2-role` (SES/SQS + S3) y se
+  aclara que `S3_PUBLIC_READ` no abre el bucket: hace falta bucket policy /
+  Block Public Access.
 
 ## [2026-11-05] — baseline documental
 

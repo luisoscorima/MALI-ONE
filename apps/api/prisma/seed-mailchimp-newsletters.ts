@@ -123,20 +123,82 @@ function extractSubject(html: string): string {
   return cleaned.slice(0, 200) || 'Boletín MALI';
 }
 
+/** Remove a nested HTML element by id (Mailchimp archive chrome, etc.). */
+function removeElementById(html: string, elementId: string): string {
+  const open = html.match(
+    new RegExp(
+      `<([a-z0-9]+)([^>]*\\bid=["']${elementId}["'][^>]*)>`,
+      'i',
+    ),
+  );
+  if (!open || open.index === undefined) return html;
+
+  const tag = open[1].toLowerCase();
+  const start = open.index;
+  let cursor = start + open[0].length;
+  const voidTags = new Set([
+    'img',
+    'br',
+    'hr',
+    'input',
+    'meta',
+    'link',
+    'area',
+    'base',
+    'col',
+    'embed',
+    'source',
+    'track',
+    'wbr',
+  ]);
+  if (voidTags.has(tag)) {
+    return html.slice(0, start) + html.slice(cursor);
+  }
+
+  let depth = 1;
+  const tokenRe = new RegExp(`</?${tag}\\b[^>]*>`, 'gi');
+  tokenRe.lastIndex = cursor;
+  while (depth > 0) {
+    const token = tokenRe.exec(html);
+    if (!token) break;
+    const value = token[0];
+    if (/^<\//.test(value)) depth -= 1;
+    else if (!/\/>$/.test(value)) depth += 1;
+    cursor = tokenRe.lastIndex;
+  }
+  return html.slice(0, start) + html.slice(cursor);
+}
+
 function extractBodyHtml(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   let body = bodyMatch?.[1] ?? html;
+
+  // Mailchimp public archive chrome (share bar + Translate language list).
+  body = removeElementById(body, 'awesomewrap');
+  body = removeElementById(body, 'awesomeshare');
+  body = removeElementById(body, 'awesomebar');
+  body = removeElementById(body, 'canspamBarWrapper');
+  body = removeElementById(body, 'templateHeaderBar');
 
   body = body
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-    // Mailchimp archive chrome / reward badges
+    // Hidden preview / archive-only bits
+    .replace(
+      /<span[^>]*class=["'][^"']*mcnPreviewText[^"']*["'][^>]*>[\s\S]*?<\/span>/gi,
+      '',
+    )
     .replace(/https:\/\/cdn-images\.mailchimp\.com\/monkey_rewards\/[^"'\s]+/gi, '')
     .replace(/\|\s*MC_PREVIEW_TEXT\s*\|/gi, '')
     .replace(/\*\|[A-Z0-9_]+\|\*/g, '')
     .replace(/<<\s*Test First Name\s*>>/gi, '')
-    .replace(/&lt;&lt;\s*Test First Name\s*&gt;&gt;/gi, '');
+    .replace(/&lt;&lt;\s*Test First Name\s*&gt;&gt;/gi, '')
+    // Leftover translate links if chrome markup varies
+    .replace(
+      /https?:\/\/translate\.google\.com\/translate\?[^"'\\\s>]+/gi,
+      '',
+    );
 
   return body.trim();
 }
