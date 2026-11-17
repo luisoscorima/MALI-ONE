@@ -339,9 +339,13 @@ export function WorkspaceInternalCampaigns() {
   const [recipientQuery, setRecipientQuery] = useState('');
   const [campaignPreview, setCampaignPreview] =
     useState<InternalCampaignDetailDto | null>(null);
-  const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
   const [statsCampaign, setStatsCampaign] = useState<InternalCampaignDto | null>(
     null,
+  );
+
+  const loadInternalStats = useCallback(
+    (id: string, days: number) => api.getInternalCampaignStats(id, days),
+    [],
   );
 
   const load = useCallback(async (quiet = false) => {
@@ -453,7 +457,6 @@ export function WorkspaceInternalCampaigns() {
   }
 
   async function openCampaignPreview(id: string) {
-    setPreviewCampaignId(id);
     try {
       setCampaignPreview(await api.getInternalCampaign(id));
     } catch (reason) {
@@ -462,8 +465,6 @@ export function WorkspaceInternalCampaigns() {
           ? reason.message
           : 'No se pudo cargar la vista previa',
       );
-    } finally {
-      setPreviewCampaignId(null);
     }
   }
 
@@ -596,6 +597,7 @@ export function WorkspaceInternalCampaigns() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[7.5rem]">Vista</TableHead>
                 <TableHead>Campaña</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviados</TableHead>
@@ -610,6 +612,30 @@ export function WorkspaceInternalCampaigns() {
             <TableBody>
               {campaigns.map((campaign) => (
                 <TableRow key={campaign.id}>
+                  <TableCell className="align-middle">
+                    <button
+                      type="button"
+                      className="relative block h-16 w-[5.5rem] overflow-hidden rounded-md border bg-white shadow-sm transition-opacity hover:opacity-90"
+                      onClick={() => void openCampaignPreview(campaign.id)}
+                      aria-label={`Vista previa de ${campaign.name}`}
+                      title="Abrir vista previa"
+                    >
+                      <iframe
+                        title={`Miniatura de ${campaign.name}`}
+                        src={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
+                        sandbox=""
+                        referrerPolicy="no-referrer"
+                        tabIndex={-1}
+                        loading="lazy"
+                        className="pointer-events-none absolute top-0 left-0 origin-top-left border-0"
+                        style={{
+                          width: 640,
+                          height: 900,
+                          transform: 'scale(0.1375)',
+                        }}
+                      />
+                    </button>
+                  </TableCell>
                   <TableCell className="min-w-64">
                     <p className="font-medium">{campaign.name}</p>
                     <p className="text-xs text-muted-foreground">
@@ -655,7 +681,7 @@ export function WorkspaceInternalCampaigns() {
                       {nf.format(campaign.clicked)}
                     </button>
                   </TableCell>
-                  <TableCell className="min-w-[16rem]">
+                  <TableCell className="min-w-[10rem]">
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <IconActionButton
                         label="Estadísticas"
@@ -663,23 +689,6 @@ export function WorkspaceInternalCampaigns() {
                       >
                         <BarChart3 className="size-4" />
                       </IconActionButton>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void openCampaignPreview(campaign.id)}
-                        disabled={previewCampaignId === campaign.id}
-                      >
-                        {previewCampaignId === campaign.id ? (
-                          <Loader2
-                            className="size-4 animate-spin motion-reduce:animate-none"
-                            aria-hidden
-                          />
-                        ) : (
-                          <Eye className="size-4" aria-hidden />
-                        )}
-                        Vista previa
-                      </Button>
                       <Button type="button" size="sm" variant="outline" asChild>
                         <a
                           href={`/api/internal-communications/campaigns/${encodeURIComponent(campaign.id)}/view`}
@@ -697,7 +706,7 @@ export function WorkspaceInternalCampaigns() {
               {!campaigns.length ? (
                 <TableRow>
                   <TableCell
-                    colSpan={9}
+                    colSpan={10}
                     className="h-32 text-center text-muted-foreground"
                   >
                     <BarChart3 className="mx-auto mb-2 size-6" aria-hidden />
@@ -1157,7 +1166,7 @@ export function WorkspaceInternalCampaigns() {
                 <MalichimpCampaignStatsPanel
                   campaignId={statsCampaign.id}
                   campaignName={statsCampaign.name}
-                  loadStats={api.getInternalCampaignStats}
+                  loadStats={loadInternalStats}
                 />
               </Suspense>
             ) : null}

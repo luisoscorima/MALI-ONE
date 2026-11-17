@@ -41,12 +41,15 @@ export function MalichimpCampaignStatsPanel({
 
   useEffect(() => {
     let cancelled = false;
-    const cached = getCachedMalichimpCampaignStats(campaignId, days);
-    if (cached) {
-      setStats(cached);
-      setLoading(false);
-      setError('');
-      return;
+    const useSharedCache = loadStats === api.getMalichimpCampaignStats;
+    if (useSharedCache) {
+      const cached = getCachedMalichimpCampaignStats(campaignId, days);
+      if (cached) {
+        setStats(cached);
+        setLoading(false);
+        setError('');
+        return;
+      }
     }
 
     setLoading(true);
@@ -54,12 +57,15 @@ export function MalichimpCampaignStatsPanel({
     void loadStats(campaignId, days)
       .then((data) => {
         if (!cancelled) {
-          setCachedMalichimpCampaignStats(campaignId, days, data);
+          if (useSharedCache) {
+            setCachedMalichimpCampaignStats(campaignId, days, data);
+          }
           setStats(data);
         }
       })
       .catch((e) => {
         if (!cancelled) {
+          setStats(null);
           setError(
             e instanceof Error ? e.message : 'Error al cargar estadísticas',
           );

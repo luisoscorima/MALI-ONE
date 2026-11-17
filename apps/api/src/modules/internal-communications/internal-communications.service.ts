@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { EmailCampaignStatus, NewsletterStatus, Prisma, SesEventType } from '@prisma/client';
+import { EmailCampaignStatus, NewsletterStatus, Prisma } from '@prisma/client';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { GoogleAdminService } from '../google-admin/google-admin.service';
@@ -185,81 +185,63 @@ export class InternalCommunicationsService {
   }
 
   async campaigns() {
-    const rows = await this.prisma.emailCampaign.findMany({
-      where: { audienceArea: AUDIENCE_AREA },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-      include: {
-        newsletter: { select: { title: true } },
-        sends: {
-          select: {
-            id: true,
-            sesMessageId: true,
-            status: true,
-            events: { select: { type: true } },
-          },
-        },
-      },
-    });
-
-    const messageIds = rows.flatMap((row) =>
-      row.sends.map((send) => send.sesMessageId).filter(Boolean),
-    ) as string[];
-    const sesEvents = messageIds.length
-      ? await this.prisma.sesEventRecord.findMany({
-          where: { messageId: { in: messageIds } },
-          select: { messageId: true, type: true },
-        })
-      : [];
-    const byMessage = new Map<string, Set<SesEventType>>();
-    for (const event of sesEvents) {
-      if (!event.messageId) continue;
-      const types = byMessage.get(event.messageId) ?? new Set<SesEventType>();
-      types.add(event.type);
-      byMessage.set(event.messageId, types);
-    }
-
-    return rows.map((row) => {
-      let delivered = 0;
-      let bounced = 0;
-      let complaints = 0;
-      let opened = 0;
-      let clicked = 0;
-      let suppressed = 0;
-      for (const send of row.sends) {
-        const types = send.sesMessageId ? byMessage.get(send.sesMessageId) : undefined;
-        if (types?.has(SesEventType.delivery)) delivered++;
-        if (types?.has(SesEventType.bounce)) bounced++;
-        if (types?.has(SesEventType.complaint)) complaints++;
-        if (types?.has(SesEventType.open) || send.events.some((event) => event.type === 'open')) {
-          opened++;
-        }
-        if (types?.has(SesEventType.click) || send.events.some((event) => event.type === 'click')) {
-          clicked++;
-        }
-        if (send.status === 'suppressed') suppressed++;
-      }
-      return {
-        id: row.id,
-        name: row.name,
-        newsletterId: row.newsletterId,
-        newsletterTitle: row.newsletter.title,
-        subject: row.subjectSnapshot,
-        replyTo: row.replyToEmail ?? DEFAULT_REPLY_TO,
-        status: row.status,
-        totalRecipients: row.totalRecipients,
-        sent: row.sentCount,
-        failed: row.errorCount,
-        suppressed,
-        delivered,
-        bounced,
-        complaints,
-        opened,
-        clicked,
-        createdAt: row.createdAt,
-        completedAt: row.completedAt,
-      };
-    });
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string;
+      name: string;
+      newsletterId: string;
+      newsletterTitle: string;
+      subject: string;
+      replyTo: string | null;
+      status: EmailCampaignStatus;
+      totalRecipients: number;
+      sent: number;
+      failed: number;
+      suppressed: bigint;
+      delivered: bigint;
+      bounced: bigint;
+      complaints: bigint;
+      opened: bigint;
+      clicked: bigint;
+      createdAt: Date;
+      completedAt: Date | null;
+    }>>(Prisma.sql`
+      SELECT
+        campaign."id",
+        campaign."name",
+        campaign."newsletterId",
+        newsletter."title" AS "newsletterTitle",
+        campaign."subjectSnapshot" AS "subject",
+        campaign."replyToEmail" AS "replyTo",
+        campaign."status",
+        campaign."totalRecipients",
+        campaign."sentCount" AS "sent",
+        campaign."errorCount" AS "failed",
+        COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
+        COUNT(send."id") FILTER (WHERE send."deliveredAt" IS NOT NULL) AS "delivered",
+        COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
+        COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
+        COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
+        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
+        campaign."createdAt",
+        campaign."completedAt"
+      FROM "EmailCampaign" campaign
+      JOIN "Newsletter" newsletter ON newsletter."id" = campaign."newsletterId"
+      LEFT JOIN "EmailSend" send ON send."campaignId" = campaign."id"
+      WHERE campaign."audienceArea" = ${AUDIENCE_AREA}
+      GROUP BY campaign."id", newsletter."title"
+      ORDER BY campaign."createdAt" DESC
+      LIMIT 50
+    `);
+    return rows.map((row) => ({
+      ...row,
+      replyTo: row.replyTo ?? DEFAULT_REPLY_TO,
+      delivered: Number(row.delivered),
+      suppressed: Number(row.suppressed),
+      bounced: Number(row.bounced),
+      complaints: Number(row.complaints),
+      opened: Number(row.opened),
+      clicked: Number(row.clicked),
+    }));
   }
 
   async getCampaign(id: string) {
