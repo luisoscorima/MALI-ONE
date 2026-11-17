@@ -61,6 +61,12 @@ export class MalichimpAudienceDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+
+  /** Preview-only search by name/email. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  q?: string;
 }
 
 export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {

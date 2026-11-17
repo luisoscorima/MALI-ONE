@@ -216,6 +216,8 @@ export interface MalichimpAudienceFilterDto {
 export interface MalichimpAudiencePreviewRequestDto extends MalichimpAudienceFilterDto {
   page?: number;
   pageSize?: number;
+  /** Filter recipients by name or email (preview only). */
+  q?: string;
 }
 
 export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto {
@@ -225,6 +227,9 @@ export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto 
   included: number;
   eligible: number;
   excluded: number;
+  /** Recipients matching `q` (equals `eligible` when `q` is empty). */
+  matched: number;
+  q: string;
   page: number;
   pageSize: number;
   totalPages: number;

@@ -411,6 +411,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   const [recipientSelectionMode, setRecipientSelectionMode] = useState<'all' | 'none'>('all');
   const [manualExcludeIds, setManualExcludeIds] = useState<Set<string>>(new Set());
   const [manualIncludeIds, setManualIncludeIds] = useState<Set<string>>(new Set());
+  const [recipientQuery, setRecipientQuery] = useState('');
+  const [debouncedRecipientQuery, setDebouncedRecipientQuery] = useState('');
   const [name, setName] = useState('');
   const [newsletterId, setNewsletterId] = useState('');
   const [subject, setSubject] = useState('');
@@ -534,6 +536,20 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     const timer = window.setInterval(() => void load(true), 15_000);
     return () => window.clearInterval(timer);
   }, [load]);
+  useEffect(() => {
+    if (!preview) {
+      setDebouncedRecipientQuery(recipientQuery.trim());
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const q = recipientQuery.trim();
+      setDebouncedRecipientQuery(q);
+      void loadAudiencePage(1, { resetSelection: false, notify: false, q });
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // Debounced search while the audience preview is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [recipientQuery]);
 
   function resetForm() {
     setDraftCampaignId(null);
@@ -555,6 +571,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setRecipientSelectionMode('all');
     setManualExcludeIds(new Set());
     setManualIncludeIds(new Set());
+    setRecipientQuery('');
+    setDebouncedRecipientQuery('');
     setFormStep('to');
   }
 
@@ -575,6 +593,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setRecipientSelectionMode('all');
     setManualExcludeIds(new Set());
     setManualIncludeIds(new Set());
+    setRecipientQuery('');
+    setDebouncedRecipientQuery('');
   }
 
   function isRecipientSelected(id: string) {
@@ -700,6 +720,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setReplyTo(detail.replyTo);
     setGroupOptionIds(detail.groupOptionIds);
     setExcludeGroupOptionIds(detail.excludeGroupOptionIds);
+    setRecipientQuery('');
+    setDebouncedRecipientQuery('');
     setScheduleMode('now');
     setScheduledAt('');
     setShowAdvancedSender(detail.replyTo !== detail.fromEmail);
@@ -776,17 +798,22 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
-  async function loadAudiencePage(page: number, options?: { resetSelection?: boolean; notify?: boolean }) {
+  async function loadAudiencePage(
+    page: number,
+    options?: { resetSelection?: boolean; notify?: boolean; q?: string },
+  ) {
     if (!groupOptionIds.length) {
       toast.error('Selecciona al menos una opción para incluir');
       return;
     }
+    const q = (options?.q ?? debouncedRecipientQuery).trim();
     setPreviewBusy(true);
     try {
       const next = await api.previewMalichimpAudience({
         ...filters,
         page,
         pageSize: RECIPIENT_PAGE_SIZE,
+        ...(q ? { q } : {}),
       });
       applyAudiencePreview(next, { resetSelection: options?.resetSelection });
       if (options?.notify !== false) {
@@ -800,7 +827,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   }
 
   async function calculateAudience() {
-    await loadAudiencePage(1, { resetSelection: true, notify: true });
+    setRecipientQuery('');
+    setDebouncedRecipientQuery('');
+    await loadAudiencePage(1, { resetSelection: true, notify: true, q: '' });
   }
 
   async function submitCampaign() {
@@ -1111,6 +1140,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span className="text-muted-foreground">
                           {nf.format(selectedCount)} / {nf.format(preview.eligible)} seleccionados
+                          {debouncedRecipientQuery
+                            ? ` · ${nf.format(preview.matched)} coincidencia${preview.matched === 1 ? '' : 's'}`
+                            : ''}
                         </span>
                         <div className="flex gap-2">
                           <Button type="button" size="sm" variant="outline" onClick={selectAllRecipients}>
@@ -1120,6 +1152,16 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                             Ninguno
                           </Button>
                         </div>
+                      </div>
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" aria-hidden />
+                        <Input
+                          value={recipientQuery}
+                          onChange={(event) => setRecipientQuery(event.target.value)}
+                          placeholder="Buscar por nombre o email"
+                          className="pl-8"
+                          aria-label="Buscar destinatarios"
+                        />
                       </div>
                       <ul className="max-h-72 divide-y overflow-y-auto rounded-md border text-sm">
                         {preview.recipients.map((row) => {
@@ -1144,7 +1186,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                         })}
                         {!preview.recipients.length ? (
                           <li className="px-3 py-6 text-center text-muted-foreground">
-                            Sin contactos en esta página
+                            {debouncedRecipientQuery
+                              ? 'Sin coincidencias para esta búsqueda'
+                              : 'Sin contactos en esta página'}
                           </li>
                         ) : null}
                       </ul>

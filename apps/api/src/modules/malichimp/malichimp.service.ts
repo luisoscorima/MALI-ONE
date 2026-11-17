@@ -397,14 +397,17 @@ export class MalichimpService implements OnModuleInit {
     const pageSize = Math.min(Math.max(Math.floor(dto.pageSize ?? 50) || 50, 1), 100);
     const page = Math.max(Math.floor(dto.page ?? 1) || 1, 1);
     const offset = (page - 1) * pageSize;
+    const q = (dto.q ?? '').trim().slice(0, 160);
     const includedWhere = this.audienceWhere(filters.groupOptionIds, [], []);
-    const where = this.audienceWhere(
+    const baseWhere = this.audienceWhere(
       filters.groupOptionIds,
       filters.excludeGroupOptionIds,
       filters.excludeContactIds,
       filters.includeContactIds,
     );
-    const [subscribed, included, eligible, recipients] = await Promise.all([
+    const searchWhere = this.audienceSearchWhere(q);
+    const listedWhere = Prisma.sql`${baseWhere}${searchWhere}`;
+    const [subscribed, included, eligible, matched, recipients] = await Promise.all([
       this.prisma.malichimpContact.count({
         where: { status: MalichimpContactStatus.subscribed },
       }),
@@ -412,12 +415,15 @@ export class MalichimpService implements OnModuleInit {
         SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${includedWhere}
       `),
       this.prisma.$queryRaw<[{ count: bigint }]>(Prisma.sql`
-        SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${where}
+        SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${baseWhere}
+      `),
+      this.prisma.$queryRaw<[{ count: bigint }]>(Prisma.sql`
+        SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${listedWhere}
       `),
       this.prisma.$queryRaw<AudienceRecipient[]>(Prisma.sql`
         SELECT contact."id", contact."email", contact."firstName", contact."lastName"
         FROM "MalichimpContact" contact
-        WHERE ${where}
+        WHERE ${listedWhere}
         ORDER BY contact."lastName" NULLS LAST, contact."firstName" NULLS LAST, contact."email"
         LIMIT ${pageSize}
         OFFSET ${offset}
@@ -425,7 +431,8 @@ export class MalichimpService implements OnModuleInit {
     ]);
     const includedTotal = Number(included[0].count);
     const eligibleTotal = Number(eligible[0].count);
-    const totalPages = Math.max(1, Math.ceil(eligibleTotal / pageSize));
+    const matchedTotal = Number(matched[0].count);
+    const totalPages = Math.max(1, Math.ceil(matchedTotal / pageSize));
     const mapped = recipients.map((contact) => ({
       id: contact.id,
       email: contact.email,
@@ -436,6 +443,8 @@ export class MalichimpService implements OnModuleInit {
       included: includedTotal,
       eligible: eligibleTotal,
       excluded: Math.max(0, includedTotal - eligibleTotal),
+      matched: matchedTotal,
+      q,
       page,
       pageSize,
       totalPages,
@@ -1409,6 +1418,19 @@ export class MalichimpService implements OnModuleInit {
     }
     const byId = new Map(existing.map((option) => [option.id, option]));
     return normalizedIds.map((id) => byId.get(id)!);
+  }
+
+  private audienceSearchWhere(q: string): Prisma.Sql {
+    if (!q) return Prisma.sql``;
+    const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    return Prisma.sql`
+      AND (
+        contact."email" ILIKE ${pattern} ESCAPE '\\'
+        OR COALESCE(contact."firstName", '') ILIKE ${pattern} ESCAPE '\\'
+        OR COALESCE(contact."lastName", '') ILIKE ${pattern} ESCAPE '\\'
+        OR CONCAT_WS(' ', contact."firstName", contact."lastName") ILIKE ${pattern} ESCAPE '\\'
+      )
+    `;
   }
 
   private audienceWhere(
