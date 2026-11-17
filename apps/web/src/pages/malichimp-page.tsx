@@ -3,20 +3,27 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Download,
   FileArchive,
+  FileSpreadsheet,
   Loader2,
+  Mail,
   Search,
   Send,
   Upload,
   Users,
 } from 'lucide-react';
 import type {
+  EmailSenderDto,
   MalichimpContactDto,
   MalichimpContactStatus,
   MalichimpGroupDto,
   MalichimpImportJobDto,
   MalichimpImportPreviewDto,
   MalichimpStatsDto,
+  MalichimpTagDto,
+  MalichimpXlsxImportPreviewDto,
+  MalichimpXlsxImportResultDto,
 } from '@mali-one/shared';
 import { AlertBanner, PageLoading } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
@@ -24,11 +31,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import { MalichimpCampaigns } from '@/components/malichimp-campaigns';
+import { MalichimpSenders } from '@/components/malichimp-senders';
 import {
   Badge,
   Button,
   Card,
   CardContent,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -57,7 +66,22 @@ import {
 } from '@/components/ui';
 
 const nf = new Intl.NumberFormat('es-PE');
+const dateTimeFormat = new Intl.DateTimeFormat('es-PE', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 const importJobStorageKey = 'malichimp-import-job-id';
+
+function formatDateTime(value: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : dateTimeFormat.format(date);
+}
+
+function attributeLabel(value: string): string {
+  const words = value.replaceAll('_', ' ').trim();
+  return words ? words[0].toLocaleUpperCase('es-PE') + words.slice(1) : value;
+}
 
 const statusMeta: Record<
   MalichimpContactStatus,
@@ -83,12 +107,25 @@ function StatCard({ label, value, hint }: { label: string; value: number; hint: 
   );
 }
 
+function ContactField({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words text-sm">{value || '—'}</dd>
+    </div>
+  );
+}
+
 export function MalichimpPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const toast = useToast();
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
+  const [tags, setTags] = useState<MalichimpTagDto[]>([]);
+  const [senders, setSenders] = useState<EmailSenderDto[]>([]);
   const [contacts, setContacts] = useState<MalichimpContactDto[]>([]);
+  const [selectedContact, setSelectedContact] = useState<MalichimpContactDto | null>(null);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [page, setPage] = useState(1);
@@ -96,16 +133,25 @@ export function MalichimpPage() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [status, setStatus] = useState<'all' | MalichimpContactStatus>('all');
   const [groupOptionId, setGroupOptionId] = useState('all');
+  const [tagId, setTagId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'xlsx' | 'zip'>('xlsx');
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] =
     useState<MalichimpImportPreviewDto | null>(null);
   const [importJob, setImportJob] = useState<MalichimpImportJobDto | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importError, setImportError] = useState('');
+  const [xlsxFile, setXlsxFile] = useState<File | null>(null);
+  const [xlsxGroupOptionIds, setXlsxGroupOptionIds] = useState<string[]>([]);
+  const [xlsxConsentConfirmed, setXlsxConsentConfirmed] = useState(false);
+  const [xlsxPreview, setXlsxPreview] =
+    useState<MalichimpXlsxImportPreviewDto | null>(null);
+  const [xlsxResult, setXlsxResult] =
+    useState<MalichimpXlsxImportResultDto | null>(null);
 
   useEffect(() => {
     const jobId = window.sessionStorage.getItem(importJobStorageKey);
@@ -114,6 +160,7 @@ export function MalichimpPage() {
       .then((job) => {
         setImportJob(job);
         if (job.status === 'queued' || job.status === 'running' || job.status === 'failed') {
+          setImportMode('zip');
           setImportOpen(true);
         }
       })
@@ -125,30 +172,39 @@ export function MalichimpPage() {
     return () => window.clearTimeout(timer);
   }, [query]);
 
-  useEffect(() => setPage(1), [debouncedQuery, status, groupOptionId]);
+  useEffect(() => setPage(1), [debouncedQuery, status, groupOptionId, tagId]);
 
   const loadContacts = useCallback(async () => {
     const result = await api.listMalichimpContacts({
       q: debouncedQuery || undefined,
       status: status === 'all' ? undefined : status,
       groupOptionId: groupOptionId === 'all' ? undefined : groupOptionId,
+      tagId: tagId === 'all' ? undefined : tagId,
       page,
       pageSize: 50,
     });
     setContacts(result.items);
     setTotal(result.total);
     setPages(result.pages);
-  }, [debouncedQuery, groupOptionId, page, status]);
+  }, [debouncedQuery, groupOptionId, page, status, tagId]);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([api.getMalichimpStats(), api.listMalichimpGroups(), loadContacts()])
-      .then(([nextStats, nextGroups]) => {
+    Promise.all([
+      api.getMalichimpStats(),
+      api.listMalichimpGroups(),
+      api.listMalichimpTags(),
+      isAdmin ? api.listEmailSenders() : Promise.resolve([]),
+      loadContacts(),
+    ])
+      .then(([nextStats, nextGroups, nextTags, nextSenders]) => {
         if (!active) return;
         setStats(nextStats);
         setGroups(nextGroups);
+        setTags(nextTags);
+        setSenders(nextSenders);
       })
       .catch((reason: unknown) => {
         if (active) setError(reason instanceof Error ? reason.message : 'No se pudo cargar MALICHIMP');
@@ -159,7 +215,7 @@ export function MalichimpPage() {
     return () => {
       active = false;
     };
-  }, [loadContacts, refreshKey]);
+  }, [isAdmin, loadContacts, refreshKey]);
 
   useEffect(() => {
     if (!importJob || !['queued', 'running'].includes(importJob.status)) return;
@@ -183,14 +239,26 @@ export function MalichimpPage() {
 
   function openImport() {
     if (importJob && ['queued', 'running'].includes(importJob.status)) {
+      setImportMode('zip');
       setImportOpen(true);
       return;
     }
+    setImportMode('xlsx');
     setZipFile(null);
     setImportPreview(null);
     setImportJob(null);
+    setXlsxFile(null);
+    setXlsxGroupOptionIds([]);
+    setXlsxConsentConfirmed(false);
+    setXlsxPreview(null);
+    setXlsxResult(null);
     setImportError('');
     setImportOpen(true);
+  }
+
+  function selectImportMode(value: string) {
+    setImportMode(value as 'xlsx' | 'zip');
+    setImportError('');
   }
 
   function selectZip(file: File | null) {
@@ -242,6 +310,68 @@ export function MalichimpPage() {
     }
   }
 
+  function selectXlsx(file: File | null) {
+    setXlsxPreview(null);
+    setXlsxResult(null);
+    setImportError('');
+    if (!file) {
+      setXlsxFile(null);
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      setXlsxFile(null);
+      setImportError('Selecciona un archivo XLSX.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setXlsxFile(null);
+      setImportError('El XLSX supera el límite de 10 MB.');
+      return;
+    }
+    setXlsxFile(file);
+  }
+
+  function toggleXlsxGroupOption(optionId: string, checked: boolean) {
+    setXlsxPreview(null);
+    setXlsxResult(null);
+    setXlsxGroupOptionIds((current) => checked
+      ? [...new Set([...current, optionId])]
+      : current.filter((id) => id !== optionId));
+  }
+
+  async function previewXlsxImport() {
+    if (!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsentConfirmed) return;
+    setImportBusy(true);
+    setImportError('');
+    try {
+      setXlsxPreview(await api.previewMalichimpXlsxImport(
+        xlsxFile,
+        xlsxGroupOptionIds,
+      ));
+    } catch (reason) {
+      setImportError(reason instanceof Error ? reason.message : 'No se pudo validar el XLSX');
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function applyXlsxImport() {
+    if (!xlsxPreview) return;
+    setImportBusy(true);
+    setImportError('');
+    try {
+      const result = await api.applyMalichimpXlsxImport(xlsxPreview.previewId);
+      setXlsxResult(result);
+      setXlsxPreview(null);
+      toast.success(`Importación completada: ${nf.format(result.imported)} contactos`);
+      setRefreshKey((value) => value + 1);
+    } catch (reason) {
+      setImportError(reason instanceof Error ? reason.message : 'No se pudo importar el XLSX');
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
   if (loading && !stats) return <PageLoading variant="table" />;
 
   return (
@@ -252,7 +382,7 @@ export function MalichimpPage() {
         actions={user?.role === 'admin' ? (
           <Button type="button" onClick={openImport}>
             <Upload className="mr-1 size-4" aria-hidden />
-            Importar ZIP de Mailchimp
+            Importar contactos
           </Button>
         ) : undefined}
       />
@@ -282,11 +412,12 @@ export function MalichimpPage() {
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
+          {isAdmin ? <TabsTrigger value="senders"><Mail aria-hidden="true" /> Remitentes</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="audience">
           <Card className="gap-0 py-0">
-        <div className="grid gap-3 border-b p-4 md:grid-cols-[minmax(240px,1fr)_200px_240px]">
+        <div className="grid gap-3 border-b p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_220px_220px]">
           <label className="relative block">
             <span className="sr-only">Buscar contacto</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -322,6 +453,17 @@ export function MalichimpPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={tagId} onValueChange={setTagId}>
+            <SelectTrigger aria-label="Filtrar por etiqueta"><SelectValue placeholder="Todas las etiquetas" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las etiquetas</SelectItem>
+              {tags.map((tag) => (
+                <SelectItem key={tag.id} value={tag.id}>
+                  {tag.name}{typeof tag.contacts === 'number' ? ` (${nf.format(tag.contacts)})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="overflow-x-auto">
@@ -332,6 +474,7 @@ export function MalichimpPage() {
                 <TableHead>Institución</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Grupos</TableHead>
+                <TableHead>Etiquetas</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -341,8 +484,15 @@ export function MalichimpPage() {
                 return (
                   <TableRow key={contact.id}>
                     <TableCell className="min-w-60">
-                      <p className="font-medium">{name || 'Sin nombre'}</p>
-                      <p className="text-xs text-muted-foreground">{contact.email}</p>
+                      <button
+                        type="button"
+                        className="group -m-1 block rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => setSelectedContact(contact)}
+                        aria-label={`Ver detalle de ${name || contact.email}`}
+                      >
+                        <span className="block font-medium underline-offset-4 group-hover:underline">{name || 'Sin nombre'}</span>
+                        <span className="block text-xs text-muted-foreground">{contact.email}</span>
+                      </button>
                     </TableCell>
                     <TableCell className="max-w-64 truncate">{contact.institutionName || '—'}</TableCell>
                     <TableCell><Badge variant={meta.variant}>{meta.label}</Badge></TableCell>
@@ -357,10 +507,19 @@ export function MalichimpPage() {
                         {!contact.groupOptions.length ? <span className="text-muted-foreground">Sin grupo</span> : null}
                       </div>
                     </TableCell>
+                    <TableCell className="min-w-48">
+                      <div className="flex max-w-sm flex-wrap gap-1">
+                        {contact.tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag.id} variant="secondary">{tag.name}</Badge>
+                        ))}
+                        {contact.tags.length > 3 ? <Badge variant="outline">+{contact.tags.length - 3}</Badge> : null}
+                        {!contact.tags.length ? <span className="text-muted-foreground">Sin etiquetas</span> : null}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               }) : (
-                <TableRow><TableCell colSpan={4} className="h-28 text-center text-muted-foreground">No hay contactos con estos filtros.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="h-28 text-center text-muted-foreground">No hay contactos con estos filtros.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -384,80 +543,414 @@ export function MalichimpPage() {
         <TabsContent value="campaigns">
           <MalichimpCampaigns
             groups={groups}
-            deliveryConfigured={stats?.delivery.configured ?? false}
-            isAdmin={user?.role === 'admin'}
+            delivery={stats?.delivery ?? null}
+            senders={senders}
+            isAdmin={isAdmin}
           />
         </TabsContent>
+
+        {isAdmin ? (
+          <TabsContent value="senders">
+            <MalichimpSenders senders={senders} onChange={setSenders} />
+          </TabsContent>
+        ) : null}
       </Tabs>
+
+      <Dialog
+        open={Boolean(selectedContact)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedContact(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+          {selectedContact ? (
+            <>
+              <DialogHeader>
+                <div className="flex flex-wrap items-center gap-2 pr-8">
+                  <DialogTitle>
+                    {[selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ') || 'Detalle del contacto'}
+                  </DialogTitle>
+                  <Badge variant={statusMeta[selectedContact.status].variant}>
+                    {statusMeta[selectedContact.status].label}
+                  </Badge>
+                </div>
+                <DialogDescription>{selectedContact.email}</DialogDescription>
+              </DialogHeader>
+
+              <section aria-labelledby="contact-profile-title" className="space-y-3">
+                <h3 id="contact-profile-title" className="text-sm font-semibold">Datos del contacto</h3>
+                <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
+                  <ContactField label="Teléfono" value={selectedContact.phone} />
+                  <ContactField label="Institución" value={selectedContact.institutionName} />
+                  <ContactField label="Cargo" value={selectedContact.jobTitle} />
+                  <ContactField label="Clasificación" value={selectedContact.classification} />
+                  <ContactField label="Ciudad" value={selectedContact.city} />
+                  <ContactField label="País" value={selectedContact.country} />
+                  <ContactField label="Origen" value={selectedContact.source} />
+                  <ContactField label="Correo" value={selectedContact.email} />
+                </dl>
+              </section>
+
+              <section aria-labelledby="contact-segmentation-title" className="space-y-3">
+                <h3 id="contact-segmentation-title" className="text-sm font-semibold">Segmentación</h3>
+                <div className="space-y-4 rounded-lg border p-4">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Grupos</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {selectedContact.groupOptions.map((option) => (
+                        <Badge key={option.id} variant="outline">
+                          {option.group.name}: {option.name}
+                        </Badge>
+                      ))}
+                      {!selectedContact.groupOptions.length ? (
+                        <span className="text-sm text-muted-foreground">Sin grupos</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etiquetas</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {selectedContact.tags.map((tag) => (
+                        <Badge key={tag.id} variant="secondary">{tag.name}</Badge>
+                      ))}
+                      {!selectedContact.tags.length ? (
+                        <span className="text-sm text-muted-foreground">Sin etiquetas</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {selectedContact.attributes && Object.keys(selectedContact.attributes).length ? (
+                <section aria-labelledby="contact-attributes-title" className="space-y-3">
+                  <h3 id="contact-attributes-title" className="text-sm font-semibold">Otros datos importados</h3>
+                  <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
+                    {Object.entries(selectedContact.attributes).map(([key, value]) => (
+                      <ContactField key={key} label={attributeLabel(key)} value={String(value)} />
+                    ))}
+                  </dl>
+                </section>
+              ) : null}
+
+              <section aria-labelledby="contact-dates-title" className="space-y-3">
+                <h3 id="contact-dates-title" className="text-sm font-semibold">Fechas y consentimiento</h3>
+                <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
+                  <ContactField label="Alta" value={formatDateTime(selectedContact.optInAt)} />
+                  <ContactField label="Confirmación" value={formatDateTime(selectedContact.confirmedAt)} />
+                  <ContactField label="Cambio de estado" value={formatDateTime(selectedContact.statusChangedAt)} />
+                  <ContactField label="Creado en MALI ONE" value={formatDateTime(selectedContact.createdAt)} />
+                  <ContactField label="Última actualización" value={formatDateTime(selectedContact.updatedAt)} />
+                </dl>
+              </section>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setSelectedContact(null)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={importOpen}
         onOpenChange={setImportOpen}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Importar ZIP de Mailchimp</DialogTitle>
+            <DialogTitle>Importar contactos</DialogTitle>
             <DialogDescription>
-              Primero validaremos el archivo. PostgreSQL no se modificará hasta que confirmes el resumen.
+              Validaremos el archivo y mostraremos un resumen antes de modificar la audiencia.
             </DialogDescription>
           </DialogHeader>
 
           {importError ? <AlertBanner>{importError}</AlertBanner> : null}
 
-          {!importPreview && !importJob ? (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-dashed p-5">
-                <div className="flex items-start gap-3">
-                  <FileArchive className="mt-0.5 size-6 text-muted-foreground" aria-hidden />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Label htmlFor="malichimp-zip">ZIP completo de Mailchimp</Label>
-                    <Input
-                      id="malichimp-zip"
-                      type="file"
-                      accept=".zip,application/zip"
-                      onChange={(event) => selectZip(event.target.files?.[0] ?? null)}
-                    />
+          {!importJob ? (
+            <Tabs value={importMode} onValueChange={selectImportMode} className="gap-4">
+              <TabsList aria-label="Tipo de importación">
+                <TabsTrigger value="xlsx">
+                  <FileSpreadsheet aria-hidden="true" /> XLSX de contactos
+                </TabsTrigger>
+                <TabsTrigger value="zip">
+                  <FileArchive aria-hidden="true" /> ZIP de Mailchimp
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="xlsx" className="space-y-4">
+                {!xlsxPreview && !xlsxResult ? (
+                  <>
+                    <div className="rounded-lg border border-dashed p-5">
+                      <div className="flex items-start gap-3">
+                        <FileSpreadsheet className="mt-0.5 size-6 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0 flex-1 space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <Label htmlFor="malichimp-xlsx">Nuevos contactos</Label>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Usa la plantilla o un XLSX con una columna Correo. Máximo 10 MB y 10 000 contactos.
+                              </p>
+                            </div>
+                            <Button asChild type="button" variant="outline" size="sm">
+                              <a href="/plantillas/plantilla-contactos-malichimp.xlsx" download>
+                                <Download aria-hidden="true" /> Descargar plantilla
+                              </a>
+                            </Button>
+                          </div>
+                          <Input
+                            id="malichimp-xlsx"
+                            type="file"
+                            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            onChange={(event) => selectXlsx(event.target.files?.[0] ?? null)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border p-4">
+                      <div>
+                        <p className="text-sm font-medium">Grupos para este lote</p>
+                        <p className="text-xs text-muted-foreground">
+                          Se agregarán a cada contacto importable sin quitar sus grupos actuales.
+                        </p>
+                      </div>
+                      <div className="max-h-60 space-y-4 overflow-y-auto pr-2">
+                        {groups.filter((group) => group.options.length).map((group) => (
+                          <fieldset key={group.id} className="space-y-2">
+                            <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              {group.name}
+                            </legend>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {group.options.map((option) => {
+                                const inputId = `xlsx-group-${option.id}`;
+                                return (
+                                  <label key={option.id} htmlFor={inputId} className="flex cursor-pointer items-start gap-2 rounded-md border p-2.5 text-sm hover:bg-muted/50">
+                                    <Checkbox
+                                      id={inputId}
+                                      checked={xlsxGroupOptionIds.includes(option.id)}
+                                      onCheckedChange={(checked) => toggleXlsxGroupOption(option.id, checked === true)}
+                                    />
+                                    <span>{option.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </fieldset>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {xlsxGroupOptionIds.length
+                          ? `${nf.format(xlsxGroupOptionIds.length)} opción${xlsxGroupOptionIds.length === 1 ? '' : 'es'} seleccionada${xlsxGroupOptionIds.length === 1 ? '' : 's'}`
+                          : 'Selecciona al menos una opción de grupo.'}
+                      </p>
+                    </div>
+
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 text-sm">
+                      <Checkbox
+                        checked={xlsxConsentConfirmed}
+                        onCheckedChange={(checked) => {
+                          setXlsxConsentConfirmed(checked === true);
+                          setXlsxPreview(null);
+                          setXlsxResult(null);
+                        }}
+                      />
+                      <span>
+                        Confirmo que estos contactos autorizaron recibir comunicaciones por correo.
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          Las bajas, correos limpiados y supresiones de SES nunca serán reactivados.
+                        </span>
+                      </span>
+                    </label>
+                  </>
+                ) : null}
+
+                {xlsxPreview ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <StatCard label="Importables" value={xlsxPreview.report.importableContacts} hint={`${nf.format(xlsxPreview.report.validRows)} correos válidos`} />
+                      <StatCard label="Nuevos" value={xlsxPreview.report.newContacts} hint="Se crearán" />
+                      <StatCard label="Existentes" value={xlsxPreview.report.existingContacts} hint="Se completarán" />
+                      <StatCard label="Bloqueados" value={xlsxPreview.report.blockedContacts} hint="Bajas, cleaned, nonsubscribed o suprimidos" />
+                    </div>
+                    {xlsxPreview.report.invalidRows || xlsxPreview.report.duplicateRows ? (
+                      <AlertBanner variant="info">
+                        <p>
+                          Se omitirán {nf.format(xlsxPreview.report.invalidRows)} fila(s) inválida(s) y {nf.format(xlsxPreview.report.duplicateRows)} duplicada(s).
+                        </p>
+                        {xlsxPreview.report.errors.length ? (
+                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                            {xlsxPreview.report.errors.slice(0, 5).map((message) => (
+                              <li key={message}>{message}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </AlertBanner>
+                    ) : null}
+                    <div className="rounded-lg border bg-muted/20 p-4 text-sm">
+                      <p className="font-medium">Grupos que se agregarán</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {xlsxPreview.groupOptions.map((option) => (
+                          <Badge key={option.id} variant="outline">
+                            {option.groupName}: {option.name}
+                          </Badge>
+                        ))}
+                      </div>
+                      <ul className="mt-3 list-disc space-y-1 pl-5 text-muted-foreground">
+                        <li>La importación agregará información, pero no borrará datos ni grupos existentes.</li>
+                        <li>Los contactos sin suscripción podrán activarse porque confirmaste su autorización.</li>
+                        <li>Las bajas, direcciones limpiadas y supresiones permanecerán bloqueadas.</li>
+                      </ul>
+                    </div>
+                    {xlsxPreview.report.sample.length ? (
+                      <div className="overflow-hidden rounded-lg border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Vista previa</TableHead>
+                              <TableHead>Correo</TableHead>
+                              <TableHead>Acción</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {xlsxPreview.report.sample.slice(0, 8).map((row) => (
+                              <TableRow key={`${row.rowNumber}-${row.email}`}>
+                                <TableCell>{row.name || `Fila ${row.rowNumber}`}</TableCell>
+                                <TableCell>{row.email}</TableCell>
+                                <TableCell>
+                                  <Badge variant={row.action === 'blocked' ? 'destructive' : row.action === 'create' ? 'default' : 'secondary'}>
+                                    {row.action === 'blocked' ? 'Bloqueado' : row.action === 'create' ? 'Crear' : 'Actualizar'}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {xlsxResult ? (
+                  <div className="space-y-3" aria-live="polite">
+                    <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+                      <CheckCircle2 className="size-6 text-emerald-600" aria-hidden />
+                      <div>
+                        <p className="font-medium">Importación completada</p>
+                        <p className="text-sm text-muted-foreground">
+                          {nf.format(xlsxResult.created)} nuevos, {nf.format(xlsxResult.updated)} actualizados y {nf.format(xlsxResult.skipped)} bloqueados.
+                        </p>
+                      </div>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Debe contener los CSV subscribed, unsubscribed, cleaned y nonsubscribed. Máximo 100 MB.
+                      Se agregaron {nf.format(xlsxResult.membershipsAdded)} membresías de grupo nuevas.
                     </p>
                   </div>
-                </div>
-              </div>
-              {zipFile ? (
-                <p className="text-sm">
-                  Seleccionado: <span className="font-medium">{zipFile.name}</span>{' '}
-                  <span className="text-muted-foreground">({(zipFile.size / 1024 / 1024).toFixed(1)} MB)</span>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+                ) : null}
 
-          {importPreview && !importJob ? (
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Total" value={importPreview.report.totalUnique} hint="Contactos únicos" />
-                <StatCard label="Elegibles" value={importPreview.report.eligibleContacts} hint="Suscritos" />
-                <StatCard label="Suprimidos" value={importPreview.report.suppressions} hint="Bajas y limpiados" />
-                <StatCard label="Opciones de grupo" value={importPreview.report.groupOptions} hint={`${nf.format(importPreview.report.groups)} grupos`} />
-              </div>
-              {importPreview.previouslyImported ? (
-                <AlertBanner variant="info">
-                  Este mismo contenido ya fue importado anteriormente. Puedes repetirlo sin duplicar contactos.
-                </AlertBanner>
-              ) : null}
-              <div className="rounded-lg border bg-muted/20 p-4 text-sm">
-                <p className="font-medium">Al confirmar:</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                  <li>Se crearán o actualizarán los contactos del ZIP.</li>
-                  <li>Se reconstruirán sus opciones de grupo para segmentar boletines.</li>
-                  <li>Las bajas y direcciones limpiadas permanecerán suprimidas.</li>
-                  <li>El ZIP temporal será eliminado al terminar.</li>
-                </ul>
-              </div>
-            </div>
-          ) : null}
+                <DialogFooter>
+                  {!xlsxPreview && !xlsxResult ? (
+                    <Button
+                      type="button"
+                      onClick={() => void previewXlsxImport()}
+                      disabled={!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsentConfirmed || importBusy}
+                    >
+                      {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
+                      {importBusy ? 'Validando…' : 'Validar XLSX'}
+                    </Button>
+                  ) : null}
+                  {xlsxPreview ? (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => { setXlsxPreview(null); setXlsxFile(null); }} disabled={importBusy}>
+                        Elegir otro XLSX
+                      </Button>
+                      <Button type="button" onClick={() => void applyXlsxImport()} disabled={importBusy}>
+                        {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
+                        Importar {nf.format(xlsxPreview.report.importableContacts)} contactos
+                      </Button>
+                    </>
+                  ) : null}
+                  {xlsxResult ? (
+                    <Button type="button" onClick={() => setImportOpen(false)}>Cerrar</Button>
+                  ) : null}
+                </DialogFooter>
+              </TabsContent>
 
-      {importJob ? (
+              <TabsContent value="zip" className="space-y-4">
+                {!importPreview ? (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-dashed p-5">
+                      <div className="flex items-start gap-3">
+                        <FileArchive className="mt-0.5 size-6 text-muted-foreground" aria-hidden />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Label htmlFor="malichimp-zip">ZIP completo de Mailchimp</Label>
+                          <Input
+                            id="malichimp-zip"
+                            type="file"
+                            accept=".zip,application/zip"
+                            onChange={(event) => selectZip(event.target.files?.[0] ?? null)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Sincroniza estados, grupos y supresiones del export completo. Máximo 100 MB.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    {zipFile ? (
+                      <p className="text-sm">
+                        Seleccionado: <span className="font-medium">{zipFile.name}</span>{' '}
+                        <span className="text-muted-foreground">({(zipFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {importPreview ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <StatCard label="Total" value={importPreview.report.totalUnique} hint="Contactos únicos" />
+                      <StatCard label="Elegibles" value={importPreview.report.eligibleContacts} hint="Suscritos" />
+                      <StatCard label="Suprimidos" value={importPreview.report.suppressions} hint="Bajas y limpiados" />
+                      <StatCard label="Opciones de grupo" value={importPreview.report.groupOptions} hint={`${nf.format(importPreview.report.groups)} grupos`} />
+                    </div>
+                    {importPreview.previouslyImported ? (
+                      <AlertBanner variant="info">
+                        Este mismo contenido ya fue importado anteriormente. Puedes repetirlo sin duplicar contactos.
+                      </AlertBanner>
+                    ) : null}
+                    <div className="rounded-lg border bg-muted/20 p-4 text-sm">
+                      <p className="font-medium">Al confirmar:</p>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                        <li>Se crearán o actualizarán los contactos del ZIP.</li>
+                        <li>Se reconstruirán sus opciones de grupo para segmentar boletines.</li>
+                        <li>Las bajas y direcciones limpiadas permanecerán suprimidas.</li>
+                        <li>El ZIP temporal será eliminado al terminar.</li>
+                      </ul>
+                    </div>
+                  </div>
+                ) : null}
+
+                <DialogFooter>
+                  {!importPreview ? (
+                    <Button type="button" onClick={() => void previewImport()} disabled={!zipFile || importBusy}>
+                      {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
+                      {importBusy ? 'Validando…' : 'Validar ZIP'}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => { setImportPreview(null); setZipFile(null); }} disabled={importBusy}>
+                        Elegir otro ZIP
+                      </Button>
+                      <Button type="button" onClick={() => void applyImport()} disabled={importBusy}>
+                        {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
+                        Importar {nf.format(importPreview.report.totalUnique)} contactos
+                      </Button>
+                    </>
+                  )}
+                </DialogFooter>
+              </TabsContent>
+            </Tabs>
+          ) : (
             <div className="space-y-4" aria-live="polite">
               {importJob.status === 'completed' ? (
                 <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
@@ -498,36 +991,17 @@ export function MalichimpPage() {
                   </p>
                 </div>
               )}
+              <DialogFooter>
+                {importJob.status === 'completed' || importJob.status === 'failed' ? (
+                  <Button type="button" onClick={() => setImportOpen(false)}>Cerrar</Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
+                    Seguir en segundo plano
+                  </Button>
+                )}
+              </DialogFooter>
             </div>
-          ) : null}
-
-          <DialogFooter>
-            {!importPreview && !importJob ? (
-              <Button type="button" onClick={() => void previewImport()} disabled={!zipFile || importBusy}>
-                {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
-                {importBusy ? 'Validando…' : 'Validar ZIP'}
-              </Button>
-            ) : null}
-            {importPreview && !importJob ? (
-              <>
-                <Button type="button" variant="outline" onClick={() => { setImportPreview(null); setZipFile(null); }} disabled={importBusy}>
-                  Elegir otro ZIP
-                </Button>
-                <Button type="button" onClick={() => void applyImport()} disabled={importBusy}>
-                  {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
-                  Importar {nf.format(importPreview.report.totalUnique)} contactos
-                </Button>
-              </>
-            ) : null}
-            {importJob?.status === 'completed' || importJob?.status === 'failed' ? (
-              <Button type="button" onClick={() => setImportOpen(false)}>Cerrar</Button>
-            ) : null}
-            {importJob && ['queued', 'running'].includes(importJob.status) ? (
-              <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
-                Seguir en segundo plano
-              </Button>
-            ) : null}
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

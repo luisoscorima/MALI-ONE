@@ -14,36 +14,46 @@ import {
   Prisma,
   type MalichimpImportJob,
 } from '@prisma/client';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { EmailDeliveryService } from '../../core/email-delivery/email-delivery.service';
+import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import {
   applyMalichimpFiles,
   inspectMalichimpFiles,
   locateMalichimpFiles,
-  type MalichimpImportReport,
-  type MalichimpLocatedFile,
 } from './lib/malichimp-import-runner';
 import { extractMailchimpZip } from './lib/mailchimp-zip';
+import {
+  fingerprintBuffer,
+  newPreviewId,
+  PREVIEW_TTL_MS,
+  readXlsxPreview,
+  readZipPreview,
+  removePreviewDirectory,
+  writeXlsxPreview,
+  writeZipPreview,
+  xlsxPreviewDirectory,
+  ZIP_PREVIEW_PREFIX,
+  zipPreviewDirectory,
+  type StoredXlsxPreview,
+  type StoredZipPreview,
+} from './lib/malichimp-preview-store';
+import {
+  MAX_XLSX_BYTES,
+  parseMalichimpContactsXlsx,
+  type MalichimpXlsxContactRow,
+} from './lib/malichimp-xlsx-import';
 import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 import {
   CreateMalichimpCampaignDto,
+  CreateMalichimpNewsletterDraftDto,
   MalichimpAudienceDto,
 } from './dto/malichimp-campaign.dto';
 import { NewslettersService } from '../newsletters/newsletters.service';
-
-type ImportPreview = {
-  id: string;
-  userId: string;
-  originalName: string;
-  directory: string;
-  files: MalichimpLocatedFile[];
-  report: MalichimpImportReport;
-  expiresAt: Date;
-};
 
 type AudienceRecipient = {
   id: string;
@@ -52,16 +62,54 @@ type AudienceRecipient = {
   lastName: string | null;
 };
 
-const PREVIEW_TTL_MS = 30 * 60 * 1000;
+const MALI_PE_EMAIL = /^[^@\s]+@mali\.pe$/i;
+
+function duplicateLabel(value: string, maxLength: number): string {
+  const suffix = ' — copia';
+  return `${value.slice(0, maxLength - suffix.length).trimEnd()}${suffix}`;
+}
+
+function duplicateNewsletterSlug(value: string): string {
+  const suffix = `copia-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
+  const base = value
+    .slice(0, 80 - suffix.length - 1)
+    .replace(/-+$/g, '');
+  return `${base}-${suffix}`;
+}
+
+function newsletterSlugFromTitle(title: string): string {
+  const suffix = `${Date.now().toString(36)}-${randomUUID().slice(0, 6)}`;
+  const base = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80 - suffix.length - 1) || 'boletin';
+  return `${base}-${suffix}`;
+}
+
+const NEW_NEWSLETTER_PLACEHOLDER_HTML =
+  '<p style="font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#444">Edita este boletín en <strong>Boletines</strong> antes de enviar la campaña.</p>';
+
+function isBlockedContactStatus(status: MalichimpContactStatus): boolean {
+  return (
+    status === MalichimpContactStatus.unsubscribed ||
+    status === MalichimpContactStatus.cleaned ||
+    status === MalichimpContactStatus.nonsubscribed
+  );
+}
 
 @Injectable()
 export class MalichimpService implements OnModuleInit {
   private readonly logger = new Logger(MalichimpService.name);
-  private readonly previews = new Map<string, ImportPreview>();
+  private readonly previews = new Map<string, StoredZipPreview>();
+  private readonly xlsxPreviews = new Map<string, StoredXlsxPreview>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailDelivery: EmailDeliveryService,
+    private readonly emailSenders: EmailSenderService,
     private readonly newsletters: NewslettersService,
   ) {}
 
@@ -71,7 +119,7 @@ export class MalichimpService implements OnModuleInit {
       where: { status: { in: ['queued', 'running'] } },
       data: {
         status: 'failed',
-        error: 'La API se reinició durante la importación. Verifica la audiencia antes de volver a importar el ZIP.',
+        error: 'La API se reinició durante la importación. Verifica la audiencia antes de volver a importar.',
         completedAt: new Date(),
         processed: 0,
       },
@@ -149,11 +197,13 @@ export class MalichimpService implements OnModuleInit {
   async listContacts(query: MalichimpContactsQueryDto) {
     const q = query.q?.trim();
     const groupOptionId = query.groupOptionId?.trim();
+    const tagId = query.tagId?.trim();
     const where: Prisma.MalichimpContactWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(groupOptionId
         ? { groupOptions: { some: { optionId: groupOptionId } } }
         : {}),
+      ...(tagId ? { tags: { some: { tagId } } } : {}),
       ...(q
         ? {
             OR: [
@@ -291,13 +341,71 @@ export class MalichimpService implements OnModuleInit {
     return this.newsletters.listPublished();
   }
 
+  async getCampaignNewsletter(id: string) {
+    const newsletter = await this.prisma.newsletter.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        subject: true,
+        htmlBody: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    if (!newsletter) throw new NotFoundException('Boletín no encontrado');
+    return newsletter;
+  }
+
+  async createNewsletterDraft(userId: string, dto: CreateMalichimpNewsletterDraftDto) {
+    const title = dto.title.trim();
+    const subject = (dto.subject?.trim() || title).slice(0, 200);
+    try {
+      return await this.prisma.newsletter.create({
+        data: {
+          slug: newsletterSlugFromTitle(title),
+          title,
+          subject,
+          htmlBody: NEW_NEWSLETTER_PLACEHOLDER_HTML,
+          designJson: null,
+          status: NewsletterStatus.draft,
+          createdById: userId,
+        },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          subject: true,
+          htmlBody: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('No se pudo crear el boletín; vuelve a intentarlo');
+      }
+      throw error;
+    }
+  }
+
   async previewAudience(dto: MalichimpAudienceDto) {
     const filters = await this.normalizeAudience(dto);
-    const where = this.audienceWhere(filters.groupOptionIds);
-    const [subscribed, eligible, sample] = await Promise.all([
+    const includedWhere = this.audienceWhere(filters.groupOptionIds, []);
+    const where = this.audienceWhere(
+      filters.groupOptionIds,
+      filters.excludeGroupOptionIds,
+    );
+    const [subscribed, included, eligible, sample] = await Promise.all([
       this.prisma.malichimpContact.count({
         where: { status: MalichimpContactStatus.subscribed },
       }),
+      this.prisma.$queryRaw<[{ count: bigint }]>(Prisma.sql`
+        SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${includedWhere}
+      `),
       this.prisma.$queryRaw<[{ count: bigint }]>(Prisma.sql`
         SELECT COUNT(*) AS count FROM "MalichimpContact" contact WHERE ${where}
       `),
@@ -310,11 +418,14 @@ export class MalichimpService implements OnModuleInit {
       `),
     ]);
     const total = Number(eligible[0].count);
+    const includedTotal = Number(included[0].count);
     return {
       subscribed,
+      included: includedTotal,
       eligible: total,
-      excluded: Math.max(0, subscribed - total),
+      excluded: Math.max(0, includedTotal - total),
       groupOptionIds: filters.groupOptionIds,
+      excludeGroupOptionIds: filters.excludeGroupOptionIds,
       sample: sample.map((contact) => ({
         id: contact.id,
         email: contact.email,
@@ -382,51 +493,203 @@ export class MalichimpService implements OnModuleInit {
     }));
   }
 
-  async createCampaign(userId: string, dto: CreateMalichimpCampaignDto) {
+  async getCampaign(id: string) {
+    const campaign = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: 'malichimp' },
+      include: {
+        newsletter: {
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            subject: true,
+            htmlBody: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      newsletterId: campaign.newsletterId,
+      newsletterTitle: campaign.newsletter.title,
+      newsletter: campaign.newsletter,
+      subject: campaign.subjectSnapshot,
+      previewHtml: campaign.status === EmailCampaignStatus.draft
+        ? campaign.newsletter.htmlBody
+        : campaign.htmlSnapshot,
+      status: campaign.status,
+      fromName: campaign.fromName ?? '',
+      fromEmail: campaign.fromEmail ?? '',
+      replyTo: campaign.replyToEmail ?? campaign.fromEmail ?? '',
+      groupOptionIds: campaign.audienceSegments,
+      excludeGroupOptionIds: campaign.audienceExcludeSegments,
+      totalRecipients: campaign.totalRecipients,
+      scheduledAt: campaign.scheduledAt,
+      createdAt: campaign.createdAt,
+    };
+  }
+
+  async getCampaignBrowserView(id: string) {
+    const campaign = await this.getCampaign(id);
+    return {
+      title: campaign.name,
+      html: campaign.previewHtml,
+    };
+  }
+
+  async duplicateCampaign(userId: string, id: string) {
+    const source = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: 'malichimp' },
+      include: {
+        newsletter: {
+          select: {
+            slug: true,
+            title: true,
+            htmlBody: true,
+            designJson: true,
+          },
+        },
+      },
+    });
+    if (!source) throw new NotFoundException('Campaña no encontrada');
+
+    const sourceHtml = source.status === EmailCampaignStatus.draft
+      ? source.newsletter.htmlBody
+      : source.htmlSnapshot;
+    const recipients = source.audienceSegments.length
+      ? await this.resolveAudience(
+        source.audienceSegments,
+        source.audienceExcludeSegments,
+      )
+      : [];
+    const draftId = await this.prisma.$transaction(async (tx) => {
+      const newsletter = await tx.newsletter.create({
+        data: {
+          slug: duplicateNewsletterSlug(source.newsletter.slug),
+          title: duplicateLabel(source.newsletter.title, 200),
+          subject: source.subjectSnapshot.slice(0, 200),
+          htmlBody: sourceHtml,
+          designJson: source.newsletter.htmlBody === sourceHtml
+            ? source.newsletter.designJson
+            : null,
+          status: NewsletterStatus.draft,
+          createdById: userId,
+        },
+      });
+      const draft = await tx.emailCampaign.create({
+        data: {
+          newsletterId: newsletter.id,
+          name: duplicateLabel(source.name, 160),
+          replyToEmail: source.replyToEmail,
+          subjectSnapshot: source.subjectSnapshot,
+          htmlSnapshot: sourceHtml,
+          fromName: source.fromName,
+          fromEmail: source.fromEmail,
+          unsubscribePath: 'mail/unsubscribe',
+          managedByDispatcher: false,
+          status: EmailCampaignStatus.draft,
+          audienceArea: 'malichimp',
+          audienceSegments: source.audienceSegments,
+          audienceExcludeSegments: source.audienceExcludeSegments,
+          totalRecipients: recipients.length,
+          scheduledAt: null,
+          createdById: userId,
+        },
+      });
+      return draft.id;
+    });
+    return this.getCampaign(draftId);
+  }
+
+  private async prepareCampaignInput(
+    dto: CreateMalichimpCampaignDto,
+    attachedDraftNewsletterId?: string,
+  ) {
     if (!this.emailDelivery.status.configured) {
       throw new BadRequestException('El motor SES todavía no está configurado');
     }
     const filters = await this.normalizeAudience(dto);
-    const newsletter = await this.prisma.newsletter.findFirst({
-      where: { id: dto.newsletterId, status: NewsletterStatus.published },
-      select: { id: true, subject: true, htmlBody: true },
-    });
-    if (!newsletter) throw new BadRequestException('Selecciona un boletín publicado');
-
-    const recipients = await this.resolveAudience(filters.groupOptionIds);
-    if (!recipients.length) {
-      throw new BadRequestException('Los grupos seleccionados no tienen destinatarios elegibles');
+    const fromEmail = dto.fromEmail.trim().toLowerCase();
+    const replyTo = dto.replyTo.trim().toLowerCase();
+    if (!MALI_PE_EMAIL.test(replyTo)) {
+      throw new BadRequestException('La respuesta debe ser un correo @mali.pe');
     }
+    await this.emailSenders.assertEnabled(fromEmail);
+    const draftNewsletterId = dto.draftNewsletterId?.trim() || attachedDraftNewsletterId;
+    const canUseAttachedDraft = Boolean(
+      draftNewsletterId && draftNewsletterId === dto.newsletterId,
+    );
+    if (dto.draftNewsletterId?.trim() && dto.draftNewsletterId.trim() !== dto.newsletterId) {
+      throw new BadRequestException('El boletín borrador no coincide con el contenido seleccionado');
+    }
+    const newsletter = await this.prisma.newsletter.findFirst({
+      where: {
+        id: dto.newsletterId,
+        ...(canUseAttachedDraft ? {} : { status: NewsletterStatus.published }),
+      },
+      select: { id: true, htmlBody: true, status: true },
+    });
+    if (!newsletter) {
+      throw new BadRequestException(
+        canUseAttachedDraft
+          ? 'El boletín borrador ya no está disponible'
+          : 'Selecciona un boletín publicado',
+      );
+    }
+    const recipients = await this.resolveAudience(
+      filters.groupOptionIds,
+      filters.excludeGroupOptionIds,
+    );
+    if (!recipients.length) {
+      throw new BadRequestException('La segmentación no tiene destinatarios elegibles');
+    }
+    const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
+    if (scheduledAt && scheduledAt.getTime() <= Date.now()) {
+      throw new BadRequestException('La programación debe usar una fecha y hora futuras');
+    }
+    return {
+      filters,
+      fromEmail,
+      replyTo,
+      newsletter,
+      recipients,
+      scheduledAt,
+    };
+  }
 
-    const requestedSchedule = dto.scheduledAt ? new Date(dto.scheduledAt) : null;
-    const scheduledAt = requestedSchedule && requestedSchedule.getTime() > Date.now()
-      ? requestedSchedule
-      : null;
+  async createCampaign(userId: string, dto: CreateMalichimpCampaignDto) {
+    const prepared = await this.prepareCampaignInput(dto);
     const campaign = await this.prisma.$transaction(async (tx) => {
       const created = await tx.emailCampaign.create({
         data: {
-          newsletterId: newsletter.id,
+          newsletterId: prepared.newsletter.id,
           name: dto.name.trim(),
-          replyToEmail: dto.replyTo.trim().toLowerCase(),
-          subjectSnapshot: newsletter.subject,
-          htmlSnapshot: newsletter.htmlBody,
-          fromName: 'MALI',
+          replyToEmail: prepared.replyTo,
+          subjectSnapshot: dto.subject.trim(),
+          htmlSnapshot: prepared.newsletter.htmlBody,
+          fromName: dto.fromName.trim(),
+          fromEmail: prepared.fromEmail,
           unsubscribePath: 'mail/unsubscribe',
           managedByDispatcher: true,
-          status: scheduledAt
+          status: prepared.scheduledAt
             ? EmailCampaignStatus.scheduled
             : EmailCampaignStatus.queued,
           audienceArea: 'malichimp',
-          audienceSegments: filters.groupOptionIds,
-          audienceExcludeSegments: [],
-          totalRecipients: recipients.length,
-          scheduledAt,
+          audienceSegments: prepared.filters.groupOptionIds,
+          audienceExcludeSegments: prepared.filters.excludeGroupOptionIds,
+          totalRecipients: prepared.recipients.length,
+          scheduledAt: prepared.scheduledAt,
           createdById: userId,
         },
       });
-      for (let index = 0; index < recipients.length; index += 1_000) {
+      for (let index = 0; index < prepared.recipients.length; index += 1_000) {
         await tx.emailSend.createMany({
-          data: recipients.slice(index, index + 1_000).map((recipient) => ({
+          data: prepared.recipients.slice(index, index + 1_000).map((recipient) => ({
             campaignId: created.id,
             email: recipient.email,
             sourceContactId: recipient.id,
@@ -437,6 +700,61 @@ export class MalichimpService implements OnModuleInit {
       return created;
     }, { maxWait: 15_000, timeout: 120_000 });
 
+    return {
+      id: campaign.id,
+      status: campaign.status,
+      totalRecipients: campaign.totalRecipients,
+      scheduledAt: campaign.scheduledAt,
+    };
+  }
+
+  async sendDraftCampaign(id: string, dto: CreateMalichimpCampaignDto) {
+    const draft = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: 'malichimp' },
+      select: { id: true, status: true, newsletterId: true },
+    });
+    if (!draft) throw new NotFoundException('Campaña no encontrada');
+    if (draft.status !== EmailCampaignStatus.draft) {
+      throw new ConflictException('Esta campaña ya no es un borrador');
+    }
+    const prepared = await this.prepareCampaignInput(dto, draft.newsletterId);
+    const campaign = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.emailCampaign.updateMany({
+        where: { id, status: EmailCampaignStatus.draft },
+        data: {
+          newsletterId: prepared.newsletter.id,
+          name: dto.name.trim(),
+          replyToEmail: prepared.replyTo,
+          subjectSnapshot: dto.subject.trim(),
+          htmlSnapshot: prepared.newsletter.htmlBody,
+          fromName: dto.fromName.trim(),
+          fromEmail: prepared.fromEmail,
+          unsubscribePath: 'mail/unsubscribe',
+          managedByDispatcher: true,
+          status: prepared.scheduledAt
+            ? EmailCampaignStatus.scheduled
+            : EmailCampaignStatus.queued,
+          audienceSegments: prepared.filters.groupOptionIds,
+          audienceExcludeSegments: prepared.filters.excludeGroupOptionIds,
+          totalRecipients: prepared.recipients.length,
+          scheduledAt: prepared.scheduledAt,
+        },
+      });
+      if (!updated.count) {
+        throw new ConflictException('Esta campaña ya no es un borrador');
+      }
+      for (let index = 0; index < prepared.recipients.length; index += 1_000) {
+        await tx.emailSend.createMany({
+          data: prepared.recipients.slice(index, index + 1_000).map((recipient) => ({
+            campaignId: id,
+            email: recipient.email,
+            sourceContactId: recipient.id,
+            name: [recipient.firstName, recipient.lastName].filter(Boolean).join(' ') || null,
+          })),
+        });
+      }
+      return tx.emailCampaign.findUniqueOrThrow({ where: { id } });
+    }, { maxWait: 15_000, timeout: 120_000 });
     return {
       id: campaign.id,
       status: campaign.status,
@@ -507,7 +825,9 @@ export class MalichimpService implements OnModuleInit {
       throw new BadRequestException('Solo se admite el ZIP completo de Mailchimp');
     }
 
-    const directory = await mkdtemp(path.join(tmpdir(), 'mali-one-malichimp-'));
+    const previewId = newPreviewId();
+    const directory = zipPreviewDirectory(previewId);
+    await mkdir(directory, { recursive: true });
     try {
       await extractMailchimpZip(file.buffer, directory);
       const files = await locateMalichimpFiles(directory);
@@ -523,8 +843,8 @@ export class MalichimpService implements OnModuleInit {
         orderBy: { completedAt: 'desc' },
         select: { id: true, completedAt: true },
       });
-      const preview: ImportPreview = {
-        id: randomUUID(),
+      const preview: StoredZipPreview = {
+        id: previewId,
         userId,
         originalName: file.originalname.slice(0, 240),
         directory,
@@ -532,6 +852,7 @@ export class MalichimpService implements OnModuleInit {
         report,
         expiresAt: new Date(Date.now() + PREVIEW_TTL_MS),
       };
+      await writeZipPreview(preview);
       this.previews.set(preview.id, preview);
       return {
         previewId: preview.id,
@@ -541,7 +862,8 @@ export class MalichimpService implements OnModuleInit {
         previouslyImported: previous,
       };
     } catch (error) {
-      await rm(directory, { recursive: true, force: true });
+      this.previews.delete(previewId);
+      await removePreviewDirectory(directory);
       if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
         error instanceof Error ? error.message : 'No se pudo procesar el ZIP',
@@ -549,12 +871,338 @@ export class MalichimpService implements OnModuleInit {
     }
   }
 
+  async previewXlsx(
+    userId: string,
+    file: Express.Multer.File,
+    rawGroupOptionIds: string | undefined,
+    consentConfirmed: string | undefined,
+  ) {
+    await this.cleanupExpiredPreviews();
+    if (!file?.buffer?.length) throw new BadRequestException('Selecciona un XLSX');
+    if (!file.originalname.toLowerCase().endsWith('.xlsx')) {
+      throw new BadRequestException('Solo se admite un archivo XLSX');
+    }
+    if (file.buffer.length > MAX_XLSX_BYTES) {
+      throw new BadRequestException('El XLSX debe pesar hasta 10 MB.');
+    }
+    if (consentConfirmed !== 'true') {
+      throw new BadRequestException(
+        'Confirma que estos contactos autorizaron recibir comunicaciones por correo.',
+      );
+    }
+
+    let requestedIds: unknown;
+    try {
+      requestedIds = JSON.parse(rawGroupOptionIds ?? '[]');
+    } catch {
+      throw new BadRequestException('La selección de grupos no es válida');
+    }
+    if (!Array.isArray(requestedIds) || requestedIds.some((id) => typeof id !== 'string')) {
+      throw new BadRequestException('La selección de grupos no es válida');
+    }
+    const groupOptions = await this.validateGroupOptionIds(requestedIds);
+    const parsed = await parseMalichimpContactsXlsx(file.buffer);
+    const emails = parsed.rows.map((row) => row.email);
+    const [existing, localSuppressions, globalSuppressions] = await Promise.all([
+      this.prisma.malichimpContact.findMany({
+        where: { email: { in: emails } },
+        select: { email: true, status: true },
+      }),
+      this.prisma.malichimpSuppression.findMany({
+        where: { email: { in: emails } },
+        select: { email: true },
+      }),
+      this.prisma.emailGlobalSuppression.findMany({
+        where: { email: { in: emails } },
+        select: { email: true },
+      }),
+    ]);
+    const existingByEmail = new Map(existing.map((contact) => [contact.email, contact]));
+    const blockedEmails = new Set([
+      ...localSuppressions.map((row) => row.email),
+      ...globalSuppressions.map((row) => row.email),
+      ...existing
+        .filter((contact) => isBlockedContactStatus(contact.status))
+        .map((contact) => contact.email),
+    ]);
+
+    let newContacts = 0;
+    let existingContacts = 0;
+    let blockedContacts = 0;
+    for (const row of parsed.rows) {
+      if (blockedEmails.has(row.email)) {
+        blockedContacts += 1;
+        continue;
+      }
+      if (existingByEmail.has(row.email)) existingContacts += 1;
+      else newContacts += 1;
+    }
+    const report = {
+      totalRows: parsed.totalRows,
+      validRows: parsed.validRows,
+      invalidRows: parsed.invalidRows,
+      duplicateRows: parsed.duplicateRows,
+      importableContacts: newContacts + existingContacts,
+      newContacts,
+      existingContacts,
+      blockedContacts,
+      errors: parsed.errors,
+      sample: parsed.rows.slice(0, 10).map((row) => ({
+        rowNumber: row.rowNumber,
+        email: row.email,
+        name: [row.firstName, row.lastName].filter(Boolean).join(' ') || null,
+        action: blockedEmails.has(row.email)
+          ? 'blocked' as const
+          : existingByEmail.has(row.email) ? 'update' as const : 'create' as const,
+      })),
+    };
+    if (!report.importableContacts) {
+      throw new BadRequestException({
+        message: 'El XLSX no contiene contactos que puedan importarse.',
+        errors: parsed.errors,
+      });
+    }
+
+    const previewId = newPreviewId();
+    const consentConfirmedAt = new Date().toISOString();
+    const preview: StoredXlsxPreview = {
+      id: previewId,
+      userId,
+      originalName: file.originalname.slice(0, 240),
+      directory: xlsxPreviewDirectory(previewId),
+      rows: parsed.rows,
+      groupOptionIds: groupOptions.map((option) => option.id),
+      groupOptions: groupOptions.map((option) => ({
+        id: option.id,
+        name: option.name,
+        groupName: option.group.name,
+      })),
+      report,
+      fingerprint: fingerprintBuffer(file.buffer),
+      consentConfirmedAt,
+      consentConfirmedBy: userId,
+      expiresAt: new Date(Date.now() + PREVIEW_TTL_MS),
+    };
+    await writeXlsxPreview(preview);
+    this.xlsxPreviews.set(preview.id, preview);
+    return {
+      previewId: preview.id,
+      fileName: preview.originalName,
+      groupOptionIds: preview.groupOptionIds,
+      groupOptions: preview.groupOptions,
+      report,
+      expiresAt: preview.expiresAt,
+    };
+  }
+
+  async applyXlsxImport(userId: string, previewId: string) {
+    await this.cleanupExpiredPreviews();
+    const preview = await this.loadXlsxPreview(previewId, userId);
+    await this.validateGroupOptionIds(preview.groupOptionIds);
+
+    const busy = await this.prisma.malichimpImportJob.count({
+      where: { status: { in: ['queued', 'running'] } },
+    });
+    if (busy) {
+      throw new ConflictException(
+        'Hay una importación en curso. Espera a que termine.',
+      );
+    }
+
+    let job: MalichimpImportJob;
+    try {
+      job = await this.prisma.malichimpImportJob.create({
+        data: {
+          userId,
+          status: 'running',
+          originalName: `xlsx:${preview.originalName}`.slice(0, 240),
+          total: preview.report.importableContacts,
+          processed: 0,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Hay una importación en curso. Espera a que termine.');
+      }
+      throw error;
+    }
+
+    const now = new Date();
+    const source = `xlsx:${preview.originalName}`.slice(0, 240);
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        const run = await tx.malichimpImportRun.create({
+          data: {
+            sourceKey: source.slice(0, 160),
+            sourceDirectory: 'temporary_ui_xlsx_upload',
+            fileFingerprint: preview.fingerprint,
+            counts: {
+              ...preview.report,
+              groupOptionIds: preview.groupOptionIds,
+              consentConfirmedAt: preview.consentConfirmedAt,
+              consentConfirmedBy: preview.consentConfirmedBy,
+              kind: 'xlsx',
+            },
+          },
+        });
+
+        const emails = preview.rows.map((row) => row.email);
+        const [existing, localSuppressions, globalSuppressions] = await Promise.all([
+          tx.malichimpContact.findMany({
+            where: { email: { in: emails } },
+            select: {
+              id: true,
+              email: true,
+              status: true,
+              source: true,
+              optInAt: true,
+              confirmedAt: true,
+            },
+          }),
+          tx.malichimpSuppression.findMany({
+            where: { email: { in: emails } },
+            select: { email: true },
+          }),
+          tx.emailGlobalSuppression.findMany({
+            where: { email: { in: emails } },
+            select: { email: true },
+          }),
+        ]);
+        const existingByEmail = new Map(existing.map((contact) => [contact.email, contact]));
+        const blocked = new Set([
+          ...localSuppressions.map((row) => row.email),
+          ...globalSuppressions.map((row) => row.email),
+          ...existing
+            .filter((contact) => isBlockedContactStatus(contact.status))
+            .map((contact) => contact.email),
+        ]);
+        const importable = preview.rows.filter((row) => !blocked.has(row.email));
+        let created = 0;
+        let updated = 0;
+        const profileData = (row: MalichimpXlsxContactRow) => ({
+          ...(row.firstName ? { firstName: row.firstName } : {}),
+          ...(row.lastName ? { lastName: row.lastName } : {}),
+          ...(row.phone ? { phone: row.phone } : {}),
+          ...(row.institutionName ? { institutionName: row.institutionName } : {}),
+          ...(row.jobTitle ? { jobTitle: row.jobTitle } : {}),
+          ...(row.city ? { city: row.city } : {}),
+          ...(row.country ? { country: row.country } : {}),
+          ...(row.classification ? { classification: row.classification } : {}),
+        });
+
+        const newRows = importable.filter((row) => !existingByEmail.has(row.email));
+        for (let index = 0; index < newRows.length; index += 1_000) {
+          const batch = await tx.malichimpContact.createMany({
+            data: newRows.slice(index, index + 1_000).map((row) => ({
+              email: row.email,
+              ...profileData(row),
+              source,
+              status: MalichimpContactStatus.subscribed,
+              optInAt: now,
+              confirmedAt: now,
+              statusChangedAt: now,
+            })),
+            skipDuplicates: true,
+          });
+          created += batch.count;
+        }
+
+        for (const row of importable) {
+          const current = existingByEmail.get(row.email);
+          if (!current) continue;
+          await tx.malichimpContact.update({
+            where: { email: row.email },
+            data: {
+              ...profileData(row),
+              source: current.source ?? source,
+              optInAt: current.optInAt ?? now,
+              confirmedAt: current.confirmedAt ?? now,
+            },
+          });
+          updated += 1;
+        }
+
+        const importedContacts = await tx.malichimpContact.findMany({
+          where: {
+            email: { in: importable.map((row) => row.email) },
+            status: MalichimpContactStatus.subscribed,
+          },
+          select: { id: true },
+        });
+        const memberships = importedContacts.flatMap((contact) =>
+          preview.groupOptionIds.map((optionId) => ({
+            contactId: contact.id,
+            optionId,
+          })),
+        );
+        let membershipsAdded = 0;
+        for (let index = 0; index < memberships.length; index += 5_000) {
+          const batch = await tx.malichimpContactGroupOption.createMany({
+            data: memberships.slice(index, index + 5_000),
+            skipDuplicates: true,
+          });
+          membershipsAdded += batch.count;
+        }
+
+        await tx.malichimpImportRun.update({
+          where: { id: run.id },
+          data: {
+            completedAt: new Date(),
+            counts: {
+              ...preview.report,
+              groupOptionIds: preview.groupOptionIds,
+              consentConfirmedAt: preview.consentConfirmedAt,
+              consentConfirmedBy: preview.consentConfirmedBy,
+              kind: 'xlsx',
+              created,
+              updated,
+              skipped: preview.rows.length - importable.length,
+              membershipsAdded,
+            },
+          },
+        });
+
+        return {
+          created,
+          updated,
+          skipped: preview.rows.length - importable.length,
+          imported: created + updated,
+          membershipsAdded,
+          runId: run.id,
+          jobId: job.id,
+        };
+      }, { maxWait: 15_000, timeout: 120_000 });
+
+      await this.prisma.malichimpImportJob.update({
+        where: { id: job.id },
+        data: {
+          status: 'completed',
+          processed: result.imported,
+          runId: result.runId,
+          completedAt: new Date(),
+        },
+      });
+      return result;
+    } catch (error) {
+      await this.prisma.malichimpImportJob.update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          processed: 0,
+          error: error instanceof Error ? error.message.slice(0, 1000) : String(error),
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    } finally {
+      this.xlsxPreviews.delete(preview.id);
+      await removePreviewDirectory(preview.directory);
+    }
+  }
+
   async startZipImport(userId: string, previewId: string) {
     await this.cleanupExpiredPreviews();
-    const preview = this.previews.get(previewId);
-    if (!preview || preview.userId !== userId) {
-      throw new NotFoundException('La vista previa expiró; vuelve a subir el ZIP');
-    }
+    const preview = await this.loadZipPreview(previewId, userId);
     const busy = await this.prisma.malichimpImportJob.count({
       where: { status: { in: ['queued', 'running'] } },
     });
@@ -590,24 +1238,59 @@ export class MalichimpService implements OnModuleInit {
   }
 
   private async normalizeAudience(dto: MalichimpAudienceDto) {
-    const groupOptionIds = [
-      ...new Set((dto.groupOptionIds ?? []).map((id) => id.trim()).filter(Boolean)),
-    ];
-    if (!groupOptionIds.length) {
-      throw new BadRequestException('Selecciona al menos una opción de grupo');
+    const [included, excluded] = await Promise.all([
+      this.validateGroupOptionIds(dto.groupOptionIds ?? []),
+      this.validateGroupOptionIds(dto.excludeGroupOptionIds ?? [], false),
+    ]);
+    const groupOptionIds = included.map((option) => option.id);
+    const excludeGroupOptionIds = excluded.map((option) => option.id);
+    const includedIds = new Set(groupOptionIds);
+    if (excludeGroupOptionIds.some((id) => includedIds.has(id))) {
+      throw new BadRequestException(
+        'Una opción de grupo no puede estar incluida y excluida a la vez',
+      );
     }
-    const existing = await this.prisma.malichimpGroupOption.findMany({
-      where: { id: { in: groupOptionIds } },
-      select: { id: true },
-    });
-    const known = new Set(existing.map((option) => option.id));
-    if (groupOptionIds.some((id) => !known.has(id))) {
-      throw new BadRequestException('La audiencia contiene opciones de grupo que ya no existen');
-    }
-    return { groupOptionIds };
+    return { groupOptionIds, excludeGroupOptionIds };
   }
 
-  private audienceWhere(groupOptionIds: string[]): Prisma.Sql {
+  private async validateGroupOptionIds(groupOptionIds: string[], required = true) {
+    const normalizedIds = [
+      ...new Set(groupOptionIds.map((id) => id.trim()).filter(Boolean)),
+    ];
+    if (!normalizedIds.length && required) {
+      throw new BadRequestException('Selecciona al menos una opción de grupo');
+    }
+    if (!normalizedIds.length) return [];
+    const existing = await this.prisma.malichimpGroupOption.findMany({
+      where: { id: { in: normalizedIds } },
+      include: {
+        group: {
+          select: { id: true, name: true, sortOrder: true },
+        },
+      },
+    });
+    const known = new Set(existing.map((option) => option.id));
+    if (normalizedIds.some((id) => !known.has(id))) {
+      throw new BadRequestException('La audiencia contiene opciones de grupo que ya no existen');
+    }
+    const byId = new Map(existing.map((option) => [option.id, option]));
+    return normalizedIds.map((id) => byId.get(id)!);
+  }
+
+  private audienceWhere(
+    groupOptionIds: string[],
+    excludeGroupOptionIds: string[],
+  ): Prisma.Sql {
+    const exclusion = excludeGroupOptionIds.length
+      ? Prisma.sql`
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "MalichimpContactGroupOption" excluded_membership
+          WHERE excluded_membership."contactId" = contact."id"
+            AND excluded_membership."optionId" IN (${Prisma.join(excludeGroupOptionIds)})
+        )
+      `
+      : Prisma.sql``;
     return Prisma.sql`
       contact."status" = 'subscribed'::"MalichimpContactStatus"
       AND NOT EXISTS (
@@ -624,11 +1307,12 @@ export class MalichimpService implements OnModuleInit {
         WHERE membership."contactId" = contact."id"
           AND membership."optionId" IN (${Prisma.join(groupOptionIds)})
       )
+      ${exclusion}
     `;
   }
 
-  private resolveAudience(groupOptionIds: string[]) {
-    const where = this.audienceWhere(groupOptionIds);
+  private resolveAudience(groupOptionIds: string[], excludeGroupOptionIds: string[]) {
+    const where = this.audienceWhere(groupOptionIds, excludeGroupOptionIds);
     return this.prisma.$queryRaw<AudienceRecipient[]>(Prisma.sql`
       SELECT contact."id", contact."email", contact."firstName", contact."lastName"
       FROM "MalichimpContact" contact
@@ -637,7 +1321,27 @@ export class MalichimpService implements OnModuleInit {
     `);
   }
 
-  private async runImport(job: MalichimpImportJob, preview: ImportPreview) {
+  private async loadZipPreview(previewId: string, userId: string): Promise<StoredZipPreview> {
+    const cached = this.previews.get(previewId);
+    const preview = cached ?? await readZipPreview(previewId);
+    if (!preview || preview.userId !== userId) {
+      throw new NotFoundException('La vista previa expiró; vuelve a subir el ZIP');
+    }
+    if (!cached) this.previews.set(preview.id, preview);
+    return preview;
+  }
+
+  private async loadXlsxPreview(previewId: string, userId: string): Promise<StoredXlsxPreview> {
+    const cached = this.xlsxPreviews.get(previewId);
+    const preview = cached ?? await readXlsxPreview(previewId);
+    if (!preview || preview.userId !== userId) {
+      throw new NotFoundException('La vista previa expiró; vuelve a subir el XLSX');
+    }
+    if (!cached) this.xlsxPreviews.set(preview.id, preview);
+    return preview;
+  }
+
+  private async runImport(job: MalichimpImportJob, preview: StoredZipPreview) {
     try {
       await this.prisma.malichimpImportJob.update({
         where: { id: job.id },
@@ -678,7 +1382,8 @@ export class MalichimpService implements OnModuleInit {
         },
       });
     } finally {
-      await rm(preview.directory, { recursive: true, force: true });
+      this.previews.delete(preview.id);
+      await removePreviewDirectory(preview.directory);
     }
   }
 
@@ -691,13 +1396,22 @@ export class MalichimpService implements OnModuleInit {
 
   private async cleanupExpiredPreviews() {
     const now = Date.now();
-    const expired = [...this.previews.values()].filter(
+    const expiredZip = [...this.previews.values()].filter(
       (preview) => preview.expiresAt.getTime() <= now,
     );
     await Promise.all(
-      expired.map(async (preview) => {
+      expiredZip.map(async (preview) => {
         this.previews.delete(preview.id);
-        await rm(preview.directory, { recursive: true, force: true });
+        await removePreviewDirectory(preview.directory);
+      }),
+    );
+    const expiredXlsx = [...this.xlsxPreviews.values()].filter(
+      (preview) => preview.expiresAt.getTime() <= now,
+    );
+    await Promise.all(
+      expiredXlsx.map(async (preview) => {
+        this.xlsxPreviews.delete(preview.id);
+        await removePreviewDirectory(preview.directory);
       }),
     );
   }
@@ -710,13 +1424,13 @@ export class MalichimpService implements OnModuleInit {
         entries
           .filter(
             (entry) =>
-              entry.isDirectory() && entry.name.startsWith('mali-one-malichimp-'),
+              entry.isDirectory() && entry.name.startsWith(ZIP_PREVIEW_PREFIX),
           )
           .map(async (entry) => {
             const directory = path.join(tmpdir(), entry.name);
             const details = await stat(directory);
             if (details.mtimeMs < cutoff) {
-              await rm(directory, { recursive: true, force: true });
+              await removePreviewDirectory(directory);
             }
           }),
       );

@@ -113,6 +113,13 @@ export interface MalichimpStatsDto {
   } | null;
 }
 
+export interface EmailSenderDto {
+  id: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface MalichimpImportReportDto {
   counts: Record<string, number>;
   totalUnique: number;
@@ -147,12 +154,52 @@ export interface MalichimpImportJobDto {
   completedAt: string | null;
 }
 
+export interface MalichimpXlsxImportReportDto {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  duplicateRows: number;
+  importableContacts: number;
+  newContacts: number;
+  existingContacts: number;
+  blockedContacts: number;
+  errors: string[];
+  sample: Array<{
+    rowNumber: number;
+    email: string;
+    name: string | null;
+    action: 'create' | 'update' | 'blocked';
+  }>;
+}
+
+export interface MalichimpXlsxImportPreviewDto {
+  previewId: string;
+  fileName: string;
+  groupOptionIds: string[];
+  groupOptions: Array<{ id: string; name: string; groupName: string }>;
+  report: MalichimpXlsxImportReportDto;
+  expiresAt: string;
+}
+
+export interface MalichimpXlsxImportResultDto {
+  created: number;
+  updated: number;
+  skipped: number;
+  imported: number;
+  membershipsAdded: number;
+  runId: string;
+  jobId: string;
+}
+
 export interface MalichimpAudienceFilterDto {
   groupOptionIds: string[];
+  excludeGroupOptionIds?: string[];
 }
 
 export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto {
+  excludeGroupOptionIds: string[];
   subscribed: number;
+  included: number;
   eligible: number;
   excluded: number;
   sample: Array<{ id: string; email: string; name: string | null }>;
@@ -161,8 +208,18 @@ export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto 
 export interface CreateMalichimpCampaignDto extends MalichimpAudienceFilterDto {
   name: string;
   newsletterId: string;
+  /** Draft newsletter created from MALICHIMP “Crear nuevo”; must match newsletterId. */
+  draftNewsletterId?: string;
+  subject: string;
+  fromName: string;
+  fromEmail: string;
   replyTo: string;
   scheduledAt?: string;
+}
+
+export interface CreateMalichimpNewsletterDraftDto {
+  title: string;
+  subject?: string;
 }
 
 export interface MalichimpCampaignDto {
@@ -184,6 +241,25 @@ export interface MalichimpCampaignDto {
   scheduledAt: string | null;
   createdAt: string;
   completedAt: string | null;
+}
+
+export interface MalichimpCampaignDetailDto {
+  id: string;
+  name: string;
+  newsletterId: string;
+  newsletterTitle: string;
+  newsletter: NewsletterDto;
+  subject: string;
+  previewHtml: string;
+  status: EmailCampaignStatus;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  groupOptionIds: string[];
+  excludeGroupOptionIds: string[];
+  totalRecipients: number;
+  scheduledAt: string | null;
+  createdAt: string;
 }
 
 export interface InternalAudienceMemberDto {

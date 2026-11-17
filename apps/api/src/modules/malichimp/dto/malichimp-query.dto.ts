@@ -16,6 +16,10 @@ export class MalichimpContactsQueryDto {
   groupOptionId?: string;
 
   @IsOptional()
+  @IsString()
+  tagId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

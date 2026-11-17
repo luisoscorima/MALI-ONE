@@ -46,7 +46,9 @@ export class NewslettersService {
         slug: true,
         title: true,
         subject: true,
+        htmlBody: true,
         status: true,
+        createdAt: true,
         updatedAt: true,
       },
     });

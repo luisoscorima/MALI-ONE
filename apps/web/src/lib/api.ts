@@ -354,6 +354,26 @@ export const api = {
   getMalichimpStats: () =>
     request<import('@mali-one/shared').MalichimpStatsDto>('/api/malichimp/stats'),
 
+  listEmailSenders: () =>
+    request<import('@mali-one/shared').EmailSenderDto[]>('/api/email-delivery/senders'),
+
+  createEmailSender: (email: string) =>
+    request<import('@mali-one/shared').EmailSenderDto>('/api/email-delivery/senders', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  updateEmailSender: (id: string, email: string) =>
+    request<import('@mali-one/shared').EmailSenderDto>(
+      `/api/email-delivery/senders/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify({ email }) },
+    ),
+
+  deleteEmailSender: (id: string) =>
+    request<{ ok: true }>(`/api/email-delivery/senders/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
   listMalichimpTags: () =>
     request<import('@mali-one/shared').MalichimpTagDto[]>('/api/malichimp/tags'),
 
@@ -364,6 +384,7 @@ export const api = {
     q?: string;
     status?: import('@mali-one/shared').MalichimpContactStatus;
     groupOptionId?: string;
+    tagId?: string;
     page?: number;
     pageSize?: number;
   } = {}) => {
@@ -371,6 +392,7 @@ export const api = {
     if (filters.q) params.set('q', filters.q);
     if (filters.status) params.set('status', filters.status);
     if (filters.groupOptionId) params.set('groupOptionId', filters.groupOptionId);
+    if (filters.tagId) params.set('tagId', filters.tagId);
     if (filters.page) params.set('page', String(filters.page));
     if (filters.pageSize) params.set('pageSize', String(filters.pageSize));
     return request<{
@@ -402,14 +424,54 @@ export const api = {
       `/api/malichimp/imports/jobs/${encodeURIComponent(jobId)}`,
     ),
 
+  previewMalichimpXlsxImport: (file: File, groupOptionIds: string[]) => {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('groupOptionIds', JSON.stringify(groupOptionIds));
+    body.append('consentConfirmed', 'true');
+    return request<import('@mali-one/shared').MalichimpXlsxImportPreviewDto>(
+      '/api/malichimp/imports/xlsx/preview',
+      { method: 'POST', body },
+    );
+  },
+
+  applyMalichimpXlsxImport: (previewId: string) =>
+    request<import('@mali-one/shared').MalichimpXlsxImportResultDto>(
+      `/api/malichimp/imports/xlsx/${encodeURIComponent(previewId)}/apply`,
+      { method: 'POST', body: '{}' },
+    ),
+
   listMalichimpNewsletters: () =>
     request<import('@mali-one/shared').NewsletterDto[]>(
       '/api/malichimp/newsletters',
     ),
 
+  getMalichimpNewsletter: (id: string) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/malichimp/newsletters/${encodeURIComponent(id)}`,
+    ),
+
+  createMalichimpNewsletterDraft: (
+    body: import('@mali-one/shared').CreateMalichimpNewsletterDraftDto,
+  ) => request<import('@mali-one/shared').NewsletterDto>(
+    '/api/malichimp/newsletters/draft',
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
+
   listMalichimpCampaigns: () =>
     request<import('@mali-one/shared').MalichimpCampaignDto[]>(
       '/api/malichimp/campaigns',
+    ),
+
+  getMalichimpCampaign: (id: string) =>
+    request<import('@mali-one/shared').MalichimpCampaignDetailDto>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}`,
+    ),
+
+  duplicateMalichimpCampaign: (id: string) =>
+    request<import('@mali-one/shared').MalichimpCampaignDetailDto>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST', body: '{}' },
     ),
 
   previewMalichimpAudience: (
@@ -423,6 +485,14 @@ export const api = {
     body: import('@mali-one/shared').CreateMalichimpCampaignDto,
   ) => request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(
     '/api/malichimp/campaigns',
+    { method: 'POST', body: JSON.stringify(body) },
+  ),
+
+  sendMalichimpDraftCampaign: (
+    id: string,
+    body: import('@mali-one/shared').CreateMalichimpCampaignDto,
+  ) => request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(
+    `/api/malichimp/campaigns/${encodeURIComponent(id)}/send`,
     { method: 'POST', body: JSON.stringify(body) },
   ),
     niubizStatus: () => request<import('@mali-one/shared').NiubizSyncStatusDto>('/api/treasury/niubiz/status'),

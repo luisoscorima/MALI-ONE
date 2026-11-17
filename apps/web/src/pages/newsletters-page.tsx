@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import type { NewsletterDto } from '@mali-one/shared';
 import {
   NewsletterEditor,
@@ -33,6 +34,8 @@ export function NewslettersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const editorRef = useRef<NewsletterEditorHandle>(null);
+  const openedFromQueryRef = useRef<string | null>(null);
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -84,7 +87,7 @@ export function NewslettersPage() {
     setEditorKey((k) => k + 1);
   }
 
-  async function openEdit(id: string) {
+  const openEdit = useCallback(async (id: string) => {
     try {
       const n = await api.getNewsletter(id);
       setEditingId(n.id);
@@ -99,7 +102,14 @@ export function NewslettersPage() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo abrir');
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    const requestedId = searchParams.get('edit');
+    if (!requestedId || openedFromQueryRef.current === requestedId) return;
+    openedFromQueryRef.current = requestedId;
+    void openEdit(requestedId);
+  }, [openEdit, searchParams]);
 
   function closeEditor() {
     setMode('closed');

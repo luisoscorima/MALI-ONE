@@ -33,7 +33,7 @@ export class EmailDeliveryService {
     const enabled = this.config.get<string>('AWS_SES_ENABLED') === 'true' ||
       credentials !== undefined;
     this.defaultFromEmail =
-      this.config.get<string>('SES_FROM_EMAIL') || 'boletines@mali.pe';
+      (this.config.get<string>('SES_FROM_EMAIL') || 'boletines@mali.pe').trim().toLowerCase();
     this.defaultFromName = this.config.get<string>('SES_FROM_NAME') || 'MALI';
     this.configurationSet =
       this.config.get<string>('AWS_SES_CONFIGURATION_SET') ||
