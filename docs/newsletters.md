@@ -12,6 +12,7 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 2. La URL pública sirve el HTML publicado.
 3. MALICHIMP, Comunicación Interna u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
 4. Tracking, bajas y transporte se añaden fuera de Boletines en `core/email-delivery` y en el módulo dueño de la audiencia.
+5. Personalización de nombre: en el HTML o asunto puedes usar `{{first_name}}` (también vale `<<First Name>>` o `*|FNAME|*`). Al enviar, el motor SES lo reemplaza con el primer nombre del destinatario; si no hay nombre, usa `estimado(a)`.
 
 ## Código
 

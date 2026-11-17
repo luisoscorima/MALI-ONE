@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { EmailCampaignStatus, EmailSendStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { applyEmailMergeTags, firstNameFromDisplayName } from './email-merge-tags';
 import { EmailDeliveryService } from './email-delivery.service';
 import { EmailTrackingService } from './email-tracking.service';
 
@@ -105,11 +106,16 @@ export class EmailCampaignDispatcherService {
           const unsubscribeUrl = campaign.unsubscribePath
             ? this.tracking.publicUrl(`${campaign.unsubscribePath}/${send.openToken}`)
             : undefined;
+          const firstName = firstNameFromDisplayName(send.name);
+          const subject = applyEmailMergeTags(campaign.subjectSnapshot, { firstName });
+          const personalizedHtml = applyEmailMergeTags(campaign.htmlSnapshot, {
+            firstName,
+          });
           const result = await this.delivery.sendHtml({
             to: send.email,
-            subject: campaign.subjectSnapshot,
+            subject,
             html: this.tracking.inject(
-              campaign.htmlSnapshot,
+              personalizedHtml,
               send.openToken,
               unsubscribeUrl,
             ),

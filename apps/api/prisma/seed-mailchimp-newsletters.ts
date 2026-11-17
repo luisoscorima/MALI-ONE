@@ -118,7 +118,8 @@ function decodeHtmlEntities(value: string): string {
 function extractSubject(html: string): string {
   const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? '';
   const cleaned = decodeHtmlEntities(title)
-    .replace(/<<\s*Test First Name\s*>>/gi, '')
+    .replace(/\*\|FNAME\|\*/g, '{{first_name}}')
+    .replace(/<<\s*(?:Test\s+)?First Name\s*>>/gi, '{{first_name}}')
     .replace(/\s+/g, ' ')
     .trim();
   return cleaned.slice(0, 200) || 'Boletín MALI';
@@ -192,9 +193,11 @@ function extractBodyHtml(html: string): string {
     )
     .replace(/https:\/\/cdn-images\.mailchimp\.com\/monkey_rewards\/[^"'\s]+/gi, '')
     .replace(/\|\s*MC_PREVIEW_TEXT\s*\|/gi, '')
+    // Keep first-name personalization as the canonical SES merge tag.
+    .replace(/\*\|FNAME\|\*/g, '{{first_name}}')
+    .replace(/<<\s*(?:Test\s+)?First Name\s*>>/gi, '{{first_name}}')
+    .replace(/&lt;&lt;\s*(?:Test\s+)?First Name\s*&gt;&gt;/gi, '{{first_name}}')
     .replace(/\*\|[A-Z0-9_]+\|\*/g, '')
-    .replace(/<<\s*Test First Name\s*>>/gi, '')
-    .replace(/&lt;&lt;\s*Test First Name\s*&gt;&gt;/gi, '')
     // Leftover translate links if chrome markup varies
     .replace(
       /https?:\/\/translate\.google\.com\/translate\?[^"'\\\s>]+/gi,

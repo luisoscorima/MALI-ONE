@@ -38,7 +38,7 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 7. Al confirmar se congelan asunto, HTML, remitente, inclusiones, exclusiones y destinatarios. Editar después el boletín o los grupos no altera la campaña.
 8. Desde la tabla se puede previsualizar el snapshot y abrirlo en el navegador. En borradores (duplicados), la vista muestra la versión actual del boletín asociado hasta confirmar.
 9. **Duplicar** crea una nueva campaña en borrador y una copia editable del boletín. Copia remitente, asunto e inclusiones/exclusiones; limpia programación, destinatarios materializados y métricas.
-10. `EmailCampaignDispatcherService` procesa lotes persistidos, respeta la tasa configurada y reintenta fallos temporales hasta tres veces.
+10. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
 11. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
 12. El footer enlaza a `/mail/unsubscribe/{token}`. El GET pide confirmación y el POST aplica la baja solo en MALICHIMP.
 
