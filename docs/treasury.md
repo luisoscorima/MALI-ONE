@@ -16,7 +16,7 @@
 
 | Ruta | Uso |
 |------|-----|
-| `/treasury` | Finanzas → Verificación de pagos |
+| `/treasury` | Finanzas → Verificación de pagos (Niubiz: Ventas por defecto; `?tab=paycash` abre PagoEfectivo) |
 
 ## API
 

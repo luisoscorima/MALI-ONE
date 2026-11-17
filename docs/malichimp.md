@@ -99,7 +99,7 @@ El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [n
 
 ## API y UI
 
-- UI: `/admin/malichimp`
+- UI: `/admin/malichimp` (Audiencia por defecto; `?tab=campaigns` abre Campañas)
 - `GET /api/malichimp/stats`
 - `GET /api/malichimp/contacts` — opcional `tagId`, `groupOptionId`, `q`
 - `GET /api/malichimp/tags`

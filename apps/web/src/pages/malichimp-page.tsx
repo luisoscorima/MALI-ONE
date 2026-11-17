@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   ChevronLeft,
@@ -118,6 +119,8 @@ export function MalichimpPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section = searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'audience';
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [tags, setTags] = useState<MalichimpTagDto[]>([]);
@@ -404,7 +407,16 @@ export function MalichimpPage() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="audience" className="gap-4">
+      <Tabs
+        value={section}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          if (value === 'campaigns') next.set('tab', 'campaigns');
+          else next.delete('tab');
+          setSearchParams(next, { replace: true });
+        }}
+        className="gap-4"
+      >
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>

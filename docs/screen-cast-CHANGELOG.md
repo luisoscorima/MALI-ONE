@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Las pestañas Configuración / Vista previa quedan en la URL (`?tab=preview`).
 - Catch-up con still en vez de overlay negro (riesgo bajo).
 - Re-anclar sync en borde de loop / fin de clip.
 - Umbrales de auto-desync más perezosos si hay falsos positivos en lobby.

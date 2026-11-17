@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Las pestañas Audiencia / Campañas quedan en la URL (`?tab=campaigns`), igual que Boletines y Usuarios Workspace.
+
 ### Added
 
 - Personalización por destinatario en el dispatcher SES: `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` se sustituyen con el primer nombre del contacto; sin nombre usa `estimado(a)`.

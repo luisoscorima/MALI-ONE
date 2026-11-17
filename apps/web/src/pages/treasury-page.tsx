@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Landmark, Pencil, Plus, RefreshCw } from 'lucide-react';
 import type {
   TreasuryCurrency,
@@ -74,6 +75,8 @@ function preferredSourceId(sources: TreasurySourceDto[]) {
 
 export function TreasuryPage() {
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const niubizTab = searchParams.get('tab') === 'paycash' ? 'paycash' : 'sales';
   const [data, setData] = useState<TreasuryOverviewDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,7 +91,6 @@ export function TreasuryPage() {
   const [formError, setFormError] = useState('');
   const [updateOpen, setUpdateOpen] = useState(false);
   const [merchantsOpen, setMerchantsOpen] = useState(false);
-  const [niubizTab, setNiubizTab] = useState<'sales' | 'paycash'>('sales');
   const [fullUpdateOpen, setFullUpdateOpen] = useState(false);
   const [niubizRefresh, setNiubizRefresh] = useState(0);
 
@@ -322,7 +324,10 @@ export function TreasuryPage() {
               {showNiubizRecords ? (
                 <Tabs value={niubizTab} onValueChange={(value) => {
                   setUpdateOpen(false);
-                  setNiubizTab(value as 'sales' | 'paycash');
+                  const next = new URLSearchParams(searchParams);
+                  if (value === 'paycash') next.set('tab', 'paycash');
+                  else next.delete('tab');
+                  setSearchParams(next, { replace: true });
                 }} className="space-y-5">
                   <TabsList aria-label="Apartados de Niubiz Comercio">
                     <TabsTrigger value="sales">Ventas Niubiz</TabsTrigger>

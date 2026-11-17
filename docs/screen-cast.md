@@ -44,7 +44,7 @@ Firma de playlist (`getPlaylistSignature`): `activo`, `crossfade`, `kenBurns` + 
 
 | Ruta | Uso |
 |------|-----|
-| `/admin/screen-cast` | Admin: playlists, ítems, monitores, agenda, sync, preview |
+| `/admin/screen-cast` | Admin: playlists, ítems, monitores, agenda, sync (Config por defecto; `?tab=preview` abre Vista previa) |
 | `/screen-cast?id={screenKey}` | Player kiosco (público) |
 
 ## API

@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/page-header';
 import { IconActionButton } from '@/components/icon-action-button';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   type DragEndEvent,
@@ -484,6 +485,9 @@ function SortablePlaylistItemCard({
 export function ScreenCastAdminPage() {
   const toast = useToast();
   const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: AdminTab =
+    searchParams.get('tab') === 'preview' ? 'preview' : 'config';
 
   const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
   const [monitors, setMonitors] = useState<ScreenCastMonitorDto[]>([]);
@@ -493,7 +497,12 @@ export function ScreenCastAdminPage() {
   const [connectionFilter, setConnectionFilter] = useState('all');
   const [assignmentFilter, setAssignmentFilter] = useState('all');
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('config');
+  function setActiveTab(next: AdminTab) {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'preview') params.set('tab', 'preview');
+    else params.delete('tab');
+    setSearchParams(params, { replace: true });
+  }
 
   const [playlistDialogOpen, setPlaylistDialogOpen] = useState(false);
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(
