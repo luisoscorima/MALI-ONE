@@ -8,7 +8,7 @@
 - Importación administrativa por XLSX con plantilla, preview, consentimiento, grupos del lote y apply transaccional.
 - Persistencia en disco de previews ZIP/XLSX (TTL 30 min) recuperable tras reinicio en el mismo host.
 - Auditoría XLSX vía `MalichimpImportJob` + `MalichimpImportRun` (huella, admin, consentimiento y conteos).
-- Catálogo compartido `EmailSender` (`@mali.pe`) con CRUD en `/api/email-delivery/senders` y pestaña **Remitentes**.
+- Catálogo compartido `EmailSender` (`@mali.pe`) con CRUD en `/api/email-delivery/senders` (UI ahora en Boletines).
 - Campañas con exclusión de opciones de grupo, asunto/remitente/nombre editables y rechazo de programación vencida.
 - Duplicación de campañas como borrador, con copia editable del boletín, configuración heredada y audiencia recalculada.
 - Vista previa del HTML congelado y apertura autenticada en navegador desde la tabla de campañas.
@@ -27,6 +27,7 @@
 
 ### Changed
 
+- La pestaña **Remitentes** sale de MALICHIMP y vive en Boletines; el catálogo `EmailSender` sigue siendo compartido.
 - Nueva campaña usa un panel numerado compacto (estilo CRM PAM): incluir/excluir con desplegables, preview tabular, boletín publicado, radios Ahora/Programar y confirmación antes de enviar.
 - El diálogo de importación ofrece XLSX (lotes nuevos) y ZIP (sincronización Mailchimp).
 - Las campañas exigen un remitente del catálogo; `fromEmail` y `replyTo` deben ser `@mali.pe`.

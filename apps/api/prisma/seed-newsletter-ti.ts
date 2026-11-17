@@ -1,5 +1,5 @@
 /**
- * Boletín de demostración para probar Comunicación Interna + SES.
+ * Boletín de demostración para probar Campañas internas + SES.
  * Es intencionalmente idempotente: si ya fue editado, una nueva ejecución no lo pisa.
  */
 import { NewsletterStatus, PrismaClient, UserRole } from '@prisma/client';

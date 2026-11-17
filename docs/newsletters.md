@@ -10,9 +10,10 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 
 1. Crear/editar newsletter (draft/published).
 2. La URL pública sirve el HTML publicado.
-3. MALICHIMP, Comunicación Interna u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
+3. MALICHIMP, Campañas internas (Usuarios Workspace) u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
 4. Tracking, bajas y transporte se añaden fuera de Boletines en `core/email-delivery` y en el módulo dueño de la audiencia.
 5. Personalización de nombre: en el HTML o asunto puedes usar `{{first_name}}` (también vale `<<First Name>>` o `*|FNAME|*`). Al enviar, el motor SES lo reemplaza con el primer nombre del destinatario; si no hay nombre, usa `estimado(a)`. En el editor hay una nota, un botón **Insertar {{first_name}}** y el atajo `{{fn}}` en la barra de GrapesJS; el asunto también tiene un acceso rápido.
+6. La pestaña **Remitentes** (solo admin) administra el catálogo compartido `EmailSender` (`@mali.pe`) usado por MALICHIMP y Campañas internas.
 
 ## Código
 
@@ -21,7 +22,8 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 
 ## UI
 
-| `/admin/newsletters` | Editor |
+| `/admin/newsletters` | Boletines + Remitentes |
+| `/admin/newsletters?tab=remitentes` | Catálogo `EmailSender` (admin) |
 | `/n/:slug` | Vista pública |
 
 ## API
@@ -46,8 +48,18 @@ Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
 ## Conexiones externas
 
 | **MALICHIMP** | Audiencia y campañas de correo masivo |
-| **Comunicación Interna** | Audiencia activa de Google Workspace |
+| **Usuarios Workspace → Campañas internas** | Audiencia activa por OU de Google Workspace |
 | Públicos | HTML del boletín |
+
+## Remitentes
+
+Pestaña en Boletines (admin):
+
+- Solo acepta direcciones `@mali.pe`.
+- Listado disponible para operadores autenticados al armar campañas; CRUD solo admin.
+- No se puede eliminar el último remitente.
+- Crear o editar no verifica identidades en AWS SES: el dominio/dirección deben estar autorizados en SES.
+- Borrar un remitente no altera campañas ya creadas.
 
 ## Variables de entorno
 
@@ -60,4 +72,5 @@ Módulo: `newsletters`
 ## Relacionados
 
 - [malichimp.md](./malichimp.md)
+- [google-admin.md](./google-admin.md) — Campañas internas
 - [crm-pam.md](./crm-pam.md) — SMTP PAM, no SES

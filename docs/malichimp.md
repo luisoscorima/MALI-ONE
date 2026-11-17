@@ -33,7 +33,7 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 2. Debe seleccionar una o más opciones de grupo para **incluir** (desplegable multi-select). **Excluir** es un segundo desplegable opcional; la exclusión siempre prevalece. Cada correo se deduplica. No existe un envío accidental a “todos”.
 3. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar.
 4. El camino feliz usa un **boletín publicado**. Si no hay publicados, se puede crear un borrador en Boletines. El asunto se propone desde el boletín; el nombre interno del envío es opcional (fallback al título o `Envío {fecha}`).
-5. El remitente se prellena desde el catálogo de la pestaña **Remitentes**; el reply-to vive en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
+5. El remitente se prellena desde el catálogo administrado en **Boletines → Remitentes**; el reply-to vive en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
 6. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita antes de crear. Una fecha programada vencida se rechaza.
 7. Al confirmar se congelan asunto, HTML, remitente, inclusiones, exclusiones y destinatarios. Editar después el boletín o los grupos no altera la campaña.
 8. Desde la tabla se puede previsualizar el snapshot y abrirlo en el navegador. En borradores (duplicados), la vista muestra la versión actual del boletín asociado hasta confirmar.
@@ -42,7 +42,7 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 11. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
 12. El footer enlaza a `/mail/unsubscribe/{token}`. El GET pide confirmación y el POST aplica la baja solo en MALICHIMP.
 
-El mismo dispatcher ya atiende Comunicación Interna y queda disponible para otros módulos. Los consumidores crean campañas con snapshots; nunca entregan al motor una consulta a sus tablas de contactos.
+El mismo dispatcher ya atiende Campañas internas (Usuarios Workspace) y queda disponible para otros módulos. Los consumidores crean campañas con snapshots; nunca entregan al motor una consulta a sus tablas de contactos.
 
 ## Importación
 
@@ -95,14 +95,7 @@ Para escribir en PostgreSQL se debe agregar explícitamente `--apply`. El direct
 
 ## Remitentes
 
-La pestaña **Remitentes** (solo admin) administra el catálogo `EmailSender`:
-
-- Solo acepta direcciones `@mali.pe`.
-- La migración inicial inserta `boletines@mali.pe` si no existe.
-- No se puede eliminar el último remitente del catálogo.
-- Crear o editar una dirección no verifica identidades en AWS SES: el dominio o la dirección deben estar autorizados en SES antes de usarla.
-- Borrar un remitente no altera campañas ya creadas (el `fromEmail` quedó congelado en el snapshot), pero sí lo quita del selector de campañas nuevas.
-- `replyTo` de cada campaña también debe ser `@mali.pe` (puede diferir del remitente elegido).
+El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [newsletters.md](./newsletters.md)). MALICHIMP solo lo consume al crear campañas.
 
 ## API y UI
 
@@ -122,10 +115,8 @@ La pestaña **Remitentes** (solo admin) administra el catálogo `EmailSender`:
 - `POST /api/malichimp/campaigns` — administrador; admite `draftNewsletterId` si el contenido es un borrador creado aquí
 - `POST /api/malichimp/campaigns/{id}/duplicate` — administrador
 - `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador duplicado, administrador
-- `GET /api/email-delivery/senders` — administrador
-- `POST /api/email-delivery/senders` — administrador
-- `PATCH /api/email-delivery/senders/{id}` — administrador
-- `DELETE /api/email-delivery/senders/{id}` — administrador
+- `GET /api/email-delivery/senders` — autenticado (selector de campañas)
+- `POST|PATCH|DELETE /api/email-delivery/senders…` — administrador (UI en Boletines)
 - `POST /api/malichimp/imports/xlsx/preview` — administrador, multipart `file` + `groupOptionIds` + `consentConfirmed`
 - `POST /api/malichimp/imports/xlsx/{previewId}/apply` — administrador
 - `POST /api/malichimp/imports/preview` — administrador, multipart `file` (ZIP)
@@ -162,7 +153,7 @@ SES_SEND_RATE_PER_SECOND=8
 
 `SES_FROM_EMAIL` es únicamente el fallback del transporte para módulos que no
 definen remitente. Los remitentes seleccionables viven en `EmailSender` y se
-administran desde MALICHIMP. El CRUD no verifica identidades en AWS: antes de
+administran en Boletines. El CRUD no verifica identidades en AWS: antes de
 usar una dirección, el dominio o la dirección debe estar autorizado en SES.
 
 El conjunto publica eventos en EventBridge y la cola SQS. El consumidor guarda

@@ -30,7 +30,6 @@ export type AppModule =
   | 'mailing'
   | 'newsletters'
   | 'malichimp'
-  | 'internal_communications'
   | 'landings'
   | 'crm_pam'
   | 'crm_educacion'
@@ -324,6 +323,9 @@ export interface InternalAudienceMemberDto {
 
 export interface InternalAudienceDto {
   members: InternalAudienceMemberDto[];
+  orgUnits: string[];
+  orgUnitPaths: string[];
+  excludeOrgUnitPaths: string[];
   activeDays: number;
   generatedAt: string;
   source: 'google_workspace_last_login';
@@ -361,7 +363,11 @@ export interface CreateInternalCampaignDto {
   name: string;
   newsletterId: string;
   replyTo: string;
-  recipients: string[];
+  fromEmail: string;
+  fromName?: string;
+  orgUnitPaths: string[];
+  excludeOrgUnitPaths?: string[];
+  activeDays?: number;
 }
 
 export * from './treasury';

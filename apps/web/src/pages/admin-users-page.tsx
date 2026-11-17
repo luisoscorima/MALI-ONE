@@ -8,10 +8,14 @@ import {
   LogOut,
   Pencil,
   RefreshCw,
+  Send,
+  Users,
   X,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { GoogleAdminIcon, IconActionButton } from '@/components/icon-action-button';
+import { WorkspaceInternalCampaigns } from '@/components/workspace-internal-campaigns';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format-bytes';
 import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
@@ -41,6 +45,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui';
 
 const WORKSPACE_DOMAIN = 'mali.pe';
@@ -67,6 +75,9 @@ function toWorkspaceUsername(email: string) {
 export function AdminUsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab =
+    searchParams.get('tab') === 'campanas' ? 'campanas' : 'directorio';
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -426,10 +437,10 @@ export function AdminUsersPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Usuarios Workspace"
-        description="Gestión manual vía Google Admin SDK"
+        description="Directorio Google Workspace y campañas internas por unidad organizativa."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {googleAdminHealth === 'loading' ? (
@@ -443,18 +454,45 @@ export function AdminUsersPage() {
                 Google Admin sin conexión
               </Badge>
             )}
-            <Button
-              onClick={() => {
-                setEditingUser(null);
-                setShowCreate((v) => !v);
-              }}
-            >
-              {showCreate ? 'Cancelar' : 'Crear usuario'}
-            </Button>
+            {tab === 'directorio' ? (
+              <Button
+                onClick={() => {
+                  setEditingUser(null);
+                  setShowCreate((v) => !v);
+                }}
+              >
+                {showCreate ? 'Cancelar' : 'Crear usuario'}
+              </Button>
+            ) : null}
           </div>
         }
       />
 
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams);
+          if (value === 'campanas') next.set('tab', 'campanas');
+          else next.delete('tab');
+          setSearchParams(next, { replace: true });
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="directorio">
+            <Users className="size-4" aria-hidden />
+            Directorio
+          </TabsTrigger>
+          <TabsTrigger value="campanas">
+            <Send className="size-4" aria-hidden />
+            Campañas internas
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="campanas" className="mt-6">
+          <WorkspaceInternalCampaigns />
+        </TabsContent>
+
+        <TabsContent value="directorio" className="mt-6 space-y-6">
       {error && (
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
@@ -949,6 +987,8 @@ export function AdminUsersPage() {
           </div>
         )}
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

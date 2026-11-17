@@ -25,7 +25,6 @@ type SimulatorScenario = keyof typeof SIMULATOR_ADDRESSES;
 
 /** Administrative diagnostics for the shared transport, independent of CRM modules. */
 @Controller('email-delivery')
-@Roles(UserRole.admin)
 export class EmailDeliveryController {
   constructor(
     private readonly delivery: EmailDeliveryService,
@@ -34,6 +33,7 @@ export class EmailDeliveryController {
   ) {}
 
   @Get('status')
+  @Roles(UserRole.admin)
   status() {
     return {
       delivery: this.delivery.status,
@@ -41,27 +41,32 @@ export class EmailDeliveryController {
     };
   }
 
+  /** Readable by any authenticated campaign operator; mutations stay admin-only. */
   @Get('senders')
   listSenders() {
     return this.senders.list();
   }
 
   @Post('senders')
+  @Roles(UserRole.admin)
   createSender(@Body() body: SaveEmailSenderDto) {
     return this.senders.create(body.email);
   }
 
   @Patch('senders/:id')
+  @Roles(UserRole.admin)
   updateSender(@Param('id') id: string, @Body() body: SaveEmailSenderDto) {
     return this.senders.update(id, body.email);
   }
 
   @Delete('senders/:id')
+  @Roles(UserRole.admin)
   removeSender(@Param('id') id: string) {
     return this.senders.remove(id);
   }
 
   @Post('simulator/:scenario')
+  @Roles(UserRole.admin)
   async simulator(@Param('scenario') scenario: string) {
     if (!(scenario in SIMULATOR_ADDRESSES)) {
       throw new BadRequestException(

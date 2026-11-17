@@ -7,7 +7,6 @@ import {
   FileArchive,
   FileSpreadsheet,
   Loader2,
-  Mail,
   Search,
   Send,
   Upload,
@@ -31,7 +30,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import { MalichimpCampaigns } from '@/components/malichimp-campaigns';
-import { MalichimpSenders } from '@/components/malichimp-senders';
 import {
   Badge,
   Button,
@@ -195,7 +193,7 @@ export function MalichimpPage() {
       api.getMalichimpStats(),
       api.listMalichimpGroups(),
       api.listMalichimpTags(),
-      isAdmin ? api.listEmailSenders() : Promise.resolve([]),
+      api.listEmailSenders().catch(() => [] as EmailSenderDto[]),
       loadContacts(),
     ])
       .then(([nextStats, nextGroups, nextTags, nextSenders]) => {
@@ -410,7 +408,6 @@ export function MalichimpPage() {
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
-          {isAdmin ? <TabsTrigger value="senders"><Mail aria-hidden="true" /> Remitentes</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="audience">
@@ -551,12 +548,6 @@ export function MalichimpPage() {
             isAdmin={isAdmin}
           />
         </TabsContent>
-
-        {isAdmin ? (
-          <TabsContent value="senders">
-            <MalichimpSenders senders={senders} onChange={setSenders} />
-          </TabsContent>
-        ) : null}
       </Tabs>
 
       <Dialog

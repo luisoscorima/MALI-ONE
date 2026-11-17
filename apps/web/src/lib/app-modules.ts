@@ -13,7 +13,8 @@ export const APP_MODULES: {
   {
     id: 'workspace_users',
     label: 'Usuarios Workspace',
-    description: 'Gestión de cuentas Google Workspace.',
+    description:
+      'Directorio Google Workspace y campañas internas por unidad organizativa.',
   },
   {
     id: 's3_manager',
@@ -59,17 +60,12 @@ export const APP_MODULES: {
     id: 'newsletters',
     label: 'Boletines',
     description:
-      'Editor visual drag & drop de boletines con URL pública compartible.',
+      'Editor visual de boletines, URL pública y catálogo de remitentes @mali.pe.',
   },
   {
     id: 'malichimp',
     label: 'MALICHIMP',
     description: 'Contactos, segmentos y supresiones para boletines.',
-  },
-  {
-    id: 'internal_communications',
-    label: 'Comunicación Interna',
-    description: 'Envíos internos a cuentas activas de Google Workspace con estadísticas.',
   },
   {
     id: 'landings',

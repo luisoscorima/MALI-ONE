@@ -1598,6 +1598,16 @@ export const api = {
       `/api/internal-communications/audience?activeDays=${activeDays}`,
     ),
 
+  previewInternalAudience: (body: {
+    activeDays?: number;
+    orgUnitPaths?: string[];
+    excludeOrgUnitPaths?: string[];
+  }) =>
+    request<import('@mali-one/shared').InternalAudienceDto>(
+      '/api/internal-communications/audience/preview',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   listInternalNewsletters: () =>
     request<import('@mali-one/shared').NewsletterDto[]>(
       '/api/internal-communications/newsletters',

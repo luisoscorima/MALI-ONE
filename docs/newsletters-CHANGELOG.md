@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Pestaña **Remitentes** en Boletines (catálogo `EmailSender`); sale de MALICHIMP.
 - UI del editor: nota + botón **Insertar {{first_name}}** (y atajo `{{fn}}` en GrapesJS / asunto) para la variable de nombre.
 - Placeholders de nombre en boletines/campañas: `{{first_name}}` (y compatibles `<<First Name>>` / `*|FNAME|*`) se resuelven al enviar; fallback `estimado(a)`.
 - Scrub de plantillas Mailchimp: “Ver este correo en el navegador” en todas (`/n/{slug}`); se eliminan preferencias/baja y badge “Powered by Mailchimp” (la baja la inyecta MALICHIMP al enviar); íconos sociales pasan a `/newsletter-brands/social/…`. Script: `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links`.

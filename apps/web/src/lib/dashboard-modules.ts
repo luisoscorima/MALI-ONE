@@ -18,7 +18,6 @@ import {
   Contact,
   FolderOpen,
   Database,
-  Send,
 } from 'lucide-react';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
@@ -123,12 +122,6 @@ export const moduleMeta: Record<
     icon: Database,
     group: 'crms',
     accent: 'emerald',
-  },
-  internal_communications: {
-    to: '/admin/comunicacion-interna',
-    icon: Send,
-    group: 'crms',
-    accent: 'cyan',
   },
   crm_pam: {
     to: '/admin/crm-pam',

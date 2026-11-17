@@ -42,7 +42,7 @@ function sortSenders(senders: EmailSenderDto[]) {
   return [...senders].sort((left, right) => left.email.localeCompare(right.email, 'es-PE'));
 }
 
-export function MalichimpSenders({ senders, onChange }: Props) {
+export function EmailSendersPanel({ senders, onChange }: Props) {
   const toast = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<EmailSenderDto | null>(null);
@@ -184,9 +184,9 @@ export function MalichimpSenders({ senders, onChange }: Props) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="malichimp-sender-email">Correo remitente</Label>
+            <Label htmlFor="email-sender-email">Correo remitente</Label>
             <Input
-              id="malichimp-sender-email"
+              id="email-sender-email"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}

@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, Mail, Newspaper, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import type { NewsletterBrand, NewsletterDto } from '@mali-one/shared';
+import type {
+  EmailSenderDto,
+  NewsletterBrand,
+  NewsletterDto,
+} from '@mali-one/shared';
 import {
   NEWSLETTER_BRANDS,
   NEWSLETTER_BRAND_LABELS,
 } from '@mali-one/shared';
+import { EmailSendersPanel } from '@/components/email-senders-panel';
 import {
   NEWSLETTER_FIRST_NAME_MERGE_TAG,
   NewsletterEditor,
@@ -13,6 +18,7 @@ import {
 } from '@/components/newsletter-editor';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
@@ -33,6 +39,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui';
 
 type EditorMode = 'closed' | 'create' | 'edit';
@@ -40,13 +50,20 @@ type EditorMode = 'closed' | 'create' | 'edit';
 export function NewslettersPage() {
   const toast = useToast();
   const confirm = useConfirm();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const editorRef = useRef<NewsletterEditorHandle>(null);
   const openedFromQueryRef = useRef<string | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const section =
+    searchParams.get('tab') === 'remitentes' && isAdmin
+      ? 'remitentes'
+      : 'boletines';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
+  const [senders, setSenders] = useState<EmailSenderDto[]>([]);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
@@ -81,13 +98,20 @@ export function NewslettersPage() {
     setLoading(true);
     setError('');
     try {
-      setNewsletters(await api.listNewsletters());
+      const [nextNewsletters, nextSenders] = await Promise.all([
+        api.listNewsletters(),
+        isAdmin
+          ? api.listEmailSenders().catch(() => [] as EmailSenderDto[])
+          : Promise.resolve([] as EmailSenderDto[]),
+      ]);
+      setNewsletters(nextNewsletters);
+      setSenders(nextSenders);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar boletines');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     void load();
@@ -241,14 +265,14 @@ export function NewslettersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Boletines"
-        description="Diseña y publica contenido reutilizable. Las audiencias y los envíos se administran desde el módulo que consume cada boletín."
+        description="Diseña y publica contenido reutilizable. El catálogo de remitentes @mali.pe vive aquí; las audiencias se administran en cada módulo de envío."
         actions={
-          mode === 'closed' ? (
+          mode === 'closed' && section === 'boletines' ? (
             <Button type="button" onClick={openCreate}>
               <Plus className="mr-1 size-4" />
               Nuevo boletín
             </Button>
-          ) : (
+          ) : mode !== 'closed' ? (
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={closeEditor}>
                 Cancelar
@@ -265,11 +289,150 @@ export function NewslettersPage() {
                     : 'Actualizar boletín'}
               </Button>
             </div>
-          )
+          ) : null
         }
       />
 
       {error ? <AlertBanner variant="error">{error}</AlertBanner> : null}
+
+      {mode === 'closed' ? (
+        <Tabs
+          value={section}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            if (value === 'remitentes') next.set('tab', 'remitentes');
+            else next.delete('tab');
+            setSearchParams(next, { replace: true });
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="boletines">
+              <Newspaper className="size-4" aria-hidden />
+              Boletines
+            </TabsTrigger>
+            {isAdmin ? (
+              <TabsTrigger value="remitentes">
+                <Mail className="size-4" aria-hidden />
+                Remitentes
+              </TabsTrigger>
+            ) : null}
+          </TabsList>
+
+          <TabsContent value="remitentes" className="mt-6">
+            <EmailSendersPanel senders={senders} onChange={setSenders} />
+          </TabsContent>
+
+          <TabsContent value="boletines" className="mt-6 space-y-6">
+            {loading ? (
+              <TableSkeleton rows={4} />
+            ) : newsletters.length === 0 ? (
+              <EmptyState
+                title="Sin boletines"
+                description="Crea el primero con el editor visual drag & drop."
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[320px] max-w-[320px]">Título</TableHead>
+                    <TableHead className="w-[200px] max-w-[200px]">Slug</TableHead>
+                    <TableHead className="w-[140px]">Marca</TableHead>
+                    <TableHead className="w-[150px]">Estado</TableHead>
+                    <TableHead className="w-[1%] whitespace-nowrap text-right">
+                      Acciones
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {newsletters.map((n) => (
+                    <TableRow key={n.id}>
+                      <TableCell className="max-w-[320px]">
+                        <div className="truncate font-medium" title={n.title}>
+                          {n.title}
+                        </div>
+                        <div
+                          className="truncate text-xs text-muted-foreground"
+                          title={n.subject}
+                        >
+                          {n.subject}
+                        </div>
+                      </TableCell>
+                      <TableCell
+                        className="max-w-[200px] truncate font-mono text-sm"
+                        title={n.slug}
+                      >
+                        {n.slug}
+                      </TableCell>
+                      <TableCell>
+                        {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            size="sm"
+                            checked={n.status === 'published'}
+                            disabled={togglingId === n.id}
+                            aria-label={
+                              n.status === 'published'
+                                ? `Despublicar ${n.title}`
+                                : `Publicar ${n.title}`
+                            }
+                            onCheckedChange={(checked) =>
+                              void togglePublish(n, checked)
+                            }
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {n.status === 'published' ? 'Publicado' : 'Borrador'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="space-x-1 text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void openEdit(n.id)}
+                          title="Editar"
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        {n.status === 'published' ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void copyUrl(n.slug)}
+                              title="Copiar URL"
+                            >
+                              <Copy className="size-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" asChild>
+                              <a
+                                href={`/n/${n.slug}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <ExternalLink className="size-4" />
+                              </a>
+                            </Button>
+                          </>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void handleDelete(n)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : null}
 
       {mode !== 'closed' ? (
         <div className="space-y-4 rounded-lg border border-border/60 p-4">
@@ -402,111 +565,6 @@ export function NewslettersPage() {
             slug={slug}
           />
         </div>
-      ) : null}
-
-      {mode === 'closed' && loading ? (
-        <TableSkeleton rows={4} />
-      ) : mode === 'closed' && newsletters.length === 0 ? (
-        <EmptyState
-          title="Sin boletines"
-          description="Crea el primero con el editor visual drag & drop."
-        />
-      ) : mode === 'closed' && newsletters.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[320px] max-w-[320px]">Título</TableHead>
-              <TableHead className="w-[200px] max-w-[200px]">Slug</TableHead>
-              <TableHead className="w-[140px]">Marca</TableHead>
-              <TableHead className="w-[150px]">Estado</TableHead>
-              <TableHead className="w-[1%] whitespace-nowrap text-right">
-                Acciones
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {newsletters.map((n) => (
-              <TableRow key={n.id}>
-                <TableCell className="max-w-[320px]">
-                  <div className="truncate font-medium" title={n.title}>
-                    {n.title}
-                  </div>
-                  <div
-                    className="truncate text-xs text-muted-foreground"
-                    title={n.subject}
-                  >
-                    {n.subject}
-                  </div>
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate font-mono text-sm" title={n.slug}>
-                  {n.slug}
-                </TableCell>
-                <TableCell>
-                  {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      size="sm"
-                      checked={n.status === 'published'}
-                      disabled={togglingId === n.id}
-                      aria-label={
-                        n.status === 'published'
-                          ? `Despublicar ${n.title}`
-                          : `Publicar ${n.title}`
-                      }
-                      onCheckedChange={(checked) =>
-                        void togglePublish(n, checked)
-                      }
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {n.status === 'published' ? 'Publicado' : 'Borrador'}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="space-x-1 text-right">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void openEdit(n.id)}
-                    title="Editar"
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  {n.status === 'published' ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void copyUrl(n.slug)}
-                        title="Copiar URL"
-                      >
-                        <Copy className="size-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" asChild>
-                        <a
-                          href={`/n/${n.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <ExternalLink className="size-4" />
-                        </a>
-                      </Button>
-                    </>
-                  ) : null}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void handleDelete(n)}
-                    title="Eliminar"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
       ) : null}
     </div>
   );

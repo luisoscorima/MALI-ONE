@@ -4,7 +4,9 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- _(vacío — registrar aquí cada cambio evolutivo)_
+- Campañas internas (antes Comunicación interna) viven en `/admin/users?tab=campanas`; permiso absorbido en `workspace_users`.
+- Audiencia por OU (include/exclude) + activos recientes; sin tope 200; remitente desde catálogo `EmailSender`.
+- Redirect legacy `/admin/comunicacion-interna` → `?tab=campanas`.
 
 ## [2026-11-05] — baseline documental
 
