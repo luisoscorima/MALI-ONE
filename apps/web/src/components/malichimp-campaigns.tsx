@@ -189,8 +189,11 @@ function GroupOptionMultiSelect({
             <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(28rem,calc(100vw-2rem))] p-2">
-          <div className="relative mb-2">
+        <PopoverContent
+          align="start"
+          className="flex w-[min(28rem,calc(100vw-2rem))] max-h-[min(24rem,var(--radix-popover-content-available-height))] flex-col overflow-hidden p-2"
+        >
+          <div className="relative mb-2 shrink-0">
             <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" aria-hidden />
             <Input
               value={query}
@@ -200,7 +203,10 @@ function GroupOptionMultiSelect({
               aria-label={`Buscar en ${label}`}
             />
           </div>
-          <div className="max-h-64 space-y-3 overflow-y-auto">
+          <div
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain touch-pan-y"
+            onWheel={(event) => event.stopPropagation()}
+          >
             {grouped.length ? grouped.map(([groupName, groupOptions]) => (
               <div key={groupName} className="space-y-1">
                 <p className="sticky top-0 z-10 bg-popover px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -321,8 +327,11 @@ function NewsletterSearchSelect({
             <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[min(28rem,calc(100vw-2rem))] p-2">
-          <div className="relative mb-2">
+        <PopoverContent
+          align="start"
+          className="flex w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] max-h-80 flex-col gap-2 overflow-hidden p-2"
+        >
+          <div className="relative shrink-0">
             <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" aria-hidden />
             <Input
               value={query}
@@ -332,14 +341,17 @@ function NewsletterSearchSelect({
               aria-label={`Buscar ${label}`}
             />
           </div>
-          <div className="max-h-64 space-y-1 overflow-y-auto">
+          <div
+            className="min-h-0 max-h-64 flex-1 space-y-1 overflow-x-hidden overflow-y-auto overscroll-contain touch-pan-y"
+            onWheel={(event) => event.stopPropagation()}
+          >
             {filtered.length ? filtered.map((newsletter) => {
               const active = newsletter.id === value;
               return (
                 <button
                   key={newsletter.id}
                   type="button"
-                  className={`flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-2 text-left text-sm hover:bg-muted/60 ${
+                  className={`flex w-full min-w-0 flex-col items-stretch gap-0.5 overflow-hidden rounded-md px-2 py-2 text-left text-sm hover:bg-muted/60 ${
                     active ? 'bg-muted' : ''
                   }`}
                   onClick={() => {
@@ -348,9 +360,9 @@ function NewsletterSearchSelect({
                     setQuery('');
                   }}
                 >
-                  <span className="font-medium">{newsletter.title}</span>
+                  <span className="block w-full truncate font-medium">{newsletter.title}</span>
                   {newsletter.subject ? (
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="block w-full truncate text-xs text-muted-foreground">
                       {newsletter.subject}
                     </span>
                   ) : null}
