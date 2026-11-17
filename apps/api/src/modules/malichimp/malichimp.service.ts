@@ -394,12 +394,17 @@ export class MalichimpService implements OnModuleInit {
 
   async previewAudience(dto: MalichimpAudienceDto) {
     const filters = await this.normalizeAudience(dto);
-    const includedWhere = this.audienceWhere(filters.groupOptionIds, []);
+    const pageSize = Math.min(Math.max(Math.floor(dto.pageSize ?? 50) || 50, 1), 100);
+    const page = Math.max(Math.floor(dto.page ?? 1) || 1, 1);
+    const offset = (page - 1) * pageSize;
+    const includedWhere = this.audienceWhere(filters.groupOptionIds, [], []);
     const where = this.audienceWhere(
       filters.groupOptionIds,
       filters.excludeGroupOptionIds,
+      filters.excludeContactIds,
+      filters.includeContactIds,
     );
-    const [subscribed, included, eligible, sample] = await Promise.all([
+    const [subscribed, included, eligible, recipients] = await Promise.all([
       this.prisma.malichimpContact.count({
         where: { status: MalichimpContactStatus.subscribed },
       }),
@@ -414,23 +419,32 @@ export class MalichimpService implements OnModuleInit {
         FROM "MalichimpContact" contact
         WHERE ${where}
         ORDER BY contact."lastName" NULLS LAST, contact."firstName" NULLS LAST, contact."email"
-        LIMIT 10
+        LIMIT ${pageSize}
+        OFFSET ${offset}
       `),
     ]);
-    const total = Number(eligible[0].count);
     const includedTotal = Number(included[0].count);
+    const eligibleTotal = Number(eligible[0].count);
+    const totalPages = Math.max(1, Math.ceil(eligibleTotal / pageSize));
+    const mapped = recipients.map((contact) => ({
+      id: contact.id,
+      email: contact.email,
+      name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
+    }));
     return {
       subscribed,
       included: includedTotal,
-      eligible: total,
-      excluded: Math.max(0, includedTotal - total),
+      eligible: eligibleTotal,
+      excluded: Math.max(0, includedTotal - eligibleTotal),
+      page,
+      pageSize,
+      totalPages,
       groupOptionIds: filters.groupOptionIds,
       excludeGroupOptionIds: filters.excludeGroupOptionIds,
-      sample: sample.map((contact) => ({
-        id: contact.id,
-        email: contact.email,
-        name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
-      })),
+      excludeContactIds: filters.excludeContactIds,
+      includeContactIds: filters.includeContactIds,
+      recipients: mapped,
+      sample: mapped,
     };
   }
 
@@ -738,6 +752,8 @@ export class MalichimpService implements OnModuleInit {
     const recipients = await this.resolveAudience(
       filters.groupOptionIds,
       filters.excludeGroupOptionIds,
+      filters.excludeContactIds,
+      filters.includeContactIds,
     );
     if (!recipients.length) {
       throw new BadRequestException('La segmentación no tiene destinatarios elegibles');
@@ -1344,7 +1360,31 @@ export class MalichimpService implements OnModuleInit {
         'Una opción de grupo no puede estar incluida y excluida a la vez',
       );
     }
-    return { groupOptionIds, excludeGroupOptionIds };
+    const excludeContactIds = [
+      ...new Set(
+        (dto.excludeContactIds ?? [])
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const includeContactIds = [
+      ...new Set(
+        (dto.includeContactIds ?? [])
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (includeContactIds.length && excludeContactIds.length) {
+      throw new BadRequestException(
+        'Usa solo exclusiones o solo inclusiones de contactos, no ambas',
+      );
+    }
+    return {
+      groupOptionIds,
+      excludeGroupOptionIds,
+      excludeContactIds,
+      includeContactIds,
+    };
   }
 
   private async validateGroupOptionIds(groupOptionIds: string[], required = true) {
@@ -1374,6 +1414,8 @@ export class MalichimpService implements OnModuleInit {
   private audienceWhere(
     groupOptionIds: string[],
     excludeGroupOptionIds: string[],
+    excludeContactIds: string[] = [],
+    includeContactIds: string[] = [],
   ): Prisma.Sql {
     const exclusion = excludeGroupOptionIds.length
       ? Prisma.sql`
@@ -1383,6 +1425,16 @@ export class MalichimpService implements OnModuleInit {
           WHERE excluded_membership."contactId" = contact."id"
             AND excluded_membership."optionId" IN (${Prisma.join(excludeGroupOptionIds)})
         )
+      `
+      : Prisma.sql``;
+    const contactExclusion = excludeContactIds.length
+      ? Prisma.sql`
+        AND contact."id" NOT IN (${Prisma.join(excludeContactIds)})
+      `
+      : Prisma.sql``;
+    const contactInclusion = includeContactIds.length
+      ? Prisma.sql`
+        AND contact."id" IN (${Prisma.join(includeContactIds)})
       `
       : Prisma.sql``;
     return Prisma.sql`
@@ -1402,11 +1454,23 @@ export class MalichimpService implements OnModuleInit {
           AND membership."optionId" IN (${Prisma.join(groupOptionIds)})
       )
       ${exclusion}
+      ${contactExclusion}
+      ${contactInclusion}
     `;
   }
 
-  private resolveAudience(groupOptionIds: string[], excludeGroupOptionIds: string[]) {
-    const where = this.audienceWhere(groupOptionIds, excludeGroupOptionIds);
+  private resolveAudience(
+    groupOptionIds: string[],
+    excludeGroupOptionIds: string[],
+    excludeContactIds: string[] = [],
+    includeContactIds: string[] = [],
+  ) {
+    const where = this.audienceWhere(
+      groupOptionIds,
+      excludeGroupOptionIds,
+      excludeContactIds,
+      includeContactIds,
+    );
     return this.prisma.$queryRaw<AudienceRecipient[]>(Prisma.sql`
       SELECT contact."id", contact."email", contact."firstName", contact."lastName"
       FROM "MalichimpContact" contact

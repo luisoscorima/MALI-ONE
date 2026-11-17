@@ -401,7 +401,7 @@ export function MalichimpPage() {
           <StatCard
             label="Opciones de grupo"
             value={stats.groupOptions}
-            hint={`${nf.format(stats.groups)} grupos · SES ${stats.delivery.configured ? 'configurado' : 'pendiente'}`}
+            hint={`${nf.format(stats.groups)} grupos`}
           />
         </div>
       ) : null}

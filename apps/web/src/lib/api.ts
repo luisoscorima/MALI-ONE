@@ -480,7 +480,7 @@ export const api = {
     ),
 
   previewMalichimpAudience: (
-    body: import('@mali-one/shared').MalichimpAudienceFilterDto,
+    body: import('@mali-one/shared').MalichimpAudiencePreviewRequestDto,
   ) => request<import('@mali-one/shared').MalichimpAudiencePreviewDto>(
     '/api/malichimp/campaigns/preview',
     { method: 'POST', body: JSON.stringify(body) },

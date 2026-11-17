@@ -208,14 +208,30 @@ export interface MalichimpXlsxImportResultDto {
 export interface MalichimpAudienceFilterDto {
   groupOptionIds: string[];
   excludeGroupOptionIds?: string[];
+  /** Contact IDs to drop one-by-one after segment filters. */
+  excludeContactIds?: string[];
+  /** Allowlist after segment filters; when set, only these contacts are kept. */
+  includeContactIds?: string[];
+}
+
+export interface MalichimpAudiencePreviewRequestDto extends MalichimpAudienceFilterDto {
+  page?: number;
+  pageSize?: number;
 }
 
 export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto {
   excludeGroupOptionIds: string[];
+  excludeContactIds: string[];
   subscribed: number;
   included: number;
   eligible: number;
   excluded: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  /** Current page of eligible contacts. */
+  recipients: Array<{ id: string; email: string; name: string | null }>;
+  /** @deprecated Prefer `recipients`; same page for older callers. */
   sample: Array<{ id: string; email: string; name: string | null }>;
 }
 

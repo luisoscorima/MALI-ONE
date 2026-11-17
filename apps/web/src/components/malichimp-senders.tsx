@@ -175,10 +175,6 @@ export function MalichimpSenders({ senders, onChange }: Props) {
         </div>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        El catálogo no verifica identidades en AWS. El dominio o la dirección también deben estar autorizados en SES.
-      </p>
-
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -5,10 +6,13 @@ import {
   IsArray,
   IsDateString,
   IsEmail,
+  IsInt,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -28,6 +32,35 @@ export class MalichimpAudienceDto {
   @IsString({ each: true })
   @MaxLength(120, { each: true })
   excludeGroupOptionIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50_000)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  excludeContactIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50_000)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  includeContactIds?: string[];
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
 }
 
 export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {

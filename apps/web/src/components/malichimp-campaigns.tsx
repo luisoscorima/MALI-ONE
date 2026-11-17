@@ -71,6 +71,7 @@ const df = new Intl.DateTimeFormat('es-PE', {
   timeStyle: 'short',
 });
 const maliPeEmailPattern = /^[^@\s]+@mali\.pe$/i;
+const RECIPIENT_PAGE_SIZE = 50;
 
 const CAMPAIGN_STEPS = [
   { id: 'to', label: 'Para', hint: 'Destinatarios' },
@@ -139,6 +140,24 @@ function GroupOptionMultiSelect({
     const haystack = `${option.groupName} ${option.label}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase());
   });
+  const grouped = useMemo(() => {
+    const map = new Map<string, FlatOption[]>();
+    for (const option of filtered) {
+      const bucket = map.get(option.groupName) ?? [];
+      bucket.push(option);
+      map.set(option.groupName, bucket);
+    }
+    return [...map.entries()];
+  }, [filtered]);
+  const selectedGrouped = useMemo(() => {
+    const map = new Map<string, FlatOption[]>();
+    for (const option of selected) {
+      const bucket = map.get(option.groupName) ?? [];
+      bucket.push(option);
+      map.set(option.groupName, bucket);
+    }
+    return [...map.entries()];
+  }, [selected]);
 
   function toggle(optionId: string, checked: boolean) {
     if (disabledIds.includes(optionId)) return;
@@ -181,52 +200,68 @@ function GroupOptionMultiSelect({
               aria-label={`Buscar en ${label}`}
             />
           </div>
-          <div className="max-h-64 space-y-1 overflow-y-auto">
-            {filtered.length ? filtered.map((option) => {
-              const blocked = disabledIds.includes(option.id);
-              const checked = selectedIds.includes(option.id);
-              const inputId = `${id}-${option.id}`;
-              return (
-                <label
-                  key={option.id}
-                  htmlFor={inputId}
-                  className={`flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted/60 ${blocked ? 'cursor-not-allowed opacity-50' : ''}`}
-                >
-                  <Checkbox
-                    id={inputId}
-                    checked={checked}
-                    disabled={blocked}
-                    onCheckedChange={(value) => toggle(option.id, value === true)}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{option.groupName} › {option.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {nf.format(option.contacts)} elegible{option.contacts === 1 ? '' : 's'}
-                      {blocked ? ' · ya incluida' : ''}
-                    </span>
-                  </span>
-                </label>
-              );
-            }) : (
+          <div className="max-h-64 space-y-3 overflow-y-auto">
+            {grouped.length ? grouped.map(([groupName, groupOptions]) => (
+              <div key={groupName} className="space-y-1">
+                <p className="sticky top-0 z-10 bg-popover px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {groupName}
+                </p>
+                {groupOptions.map((option) => {
+                  const blocked = disabledIds.includes(option.id);
+                  const checked = selectedIds.includes(option.id);
+                  const inputId = `${id}-${option.id}`;
+                  return (
+                    <label
+                      key={option.id}
+                      htmlFor={inputId}
+                      className={`flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted/60 ${blocked ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <Checkbox
+                        id={inputId}
+                        checked={checked}
+                        disabled={blocked}
+                        onCheckedChange={(value) => toggle(option.id, value === true)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{option.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {nf.format(option.contacts)} elegible{option.contacts === 1 ? '' : 's'}
+                          {blocked ? ' · ya incluida' : ''}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )) : (
               <p className="px-2 py-6 text-center text-sm text-muted-foreground">Sin coincidencias</p>
             )}
           </div>
         </PopoverContent>
       </Popover>
-      {selected.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {selected.map((option) => (
-            <Badge key={option.id} variant="secondary" className="gap-1 pr-1">
-              <span className="max-w-[14rem] truncate">{option.groupName} › {option.label}</span>
-              <button
-                type="button"
-                className="rounded-sm p-0.5 hover:bg-muted"
-                aria-label={`Quitar ${option.label}`}
-                onClick={() => toggle(option.id, false)}
-              >
-                <X className="size-3.5" aria-hidden />
-              </button>
-            </Badge>
+      {selectedGrouped.length ? (
+        <div className="space-y-2">
+          {selectedGrouped.map(([groupName, groupOptions]) => (
+            <div key={groupName} className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {groupName}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {groupOptions.map((option) => (
+                  <Badge key={option.id} variant="secondary" className="gap-1 pr-1">
+                    <span className="max-w-[14rem] truncate">{option.label}</span>
+                    <button
+                      type="button"
+                      className="rounded-sm p-0.5 hover:bg-muted"
+                      aria-label={`Quitar ${option.label}`}
+                      onClick={() => toggle(option.id, false)}
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       ) : null}
@@ -261,10 +296,14 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   const [refreshingContent, setRefreshingContent] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [preview, setPreview] = useState<MalichimpAudiencePreviewDto | null>(null);
+  /** `all` = everyone selected except `manualExcludeIds`; `none` = only `manualIncludeIds`. */
+  const [recipientSelectionMode, setRecipientSelectionMode] = useState<'all' | 'none'>('all');
+  const [manualExcludeIds, setManualExcludeIds] = useState<Set<string>>(new Set());
+  const [manualIncludeIds, setManualIncludeIds] = useState<Set<string>>(new Set());
   const [name, setName] = useState('');
   const [newsletterId, setNewsletterId] = useState('');
   const [subject, setSubject] = useState('');
-  const [fromName, setFromName] = useState(delivery?.defaultFromName ?? 'MALI');
+  const [fromName, setFromName] = useState('Museo de Arte de Lima');
   const [fromEmail, setFromEmail] = useState(defaultSenderEmail);
   const [replyTo, setReplyTo] = useState(defaultSenderEmail);
   const [groupOptionIds, setGroupOptionIds] = useState<string[]>([]);
@@ -304,7 +343,12 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     || `Envío ${new Date().toLocaleString('es-PE')}`
   ).trim();
 
-  const audienceReady = Boolean(preview?.eligible);
+  const selectedCount = preview
+    ? recipientSelectionMode === 'all'
+      ? Math.max(0, preview.eligible - manualExcludeIds.size)
+      : manualIncludeIds.size
+    : 0;
+  const audienceReady = Boolean(preview && preview.eligible > 0 && selectedCount > 0);
   const senderReady = Boolean(
     fromName.trim()
       && senderEmails.includes(fromEmail)
@@ -333,7 +377,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
           ? 'Muestra los destinatarios para continuar'
           : !preview.eligible
             ? 'No hay destinatarios elegibles con estos filtros'
-            : undefined,
+            : !selectedCount
+              ? 'Selecciona al menos un destinatario'
+              : undefined,
     from: !senderEmails.length
       ? 'No hay remitentes configurados'
       : !fromName.trim()
@@ -387,7 +433,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setName('');
     setNewsletterId('');
     setSubject('');
-    setFromName(delivery?.defaultFromName ?? 'MALI');
+    setFromName('Museo de Arte de Lima');
     setFromEmail(defaultSenderEmail);
     setReplyTo(defaultSenderEmail);
     setGroupOptionIds([]);
@@ -395,20 +441,65 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setScheduleMode('now');
     setScheduledAt('');
     setPreview(null);
+    setRecipientSelectionMode('all');
+    setManualExcludeIds(new Set());
+    setManualIncludeIds(new Set());
     setFormStep('to');
   }
 
-  function goToStep(next: CampaignStepId) {
-    const nextIndex = CAMPAIGN_STEPS.findIndex((step) => step.id === next);
-    if (nextIndex < 0) return;
-    const blocked = CAMPAIGN_STEPS.slice(0, nextIndex).find((step) => !stepReady[step.id]);
-    if (blocked) {
-      setFormStep(blocked.id);
-      const reason = stepBlockReason[blocked.id];
-      if (reason) toast.error(reason);
+  function applyAudiencePreview(
+    next: MalichimpAudiencePreviewDto,
+    options?: { resetSelection?: boolean },
+  ) {
+    setPreview(next);
+    if (options?.resetSelection !== false) {
+      setRecipientSelectionMode('all');
+      setManualExcludeIds(new Set());
+      setManualIncludeIds(new Set());
+    }
+  }
+
+  function clearAudiencePreview() {
+    setPreview(null);
+    setRecipientSelectionMode('all');
+    setManualExcludeIds(new Set());
+    setManualIncludeIds(new Set());
+  }
+
+  function isRecipientSelected(id: string) {
+    return recipientSelectionMode === 'all'
+      ? !manualExcludeIds.has(id)
+      : manualIncludeIds.has(id);
+  }
+
+  function toggleRecipient(id: string) {
+    if (recipientSelectionMode === 'all') {
+      setManualExcludeIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
       return;
     }
-    setFormStep(next);
+    setManualIncludeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllRecipients() {
+    setRecipientSelectionMode('all');
+    setManualExcludeIds(new Set());
+    setManualIncludeIds(new Set());
+  }
+
+  function selectNoRecipients() {
+    setRecipientSelectionMode('none');
+    setManualExcludeIds(new Set());
+    setManualIncludeIds(new Set());
   }
 
   function goNext() {
@@ -448,12 +539,12 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   function setIncludeIds(next: string[]) {
     setGroupOptionIds(next);
     setExcludeGroupOptionIds((current) => current.filter((id) => !next.includes(id)));
-    setPreview(null);
+    clearAudiencePreview();
   }
 
   function setExcludeIds(next: string[]) {
     setExcludeGroupOptionIds(next.filter((id) => !groupOptionIds.includes(id)));
-    setPreview(null);
+    clearAudiencePreview();
   }
 
   async function createNewNewsletterDraft() {
@@ -505,12 +596,14 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setOpen(true);
     setPreviewBusy(true);
     try {
-      setPreview(await api.previewMalichimpAudience({
+      applyAudiencePreview(await api.previewMalichimpAudience({
         groupOptionIds: detail.groupOptionIds,
         excludeGroupOptionIds: detail.excludeGroupOptionIds,
+        page: 1,
+        pageSize: RECIPIENT_PAGE_SIZE,
       }));
     } catch (reason) {
-      setPreview(null);
+      clearAudiencePreview();
       toast.error(reason instanceof Error ? reason.message : 'No se pudo recalcular la audiencia');
     } finally {
       setPreviewBusy(false);
@@ -572,16 +665,22 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
-  async function calculateAudience() {
+  async function loadAudiencePage(page: number, options?: { resetSelection?: boolean; notify?: boolean }) {
     if (!groupOptionIds.length) {
       toast.error('Selecciona al menos una opción para incluir');
       return;
     }
     setPreviewBusy(true);
     try {
-      const next = await api.previewMalichimpAudience(filters);
-      setPreview(next);
-      toast.success(`${nf.format(next.eligible)} destinatarios`);
+      const next = await api.previewMalichimpAudience({
+        ...filters,
+        page,
+        pageSize: RECIPIENT_PAGE_SIZE,
+      });
+      applyAudiencePreview(next, { resetSelection: options?.resetSelection });
+      if (options?.notify !== false) {
+        toast.success(`${nf.format(next.eligible)} destinatarios`);
+      }
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo calcular la audiencia');
     } finally {
@@ -589,14 +688,29 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
+  async function calculateAudience() {
+    await loadAudiencePage(1, { resetSelection: true, notify: true });
+  }
+
   async function submitCampaign() {
-    if (!campaignReady || !preview) return;
+    if (!campaignReady || !preview || !selectedCount) return;
+    const excludeContactIds = recipientSelectionMode === 'all'
+      ? [...manualExcludeIds]
+      : [];
+    const includeContactIds = recipientSelectionMode === 'none'
+      ? [...manualIncludeIds]
+      : [];
     const when = scheduleMode === 'scheduled' && scheduledAt
       ? `programada para ${df.format(new Date(limaDateTimeToIso(scheduledAt)))}`
       : 'envío inmediato';
+    const manualNote = recipientSelectionMode === 'all' && excludeContactIds.length
+      ? ` · ${nf.format(excludeContactIds.length)} excluido(s) a mano`
+      : recipientSelectionMode === 'none'
+        ? ` · selección manual de ${nf.format(includeContactIds.length)}`
+        : '';
     const ok = await confirm({
       title: scheduleMode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
-      description: `Se creará la campaña (${when}) hacia ${nf.format(preview.eligible)} destinatarios elegibles.`,
+      description: `Se creará la campaña (${when}) hacia ${nf.format(selectedCount)} destinatarios${manualNote}.`,
       confirmLabel: scheduleMode === 'scheduled' ? 'Programar' : 'Enviar',
     });
     if (!ok) return;
@@ -614,6 +728,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
         fromEmail,
         replyTo: replyTo.trim(),
         ...filters,
+        ...(excludeContactIds.length ? { excludeContactIds } : {}),
+        ...(includeContactIds.length ? { includeContactIds } : {}),
         ...(scheduleMode === 'scheduled' && scheduledAt
           ? { scheduledAt: limaDateTimeToIso(scheduledAt) }
           : {}),
@@ -645,7 +761,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
         <div>
           <h2 className="text-base font-semibold">Campañas de correo</h2>
           <p className="text-sm text-muted-foreground">
-            Cada envío congela el boletín y su audiencia; nunca consulta los CRM de WhatsApp.
+            Cada envío congela el boletín y su audiencia.
           </p>
         </div>
         <div className="flex gap-2">
@@ -825,35 +941,6 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
             <DialogDescription>
               Paso {stepIndex + 1} de {CAMPAIGN_STEPS.length}: {CAMPAIGN_STEPS[stepIndex]?.hint}
             </DialogDescription>
-            <nav aria-label="Pasos de la campaña" className="pt-3">
-              <ol className="grid grid-cols-4 gap-1">
-                {CAMPAIGN_STEPS.map((step, index) => {
-                  const active = step.id === formStep;
-                  const done = stepReady[step.id] && index < stepIndex;
-                  return (
-                    <li key={step.id}>
-                      <button
-                        type="button"
-                        onClick={() => goToStep(step.id)}
-                        className={`flex w-full flex-col items-start gap-1 rounded-md px-1.5 py-1.5 text-left transition-colors ${
-                          active
-                            ? 'bg-foreground text-background'
-                            : done
-                              ? 'bg-muted text-foreground hover:bg-muted/80'
-                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                        }`}
-                        aria-current={active ? 'step' : undefined}
-                      >
-                        <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
-                          {index + 1}
-                        </span>
-                        <span className="truncate text-xs font-medium sm:text-sm">{step.label}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-            </nav>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
@@ -867,17 +954,15 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                 </div>
                 <GroupOptionMultiSelect
                   id="malichimp-include"
-                  label="Opciones a incluir"
-                  hint="Contactos en cualquiera de estas opciones (unión), suscritos y elegibles."
+                  label="Contactos a incluir"
                   options={flatOptions}
                   selectedIds={groupOptionIds}
                   onChange={setIncludeIds}
-                  placeholder="Seleccionar opciones para incluir"
+                  placeholder="Seleccionar contactos a incluir"
                 />
                 <GroupOptionMultiSelect
                   id="malichimp-exclude"
-                  label="Opciones a excluir (opcional)"
-                  hint="Si coinciden con una inclusión, la exclusión prevalece."
+                  label="Contactos a excluir"
                   options={flatOptions}
                   selectedIds={excludeGroupOptionIds}
                   disabledIds={groupOptionIds}
@@ -902,42 +987,93 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     </Button>
                     {preview ? (
                       <span className="text-sm text-muted-foreground">
-                        {nf.format(preview.eligible)} destinatarios
-                        {preview.excluded ? ` · ${nf.format(preview.excluded)} excluidos` : ''}
+                        {nf.format(preview.eligible)} contactos
+                        {preview.excluded ? ` · ${nf.format(preview.excluded)} excluidos por grupo` : ''}
                       </span>
                     ) : null}
                   </div>
-                  {preview ? (
-                    <div className="max-h-56 overflow-auto rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Nombre</TableHead>
-                            <TableHead>Email</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {preview.sample.map((row) => (
-                            <TableRow key={row.id}>
-                              <TableCell>{row.name || '—'}</TableCell>
-                              <TableCell>{row.email}</TableCell>
-                            </TableRow>
-                          ))}
-                          {!preview.sample.length ? (
-                            <TableRow>
-                              <TableCell colSpan={2} className="text-muted-foreground">
-                                Sin muestra disponible
-                              </TableCell>
-                            </TableRow>
-                          ) : null}
-                        </TableBody>
-                      </Table>
-                      {preview.eligible > preview.sample.length ? (
-                        <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-                          Mostrando {preview.sample.length} de {nf.format(preview.eligible)}
-                        </p>
+                  {preview && preview.eligible > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-muted-foreground">
+                          {nf.format(selectedCount)} / {nf.format(preview.eligible)} seleccionados
+                        </span>
+                        <div className="flex gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={selectAllRecipients}>
+                            Marcar todos
+                          </Button>
+                          <Button type="button" size="sm" variant="outline" onClick={selectNoRecipients}>
+                            Ninguno
+                          </Button>
+                        </div>
+                      </div>
+                      <ul className="max-h-72 divide-y overflow-y-auto rounded-md border text-sm">
+                        {preview.recipients.map((row) => {
+                          const checked = isRecipientSelected(row.id);
+                          const inputId = `malichimp-recipient-${row.id}`;
+                          return (
+                            <li key={row.id} className="flex items-start gap-3 px-3 py-2">
+                              <Checkbox
+                                id={inputId}
+                                checked={checked}
+                                className="mt-0.5"
+                                onCheckedChange={() => toggleRecipient(row.id)}
+                              />
+                              <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer">
+                                <span className="block font-medium">{row.name || '—'}</span>
+                                <span className="block font-mono text-xs text-muted-foreground">
+                                  {row.email}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                        {!preview.recipients.length ? (
+                          <li className="px-3 py-6 text-center text-muted-foreground">
+                            Sin contactos en esta página
+                          </li>
+                        ) : null}
+                      </ul>
+                      {preview.totalPages > 1 ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span className="text-muted-foreground">
+                            Página {preview.page} de {preview.totalPages}
+                          </span>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={previewBusy || preview.page <= 1}
+                              onClick={() => void loadAudiencePage(preview.page - 1, {
+                                resetSelection: false,
+                                notify: false,
+                              })}
+                            >
+                              <ChevronLeft className="size-4" aria-hidden />
+                              Anterior
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={previewBusy || preview.page >= preview.totalPages}
+                              onClick={() => void loadAudiencePage(preview.page + 1, {
+                                resetSelection: false,
+                                notify: false,
+                              })}
+                            >
+                              Siguiente
+                              <ChevronRight className="size-4" aria-hidden />
+                            </Button>
+                          </div>
+                        </div>
                       ) : null}
                     </div>
+                  ) : preview ? (
+                    <p className="text-sm text-muted-foreground">
+                      No hay destinatarios con los filtros actuales.
+                    </p>
                   ) : null}
                 </div>
               </div>
@@ -971,7 +1107,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       id="malichimp-from-name"
                       value={fromName}
                       onChange={(event) => setFromName(event.target.value)}
-                      placeholder="Museo de Arte de Lima - MALI"
+                      placeholder="Museo de Arte de Lima"
                       maxLength={160}
                     />
                   </div>
@@ -1067,7 +1203,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       ) : (
                         <Plus className="size-4" aria-hidden />
                       )}
-                      {creatingNewsletter ? 'Creando…' : 'Crear borrador en Boletines'}
+                      {creatingNewsletter ? 'Creando…' : 'Crear boletín nuevo'}
                     </Button>
                   </div>
                 )}
@@ -1105,23 +1241,53 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     Revisa el resumen y envía ahora o programa para más tarde.
                   </p>
                 </div>
-                <div className="space-y-2 rounded-md border px-3 py-3 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Para:</span>{' '}
-                    {preview ? `${nf.format(preview.eligible)} destinatarios` : '—'}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">De:</span>{' '}
-                    {fromName.trim() || '—'} &lt;{fromEmail || '—'}&gt;
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Asunto:</span>{' '}
-                    {subject.trim() || '—'}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Contenido:</span>{' '}
-                    {selectedNewsletter?.title || '—'}
-                  </p>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11.5rem]">
+                  <div className="space-y-2 rounded-md border px-3 py-3 text-sm">
+                    <p>
+                      <span className="text-muted-foreground">Para:</span>{' '}
+                      {preview
+                        ? `${nf.format(selectedCount)} destinatarios`
+                        : '—'}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">De:</span>{' '}
+                      {fromName.trim() || '—'} &lt;{fromEmail || '—'}&gt;
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Asunto:</span>{' '}
+                      {subject.trim() || '—'}
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Contenido:</span>{' '}
+                      {selectedNewsletter?.title || '—'}
+                    </p>
+                  </div>
+                  <div className="overflow-hidden rounded-md border bg-white">
+                    <p className="border-b px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
+                      Vista previa
+                    </p>
+                    <div className="relative h-48 overflow-hidden bg-white">
+                      {selectedNewsletter?.htmlBody ? (
+                        <iframe
+                          title={`Vista previa de ${selectedNewsletter.title}`}
+                          srcDoc={selectedNewsletter.htmlBody}
+                          sandbox=""
+                          referrerPolicy="no-referrer"
+                          tabIndex={-1}
+                          className="pointer-events-none absolute left-0 top-0 origin-top-left border-0"
+                          style={{
+                            width: 640,
+                            height: 900,
+                            transform: 'scale(0.275)',
+                          }}
+                        />
+                      ) : (
+                        <p className="flex h-full items-center justify-center px-3 text-center text-xs text-muted-foreground">
+                          Sin contenido para previsualizar
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm">
                   <label className="flex items-center gap-2">

@@ -125,6 +125,7 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     assert.equal(preview.included, 2);
     assert.equal(preview.excluded, 1);
     assert.equal(preview.eligible, 1);
+    assert.equal(preview.recipients[0]?.email, emails[0]);
     assert.equal(preview.sample[0]?.email, emails[0]);
 
     const created = await service.createCampaign(user.id, {
