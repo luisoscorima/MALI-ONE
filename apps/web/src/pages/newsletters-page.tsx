@@ -343,8 +343,9 @@ export function NewslettersPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            En el panel izquierdo usa la categoría <strong>MALI</strong>: Texto |
-            Imagen, Imagen | Texto, bloque de color, barra CTA
+            En el panel izquierdo usa la categoría <strong>MALI</strong>:
+            cabecera, columnas, color por marca (Museo / Cursos / Extensión),
+            CTA entradas u outline, redes y pie
             {brand
               ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
               : '.'}{' '}

@@ -90,6 +90,15 @@ export class MalichimpController {
       );
   }
 
+  @Get('campaigns/:id/stats')
+  campaignStats(@Param('id') id: string, @Query('days') days?: string) {
+    const parsedDays = days ? Number(days) : 30;
+    return this.malichimp.getCampaignStats(
+      id,
+      Number.isFinite(parsedDays) ? parsedDays : 30,
+    );
+  }
+
   @Get('campaigns/:id')
   campaign(@Param('id') id: string) {
     return this.malichimp.getCampaign(id);

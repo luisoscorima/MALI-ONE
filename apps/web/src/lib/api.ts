@@ -468,6 +468,11 @@ export const api = {
       `/api/malichimp/campaigns/${encodeURIComponent(id)}`,
     ),
 
+  getMalichimpCampaignStats: (id: string, days = 30) =>
+    request<import('@mali-one/shared').MalichimpCampaignStatsDto>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}/stats?days=${encodeURIComponent(String(days))}`,
+    ),
+
   duplicateMalichimpCampaign: (id: string) =>
     request<import('@mali-one/shared').MalichimpCampaignDetailDto>(
       `/api/malichimp/campaigns/${encodeURIComponent(id)}/duplicate`,

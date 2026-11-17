@@ -276,6 +276,28 @@ export interface MalichimpCampaignDetailDto {
   createdAt: string;
 }
 
+/** Lifetime totals + daily open/click series for a MALICHIMP campaign. */
+export interface MalichimpCampaignStatsDto {
+  campaignId: string;
+  name: string;
+  status: EmailCampaignStatus;
+  totalRecipients: number;
+  sent: number;
+  failed: number;
+  suppressed: number;
+  delivered: number;
+  bounced: number;
+  complaints: number;
+  opened: number;
+  clicked: number;
+  /** Unique opens / delivered (0–1). */
+  openRate: number;
+  /** Unique clicks / delivered (0–1). */
+  clickRate: number;
+  opensByDay: Array<{ date: string; count: number }>;
+  clicksByDay: Array<{ date: string; count: number }>;
+}
+
 export interface InternalAudienceMemberDto {
   id: string;
   email: string;

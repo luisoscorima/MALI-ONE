@@ -5,6 +5,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 ## [Unreleased]
 
 - Scrub de plantillas Mailchimp: “Ver este correo en el navegador” en todas (`/n/{slug}`); se eliminan preferencias/baja y badge “Powered by Mailchimp” (la baja la inyecta MALICHIMP al enviar); íconos sociales pasan a `/newsletter-brands/social/…`. Script: `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links`.
+- Bloques MALI alineados a sembradas: cabecera con logo, tipografía/CTA rosa en columnas, Color Museo/Cursos/Extensión, CTA Entradas + Outline, Redes sociales, pie con nav/redes/copyright.
 - Copyright unificado en español con año actual (`newsletterCopyrightLine`) en footers de marca (museo/cursos/EP) y en el scrub de sembrados.
 - Footer de marca usa íconos PNG (no letras) servidos desde el origen web.
 - Campo opcional `brand` (`museo` | `cursos_arte` | `extension_profesional`) para header/footer por marca.

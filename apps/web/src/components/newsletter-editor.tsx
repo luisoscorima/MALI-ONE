@@ -64,9 +64,12 @@ function brandAssetsFor(
   };
 }
 
-/** Accent used for CTAs in Mailchimp MALI templates. */
+/** Accents from Mailchimp MALI templates / brand chrome. */
 const MALI_PINK = '#e2187d';
 const MALI_BLACK = '#111111';
+const MALI_BLUE = '#0084ca';
+const MALI_TEAL = '#2f9e8f';
+const MALI_NAVY = '#1a3d8f';
 const IMG_SQ =
   'https://placehold.co/520x520/e8e8e8/999999?text=Imagen';
 const IMG_WIDE =
@@ -75,21 +78,29 @@ const IMG_WIDE =
 const FONT =
   "Arial, Helvetica, 'Helvetica Neue', sans-serif";
 
+function socialSrc(file: string): string {
+  return `${BRAND_LOGO_ORIGIN}/newsletter-brands/social/${file}`;
+}
+
+function socialLink(href: string, file: string, label: string): string {
+  return `<a href="${href}" target="_blank" rel="noreferrer" style="display:inline-block;margin:0 5px;text-decoration:none"><img src="${socialSrc(file)}" alt="${label}" width="28" height="28" style="display:block;width:28px;height:28px;border:0" /></a>`;
+}
+
 function textCol(title: string, body: string): string {
   return `
-<td style="width:50%;padding:12px 16px;vertical-align:top;font-family:${FONT}" width="50%">
-  <h2 style="margin:0 0 10px;color:${MALI_BLACK};font-size:18px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase">${title}</h2>
-  <div style="height:3px;width:100%;background:${MALI_BLACK};margin:0 0 14px"></div>
+<td style="width:50%;padding:14px 18px;vertical-align:top;font-family:${FONT}" width="50%">
+  <h2 style="margin:0 0 8px;color:${MALI_BLACK};font-size:17px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;line-height:1.25">${title}</h2>
+  <div style="height:2px;width:48px;background:${MALI_PINK};margin:0 0 14px"></div>
   <p style="margin:0 0 16px;color:${MALI_BLACK};font-size:14px;line-height:1.55">${body}</p>
   <p style="margin:0">
-    <a href="https://mali.pe" style="color:${MALI_PINK};font-size:13px;font-weight:700;text-decoration:underline;text-transform:uppercase;letter-spacing:0.02em">→ Conoce más aquí</a>
+    <a href="https://mali.pe" style="color:${MALI_PINK};font-size:13px;font-weight:700;text-decoration:underline;text-transform:uppercase;letter-spacing:0.03em">→ Conoce más aquí</a>
   </p>
 </td>`.trim();
 }
 
 function imageCol(src: string): string {
   return `
-<td style="width:50%;padding:12px 16px;vertical-align:top" width="50%">
+<td style="width:50%;padding:14px 18px;vertical-align:top" width="50%">
   <img src="${src}" alt="" width="260" style="display:block;width:100%;max-width:260px;height:auto;border:0" />
 </td>`.trim();
 }
@@ -106,10 +117,54 @@ function twoCol(left: string, right: string): string {
 </table>`.trim();
 }
 
+function colorBanner(opts: {
+  bg: string;
+  title: string;
+  body: string;
+  ctaLabel: string;
+  ctaHref?: string;
+}): string {
+  const href = opts.ctaHref ?? 'https://mali.pe';
+  return `
+<table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
+  <tbody>
+    <tr>
+      <td style="background-color:${opts.bg};padding:36px 28px;color:#ffffff">
+        <h2 style="margin:0 0 14px;font-size:26px;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:#ffffff;line-height:1.2">${opts.title}</h2>
+        <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#ffffff">${opts.body}</p>
+        <p style="margin:0">
+          <a href="${href}" style="display:inline-block;border:1px solid #ffffff;color:#ffffff;text-decoration:none;padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase">${opts.ctaLabel}</a>
+        </p>
+      </td>
+    </tr>
+  </tbody>
+</table>`.trim();
+}
+
+function ctaBar(opts: {
+  bg: string;
+  label: string;
+  href?: string;
+  color?: string;
+}): string {
+  const href = opts.href ?? 'https://mali.pe';
+  const color = opts.color ?? '#ffffff';
+  return `
+<table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
+  <tbody>
+    <tr>
+      <td style="background-color:${opts.bg};padding:16px 20px;text-align:center">
+        <a href="${href}" style="color:${color};font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.06em;text-transform:uppercase">${opts.label}</a>
+      </td>
+    </tr>
+  </tbody>
+</table>`.trim();
+}
+
 const BLOCK_TEXT_LEFT = twoCol(
   textCol(
     'Álbumes de juventud',
-    'Texto del bloque. Edita el título, el párrafo y el enlace. Cambia colores en el panel de estilos.',
+    'Texto del bloque. Edita el título, el párrafo y el enlace rosa. Ajusta colores en el panel de estilos.',
   ),
   imageCol(IMG_SQ),
 );
@@ -131,8 +186,13 @@ const BLOCK_HERO = `
       </td>
     </tr>
     <tr>
-      <td style="padding:8px 16px 20px;color:${MALI_BLACK};font-size:14px;line-height:1.55">
-        <p style="margin:0">Párrafo bajo la imagen a ancho completo. Edítalo aquí.</p>
+      <td style="padding:4px 18px 8px;color:${MALI_BLACK};font-family:${FONT}">
+        <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;line-height:1.25">Título de la nota</h2>
+        <div style="height:2px;width:48px;background:${MALI_PINK};margin:0 0 12px"></div>
+        <p style="margin:0 0 14px;font-size:14px;line-height:1.55">Párrafo bajo la imagen a ancho completo. Edítalo aquí.</p>
+        <p style="margin:0 0 12px">
+          <a href="https://mali.pe" style="color:${MALI_PINK};font-size:13px;font-weight:700;text-decoration:underline;text-transform:uppercase;letter-spacing:0.03em">→ Conoce más aquí</a>
+        </p>
       </td>
     </tr>
   </tbody>
@@ -142,46 +202,80 @@ const BLOCK_HEADER = `
 <table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
     <tr>
-      <td style="padding:8px 16px;text-align:center;font-size:11px;color:#888888">
+      <td style="padding:10px 16px;text-align:center;font-size:11px;color:#888888;background:#ffffff">
         <a href="https://mali.pe" style="color:#888888;text-decoration:underline">Ver este correo en el navegador</a>
       </td>
     </tr>
     <tr>
-      <td style="padding:16px 16px 8px">
-        <div style="font-size:28px;font-weight:900;letter-spacing:0.08em;color:${MALI_BLACK}">MALI</div>
+      <td style="padding:18px 16px 10px;text-align:left;background:#ffffff">
+        <img src="${NEWSLETTER_BRAND_LOGO_URLS.museo}" alt="MALI" width="120" style="display:block;width:120px;max-width:100%;height:auto;border:0" />
       </td>
     </tr>
     <tr>
-      <td style="padding:4px 16px 20px">
-        <h1 style="margin:0;color:${MALI_BLACK};font-size:26px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase">Edición especial</h1>
-      </td>
-    </tr>
-  </tbody>
-</table>`.trim();
-
-const BLOCK_COLOR_BANNER = `
-<table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
-  <tbody>
-    <tr>
-      <td style="background-color:#1a6bb5;padding:36px 28px;color:#ffffff">
-        <h2 style="margin:0 0 14px;font-size:28px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff">Dona al MALI</h2>
-        <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#ffffff">
-          Texto del bloque de color. Cambia el fondo y el color del texto en Estilos.
-        </p>
-        <p style="margin:0 0 10px">
-          <a href="https://mali.pe" style="display:inline-block;border:1px solid #ffffff;color:#ffffff;text-decoration:none;padding:10px 18px;font-size:13px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Donar</a>
-        </p>
+      <td style="padding:6px 16px 22px;background:#ffffff">
+        <h1 style="margin:0;color:${MALI_BLACK};font-size:24px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;line-height:1.2">Edición especial</h1>
+        <div style="height:2px;width:56px;background:${MALI_PINK};margin:12px 0 0"></div>
       </td>
     </tr>
   </tbody>
 </table>`.trim();
 
-const BLOCK_CTA_BAR = `
+const BLOCK_COLOR_MUSEO = colorBanner({
+  bg: MALI_BLUE,
+  title: 'Dona al MALI',
+  body: 'Tu apoyo sostiene las exposiciones, la biblioteca y los programas educativos del museo.',
+  ctaLabel: 'Donar',
+  ctaHref: 'https://mali.pe',
+});
+
+const BLOCK_COLOR_CURSOS = colorBanner({
+  bg: MALI_TEAL,
+  title: 'Cursos de Arte',
+  body: 'Vive el arte en el MALI. Inicios todos los meses. Vacantes limitadas.',
+  ctaLabel: 'Más información',
+  ctaHref: 'https://educacion.mali.pe',
+});
+
+const BLOCK_COLOR_EP = colorBanner({
+  bg: MALI_NAVY,
+  title: 'Extensión Profesional',
+  body: 'Programas de formación continua para profesionales de la cultura y las artes.',
+  ctaLabel: 'Más información',
+  ctaHref: 'https://educacion.mali.pe',
+});
+
+const BLOCK_CTA_PINK = ctaBar({
+  bg: MALI_PINK,
+  label: 'Compra tus entradas aquí',
+  href: 'https://mali.pe',
+});
+
+const BLOCK_CTA_OUTLINE = `
 <table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
     <tr>
-      <td style="background-color:${MALI_PINK};padding:16px 20px;text-align:center">
-        <a href="https://mali.pe" style="color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.06em;text-transform:uppercase">Compra tus entradas aquí</a>
+      <td style="background-color:${MALI_BLUE};padding:28px 24px;text-align:center">
+        <a href="https://educacion.mali.pe" style="display:inline-block;border:1px solid #ffffff;color:#ffffff;text-decoration:none;padding:12px 22px;font-size:13px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase">Más información</a>
+      </td>
+    </tr>
+  </tbody>
+</table>`.trim();
+
+const BLOCK_SOCIAL = `
+<table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
+  <tbody>
+    <tr>
+      <td style="padding:8px 20px 4px;text-align:center;background:#ffffff;color:${MALI_BLACK};font-size:13px">
+        ¡Cuéntanos tu experiencia!
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 20px 18px;text-align:center;background:#ffffff">
+        ${socialLink('https://www.facebook.com/museodeartedelima', 'facebook.png', 'Facebook')}
+        ${socialLink('https://x.com/mali_lima', 'twitter.png', 'X')}
+        ${socialLink('https://www.instagram.com/museodeartedelima', 'instagram.png', 'Instagram')}
+        ${socialLink('https://www.youtube.com/@museodeartedelima', 'youtube.png', 'YouTube')}
+        ${socialLink('https://open.spotify.com', 'spotify.png', 'Spotify')}
       </td>
     </tr>
   </tbody>
@@ -191,17 +285,32 @@ const BLOCK_FOOTER = `
 <table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
     <tr>
-      <td style="background-color:#4a4a4a;padding:20px 24px;text-align:center;color:#ffffff;font-size:13px;line-height:1.5">
-        Explora y comparte los archivos digitalizados del MALI.
+      <td style="padding:14px 20px;text-align:center;font-size:12px;color:${MALI_BLACK};background:#ffffff;letter-spacing:0.04em">
+        <div style="margin:0 0 6px">EXPOSICIONES | BIBLIOTECA | CURSOS | PAM | TIENDA</div>
+        <div>ARCHI | VISÍTANOS</div>
       </td>
     </tr>
     <tr>
-      <td style="background-color:#111111;padding:18px 24px;text-align:center;color:#ffffff;font-size:14px;font-weight:700">
-        Explora más historias del arte peruano en el MALI
+      <td style="padding:8px 20px 4px;text-align:center;background:#ffffff;color:${MALI_BLACK};font-size:13px">
+        ¡Cuéntanos tu experiencia!
       </td>
     </tr>
     <tr>
-      <td style="padding:16px;text-align:center;font-size:11px;color:#888888">
+      <td style="padding:10px 20px 16px;text-align:center;background:#ffffff">
+        ${socialLink('https://www.facebook.com/museodeartedelima', 'facebook.png', 'Facebook')}
+        ${socialLink('https://x.com/mali_lima', 'twitter.png', 'X')}
+        ${socialLink('https://www.instagram.com/museodeartedelima', 'instagram.png', 'Instagram')}
+        ${socialLink('https://www.youtube.com/@museodeartedelima', 'youtube.png', 'YouTube')}
+        ${socialLink('https://open.spotify.com', 'spotify.png', 'Spotify')}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 16px 16px;background:#ffffff">
+        <a href="https://mali.pe" style="display:block;background:${MALI_PINK};color:#ffffff;text-decoration:none;text-align:center;padding:14px 18px;font-size:14px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">Compra tus entradas aquí</a>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:12px 16px 20px;text-align:center;font-size:11px;color:#888888;background:#ffffff">
         ${newsletterCopyrightLine()}
       </td>
     </tr>
@@ -230,7 +339,7 @@ const MALI_STARTER_HTML = `
             <tr><td>${BLOCK_HERO}</td></tr>
             <tr><td>${BLOCK_TEXT_LEFT}</td></tr>
             <tr><td>${BLOCK_IMAGE_LEFT}</td></tr>
-            <tr><td>${BLOCK_CTA_BAR}</td></tr>
+            <tr><td>${BLOCK_CTA_PINK}</td></tr>
             <tr><td>${BLOCK_FOOTER}</td></tr>
           </tbody>
         </table>
@@ -258,7 +367,7 @@ function registerMaliBlocks(
       id: 'mali-header',
       label: 'Cabecera MALI',
       content: BLOCK_HEADER,
-      media: `<svg viewBox="0 0 24 24" width="40" height="40"><text x="2" y="16" font-size="10" font-weight="700">MALI</text></svg>`,
+      media: `<svg viewBox="0 0 48 24" width="48" height="24"><text x="24" y="16" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">MALI</text></svg>`,
     },
     {
       id: 'mali-hero',
@@ -279,22 +388,46 @@ function registerMaliBlocks(
       media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="20" height="28" y="2" fill="#ccc"/><rect x="24" y="2" width="22" height="28" fill="#eee" stroke="#999"/></svg>`,
     },
     {
-      id: 'mali-color-banner',
-      label: 'Bloque de color',
-      content: BLOCK_COLOR_BANNER,
-      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="32" fill="#1a6bb5"/><rect x="6" y="10" width="24" height="3" fill="#fff"/><rect x="6" y="16" width="32" height="2" fill="#cde"/></svg>`,
+      id: 'mali-color-museo',
+      label: 'Color Museo',
+      content: BLOCK_COLOR_MUSEO,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="32" fill="${MALI_BLUE}"/><rect x="6" y="10" width="24" height="3" fill="#fff"/><rect x="6" y="16" width="18" height="10" fill="none" stroke="#fff"/></svg>`,
     },
     {
-      id: 'mali-cta-bar',
-      label: 'Barra CTA',
-      content: BLOCK_CTA_BAR,
+      id: 'mali-color-cursos',
+      label: 'Color Cursos',
+      content: BLOCK_COLOR_CURSOS,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="32" fill="${MALI_TEAL}"/><rect x="6" y="10" width="24" height="3" fill="#fff"/><rect x="6" y="16" width="18" height="10" fill="none" stroke="#fff"/></svg>`,
+    },
+    {
+      id: 'mali-color-ep',
+      label: 'Color Extensión',
+      content: BLOCK_COLOR_EP,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="32" fill="${MALI_NAVY}"/><rect x="6" y="10" width="24" height="3" fill="#fff"/><rect x="6" y="16" width="18" height="10" fill="none" stroke="#fff"/></svg>`,
+    },
+    {
+      id: 'mali-cta-pink',
+      label: 'CTA Entradas',
+      content: BLOCK_CTA_PINK,
       media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect y="10" width="48" height="12" fill="${MALI_PINK}"/><rect x="10" y="14" width="28" height="3" fill="#fff"/></svg>`,
+    },
+    {
+      id: 'mali-cta-outline',
+      label: 'CTA Outline',
+      content: BLOCK_CTA_OUTLINE,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="32" fill="${MALI_BLUE}"/><rect x="10" y="11" width="28" height="10" fill="none" stroke="#fff"/></svg>`,
+    },
+    {
+      id: 'mali-social',
+      label: 'Redes sociales',
+      content: BLOCK_SOCIAL,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><circle cx="12" cy="16" r="5" fill="#999"/><circle cx="24" cy="16" r="5" fill="#999"/><circle cx="36" cy="16" r="5" fill="#999"/></svg>`,
     },
     {
       id: 'mali-footer',
       label: 'Pie MALI',
       content: BLOCK_FOOTER,
-      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="14" fill="#4a4a4a"/><rect y="14" width="48" height="12" fill="#111"/><rect y="28" width="48" height="4" fill="#ddd"/></svg>`,
+      media: `<svg viewBox="0 0 48 32" width="48" height="32"><rect width="48" height="10" fill="#eee"/><rect y="12" width="48" height="10" fill="${MALI_PINK}"/><rect y="24" width="48" height="8" fill="#ddd"/></svg>`,
     },
     {
       id: 'mali-divider',
@@ -413,17 +546,22 @@ export const NewsletterEditor = forwardRef<
       },
       deviceManager: {
         devices: [
-          { name: 'Escritorio', width: '' },
-          { name: 'Móvil', width: '320px', widthMedia: '480px' },
+          { id: 'desktop', name: 'Escritorio', width: '' },
+          {
+            id: 'mobilePortrait',
+            name: 'Móvil',
+            width: '320px',
+            widthMedia: '480px',
+          },
         ],
       },
       plugins: [
         (ed) =>
           newsletterPlugin(ed, {
-            modalTitleImport: 'Importar plantilla',
+            modalTitleImport: 'Importar HTML',
             modalTitleExport: 'Exportar HTML',
             modalLabelImport:
-              'Pega el HTML de la plantilla y haz clic en Importar',
+              'Pega el HTML completo del boletín y haz clic en Importar (reemplaza todo el lienzo)',
             modalLabelExport: 'Copia el HTML para usarlo donde necesites',
             importPlaceholder: '<table>...</table>',
             cellStyle: {
@@ -478,6 +616,39 @@ export const NewsletterEditor = forwardRef<
         ],
       },
     });
+
+    const panels = editor.Panels;
+    // El preset llama setDevice('Desktop'|'Mobile portrait'); re-mapear a Escritorio/Móvil.
+    editor.Commands.add('set-device-desktop', {
+      run: (ed) => ed.setDevice('Escritorio'),
+    });
+    editor.Commands.add('set-device-mobile', {
+      run: (ed) => ed.setDevice('Móvil'),
+    });
+    panels.removeButton('devices-c', 'set-device-tablet');
+    for (const id of ['toggle-images', 'canvas-clear'] as const) {
+      panels.removeButton('options', id);
+    }
+    for (const [panel, id, title] of [
+      ['devices-c', 'set-device-desktop', 'Escritorio'],
+      ['devices-c', 'set-device-mobile', 'Móvil'],
+      ['options', 'undo', 'Deshacer'],
+      ['options', 'redo', 'Rehacer'],
+      ['options', 'sw-visibility', 'Ver bordes'],
+      ['options', 'preview', 'Vista previa'],
+      ['options', 'fullscreen', 'Pantalla completa'],
+      ['options', 'export-template', 'Ver código HTML'],
+      [
+        'options',
+        'gjs-open-import-template',
+        'Importar HTML (reemplaza todo el boletín)',
+      ],
+    ] as const) {
+      const btn = panels.getButton(panel, id);
+      if (btn) {
+        btn.set('attributes', { ...(btn.get('attributes') ?? {}), title });
+      }
+    }
 
     registerMaliBlocks(editor, brand, slug);
     loadInitialContent(editor, initialDesignJson, initialHtml, brand, slug);

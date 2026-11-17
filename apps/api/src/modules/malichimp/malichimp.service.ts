@@ -534,6 +534,100 @@ export class MalichimpService implements OnModuleInit {
     };
   }
 
+  async getCampaignStats(id: string, days = 30) {
+    const campaign = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: 'malichimp' },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        totalRecipients: true,
+        sentCount: true,
+        errorCount: true,
+      },
+    });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+
+    const safeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - (safeDays - 1));
+    since.setUTCHours(0, 0, 0, 0);
+
+    const [totals] = await this.prisma.$queryRaw<Array<{
+      suppressed: bigint;
+      delivered: bigint;
+      bounced: bigint;
+      complaints: bigint;
+      opened: bigint;
+      clicked: bigint;
+    }>>(Prisma.sql`
+      SELECT
+        COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
+        COUNT(send."id") FILTER (WHERE send."deliveredAt" IS NOT NULL) AS "delivered",
+        COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
+        COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
+        COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
+        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked"
+      FROM "EmailSend" send
+      WHERE send."campaignId" = ${campaign.id}
+    `);
+
+    const openRows = await this.prisma.$queryRaw<Array<{ day: string; count: bigint }>>(Prisma.sql`
+      SELECT to_char(send."openedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+             COUNT(send."id")::bigint AS count
+      FROM "EmailSend" send
+      WHERE send."campaignId" = ${campaign.id}
+        AND send."openedAt" >= ${since}
+      GROUP BY 1
+      ORDER BY 1
+    `);
+
+    const clickRows = await this.prisma.$queryRaw<Array<{ day: string; count: bigint }>>(Prisma.sql`
+      SELECT to_char(send."clickedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+             COUNT(send."id")::bigint AS count
+      FROM "EmailSend" send
+      WHERE send."campaignId" = ${campaign.id}
+        AND send."clickedAt" >= ${since}
+      GROUP BY 1
+      ORDER BY 1
+    `);
+
+    const opensMap = new Map(openRows.map((row) => [row.day, Number(row.count)]));
+    const clicksMap = new Map(clickRows.map((row) => [row.day, Number(row.count)]));
+    const opensByDay: Array<{ date: string; count: number }> = [];
+    const clicksByDay: Array<{ date: string; count: number }> = [];
+    for (let i = 0; i < safeDays; i += 1) {
+      const day = new Date(since);
+      day.setUTCDate(since.getUTCDate() + i);
+      const key = day.toISOString().slice(0, 10);
+      opensByDay.push({ date: key, count: opensMap.get(key) ?? 0 });
+      clicksByDay.push({ date: key, count: clicksMap.get(key) ?? 0 });
+    }
+
+    const delivered = Number(totals?.delivered ?? 0);
+    const opened = Number(totals?.opened ?? 0);
+    const clicked = Number(totals?.clicked ?? 0);
+
+    return {
+      campaignId: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      totalRecipients: campaign.totalRecipients,
+      sent: campaign.sentCount,
+      failed: campaign.errorCount,
+      suppressed: Number(totals?.suppressed ?? 0),
+      delivered,
+      bounced: Number(totals?.bounced ?? 0),
+      complaints: Number(totals?.complaints ?? 0),
+      opened,
+      clicked,
+      openRate: delivered > 0 ? opened / delivered : 0,
+      clickRate: delivered > 0 ? clicked / delivered : 0,
+      opensByDay,
+      clicksByDay,
+    };
+  }
+
   async getCampaignBrowserView(id: string) {
     const campaign = await this.getCampaign(id);
     return {

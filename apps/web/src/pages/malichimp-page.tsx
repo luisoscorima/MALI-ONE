@@ -480,17 +480,22 @@ export function MalichimpPage() {
                 const meta = statusMeta[contact.status];
                 const name = [contact.firstName, contact.lastName].filter(Boolean).join(' ');
                 return (
-                  <TableRow key={contact.id}>
+                  <TableRow
+                    key={contact.id}
+                    tabIndex={0}
+                    className="cursor-pointer"
+                    aria-label={`Ver detalle de ${name || contact.email}`}
+                    onClick={() => setSelectedContact(contact)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedContact(contact);
+                      }
+                    }}
+                  >
                     <TableCell className="min-w-60">
-                      <button
-                        type="button"
-                        className="group -m-1 block rounded-md p-1 text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        onClick={() => setSelectedContact(contact)}
-                        aria-label={`Ver detalle de ${name || contact.email}`}
-                      >
-                        <span className="block font-medium underline-offset-4 group-hover:underline">{name || 'Sin nombre'}</span>
-                        <span className="block text-xs text-muted-foreground">{contact.email}</span>
-                      </button>
+                      <span className="block font-medium">{name || 'Sin nombre'}</span>
+                      <span className="block text-xs text-muted-foreground">{contact.email}</span>
                     </TableCell>
                     <TableCell className="max-w-64 truncate">{contact.institutionName || '—'}</TableCell>
                     <TableCell><Badge variant={meta.variant}>{meta.label}</Badge></TableCell>

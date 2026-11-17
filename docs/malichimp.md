@@ -116,6 +116,7 @@ La pestaña **Remitentes** (solo admin) administra el catálogo `EmailSender`:
 - `POST /api/malichimp/newsletters/draft` — administrador, crea borrador en Boletines desde Nueva campaña
 - `GET /api/malichimp/campaigns`
 - `GET /api/malichimp/campaigns/{id}` — detalle y preview
+- `GET /api/malichimp/campaigns/{id}/stats?days=30` — totales y aperturas/clics por día
 - `GET /api/malichimp/campaigns/{id}/view` — HTML en navegador, autenticado y sin scripts
 - `POST /api/malichimp/campaigns/preview`
 - `POST /api/malichimp/campaigns` — administrador; admite `draftNewsletterId` si el contenido es un borrador creado aquí

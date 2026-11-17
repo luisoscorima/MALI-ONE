@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
@@ -25,7 +25,8 @@ import type {
   MalichimpStatsDto,
   NewsletterDto,
 } from '@mali-one/shared';
-import { AlertBanner, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, Spinner, TableSkeleton } from '@/components/feedback';
+import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
@@ -57,6 +58,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui';
+
+const MalichimpCampaignStatsPanel = lazy(() =>
+  import('@/components/malichimp-campaign-stats-panel').then((m) => ({
+    default: m.MalichimpCampaignStatsPanel,
+  })),
+);
 
 const nf = new Intl.NumberFormat('es-PE');
 const df = new Intl.DateTimeFormat('es-PE', {
@@ -249,6 +256,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [campaignPreview, setCampaignPreview] = useState<MalichimpCampaignDetailDto | null>(null);
+  const [statsCampaign, setStatsCampaign] = useState<MalichimpCampaignDto | null>(null);
   const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
   const [refreshingContent, setRefreshingContent] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -710,10 +718,32 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                   <TableCell>{nf.format(campaign.delivered)}</TableCell>
                   <TableCell>{nf.format(campaign.bounced)}</TableCell>
                   <TableCell>{nf.format(campaign.suppressed)}</TableCell>
-                  <TableCell>{nf.format(campaign.opened)}</TableCell>
-                  <TableCell>{nf.format(campaign.clicked)}</TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="tabular-nums underline-offset-2 hover:underline"
+                      onClick={() => setStatsCampaign(campaign)}
+                    >
+                      {nf.format(campaign.opened)}
+                    </button>
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="tabular-nums underline-offset-2 hover:underline"
+                      onClick={() => setStatsCampaign(campaign)}
+                    >
+                      {nf.format(campaign.clicked)}
+                    </button>
+                  </TableCell>
                   <TableCell className="min-w-[20rem]">
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <IconActionButton
+                        label="Estadísticas"
+                        onClick={() => setStatsCampaign(campaign)}
+                      >
+                        <BarChart3 className="size-4" />
+                      </IconActionButton>
                       {campaign.status === 'draft' && isAdmin ? (
                         <Button
                           type="button"
@@ -1223,6 +1253,38 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
               </DialogFooter>
             </>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(statsCampaign)}
+        onOpenChange={(openDialog) => {
+          if (!openDialog) setStatsCampaign(null);
+        }}
+      >
+        <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),48rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
+          <DialogHeader className="shrink-0 border-b px-4 py-4">
+            <DialogTitle>Estadísticas de la campaña</DialogTitle>
+            <DialogDescription>
+              Totales de envío y actividad de aperturas/clics por día
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4">
+            {statsCampaign ? (
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted">
+                    <Spinner /> Cargando estadísticas...
+                  </div>
+                }
+              >
+                <MalichimpCampaignStatsPanel
+                  campaignId={statsCampaign.id}
+                  campaignName={statsCampaign.name}
+                />
+              </Suspense>
+            ) : null}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
