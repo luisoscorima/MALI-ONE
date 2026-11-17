@@ -15,6 +15,7 @@ import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
+import { slugify } from '@/lib/coordinates';
 import {
   Button,
   Input,
@@ -55,10 +56,23 @@ export function NewslettersPage() {
   const [initialHtml, setInitialHtml] = useState<string | null>(null);
 
   const [slug, setSlug] = useState('');
+  const [slugManual, setSlugManual] = useState(false);
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [brand, setBrand] = useState<NewsletterBrand | null>(null);
   const [status, setStatus] = useState<'draft' | 'published'>('draft');
+
+  function handleTitleChange(value: string) {
+    setTitle(value);
+    if (mode === 'create' && !slugManual) {
+      setSlug(slugify(value));
+    }
+  }
+
+  function handleSlugChange(value: string) {
+    setSlugManual(true);
+    setSlug(value);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +92,7 @@ export function NewslettersPage() {
 
   function resetMeta() {
     setSlug('');
+    setSlugManual(false);
     setTitle('');
     setSubject('');
     setBrand(null);
@@ -249,29 +264,22 @@ export function NewslettersPage() {
           </h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1">
+              <Label htmlFor="title">Título</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="slug">Slug (URL /n/…)</Label>
               <Input
                 id="slug"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="boletin-marzo-2026"
+                onChange={(e) => handleSlugChange(e.target.value)}
+                placeholder="se-genera-del-titulo"
                 disabled={mode === 'edit'}
               />
-            </div>
-            <div className="space-y-1">
-              <Label>Estado</Label>
-              <Select
-                value={status}
-                onValueChange={(v) => setStatus(v as 'draft' | 'published')}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Borrador</SelectItem>
-                  <SelectItem value="published">Publicado</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div className="space-y-1">
               <Label>Marca (opcional)</Label>
@@ -297,20 +305,27 @@ export function NewslettersPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="title">Título</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
               <Label htmlFor="subject">Asunto del correo</Label>
               <Input
                 id="subject"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
               />
+            </div>
+            <div className="space-y-1">
+              <Label>Estado</Label>
+              <Select
+                value={status}
+                onValueChange={(v) => setStatus(v as 'draft' | 'published')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="published">Publicado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

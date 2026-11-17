@@ -18,6 +18,7 @@ import {
   PrismaClient,
   UserRole,
 } from '@prisma/client';
+import { scrubMailchimpNewsletterHtml } from './lib/scrub-mailchimp-newsletter-html';
 
 type CampaignSpec = {
   slug: string;
@@ -203,6 +204,11 @@ function extractBodyHtml(html: string): string {
   return body.trim();
 }
 
+function scrubImportedHtml(html: string, slug: string): string {
+  const appUrl = (process.env.APP_URL ?? 'https://mali.pe').trim();
+  return scrubMailchimpNewsletterHtml(html, { appUrl, slug });
+}
+
 function collectAssetUrls(html: string): string[] {
   const urls = new Set<string>();
   const re =
@@ -328,7 +334,7 @@ async function main() {
     }
     const rawHtml = await page.text();
     const subject = extractSubject(rawHtml);
-    let htmlBody = extractBodyHtml(rawHtml);
+    let htmlBody = scrubImportedHtml(extractBodyHtml(rawHtml), campaign.slug);
     const assetUrls = collectAssetUrls(htmlBody);
     console.log(`  assets=${assetUrls.length} subject="${subject.slice(0, 80)}"`);
 

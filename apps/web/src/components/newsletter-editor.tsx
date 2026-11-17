@@ -293,7 +293,7 @@ function registerMaliBlocks(editor: Editor, brand?: NewsletterBrand | null) {
       {
         id: `mali-brand-footer-${brand}`,
         label: `Footer ${NEWSLETTER_BRAND_LABELS[brand]}`,
-        content: buildNewsletterBrandFooter(brand),
+        content: buildNewsletterBrandFooter(brand, { logoUrl }),
       },
     );
   }

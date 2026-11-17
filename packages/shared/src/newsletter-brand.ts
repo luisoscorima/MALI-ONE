@@ -17,9 +17,27 @@ export type NewsletterBrandAssets = {
 };
 
 const FONT = "Arial, Helvetica, 'Helvetica Neue', sans-serif";
+const DEFAULT_ASSET_ORIGIN = 'https://dev.mali.pe';
 
-function socialIcon(href: string, label: string, bg: string): string {
-  return `<a href="${href}" target="_blank" rel="noreferrer" style="display:inline-block;width:28px;height:28px;margin:0 4px;border:1px solid ${bg};border-radius:50%;color:${bg};text-decoration:none;font-size:11px;line-height:28px;text-align:center;font-family:${FONT}">${label}</a>`;
+function brandAssetOrigin(logoUrl?: string): string {
+  if (logoUrl) {
+    try {
+      return new URL(logoUrl).origin;
+    } catch {
+      // fall through
+    }
+  }
+  return DEFAULT_ASSET_ORIGIN;
+}
+
+function socialIcon(
+  href: string,
+  file: string,
+  label: string,
+  assets?: NewsletterBrandAssets,
+): string {
+  const src = `${brandAssetOrigin(assets?.logoUrl)}/newsletter-brands/social/${file}`;
+  return `<a href="${href}" target="_blank" rel="noreferrer" style="display:inline-block;margin:0 4px;text-decoration:none"><img src="${src}" alt="${label}" width="28" height="28" style="display:block;width:28px;height:28px;border:0" /></a>`;
 }
 
 /** Header chrome: brand logo only (as in Mailchimp templates). */
@@ -43,7 +61,10 @@ export function buildNewsletterBrandHeader(
 }
 
 /** Footer chrome per brand, from MALI Mailchimp references. */
-export function buildNewsletterBrandFooter(brand: NewsletterBrand): string {
+export function buildNewsletterBrandFooter(
+  brand: NewsletterBrand,
+  assets?: NewsletterBrandAssets,
+): string {
   if (brand === 'cursos_arte') {
     return `
 <table data-mali-brand-footer="cursos_arte" role="presentation" style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
@@ -57,9 +78,9 @@ export function buildNewsletterBrandFooter(brand: NewsletterBrand): string {
               <div style="font-size:13px;line-height:1.45;margin:0 0 16px">Vive el arte en el MALI / ¡Inicios todos los meses!</div>
               <a href="https://educacion.mali.pe" style="display:inline-block;border:1px solid #ffffff;color:#ffffff;text-decoration:none;padding:8px 14px;font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase">Más información</a>
               <div style="margin-top:18px">
-                ${socialIcon('https://www.facebook.com/museodeartedelima', 'f', '#ffffff')}
-                ${socialIcon('https://www.instagram.com/museodeartedelima', 'ig', '#ffffff')}
-                ${socialIcon('https://www.tiktok.com/@museodeartedelima', 'tk', '#ffffff')}
+                ${socialIcon('https://www.facebook.com/museodeartedelima', 'facebook-outline.png', 'Facebook', assets)}
+                ${socialIcon('https://www.instagram.com/museodeartedelima', 'instagram-outline.png', 'Instagram', assets)}
+                ${socialIcon('https://www.tiktok.com/@museodeartedelima', 'tiktok.png', 'TikTok', assets)}
               </div>
             </td>
             <td valign="top" style="width:50%;padding-left:12px;color:#ffffff;font-size:12px;line-height:1.55">
@@ -99,9 +120,9 @@ export function buildNewsletterBrandFooter(brand: NewsletterBrand): string {
               <div style="border-top:1px dotted rgba(255,255,255,.55);padding:8px 0"><a href="mailto:extension@mali.pe" style="color:#ffffff;text-decoration:underline">extension@mali.pe</a></div>
               <div style="border-top:1px dotted rgba(255,255,255,.55);border-bottom:1px dotted rgba(255,255,255,.55);padding:8px 0"><a href="https://educacion.mali.pe" style="color:#ffffff;text-decoration:underline">educacion.mali.pe</a></div>
               <div style="margin-top:16px;text-align:right">
-                ${socialIcon('https://www.facebook.com/museodeartedelima', 'f', '#ffffff')}
-                ${socialIcon('https://www.instagram.com/museodeartedelima', 'ig', '#ffffff')}
-                ${socialIcon('https://www.tiktok.com/@museodeartedelima', 'tk', '#ffffff')}
+                ${socialIcon('https://www.facebook.com/museodeartedelima', 'facebook-outline.png', 'Facebook', assets)}
+                ${socialIcon('https://www.instagram.com/museodeartedelima', 'instagram-outline.png', 'Instagram', assets)}
+                ${socialIcon('https://www.tiktok.com/@museodeartedelima', 'tiktok.png', 'TikTok', assets)}
               </div>
             </td>
           </tr>
@@ -141,11 +162,11 @@ export function buildNewsletterBrandFooter(brand: NewsletterBrand): string {
     </tr>
     <tr>
       <td style="padding:8px 20px 16px;text-align:center;background:#ffffff">
-        ${socialIcon('https://www.facebook.com/museodeartedelima', 'f', '#111111')}
-        ${socialIcon('https://x.com/mali_lima', 'x', '#111111')}
-        ${socialIcon('https://www.instagram.com/museodeartedelima', 'ig', '#111111')}
-        ${socialIcon('https://www.youtube.com/@museodeartedelima', 'yt', '#111111')}
-        ${socialIcon('https://open.spotify.com', 'sp', '#111111')}
+        ${socialIcon('https://www.facebook.com/museodeartedelima', 'facebook.png', 'Facebook', assets)}
+        ${socialIcon('https://x.com/mali_lima', 'twitter.png', 'X', assets)}
+        ${socialIcon('https://www.instagram.com/museodeartedelima', 'instagram.png', 'Instagram', assets)}
+        ${socialIcon('https://www.youtube.com/@museodeartedelima', 'youtube.png', 'YouTube', assets)}
+        ${socialIcon('https://open.spotify.com', 'spotify.png', 'Spotify', assets)}
       </td>
     </tr>
     <tr>
@@ -195,7 +216,7 @@ export function wrapNewsletterWithBrandChrome(
           <tbody>
             <tr><td>${buildNewsletterBrandHeader(brand, assets)}</td></tr>
             <tr><td>${bodyHtml}</td></tr>
-            <tr><td>${buildNewsletterBrandFooter(brand)}</td></tr>
+            <tr><td>${buildNewsletterBrandFooter(brand, assets)}</td></tr>
           </tbody>
         </table>
       </td>

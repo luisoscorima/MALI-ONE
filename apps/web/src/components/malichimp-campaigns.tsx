@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ChevronsUpDown,
   Copy,
   Eye,
@@ -62,6 +64,15 @@ const df = new Intl.DateTimeFormat('es-PE', {
   timeStyle: 'short',
 });
 const maliPeEmailPattern = /^[^@\s]+@mali\.pe$/i;
+
+const CAMPAIGN_STEPS = [
+  { id: 'to', label: 'Para', hint: 'Destinatarios' },
+  { id: 'from', label: 'De', hint: 'Remitente' },
+  { id: 'content', label: 'Contenido', hint: 'Boletín y asunto' },
+  { id: 'send', label: 'Envío', hint: 'Programar o enviar' },
+] as const;
+
+type CampaignStepId = (typeof CAMPAIGN_STEPS)[number]['id'];
 
 const statusLabel: Record<MalichimpCampaignDto['status'], string> = {
   draft: 'Borrador',
@@ -252,6 +263,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   const [excludeGroupOptionIds, setExcludeGroupOptionIds] = useState<string[]>([]);
   const [scheduleMode, setScheduleMode] = useState<'now' | 'scheduled'>('now');
   const [scheduledAt, setScheduledAt] = useState('');
+  const [formStep, setFormStep] = useState<CampaignStepId>('to');
 
   const flatOptions = useMemo<FlatOption[]>(
     () => groups.flatMap((group) => group.options.map((option) => ({
@@ -290,11 +302,50 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
       && senderEmails.includes(fromEmail)
       && maliPeEmailPattern.test(replyTo.trim()),
   );
-  const contentReady = Boolean(selectedNewsletter) && Boolean(subject.trim()) && effectiveName.length >= 3;
+  const contentReady = Boolean(selectedNewsletter)
+    && Boolean(subject.trim())
+    && effectiveName.length >= 3;
   const scheduleReady = scheduleMode === 'now' || Boolean(
     scheduledAt && new Date(limaDateTimeToIso(scheduledAt)).getTime() > Date.now(),
   );
   const campaignReady = audienceReady && senderReady && contentReady && scheduleReady;
+  const stepIndex = CAMPAIGN_STEPS.findIndex((step) => step.id === formStep);
+  const stepReady: Record<CampaignStepId, boolean> = {
+    to: audienceReady,
+    from: senderReady,
+    content: contentReady,
+    send: scheduleReady,
+  };
+  const stepBlockReason: Partial<Record<CampaignStepId, string>> = {
+    to: !groupOptionIds.length
+      ? 'Selecciona al menos una opción para incluir'
+      : previewBusy
+        ? 'Calculando destinatarios…'
+        : !preview
+          ? 'Muestra los destinatarios para continuar'
+          : !preview.eligible
+            ? 'No hay destinatarios elegibles con estos filtros'
+            : undefined,
+    from: !senderEmails.length
+      ? 'No hay remitentes configurados'
+      : !fromName.trim()
+        ? 'Indica el nombre visible del remitente'
+        : !senderEmails.includes(fromEmail)
+          ? 'Elige un correo de remitente'
+          : !maliPeEmailPattern.test(replyTo.trim())
+            ? 'El correo de respuesta debe ser @mali.pe'
+            : undefined,
+    content: !selectedNewsletter
+      ? 'Elige o crea el contenido del boletín'
+      : !subject.trim()
+        ? 'Escribe el asunto del correo'
+        : effectiveName.length < 3
+          ? 'El nombre del envío debe tener al menos 3 caracteres'
+          : undefined,
+    send: scheduleMode === 'scheduled' && !scheduleReady
+      ? 'Indica una fecha y hora futura en Lima'
+      : undefined,
+  };
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
@@ -336,6 +387,37 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setScheduleMode('now');
     setScheduledAt('');
     setPreview(null);
+    setFormStep('to');
+  }
+
+  function goToStep(next: CampaignStepId) {
+    const nextIndex = CAMPAIGN_STEPS.findIndex((step) => step.id === next);
+    if (nextIndex < 0) return;
+    const blocked = CAMPAIGN_STEPS.slice(0, nextIndex).find((step) => !stepReady[step.id]);
+    if (blocked) {
+      setFormStep(blocked.id);
+      const reason = stepBlockReason[blocked.id];
+      if (reason) toast.error(reason);
+      return;
+    }
+    setFormStep(next);
+  }
+
+  function goNext() {
+    const current = CAMPAIGN_STEPS[stepIndex];
+    if (!current) return;
+    if (!stepReady[current.id]) {
+      const reason = stepBlockReason[current.id];
+      if (reason) toast.error(reason);
+      return;
+    }
+    const next = CAMPAIGN_STEPS[stepIndex + 1];
+    if (next) setFormStep(next.id);
+  }
+
+  function goBack() {
+    const prev = CAMPAIGN_STEPS[stepIndex - 1];
+    if (prev) setFormStep(prev.id);
   }
 
   function openCampaign() {
@@ -411,6 +493,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     setScheduleMode('now');
     setScheduledAt('');
     setShowAdvancedSender(detail.replyTo !== detail.fromEmail);
+    setFormStep('to');
     setOpen(true);
     setPreviewBusy(true);
     try {
@@ -704,148 +787,244 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
       </Card>
 
       <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) resetForm(); }}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl overflow-y-auto p-0">
-          <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-5 sm:px-6">
             <DialogTitle>
               {draftCampaignId ? 'Continuar campaña' : 'Nueva campaña'}
             </DialogTitle>
             <DialogDescription>
-              Incluye audiencia, revisa destinatarios, elige el boletín y envía o programa.
+              Paso {stepIndex + 1} de {CAMPAIGN_STEPS.length}: {CAMPAIGN_STEPS[stepIndex]?.hint}
             </DialogDescription>
+            <nav aria-label="Pasos de la campaña" className="pt-3">
+              <ol className="grid grid-cols-4 gap-1">
+                {CAMPAIGN_STEPS.map((step, index) => {
+                  const active = step.id === formStep;
+                  const done = stepReady[step.id] && index < stepIndex;
+                  return (
+                    <li key={step.id}>
+                      <button
+                        type="button"
+                        onClick={() => goToStep(step.id)}
+                        className={`flex w-full flex-col items-start gap-1 rounded-md px-1.5 py-1.5 text-left transition-colors ${
+                          active
+                            ? 'bg-foreground text-background'
+                            : done
+                              ? 'bg-muted text-foreground hover:bg-muted/80'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        }`}
+                        aria-current={active ? 'step' : undefined}
+                      >
+                        <span className="text-[10px] font-medium uppercase tracking-wide opacity-70">
+                          {index + 1}
+                        </span>
+                        <span className="truncate text-xs font-medium sm:text-sm">{step.label}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
           </DialogHeader>
 
-          <div className="space-y-5 p-5 sm:p-6">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">1. Incluir opciones</p>
-              <GroupOptionMultiSelect
-                id="malichimp-include"
-                label="Opciones a incluir"
-                hint="Contactos en cualquiera de estas opciones (unión), suscritos y elegibles."
-                options={flatOptions}
-                selectedIds={groupOptionIds}
-                onChange={setIncludeIds}
-                placeholder="Seleccionar opciones para incluir"
-              />
-            </div>
-
-            <div className="space-y-2 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">Excluir opciones (opcional)</p>
-              <GroupOptionMultiSelect
-                id="malichimp-exclude"
-                label="Opciones a excluir"
-                hint="Si coinciden con una inclusión, la exclusión prevalece."
-                options={flatOptions}
-                selectedIds={excludeGroupOptionIds}
-                disabledIds={groupOptionIds}
-                onChange={setExcludeIds}
-                placeholder="Ninguna exclusión"
-              />
-            </div>
-
-            <div className="space-y-3 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">2. Vista previa de destinatarios</p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={previewBusy || !groupOptionIds.length}
-                  onClick={() => void calculateAudience()}
-                >
-                  {previewBusy ? (
-                    <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                  ) : (
-                    <Eye className="size-4" aria-hidden />
-                  )}
-                  {previewBusy ? 'Calculando…' : preview ? 'Recalcular' : 'Mostrar destinatarios'}
-                </Button>
-                {preview ? (
-                  <span className="text-sm text-muted-foreground">
-                    {nf.format(preview.eligible)} destinatarios
-                    {preview.excluded ? ` · ${nf.format(preview.excluded)} excluidos` : ''}
-                  </span>
-                ) : null}
-              </div>
-              {preview ? (
-                <div className="max-h-56 overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Email</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.sample.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell>{row.name || '—'}</TableCell>
-                          <TableCell>{row.email}</TableCell>
-                        </TableRow>
-                      ))}
-                      {!preview.sample.length ? (
-                        <TableRow>
-                          <TableCell colSpan={2} className="text-muted-foreground">
-                            Sin muestra disponible
-                          </TableCell>
-                        </TableRow>
+          <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+            {formStep === 'to' ? (
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <h3 className="text-base font-medium">Para</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Elige a quién llega este correo e incluye o excluye opciones de grupo.
+                  </p>
+                </div>
+                <GroupOptionMultiSelect
+                  id="malichimp-include"
+                  label="Opciones a incluir"
+                  hint="Contactos en cualquiera de estas opciones (unión), suscritos y elegibles."
+                  options={flatOptions}
+                  selectedIds={groupOptionIds}
+                  onChange={setIncludeIds}
+                  placeholder="Seleccionar opciones para incluir"
+                />
+                <GroupOptionMultiSelect
+                  id="malichimp-exclude"
+                  label="Opciones a excluir (opcional)"
+                  hint="Si coinciden con una inclusión, la exclusión prevalece."
+                  options={flatOptions}
+                  selectedIds={excludeGroupOptionIds}
+                  disabledIds={groupOptionIds}
+                  onChange={setExcludeIds}
+                  placeholder="Ninguna exclusión"
+                />
+                <div className="space-y-3 border-t border-border/60 pt-5">
+                  <p className="text-sm font-medium">Vista previa de destinatarios</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={previewBusy || !groupOptionIds.length}
+                      onClick={() => void calculateAudience()}
+                    >
+                      {previewBusy ? (
+                        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : (
+                        <Eye className="size-4" aria-hidden />
+                      )}
+                      {previewBusy ? 'Calculando…' : preview ? 'Recalcular' : 'Mostrar destinatarios'}
+                    </Button>
+                    {preview ? (
+                      <span className="text-sm text-muted-foreground">
+                        {nf.format(preview.eligible)} destinatarios
+                        {preview.excluded ? ` · ${nf.format(preview.excluded)} excluidos` : ''}
+                      </span>
+                    ) : null}
+                  </div>
+                  {preview ? (
+                    <div className="max-h-56 overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Email</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {preview.sample.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell>{row.name || '—'}</TableCell>
+                              <TableCell>{row.email}</TableCell>
+                            </TableRow>
+                          ))}
+                          {!preview.sample.length ? (
+                            <TableRow>
+                              <TableCell colSpan={2} className="text-muted-foreground">
+                                Sin muestra disponible
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
+                        </TableBody>
+                      </Table>
+                      {preview.eligible > preview.sample.length ? (
+                        <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+                          Mostrando {preview.sample.length} de {nf.format(preview.eligible)}
+                        </p>
                       ) : null}
-                    </TableBody>
-                  </Table>
-                  {preview.eligible > preview.sample.length ? (
-                    <p className="border-t px-3 py-2 text-xs text-muted-foreground">
-                      Mostrando {preview.sample.length} de {nf.format(preview.eligible)}
-                    </p>
+                    </div>
                   ) : null}
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
 
-            <div className="space-y-4 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">3. Boletín y asunto</p>
-              {usingDraftContent && selectedNewsletter ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                  <Badge variant="secondary">Borrador en Boletines</Badge>
-                  <span className="font-medium">{selectedNewsletter.title}</span>
-                  <Button type="button" size="sm" variant="outline" asChild>
-                    <a
-                      href={`/admin/newsletters?edit=${encodeURIComponent(selectedNewsletter.id)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Pencil className="size-4" aria-hidden />
-                      Editar
-                    </a>
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void refreshAttachedNewsletter()}
-                    disabled={refreshingContent}
-                  >
-                    {refreshingContent ? (
-                      <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                    ) : (
-                      <RefreshCw className="size-4" aria-hidden />
-                    )}
-                    Actualizar
-                  </Button>
+            {formStep === 'from' ? (
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <h3 className="text-base font-medium">De</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Define quién envía el correo y a dónde llegan las respuestas.
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="malichimp-newsletter">Boletín publicado</Label>
-                  <Select value={newsletterId} onValueChange={selectNewsletter}>
-                    <SelectTrigger id="malichimp-newsletter" aria-label="Boletín publicado">
-                      <SelectValue placeholder="Seleccionar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectableNewsletters.map((newsletter) => (
-                        <SelectItem key={newsletter.id} value={newsletter.id}>
-                          {newsletter.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!newsletters.length ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="malichimp-from-email">Remitente</Label>
+                    <Select value={fromEmail} onValueChange={selectFromEmail}>
+                      <SelectTrigger id="malichimp-from-email" aria-label="Correo del remitente">
+                        <SelectValue placeholder="Selecciona un remitente" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {senders.map((sender) => (
+                          <SelectItem key={sender.id} value={sender.email}>{sender.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="malichimp-from-name">Nombre visible</Label>
+                    <Input
+                      id="malichimp-from-name"
+                      value={fromName}
+                      onChange={(event) => setFromName(event.target.value)}
+                      placeholder="Museo de Arte de Lima - MALI"
+                      maxLength={160}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => setShowAdvancedSender((value) => !value)}
+                  >
+                    {showAdvancedSender ? 'Ocultar opciones de respuesta' : 'Opciones de respuesta'}
+                  </button>
+                  {showAdvancedSender ? (
+                    <div className="mt-2 space-y-2">
+                      <Label htmlFor="malichimp-reply-to">Las respuestas llegarán a</Label>
+                      <Input
+                        id="malichimp-reply-to"
+                        type="email"
+                        value={replyTo}
+                        onChange={(event) => setReplyTo(event.target.value)}
+                        placeholder="correo@mali.pe"
+                      />
+                      <p className="text-xs text-muted-foreground">Debe ser un correo @mali.pe.</p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {formStep === 'content' ? (
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <h3 className="text-base font-medium">Contenido</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Elige el boletín y define el asunto que verán los destinatarios.
+                  </p>
+                </div>
+                {usingDraftContent && selectedNewsletter ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+                    <Badge variant="secondary">Borrador en Boletines</Badge>
+                    <span className="font-medium">{selectedNewsletter.title}</span>
+                    <Button type="button" size="sm" variant="outline" asChild>
+                      <a
+                        href={`/admin/newsletters?edit=${encodeURIComponent(selectedNewsletter.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Pencil className="size-4" aria-hidden />
+                        Editar
+                      </a>
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void refreshAttachedNewsletter()}
+                      disabled={refreshingContent}
+                    >
+                      {refreshingContent ? (
+                        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                      ) : (
+                        <RefreshCw className="size-4" aria-hidden />
+                      )}
+                      Actualizar
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="malichimp-newsletter">Boletín publicado</Label>
+                      <Select value={newsletterId} onValueChange={selectNewsletter}>
+                        <SelectTrigger id="malichimp-newsletter" aria-label="Boletín publicado">
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectableNewsletters.map((newsletter) => (
+                            <SelectItem key={newsletter.id} value={newsletter.id}>
+                              {newsletter.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <Button
                       type="button"
                       size="sm"
@@ -860,12 +1039,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       )}
                       {creatingNewsletter ? 'Creando…' : 'Crear borrador en Boletines'}
                     </Button>
-                  ) : null}
-                </div>
-              )}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-2">
+                  </div>
+                )}
+                <div className="space-y-2 border-t border-border/60 pt-5">
                   <Label htmlFor="malichimp-subject">Asunto del correo</Label>
                   <Input
                     id="malichimp-subject"
@@ -875,7 +1051,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     maxLength={300}
                   />
                 </div>
-                <div className="space-y-2 sm:col-span-2">
+                <div className="space-y-2">
                   <Label htmlFor="malichimp-campaign-name">Nombre del envío (opcional)</Label>
                   <Input
                     id="malichimp-campaign-name"
@@ -884,94 +1060,99 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     placeholder="Si lo dejas vacío, usamos el título del boletín"
                     maxLength={160}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Solo se usa internamente para identificar la campaña.
+                  </p>
                 </div>
               </div>
+            ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="malichimp-from-email">Remitente</Label>
-                  <Select value={fromEmail} onValueChange={selectFromEmail}>
-                    <SelectTrigger id="malichimp-from-email" aria-label="Correo del remitente">
-                      <SelectValue placeholder="Selecciona un remitente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {senders.map((sender) => (
-                        <SelectItem key={sender.id} value={sender.email}>{sender.email}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {formStep === 'send' ? (
+              <div className="space-y-5">
+                <div className="space-y-1">
+                  <h3 className="text-base font-medium">Envío</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Revisa el resumen y envía ahora o programa para más tarde.
+                  </p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="malichimp-from-name">Nombre visible</Label>
-                  <Input
-                    id="malichimp-from-name"
-                    value={fromName}
-                    onChange={(event) => setFromName(event.target.value)}
-                    placeholder="Museo de Arte de Lima - MALI"
-                    maxLength={160}
-                  />
+                <div className="space-y-2 rounded-md border px-3 py-3 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Para:</span>{' '}
+                    {preview ? `${nf.format(preview.eligible)} destinatarios` : '—'}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">De:</span>{' '}
+                    {fromName.trim() || '—'} &lt;{fromEmail || '—'}&gt;
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Asunto:</span>{' '}
+                    {subject.trim() || '—'}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Contenido:</span>{' '}
+                    {selectedNewsletter?.title || '—'}
+                  </p>
                 </div>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-                  onClick={() => setShowAdvancedSender((value) => !value)}
-                >
-                  {showAdvancedSender ? 'Ocultar opciones de respuesta' : 'Opciones de respuesta'}
-                </button>
-                {showAdvancedSender ? (
-                  <div className="mt-2 space-y-2">
-                    <Label htmlFor="malichimp-reply-to">Las respuestas llegarán a</Label>
-                    <Input
-                      id="malichimp-reply-to"
-                      type="email"
-                      value={replyTo}
-                      onChange={(event) => setReplyTo(event.target.value)}
-                      placeholder="correo@mali.pe"
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="malichimp-schedule-mode"
+                      checked={scheduleMode === 'now'}
+                      onChange={() => setScheduleMode('now')}
                     />
-                    <p className="text-xs text-muted-foreground">Debe ser un correo @mali.pe.</p>
+                    Enviar ahora
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="malichimp-schedule-mode"
+                      checked={scheduleMode === 'scheduled'}
+                      onChange={() => setScheduleMode('scheduled')}
+                    />
+                    Programar envío
+                  </label>
+                </div>
+                {scheduleMode === 'scheduled' ? (
+                  <div className="max-w-xs space-y-2">
+                    <Label htmlFor="malichimp-scheduled-at">Fecha y hora en Lima</Label>
+                    <Input
+                      id="malichimp-scheduled-at"
+                      type="datetime-local"
+                      value={scheduledAt}
+                      min={minimumLimaDateTime()}
+                      onChange={(event) => setScheduledAt(event.target.value)}
+                    />
                   </div>
                 ) : null}
+                {campaignReady ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden />
+                    Lista para confirmar
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {stepBlockReason.send
+                      || Object.values(stepBlockReason).find(Boolean)
+                      || 'Completa los pasos anteriores'}
+                  </span>
+                )}
               </div>
-            </div>
+            ) : null}
+          </div>
 
-            <div className="space-y-3 border-t border-border/60 pt-5">
-              <p className="text-sm font-medium">4. Programación y envío</p>
-              <div className="flex flex-wrap gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="malichimp-schedule-mode"
-                    checked={scheduleMode === 'now'}
-                    onChange={() => setScheduleMode('now')}
-                  />
-                  Enviar ahora
-                </label>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="malichimp-schedule-mode"
-                    checked={scheduleMode === 'scheduled'}
-                    onChange={() => setScheduleMode('scheduled')}
-                  />
-                  Programar envío
-                </label>
-              </div>
-              {scheduleMode === 'scheduled' ? (
-                <div className="max-w-xs space-y-2">
-                  <Label htmlFor="malichimp-scheduled-at">Fecha y hora en Lima</Label>
-                  <Input
-                    id="malichimp-scheduled-at"
-                    type="datetime-local"
-                    value={scheduledAt}
-                    min={minimumLimaDateTime()}
-                    onChange={(event) => setScheduledAt(event.target.value)}
-                  />
-                </div>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-3">
+          <DialogFooter className="shrink-0 border-t bg-background px-5 py-4 sm:px-6">
+            <div className="flex w-full flex-wrap items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={goBack}
+                disabled={stepIndex === 0 || busy}
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+                Atrás
+              </Button>
+              {formStep === 'send' ? (
                 <Button
                   type="button"
                   onClick={() => void submitCampaign()}
@@ -988,25 +1169,14 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       ? 'Programar'
                       : 'Enviar'}
                 </Button>
-                {!campaignReady ? (
-                  <span className="text-xs text-muted-foreground">
-                    {!groupOptionIds.length || !preview
-                      ? 'Calcula la audiencia para continuar'
-                      : !selectedNewsletter || !subject.trim()
-                        ? 'Elige boletín y asunto'
-                        : !senderReady
-                          ? 'Revisa el remitente'
-                          : 'Indica una fecha futura'}
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                    <CheckCircle2 className="size-3.5 text-emerald-600" aria-hidden />
-                    Lista para confirmar
-                  </span>
-                )}
-              </div>
+              ) : (
+                <Button type="button" onClick={goNext} disabled={busy || !stepReady[formStep]}>
+                  Siguiente
+                  <ChevronRight className="size-4" aria-hidden />
+                </Button>
+              )}
             </div>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Scrub de plantillas Mailchimp: “Ver este correo en el navegador” en todas (`/n/{slug}`); se eliminan preferencias/baja y badge “Powered by Mailchimp” (la baja la inyecta MALICHIMP al enviar); íconos sociales pasan a `/newsletter-brands/social/…`. Script: `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links`.
+- Footer de marca usa íconos PNG (no letras) servidos desde el origen web.
 - Campo opcional `brand` (`museo` | `cursos_arte` | `extension_profesional`) para header/footer por marca.
 - Seed/import de campañas Mailchimp públicas con rehost de imágenes a S3 (`newsletters/…`).
 - Nota operativa: el rol EC2 sube a S3, pero la URL pública anónima depende de bucket policy (ver `aws-runtime-role.md`).
