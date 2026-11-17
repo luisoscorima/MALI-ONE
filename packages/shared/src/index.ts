@@ -9,6 +9,7 @@ export {
   NEWSLETTER_BRAND_LABELS,
   buildNewsletterBrandFooter,
   buildNewsletterBrandHeader,
+  newsletterCopyrightLine,
   wrapNewsletterWithBrandChrome,
 } from './newsletter-brand';
 export type { NewsletterBrand, NewsletterBrandAssets };

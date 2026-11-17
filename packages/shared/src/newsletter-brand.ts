@@ -14,10 +14,28 @@ export const NEWSLETTER_BRAND_LABELS: Record<NewsletterBrand, string> = {
 
 export type NewsletterBrandAssets = {
   logoUrl: string;
+  /** Absolute public URL for “Ver este correo…”. Defaults to mali.pe. */
+  viewInBrowserUrl?: string;
 };
 
 const FONT = "Arial, Helvetica, 'Helvetica Neue', sans-serif";
 const DEFAULT_ASSET_ORIGIN = 'https://dev.mali.pe';
+
+/** Canonical newsletter copyright (Spanish, current year). */
+export function newsletterCopyrightLine(
+  year: number = new Date().getFullYear(),
+): string {
+  return `© ${year} MALI — Museo de Arte de Lima. Todos los derechos reservados.`;
+}
+
+function copyrightFooterRow(bg = '#ffffff', color = '#888888'): string {
+  return `
+    <tr>
+      <td style="padding:12px 16px 20px;text-align:center;font-size:11px;color:${color};background:${bg};font-family:${FONT}">
+        ${newsletterCopyrightLine()}
+      </td>
+    </tr>`.trim();
+}
 
 function brandAssetOrigin(logoUrl?: string): string {
   if (logoUrl) {
@@ -40,7 +58,7 @@ function socialIcon(
   return `<a href="${href}" target="_blank" rel="noreferrer" style="display:inline-block;margin:0 4px;text-decoration:none"><img src="${src}" alt="${label}" width="28" height="28" style="display:block;width:28px;height:28px;border:0" /></a>`;
 }
 
-/** Header chrome: brand logo only (as in Mailchimp templates). */
+/** Header chrome: view-in-browser + brand logo (as in Mailchimp templates). */
 export function buildNewsletterBrandHeader(
   brand: NewsletterBrand,
   assets: NewsletterBrandAssets,
@@ -48,9 +66,15 @@ export function buildNewsletterBrandHeader(
   const alt = NEWSLETTER_BRAND_LABELS[brand];
   const width =
     brand === 'museo' ? 120 : brand === 'cursos_arte' ? 168 : 150;
+  const viewUrl = assets.viewInBrowserUrl ?? 'https://mali.pe';
   return `
 <table data-mali-brand-header="${brand}" role="presentation" style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
+    <tr>
+      <td style="padding:8px 16px;text-align:center;font-size:11px;color:#888888;background:#ffffff">
+        <a href="${viewUrl}" style="color:#888888;text-decoration:underline">Ver este correo en el navegador</a>
+      </td>
+    </tr>
     <tr>
       <td style="padding:16px 16px 8px;text-align:left;background:#ffffff">
         <img src="${assets.logoUrl}" alt="${alt}" width="${width}" style="display:block;width:${width}px;max-width:100%;height:auto;border:0" />
@@ -97,6 +121,7 @@ export function buildNewsletterBrandFooter(
         </table>
       </td>
     </tr>
+    ${copyrightFooterRow()}
   </tbody>
 </table>`.trim();
   }
@@ -129,12 +154,12 @@ export function buildNewsletterBrandFooter(
         </table>
       </td>
     </tr>
+    ${copyrightFooterRow()}
   </tbody>
 </table>`.trim();
   }
 
   // museo — from DONA AL MALI through copyright
-  const year = new Date().getFullYear();
   return `
 <table data-mali-brand-footer="museo" role="presentation" style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
@@ -193,11 +218,7 @@ export function buildNewsletterBrandFooter(
         </table>
       </td>
     </tr>
-    <tr>
-      <td style="padding:12px 16px 20px;text-align:center;font-size:11px;color:#888888;background:#ffffff">
-        © ${year} MALI — Museo de Arte de Lima. Todos los derechos reservados.
-      </td>
-    </tr>
+    ${copyrightFooterRow()}
   </tbody>
 </table>`.trim();
 }

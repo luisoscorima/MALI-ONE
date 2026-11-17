@@ -2,6 +2,7 @@
  * Removes / rewrites leftover Mailchimp archive chrome and list-manage links
  * so seeded newsletters no longer send readers back to Mailchimp.
  */
+import { newsletterCopyrightLine } from '@mali-one/shared';
 
 export type ScrubMailchimpOptions = {
   /** Public app origin without trailing slash (e.g. https://dev.mali.pe). */
@@ -118,6 +119,12 @@ function rewriteSocialIconCdn(html: string, appUrl: string): string {
 
 function stripMailchimpComplianceCopy(html: string): string {
   let out = html;
+  // Permission / preference reminders (ES + EN), including orphans after link removal.
+  out = out.replace(/Eres parte del MALI\.?/gi, '');
+  out = out.replace(
+    /(?:\¿|&iquest;)?Quieres hacer cambios en c(?:[oó]|&oacute;)mo recibes estos e-?mails?\??/gi,
+    '',
+  );
   out = out.replace(/Want to change how you receive these emails\??/gi, '');
   out = out.replace(
     /You can\s+(?:update your preferences|actualizar tus preferencias)\s+or\s+(?:unsubscribe from this list|cancelar tu suscripci[oó]n)\.?/gi,
@@ -131,11 +138,29 @@ function stripMailchimpComplianceCopy(html: string): string {
   out = out.replace(/actualizar tus preferencias/gi, '');
   out = out.replace(/unsubscribe from this list/gi, '');
   out = out.replace(/cancelar tu suscripci[oó]n/gi, '');
+  // Leftovers like "Puedes  o ." / "You can or ." after anchors were dropped.
+  out = out.replace(/You can\s+or\s*\.?/gi, '');
+  out = out.replace(/Puedes\s+o\s*\.?/gi, '');
   out = out.replace(/why did I get this\?/gi, '');
   out = out.replace(/Email Marketing Powered by Mailchimp/gi, '');
   out = out.replace(
     /https:\/\/cdn-images\.mailchimp\.com\/monkey_rewards\/[^"'\\\s>]+/gi,
     '',
+  );
+  return out;
+}
+
+/** Force a single Spanish copyright line with the current year. */
+function normalizeCopyright(html: string): string {
+  const line = newsletterCopyrightLine();
+  let out = html.replace(
+    /(?:Copyright\s*)?©\s*(?:\d{4}|\*&nbsp;CURRENT_YEAR&nbsp;\*|\*\|CURRENT_YEAR\|\*)[^<]*?(?:All rights reserved|Todos los derechos reservados)\.?/gi,
+    line,
+  );
+  // Bare "Copyright © YEAR Company" without the reserved phrase.
+  out = out.replace(
+    /Copyright\s*©\s*\d{4}[^<]{0,120}?MALI[^<]{0,80}\.?/gi,
+    line,
   );
   return out;
 }
@@ -198,6 +223,7 @@ export function scrubMailchimpNewsletterHtml(
 
   out = rewriteSocialIconCdn(out, opts.appUrl);
   out = stripMailchimpComplianceCopy(out);
+  out = normalizeCopyright(out);
 
   // Merge-field leftovers from archive HTML.
   out = out.replace(/\?e=\[UNIQID\]/gi, '');

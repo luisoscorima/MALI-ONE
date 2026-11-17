@@ -345,6 +345,7 @@ export function NewslettersPage() {
             initialDesignJson={initialDesignJson}
             initialHtml={initialHtml}
             brand={brand}
+            slug={slug}
           />
         </div>
       ) : null}

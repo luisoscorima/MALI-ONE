@@ -12,6 +12,7 @@ import {
   NEWSLETTER_BRAND_LABELS,
   buildNewsletterBrandFooter,
   buildNewsletterBrandHeader,
+  newsletterCopyrightLine,
   wrapNewsletterWithBrandChrome,
 } from '@mali-one/shared';
 import 'grapesjs/dist/css/grapes.min.css';
@@ -44,8 +45,24 @@ type NewsletterEditorProps = {
   initialDesignJson?: string | null;
   initialHtml?: string | null;
   brand?: NewsletterBrand | null;
+  /** Used for “Ver este correo…” when brand chrome is inserted. */
+  slug?: string;
   className?: string;
 };
+
+function brandAssetsFor(
+  brand: NewsletterBrand,
+  slug?: string,
+): { logoUrl: string; viewInBrowserUrl: string } {
+  const logoUrl = NEWSLETTER_BRAND_LOGO_URLS[brand];
+  const trimmed = slug?.trim();
+  return {
+    logoUrl,
+    viewInBrowserUrl: trimmed
+      ? `${BRAND_LOGO_ORIGIN}/n/${trimmed}`
+      : 'https://mali.pe',
+  };
+}
 
 /** Accent used for CTAs in Mailchimp MALI templates. */
 const MALI_PINK = '#e2187d';
@@ -185,7 +202,7 @@ const BLOCK_FOOTER = `
     </tr>
     <tr>
       <td style="padding:16px;text-align:center;font-size:11px;color:#888888">
-        © ${new Date().getFullYear()} MALI — Museo de Arte de Lima. Todos los derechos reservados.
+        ${newsletterCopyrightLine()}
       </td>
     </tr>
   </tbody>
@@ -223,7 +240,11 @@ const MALI_STARTER_HTML = `
 </table>
 `.trim();
 
-function registerMaliBlocks(editor: Editor, brand?: NewsletterBrand | null) {
+function registerMaliBlocks(
+  editor: Editor,
+  brand?: NewsletterBrand | null,
+  slug?: string,
+) {
   const bm = editor.BlockManager;
   const cat = 'MALI';
 
@@ -283,17 +304,17 @@ function registerMaliBlocks(editor: Editor, brand?: NewsletterBrand | null) {
   ];
 
   if (brand) {
-    const logoUrl = NEWSLETTER_BRAND_LOGO_URLS[brand];
+    const assets = brandAssetsFor(brand, slug);
     items.unshift(
       {
         id: `mali-brand-header-${brand}`,
         label: `Header ${NEWSLETTER_BRAND_LABELS[brand]}`,
-        content: buildNewsletterBrandHeader(brand, { logoUrl }),
+        content: buildNewsletterBrandHeader(brand, assets),
       },
       {
         id: `mali-brand-footer-${brand}`,
         label: `Footer ${NEWSLETTER_BRAND_LABELS[brand]}`,
-        content: buildNewsletterBrandFooter(brand, { logoUrl }),
+        content: buildNewsletterBrandFooter(brand, assets),
       },
     );
   }
@@ -313,6 +334,7 @@ function loadInitialContent(
   designJson?: string | null,
   html?: string | null,
   brand?: NewsletterBrand | null,
+  slug?: string,
 ) {
   if (designJson?.trim()) {
     try {
@@ -331,7 +353,7 @@ function loadInitialContent(
       wrapNewsletterWithBrandChrome(
         `<table style="width:100%;margin:0;padding:0;border-collapse:collapse" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding:24px 16px;font-family:${FONT};color:${MALI_BLACK};font-size:14px;line-height:1.55"><p style="margin:0">Escribe aquí el contenido del boletín.</p></td></tr></tbody></table>`,
         brand,
-        { logoUrl: NEWSLETTER_BRAND_LOGO_URLS[brand] },
+        brandAssetsFor(brand, slug),
       ),
     );
     return;
@@ -343,7 +365,7 @@ export const NewsletterEditor = forwardRef<
   NewsletterEditorHandle,
   NewsletterEditorProps
 >(function NewsletterEditor(
-  { initialDesignJson, initialHtml, brand = null, className },
+  { initialDesignJson, initialHtml, brand = null, slug, className },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -457,8 +479,8 @@ export const NewsletterEditor = forwardRef<
       },
     });
 
-    registerMaliBlocks(editor, brand);
-    loadInitialContent(editor, initialDesignJson, initialHtml, brand);
+    registerMaliBlocks(editor, brand, slug);
+    loadInitialContent(editor, initialDesignJson, initialHtml, brand, slug);
     editorRef.current = editor;
 
     return () => {

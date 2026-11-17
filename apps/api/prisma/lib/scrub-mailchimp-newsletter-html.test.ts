@@ -55,6 +55,44 @@ test('removes list-manage preference/unsubscribe copy and referral badge', () =>
   assert.doesNotMatch(html, /cdn-images\.mailchimp/);
 });
 
+test('removes Spanish preference leftovers after copyright', () => {
+  const year = new Date().getFullYear();
+  const html = scrubMailchimpNewsletterHtml(
+    `© 2024 MALI — Museo de Arte de Lima. Todos los derechos reservados.
+     Eres parte del MALI
+     ¿Quieres hacer cambios en cómo recibes estos emails?
+     Puedes  o .
+     You can or .
+     You can or .`,
+    opts,
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `© ${year} MALI — Museo de Arte de Lima\\. Todos los derechos reservados\\.`,
+    ),
+  );
+  assert.doesNotMatch(html, /Eres parte del MALI/i);
+  assert.doesNotMatch(html, /Quieres hacer cambios/i);
+  assert.doesNotMatch(html, /Puedes\s+o/i);
+  assert.doesNotMatch(html, /You can\s+or/i);
+});
+
+test('normalizes English copyright to Spanish with current year', () => {
+  const year = new Date().getFullYear();
+  const html = scrubMailchimpNewsletterHtml(
+    `Copyright © 2023 Museo de Arte de Lima, All rights reserved.`,
+    opts,
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `© ${year} MALI — Museo de Arte de Lima\\. Todos los derechos reservados\\.`,
+    ),
+  );
+  assert.doesNotMatch(html, /All rights reserved/i);
+});
+
 test('unknown mailchi.mp archive falls back to mali.pe', () => {
   const html = scrubMailchimpNewsletterHtml(
     `<a href="https://mailchi.mp/mali/boletinmarzo2026-7706613?e=[UNIQID]"><img src="x.jpg" /></a>`,
