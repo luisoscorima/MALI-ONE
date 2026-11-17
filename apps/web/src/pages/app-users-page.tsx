@@ -159,9 +159,9 @@ export function AppUsersPage() {
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
-        <Card className="overflow-hidden p-0">
-          <div className="border-b border-border/60 p-3">
+      <div className="grid gap-6 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] lg:items-stretch">
+        <Card className="flex max-h-[min(70vh,40rem)] flex-col overflow-hidden p-0">
+          <div className="shrink-0 border-b border-border/60 p-3">
             <Input
               placeholder="Buscar por nombre o email..."
               value={query}
@@ -170,7 +170,7 @@ export function AppUsersPage() {
             />
           </div>
 
-          <div className="max-h-[min(70vh,40rem)] overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {loading ? (
               <div className="space-y-2 p-3">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -256,9 +256,9 @@ export function AppUsersPage() {
           </div>
         </Card>
 
-        <Card className="overflow-hidden p-0">
+        <Card className="flex max-h-[min(70vh,40rem)] flex-col overflow-hidden p-0">
           {loading ? (
-            <div className="space-y-3 p-6">
+            <div className="space-y-3 overflow-y-auto p-6">
               <Skeleton className="h-8 w-48" />
               <Skeleton className="h-4 w-72" />
               <div className="space-y-2 pt-4">
@@ -274,7 +274,7 @@ export function AppUsersPage() {
             />
           ) : (
             <>
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
+              <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-lg font-semibold tracking-tight">
@@ -303,7 +303,7 @@ export function AppUsersPage() {
                 )}
               </div>
 
-              <ul className="divide-y divide-border/60">
+              <ul className="min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto">
                 {APP_MODULES.map((mod) => {
                   const checked = selectedIsAdmin
                     ? true
@@ -347,7 +347,7 @@ export function AppUsersPage() {
               </ul>
 
               {!selectedIsAdmin ? (
-                <div className="sticky bottom-0 flex justify-end border-t border-border/60 bg-card px-5 py-3">
+                <div className="flex shrink-0 justify-end border-t border-border/60 bg-card px-5 py-3">
                   <Button
                     disabled={!selectedHasChanges || saving}
                     onClick={() => void saveModules()}

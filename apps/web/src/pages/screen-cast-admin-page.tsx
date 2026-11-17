@@ -403,12 +403,14 @@ function SortablePlaylistItemCard({
   onEdit,
   onDuplicate,
   onRemove,
+  onPreview,
 }: {
   item: ScreenCastPlaylistItemDto;
   disabled?: boolean;
   onEdit: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
+  onPreview: () => void;
 }) {
   const {
     attributes,
@@ -451,7 +453,17 @@ function SortablePlaylistItemCard({
           : `${item.mediaType} · ${Math.round(item.durationMs / 1000)}s`}
         {!item.activo ? ' · inactivo' : ''}
       </div>
-      <div className="absolute inset-x-0 top-0 z-10 flex justify-end gap-1 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <IconActionButton
+          variant="secondary"
+          className="pointer-events-auto size-10 shadow-sm"
+          label="Ver en pantalla completa"
+          onClick={onPreview}
+        >
+          <Eye size={18} />
+        </IconActionButton>
+      </div>
+      <div className="absolute inset-x-0 top-0 z-20 flex justify-end gap-1 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         <IconActionButton
           id={`sc-item-edit-${item.id}`}
           variant="secondary"
@@ -517,6 +529,8 @@ export function ScreenCastAdminPage() {
   const [reordering, setReordering] = useState(false);
 
   const [itemDraft, setItemDraft] = useState<ItemDraft | null>(null);
+  const [itemMediaPreview, setItemMediaPreview] =
+    useState<ScreenCastPlaylistItemDto | null>(null);
   const [savingItem, setSavingItem] = useState(false);
   const itemBaselineRef = useRef<ItemDraft | null>(null);
   const itemFocusReturnRef = useRef<string | null>(null);
@@ -665,9 +679,16 @@ export function ScreenCastAdminPage() {
     itemBaselineRef.current = null;
     itemFocusReturnRef.current = null;
     setItemDraft(null);
+    setItemMediaPreview(null);
     setItems([]);
     setPlaylistCrossfade(false);
     setPlaylistKenBurns(false);
+  }
+
+  function closeItemMediaPreview() {
+    setItemMediaPreview(null);
+    // Evita que el mismo click cierre el dialog de playlist.
+    notifyFloatingLayerOpen(false);
   }
 
   async function ensurePlaylistSaved(): Promise<string | null> {
@@ -1603,7 +1624,7 @@ export function ScreenCastAdminPage() {
         open={playlistDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
-            if (isFloatingLayerBlockingDismiss()) return;
+            if (itemMediaPreview || isFloatingLayerBlockingDismiss()) return;
             if (itemDraft) {
               void requestLeaveItemPanel();
               return;
@@ -1617,7 +1638,7 @@ export function ScreenCastAdminPage() {
         <DialogContent
           className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),56rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
           onPointerDownOutside={(e) => {
-            if (isFloatingLayerBlockingDismiss()) {
+            if (itemMediaPreview || isFloatingLayerBlockingDismiss()) {
               e.preventDefault();
               return;
             }
@@ -1627,12 +1648,16 @@ export function ScreenCastAdminPage() {
             }
           }}
           onFocusOutside={(e) => {
-            if (isFloatingLayerBlockingDismiss() || itemDraft) {
+            if (
+              itemMediaPreview ||
+              isFloatingLayerBlockingDismiss() ||
+              itemDraft
+            ) {
               e.preventDefault();
             }
           }}
           onInteractOutside={(e) => {
-            if (isFloatingLayerBlockingDismiss()) {
+            if (itemMediaPreview || isFloatingLayerBlockingDismiss()) {
               e.preventDefault();
               return;
             }
@@ -1642,6 +1667,11 @@ export function ScreenCastAdminPage() {
             }
           }}
           onEscapeKeyDown={(e) => {
+            if (itemMediaPreview) {
+              e.preventDefault();
+              closeItemMediaPreview();
+              return;
+            }
             if (isFloatingLayerBlockingDismiss()) {
               e.preventDefault();
               return;
@@ -1885,6 +1915,7 @@ export function ScreenCastAdminPage() {
                                 onEdit={() => openItemEdit(item)}
                                 onDuplicate={() => void duplicateItem(item)}
                                 onRemove={() => void removeItem(item)}
+                                onPreview={() => setItemMediaPreview(item)}
                               />
                             ))}
                             <button
@@ -1926,6 +1957,48 @@ export function ScreenCastAdminPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(itemMediaPreview)}
+        onOpenChange={(open) => {
+          if (!open) closeItemMediaPreview();
+        }}
+      >
+        <DialogContent className="gap-3 p-4 sm:max-w-[min(96vw,1100px)]">
+          <DialogHeader>
+            <DialogTitle>Vista previa</DialogTitle>
+            <DialogDescription>
+              {itemMediaPreview?.mediaType === 'video'
+                ? 'Video de la playlist'
+                : `Imagen de la playlist${
+                    itemMediaPreview
+                      ? ` · ${Math.round(itemMediaPreview.durationMs / 1000)}s`
+                      : ''
+                  }`}
+            </DialogDescription>
+          </DialogHeader>
+          {itemMediaPreview ? (
+            <div className="overflow-hidden rounded-md bg-black">
+              {itemMediaPreview.mediaType === 'video' ? (
+                <video
+                  key={itemMediaPreview.mediaUrl}
+                  src={itemMediaPreview.mediaUrl}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="max-h-[min(85dvh,860px)] w-full object-contain"
+                />
+              ) : (
+                <img
+                  src={itemMediaPreview.mediaUrl}
+                  alt=""
+                  className="max-h-[min(85dvh,860px)] w-full object-contain"
+                />
+              )}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
