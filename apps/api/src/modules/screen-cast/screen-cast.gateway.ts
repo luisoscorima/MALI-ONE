@@ -41,6 +41,11 @@ const OFFLINE_GRACE_MS = 15_000;
  */
 const PING_INTERVAL_MS = 20_000;
 const PING_TIMEOUT_MS = 45_000;
+/**
+ * Admin "online" grace when the WS map is briefly empty (reconnect race) but
+ * the screen still heartbeated recently. Three player heartbeats (30s each).
+ */
+const ONLINE_SEEN_MS = 90_000;
 /** Status older than this is ignored by the relative-desync watchdog. */
 const PLAYBACK_FRESH_MS = 15_000;
 /** Sibling mediaTime delta that counts as a desync sample. */
@@ -234,6 +239,13 @@ export class ScreenCastGateway
   handleConnection(client: Socket) {
     const transport = client.conn?.transport?.name ?? 'unknown';
     this.logger.debug(`WS connected: ${client.id} transport=${transport}`);
+    // Players send auth.screenKey on connect. Register presence immediately so
+    // the admin badge does not wait for the join round-trip (or a failed join).
+    const authKey = this.screenKeyFromAuth(client);
+    if (authKey) {
+      client.data.screenKey = authKey;
+      this.addConnection(authKey, client.id);
+    }
     // engine.io reports why the socket really went away ("ping timeout",
     // "transport close", "transport error"...). Without it every drop looks
     // the same in the logs and a proxy problem is indistinguishable from a
@@ -285,13 +297,26 @@ export class ScreenCastGateway
     // A screen that comes back while its group is still buffering has to
     // rejoin that barrier, otherwise it is left out of the count and gets a
     // play:go it never prepared for.
+    const liveSession = playlistId ? this.sessions.get(playlistId) : undefined;
+    const midBarrier =
+      !!liveSession &&
+      !liveSession.done &&
+      liveSession.members.has(key);
     this.rejoinLiveSession(client, key, playlistId);
+
+    // Wall already has a clock and no open barrier: catch this screen up onto
+    // the shared epoch without restarting siblings.
+    if (playlistId && this.clocks.has(playlistId) && !midBarrier) {
+      void this.catchUpScreen(key);
+    }
 
     return {
       ok: true,
       screenKey: key,
       serverNow: Date.now(),
-      clock: this.publicClock(playlistId),
+      // Mid-barrier the finished clock is stale relative to the open session;
+      // rejoinLiveSession already sent playlist:sync for that syncId.
+      clock: midBarrier ? null : this.publicClock(playlistId),
       playableUrls: this.playableUrls(playlistId),
     };
   }
@@ -461,6 +486,32 @@ export class ScreenCastGateway
   isScreenConnected(screenKey: string): boolean {
     const set = this.connections.get(screenKey.trim().toLowerCase());
     return !!set && set.size > 0;
+  }
+
+  /**
+   * Admin presence: live socket, or a recent heartbeat while the WS map is
+   * briefly empty during reconnect.
+   */
+  isScreenOnline(
+    screenKey: string,
+    lastSeenAt?: string | Date | null,
+  ): boolean {
+    if (this.isScreenConnected(screenKey)) return true;
+    if (lastSeenAt == null) return false;
+    const seenMs =
+      typeof lastSeenAt === 'string'
+        ? Date.parse(lastSeenAt)
+        : lastSeenAt.getTime();
+    if (!Number.isFinite(seenMs)) return false;
+    return Date.now() - seenMs < ONLINE_SEEN_MS;
+  }
+
+  private screenKeyFromAuth(client: Socket): string | null {
+    const raw = (client.handshake?.auth as { screenKey?: unknown } | undefined)
+      ?.screenKey;
+    if (typeof raw !== 'string') return null;
+    const key = raw.trim().toLowerCase();
+    return key || null;
   }
 
   getPlaybackStatus(screenKey: string): {
@@ -980,8 +1031,14 @@ export class ScreenCastGateway
     const screens = this.connectedKeysForPlaylist(playlistId);
     if (screens.length === 0) return [];
     let acc: Set<string> | null = null;
+    let reported = 0;
     for (const key of screens) {
-      const urls = this.localUrlsByScreen.get(key) ?? new Set<string>();
+      // A connected screen that has not reported localUrls yet must not be
+      // treated as an empty set — that zeroes the wall intersection and freezes
+      // every video slot on every sibling.
+      const urls = this.localUrlsByScreen.get(key);
+      if (!urls) continue;
+      reported += 1;
       if (!acc) {
         acc = new Set(urls);
         continue;
@@ -989,6 +1046,11 @@ export class ScreenCastGateway
       for (const url of [...acc]) {
         if (!urls.has(url)) acc.delete(url);
       }
+    }
+    // Nobody has reported yet: keep the last published consensus instead of
+    // broadcasting an empty playable set.
+    if (reported === 0) {
+      return this.playableByPlaylist.get(playlistId) ?? [];
     }
     return acc ? [...acc] : [];
   }

@@ -96,7 +96,10 @@ export class ScreenCastController {
       ...playlist,
       monitors: playlist.monitors.map((monitor) => ({
         ...monitor,
-        online: this.gateway.isScreenConnected(monitor.screenKey),
+        online: this.gateway.isScreenOnline(
+          monitor.screenKey,
+          monitor.lastSeenAt,
+        ),
       })),
     }));
   }
@@ -443,7 +446,7 @@ export class ScreenCastController {
   }
 
   private withLivePresence<
-    T extends { screenKey: string; online: boolean },
+    T extends { screenKey: string; online: boolean; lastSeenAt?: string | null },
   >(monitor: T): T & {
     playbackIndex: number | null;
     playbackTotal: number | null;
@@ -452,7 +455,10 @@ export class ScreenCastController {
     const playback = this.gateway.getPlaybackStatus(monitor.screenKey);
     return {
       ...monitor,
-      online: this.gateway.isScreenConnected(monitor.screenKey),
+      online: this.gateway.isScreenOnline(
+        monitor.screenKey,
+        monitor.lastSeenAt,
+      ),
       playbackIndex: playback?.index ?? null,
       playbackTotal: playback?.total ?? null,
       lastError: playback?.lastError ?? null,

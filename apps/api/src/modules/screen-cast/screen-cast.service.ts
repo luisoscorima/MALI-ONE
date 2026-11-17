@@ -234,7 +234,13 @@ export class ScreenCastService {
       include: {
         _count: { select: { monitors: true, items: true } },
         monitors: {
-          select: { id: true, name: true, screenKey: true, photoUrl: true },
+          select: {
+            id: true,
+            name: true,
+            screenKey: true,
+            photoUrl: true,
+            lastSeenAt: true,
+          },
           orderBy: { name: 'asc' },
         },
         items: {
@@ -244,9 +250,13 @@ export class ScreenCastService {
         },
       },
     });
-    return rows.map(({ items, ...playlist }) => ({
+    return rows.map(({ items, monitors, ...playlist }) => ({
       ...playlist,
       previewItems: items,
+      monitors: monitors.map(({ lastSeenAt, ...monitor }) => ({
+        ...monitor,
+        lastSeenAt: lastSeenAt?.toISOString() ?? null,
+      })),
     }));
   }
 

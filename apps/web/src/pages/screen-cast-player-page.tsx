@@ -84,6 +84,16 @@ const MAX_PLAY_SCHEDULE_MS = 5_000;
 const VIDEO_COVER_MAX_MS = 2_500;
 /** How often a held slot re-checks whether its clip became playable. */
 const HOLD_RECHECK_MS = 3_000;
+/**
+ * If sync cover / waitingGo lasts this long without a shared play:go, re-apply
+ * the last known group clock (never invent a solo epoch while one exists).
+ */
+const STUCK_SYNC_RECOVERY_MS = 22_000;
+const STUCK_SYNC_POLL_MS = 5_000;
+/** Join ack must land before we claim the screen is connected in the UI. */
+const JOIN_ACK_TIMEOUT_MS = 5_000;
+const JOIN_RETRY_MAX = 2;
+const JOIN_RETRY_DELAY_MS = 1_500;
 
 /** Soft image→image blend; stays inside the new slide's clock slot. */
 const IMAGE_CROSSFADE_MS = 450;
@@ -254,6 +264,7 @@ function stageStyle(
 
 type JoinAck = {
   ok?: boolean;
+  error?: string;
   serverNow?: number;
   clock?: PlaylistClock | null;
   playableUrls?: string[];
@@ -344,8 +355,34 @@ export function ScreenCastPlayerPage() {
    */
   const stillShownAtPerfRef = useRef<number | null>(null);
   const stillEntryOffsetMsRef = useRef(0);
+  /** When holdForSync / waitingGo started — drives stuck-sync recovery. */
+  const syncStuckSinceRef = useRef<number | null>(null);
 
   const nowServer = useCallback(() => Date.now() + clockOffsetRef.current, []);
+
+  /** Prefer the wall clock from join/heartbeat, then the epoch already in use. */
+  const sharedClockPayload = useCallback((): PlayGoPayload | null => {
+    const join = joinClockRef.current;
+    if (join?.epochMs) {
+      return {
+        syncId: join.syncId,
+        epochMs: join.epochMs,
+        durationsMs: join.durationsMs,
+        serverNow: nowServer(),
+      };
+    }
+    if (epochMsRef.current != null) {
+      return {
+        syncId: syncIdRef.current ?? undefined,
+        epochMs: epochMsRef.current,
+        durationsMs: durationsRef.current.length
+          ? durationsRef.current
+          : localDurationsRef.current,
+        serverNow: nowServer(),
+      };
+    }
+    return null;
+  }, [nowServer]);
 
   const setHold = useCallback((holding: boolean) => {
     videoHoldingRef.current = holding;
@@ -478,6 +515,7 @@ export function ScreenCastPlayerPage() {
 
   const holdForSync = useCallback(() => {
     syncingRef.current = true;
+    syncStuckSinceRef.current = Date.now();
     setSyncing(true);
     setLoaderHint('Sincronizando…');
     setVideoCovered(true);
@@ -577,6 +615,7 @@ export function ScreenCastPlayerPage() {
       pendingConfigRef.current = data;
       itemsRef.current = data.items;
       indexRef.current = startIndex;
+      syncStuckSinceRef.current = null;
       setConfig(data);
       setIndex(startIndex);
       setError('');
@@ -598,6 +637,7 @@ export function ScreenCastPlayerPage() {
         return;
       }
       waitingGoRef.current = false;
+      syncStuckSinceRef.current = null;
       clearGoFallback();
       pendingGoRef.current = null;
       readyForGoRef.current = false;
@@ -659,6 +699,61 @@ export function ScreenCastPlayerPage() {
     pendingConfigRef.current = data;
     return data;
   }, [screenKey]);
+
+  /**
+   * Re-enter the wall timeline from a known group clock. Never invents a solo
+   * epoch — that would desync siblings sharing the playlist.
+   */
+  const recoverWithSharedClock = useCallback(
+    async (
+      clock?: PlaylistClock | null,
+      playableUrls?: string[],
+      serverNow?: number,
+    ) => {
+      const fromJoin = clock?.epochMs
+        ? {
+            syncId: clock.syncId,
+            epochMs: clock.epochMs,
+            durationsMs: clock.durationsMs,
+            playableUrls,
+            serverNow: serverNow ?? nowServer(),
+          }
+        : null;
+      const payload = fromJoin ?? sharedClockPayload();
+      if (!payload) return false;
+      if (playableUrls) payload.playableUrls = playableUrls;
+      try {
+        let data = pendingConfigRef.current;
+        if (!data || data.empty) {
+          data = await fetchConfig();
+          pendingConfigRef.current = data;
+        }
+        if (data.empty) {
+          waitingGoRef.current = false;
+          syncStuckSinceRef.current = null;
+          clearGoFallback();
+          epochMsRef.current = null;
+          applyConfig(data, 0);
+          return true;
+        }
+        // Align to the group's syncId before applyGo so a stale waitingGo
+        // from an older barrier cannot reject the live wall clock.
+        if (payload.syncId) syncIdRef.current = payload.syncId;
+        applyGo(payload);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [
+      applyConfig,
+      applyGo,
+      clearGoFallback,
+      fetchConfig,
+      nowServer,
+      sharedClockPayload,
+    ],
+  );
 
   const emitReady = useCallback(
     (syncId: string | null, playlistId: string | null, durationsMs: number[]) => {
@@ -845,10 +940,15 @@ export function ScreenCastPlayerPage() {
       clearGoFallback();
       goFallbackRef.current = window.setTimeout(() => {
         if (!waitingGoRef.current) return;
+        // Prefer the wall clock over inventing a solo epoch that would
+        // desync siblings on the same playlist.
+        const shared = sharedClockPayload();
         applyGo({
-          syncId: payload.syncId ?? undefined,
-          epochMs: nowServer(),
-          durationsMs: localDurationsRef.current,
+          syncId: shared?.syncId ?? payload.syncId ?? undefined,
+          epochMs: shared?.epochMs ?? nowServer(),
+          durationsMs: shared?.durationsMs?.length
+            ? shared.durationsMs
+            : localDurationsRef.current,
           serverNow: nowServer(),
         });
       }, CLIENT_GO_FALLBACK_MS);
@@ -894,6 +994,7 @@ export function ScreenCastPlayerPage() {
       emitReady,
       holdForSync,
       clearPlayAtTimer,
+      sharedClockPayload,
       warmupStartItem,
     ],
   );
@@ -1012,6 +1113,8 @@ export function ScreenCastPlayerPage() {
     kioskToast,
     clearGoFallback,
     localUrlsForReport,
+    recoverWithSharedClock,
+    onSocketDisconnect: () => {},
   });
   useEffect(() => {
     socketHandlersRef.current = {
@@ -1022,6 +1125,25 @@ export function ScreenCastPlayerPage() {
       kioskToast,
       clearGoFallback,
       localUrlsForReport,
+      recoverWithSharedClock,
+      onSocketDisconnect: () => {
+        // Drop the sync cover but keep the last shared epoch so the slot
+        // clock keeps advancing offline; reconnect catch-up realigns.
+        if (!waitingGoRef.current && !syncingRef.current) return;
+        waitingGoRef.current = false;
+        syncStuckSinceRef.current = null;
+        clearGoFallback();
+        setSyncing(false);
+        setLoading(false);
+        if (
+          pendingConfigRef.current &&
+          !pendingConfigRef.current.empty &&
+          epochMsRef.current != null
+        ) {
+          setVideoCovered(false);
+          setPlaybackGen((g) => g + 1);
+        }
+      },
     };
   });
 
@@ -1031,34 +1153,105 @@ export function ScreenCastPlayerPage() {
     const socket = connectScreenCastSocket(screenKey);
     socketRef.current = socket;
 
-    socket.on('connect', () => {
+    const joinTimers = new Set<number>();
+    const trackTimer = (id: number) => {
+      joinTimers.add(id);
+      return id;
+    };
+    const clearJoinTimers = () => {
+      for (const id of joinTimers) window.clearTimeout(id);
+      joinTimers.clear();
+    };
+
+    const emitJoin = (attempt: number) => {
+      if (!socket.connected) return;
       const sentAt = Date.now();
-      if (socketWasConnectedRef.current) {
-        socketHandlersRef.current.kioskToast('Conexión restablecida', 'ok');
-      } else {
-        socketHandlersRef.current.kioskToast('Pantalla conectada', 'ok');
-        socketWasConnectedRef.current = true;
-      }
-      socket.emit('join', { screenKey, localUrls: socketHandlersRef.current.localUrlsForReport() }, (ack: JoinAck) => {
-        socketHandlersRef.current.applyClockOffset(ack?.serverNow, sentAt);
-        socketHandlersRef.current.applyPlayableUrls(ack?.playableUrls);
-        if (ack?.clock?.epochMs) {
-          joinClockRef.current = ack.clock;
-          if (pendingConfigRef.current && !waitingGoRef.current) {
-            socketHandlersRef.current.applyGo({
-              syncId: ack.clock.syncId,
-              epochMs: ack.clock.epochMs,
-              durationsMs: ack.clock.durationsMs,
-              playableUrls: ack.playableUrls,
-              serverNow: ack.serverNow,
-            });
+      let settled = false;
+      const timer = trackTimer(
+        window.setTimeout(() => {
+          joinTimers.delete(timer);
+          if (settled) return;
+          settled = true;
+          if (attempt < JOIN_RETRY_MAX) {
+            socketHandlersRef.current.kioskToast(
+              'Reintentando registro…',
+              'warn',
+            );
+            trackTimer(
+              window.setTimeout(
+                () => emitJoin(attempt + 1),
+                JOIN_RETRY_DELAY_MS,
+              ),
+            );
+            return;
           }
-        }
-      });
+          socketHandlersRef.current.kioskToast(
+            'Sin registro en el servidor',
+            'warn',
+          );
+        }, JOIN_ACK_TIMEOUT_MS),
+      );
+
+      socket.emit(
+        'join',
+        {
+          screenKey,
+          localUrls: socketHandlersRef.current.localUrlsForReport(),
+        },
+        (ack: JoinAck) => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          joinTimers.delete(timer);
+          if (!ack?.ok) {
+            if (attempt < JOIN_RETRY_MAX) {
+              socketHandlersRef.current.kioskToast(
+                'Reintentando registro…',
+                'warn',
+              );
+              trackTimer(
+                window.setTimeout(
+                  () => emitJoin(attempt + 1),
+                  JOIN_RETRY_DELAY_MS,
+                ),
+              );
+              return;
+            }
+            socketHandlersRef.current.kioskToast(
+              ack?.error?.trim() || 'Sin registro en el servidor',
+              'warn',
+            );
+            return;
+          }
+          if (socketWasConnectedRef.current) {
+            socketHandlersRef.current.kioskToast('Conexión restablecida', 'ok');
+          } else {
+            socketHandlersRef.current.kioskToast('Pantalla conectada', 'ok');
+            socketWasConnectedRef.current = true;
+          }
+          socketHandlersRef.current.applyClockOffset(ack.serverNow, sentAt);
+          socketHandlersRef.current.applyPlayableUrls(ack.playableUrls);
+          if (ack.clock?.epochMs) {
+            joinClockRef.current = ack.clock;
+            // Always re-apply the group clock — even if waitingGo was stuck
+            // from a cut sync. Inventing a solo epoch is forbidden.
+            void socketHandlersRef.current.recoverWithSharedClock(
+              ack.clock,
+              ack.playableUrls,
+              ack.serverNow,
+            );
+          }
+        },
+      );
+    };
+
+    socket.on('connect', () => {
+      emitJoin(0);
     });
 
     socket.on('disconnect', () => {
       socketHandlersRef.current.kioskToast('Sin conexión', 'warn');
+      socketHandlersRef.current.onSocketDisconnect();
     });
 
     socket.on('playlist:sync', (payload: PlaylistSyncPayload) => {
@@ -1111,7 +1304,16 @@ export function ScreenCastPlayerPage() {
         (ack: JoinAck) => {
         socketHandlersRef.current.applyClockOffset(ack?.serverNow, sentAt);
         socketHandlersRef.current.applyPlayableUrls(ack?.playableUrls);
-        if (ack?.clock?.epochMs && !waitingGoRef.current) {
+        if (ack?.clock?.epochMs) {
+          joinClockRef.current = ack.clock;
+          if (waitingGoRef.current || syncingRef.current) {
+            void socketHandlersRef.current.recoverWithSharedClock(
+              ack.clock,
+              ack.playableUrls,
+              ack.serverNow,
+            );
+            return;
+          }
           epochMsRef.current = ack.clock.epochMs;
           if (ack.clock.durationsMs?.length) {
             durationsRef.current = resolveDurations(
@@ -1128,6 +1330,7 @@ export function ScreenCastPlayerPage() {
     heartbeatRef.current = window.setInterval(sendHeartbeat, HEARTBEAT_MS);
 
     return () => {
+      clearJoinTimers();
       if (heartbeatRef.current !== null) {
         window.clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
@@ -1703,6 +1906,14 @@ export function ScreenCastPlayerPage() {
         if (entry.mediaType === 'video') retryVideoDownload(entry.mediaUrl);
       }
       holdCooldownRef.current.clear();
+      const socket = socketRef.current;
+      if (socket && !socket.connected) {
+        socket.connect();
+        return;
+      }
+      if (waitingGoRef.current || syncingRef.current) {
+        void recoverWithSharedClock();
+      }
     };
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
@@ -1710,7 +1921,18 @@ export function ScreenCastPlayerPage() {
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('online', onOnline);
     };
-  }, [isPreview, kioskToast]);
+  }, [isPreview, kioskToast, recoverWithSharedClock]);
+
+  useEffect(() => {
+    if (isPreview) return;
+    const id = window.setInterval(() => {
+      if (!waitingGoRef.current && !syncingRef.current) return;
+      const since = syncStuckSinceRef.current;
+      if (since == null || Date.now() - since < STUCK_SYNC_RECOVERY_MS) return;
+      void recoverWithSharedClock();
+    }, STUCK_SYNC_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [isPreview, recoverWithSharedClock]);
 
   const current = config?.items[index];
   const holdUi = loading || syncing;
