@@ -67,6 +67,10 @@ const MalichimpCampaignStatsPanel = lazy(() =>
 );
 
 const nf = new Intl.NumberFormat('es-PE');
+const pf = new Intl.NumberFormat('es-PE', {
+  style: 'percent',
+  maximumFractionDigits: 1,
+});
 const df = new Intl.DateTimeFormat('es-PE', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -920,7 +924,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
-  if (loading) return <TableShellSkeleton rows={5} cols={10} />;
+  if (loading) return <TableShellSkeleton rows={5} cols={7} />;
 
   return (
     <div className="space-y-4">
@@ -964,7 +968,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
       ) : null}
 
       <TableShell>
-        <Table className="min-w-[1100px]">
+        <Table className="min-w-[840px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[7.5rem]">Vista</TableHead>
@@ -972,10 +976,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviados</TableHead>
                 <TableHead>Entregados</TableHead>
-                <TableHead>Rebotes</TableHead>
-                <TableHead>Omitidos</TableHead>
-                <TableHead>Aperturas</TableHead>
-                <TableHead>Clics</TableHead>
+                <TableHead>% apertura</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -1025,28 +1026,15 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                   </TableCell>
                   <TableCell>{nf.format(campaign.sent)} / {nf.format(campaign.totalRecipients)}</TableCell>
                   <TableCell>{nf.format(campaign.delivered)}</TableCell>
-                  <TableCell>{nf.format(campaign.bounced)}</TableCell>
-                  <TableCell>{nf.format(campaign.suppressed)}</TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="tabular-nums underline-offset-2 hover:underline"
-                      onClick={() => setStatsCampaign(campaign)}
-                    >
-                      {nf.format(campaign.opened)}
-                    </button>
+                  <TableCell className="tabular-nums">
+                    {pf.format(
+                      campaign.delivered > 0
+                        ? campaign.opened / campaign.delivered
+                        : 0,
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <button
-                      type="button"
-                      className="tabular-nums underline-offset-2 hover:underline"
-                      onClick={() => setStatsCampaign(campaign)}
-                    >
-                      {nf.format(campaign.clicked)}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <TableCell className="text-right">
+                    <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                       <IconActionButton
                         label="Estadísticas"
                         onClick={() => setStatsCampaign(campaign)}
@@ -1104,7 +1092,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
               ))}
               {!campaigns.length ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     <BarChart3 className="mx-auto mb-2 size-6" aria-hidden />
                     Aún no hay campañas MALICHIMP.
                   </TableCell>
