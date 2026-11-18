@@ -96,14 +96,19 @@ export class CrmEducacionService {
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 200),
     });
-    const items = Array.isArray((payload as { items?: unknown[] })?.items)
-      ? ((payload as { items: Array<{ id?: number }> }).items)
+    const base =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
+    const rawItems = base.items;
+    const items = Array.isArray(rawItems)
+      ? (rawItems as Array<Record<string, unknown> & { id?: number }>)
       : [];
     const links = await this.sales.linksByCycleIds(
       items.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0),
     );
     return {
-      ...payload,
+      ...base,
       items: items.map((item) => ({
         ...item,
         payment_link: links.get(Number(item.id)) ?? null,

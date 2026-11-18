@@ -1360,7 +1360,7 @@ export function CrmEducacionPage() {
       </TabsContent>
       <TabsContent value="payments" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Transición asesor: asociar código sin entrar a Treasury.
+          Transición asesor: asociar código de pago a la oportunidad.
           Caja: aplicar importe y boleteo. Destino asesor: misma asociación desde mali-whatsapp.
         </p>
         <AssociatePaymentPanel initialCycleId={paymentCyclePrefill} />
@@ -1459,7 +1459,7 @@ function AssociatePaymentPanel({
     try {
       const data = await api.lookupCrmEducationPayment(code.trim(), provider);
       setHits(data.hits);
-      if (!data.hits.length) toast.error('Sin coincidencias en Treasury');
+      if (!data.hits.length) toast.error('Sin coincidencias');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Error al buscar');
     } finally {
@@ -1736,7 +1736,7 @@ function CajaPaymentPanel() {
       <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} />
     </div>
     <div className="space-y-1">
-      <Label>Código Treasury</Label>
+      <Label>Código de pago</Label>
       <Input value={code} onChange={(e) => setCode(e.target.value)} />
     </div>
     <Button type="button" disabled={busy || code.trim().length < 4} onClick={() => void apply()}>
