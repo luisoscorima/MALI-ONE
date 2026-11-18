@@ -235,6 +235,7 @@ export function CrmEducacionPage() {
   const [managementCatalog, setManagementCatalog] = useState<EducationManagementCatalog>({ advisors: [], statuses: [] });
   const [managementSaving, setManagementSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
+  const [paymentCyclePrefill, setPaymentCyclePrefill] = useState('');
   const [syncingProspectia, setSyncingProspectia] = useState(false);
   const [prospectiaWatch, setProspectiaWatch] = useState(0);
   const [prospectiaSync, setProspectiaSync] = useState({
@@ -681,13 +682,22 @@ export function CrmEducacionPage() {
       />;
     } },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
-    { id: 'actions', header: 'Revisión', cell: ({ row }) => {
+    { id: 'actions', header: 'Acciones', cell: ({ row }) => {
       const cycle = row.original;
-      return cycle.requires_review && cycle.assigned_user_id && !cycle.closed_at
-        ? <Button size="sm" variant="outline" disabled={managementSaving}
-          onClick={() => void updateManagement(cycle.contact_id,
-            { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
-        : '—';
+      return <div className="flex flex-wrap gap-1">
+        <Button size="sm" variant="outline"
+          onClick={() => {
+            setPaymentCyclePrefill(String(cycle.id));
+            setTab('payments');
+          }}>
+          Asociar pago
+        </Button>
+        {cycle.requires_review && cycle.assigned_user_id && !cycle.closed_at
+          ? <Button size="sm" variant="outline" disabled={managementSaving}
+            onClick={() => void updateManagement(cycle.contact_id,
+              { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
+          : null}
+      </div>;
     } },
   ], [educationAdvisors, managementCatalog.statuses, managementSaving, requestStatusChange, updateManagement]);
 
@@ -1323,7 +1333,7 @@ export function CrmEducacionPage() {
           Transición asesor: asociar código sin entrar a Treasury.
           Caja: aplicar importe y boleteo. Destino asesor: misma asociación desde mali-whatsapp.
         </p>
-        <AssociatePaymentPanel />
+        <AssociatePaymentPanel initialCycleId={paymentCyclePrefill} />
         <CajaPaymentPanel />
         <BillingPanel />
       </TabsContent>
@@ -1385,20 +1395,38 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
   </div>;
 }
 
-function AssociatePaymentPanel() {
+const PAYMENT_PROVIDERS = [
+  { id: 'all', label: 'Todas las fuentes' },
+  { id: 'niubiz', label: 'Niubiz' },
+  { id: 'paycash', label: 'PagoEfectivo' },
+  { id: 'mercadopago', label: 'Mercado Pago' },
+] as const;
+
+function AssociatePaymentPanel({
+  initialCycleId = '',
+}: {
+  initialCycleId?: string;
+}) {
   const { toast } = useToast();
-  const [cycleId, setCycleId] = useState('');
+  const [cycleId, setCycleId] = useState(initialCycleId);
+  const [provider, setProvider] = useState('all');
   const [code, setCode] = useState('');
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [hits, setHits] = useState<Array<{
-    provider: string; transactionCode: string; amount: number; status: string;
+    provider: string; transactionCode: string; amount: number; currency: string; status: string;
     customerName: string | null; customerEmail: string | null;
   }>>([]);
 
+  useEffect(() => {
+    if (initialCycleId) setCycleId(initialCycleId);
+  }, [initialCycleId]);
+
   async function lookup() {
     setBusy(true);
+    setSelectedCode(null);
     try {
-      const data = await api.lookupCrmEducationPayment(code.trim());
+      const data = await api.lookupCrmEducationPayment(code.trim(), provider);
       setHits(data.hits);
       if (!data.hits.length) toast.error('Sin coincidencias en Treasury');
     } catch (error) {
@@ -1410,15 +1438,20 @@ function AssociatePaymentPanel() {
 
   async function associate() {
     const waCycleId = Number(cycleId);
+    const transactionCode = selectedCode || code.trim();
     if (!Number.isInteger(waCycleId) || waCycleId < 1) {
       toast.error('Indica el ID de oportunidad (ciclo WA)');
+      return;
+    }
+    if (!transactionCode) {
+      toast.error('Elige una coincidencia o escribe el código');
       return;
     }
     setBusy(true);
     try {
       await api.associateCrmEducationPayment({
         waCycleId,
-        transactionCode: code.trim(),
+        transactionCode,
       });
       toast.success('Código asociado a la venta');
     } catch (error) {
@@ -1429,28 +1462,57 @@ function AssociatePaymentPanel() {
   }
 
   return <div className="max-w-xl space-y-4 rounded-md border p-4">
+    <p className="text-sm font-medium">Asociar pago a oportunidad</p>
     <div className="space-y-1">
       <Label>ID oportunidad (ciclo WA)</Label>
       <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 1234" />
     </div>
     <div className="space-y-1">
-      <Label>Código de transacción / CIP / pedido</Label>
-      <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código Treasury" />
+      <Label>Fuente</Label>
+      <Select value={provider} onValueChange={setProvider}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {PAYMENT_PROVIDERS.map((p) =>
+            <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="space-y-1">
+      <Label>Código / pedido / CIP (primeros dígitos)</Label>
+      <Input value={code} onChange={(e) => setCode(e.target.value)}
+        placeholder="Escribe ≥4 caracteres" onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); void lookup(); }
+        }} />
     </div>
     <div className="flex gap-2">
       <Button type="button" variant="outline" disabled={busy || code.trim().length < 4} onClick={() => void lookup()}>
-        Validar
+        Buscar
       </Button>
-      <Button type="button" disabled={busy || code.trim().length < 4 || !cycleId} onClick={() => void associate()}>
+      <Button type="button" disabled={busy || (!selectedCode && code.trim().length < 4) || !cycleId}
+        onClick={() => void associate()}>
         Asociar a oportunidad
       </Button>
     </div>
-    {hits.length > 0 && <div className="space-y-2 text-sm">
-      {hits.map((hit) => <p key={`${hit.provider}-${hit.transactionCode}`} className="text-muted-foreground">
-        {hit.provider}: {hit.transactionCode} · {hit.amount} · {hit.status}
-        {hit.customerName ? ` · ${hit.customerName}` : ''}
-        {hit.customerEmail ? ` · ${hit.customerEmail}` : ''}
-      </p>)}
+    {hits.length > 0 && <div className="max-h-56 space-y-2 overflow-y-auto">
+      {hits.map((hit) => {
+        const active = selectedCode === hit.transactionCode;
+        return <button key={`${hit.provider}-${hit.transactionCode}`} type="button"
+          className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
+            active ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
+          }`}
+          onClick={() => {
+            setSelectedCode(hit.transactionCode);
+            setCode(hit.transactionCode);
+          }}>
+          <span className="font-medium">{hit.provider} · {hit.transactionCode}</span>
+          <br />
+          <span className="text-muted-foreground">
+            {hit.amount} {hit.currency} · {hit.status}
+            {hit.customerName ? ` · ${hit.customerName}` : ''}
+            {hit.customerEmail ? ` · ${hit.customerEmail}` : ''}
+          </span>
+        </button>;
+      })}
     </div>}
   </div>;
 }
