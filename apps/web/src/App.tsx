@@ -5,6 +5,7 @@ import { ToastProvider } from '@/contexts/toast-context';
 import { ConfirmProvider } from '@/hooks/use-confirm';
 import { TooltipProvider } from '@/components/ui';
 import { AccentThemeUserSync } from '@/components/accent-theme-user-sync';
+import { ColorSchemeProvider } from '@/components/color-scheme-provider';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, ModuleGuard, SuperAdminGuard } from '@/components/auth-guard';
 import { AdminUsersPage } from '@/pages/admin-users-page';
@@ -199,16 +200,18 @@ function AuthenticatedApp() {
 
 export function App() {
   return (
-    <AccentThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public routes — outside AuthProvider to avoid /api/auth/me 401 */}
-          <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
-          <Route path="/presentacion" element={<PresentacionPage />} />
-          <Route path="/presentacion/" element={<PresentacionPage />} />
-          <Route path="*" element={<AuthenticatedApp />} />
-        </Routes>
-      </BrowserRouter>
-    </AccentThemeProvider>
+    <BrowserRouter>
+      <ColorSchemeProvider>
+        <AccentThemeProvider>
+          <Routes>
+            {/* Public routes — outside AuthProvider to avoid /api/auth/me 401 */}
+            <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
+            <Route path="/presentacion" element={<PresentacionPage />} />
+            <Route path="/presentacion/" element={<PresentacionPage />} />
+            <Route path="*" element={<AuthenticatedApp />} />
+          </Routes>
+        </AccentThemeProvider>
+      </ColorSchemeProvider>
+    </BrowserRouter>
   );
 }

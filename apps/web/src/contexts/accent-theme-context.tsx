@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useTheme } from 'next-themes';
 import {
   ACCENT_STORAGE_KEY,
   applyAccentTheme,
@@ -15,6 +16,7 @@ import {
   persistCustomAccentHex,
   readStoredAccentTheme,
   type AccentThemeValue,
+  type ColorScheme,
 } from '@/lib/accent-themes';
 
 type AccentThemeContextValue = {
@@ -35,20 +37,26 @@ function persistLocal(id: AccentThemeValue) {
   }
 }
 
+function toColorScheme(resolved: string | undefined): ColorScheme {
+  return resolved === 'light' ? 'light' : 'dark';
+}
+
 export function AccentThemeProvider({ children }: { children: ReactNode }) {
+  const { resolvedTheme } = useTheme();
   const [accentId, setAccentIdState] =
     useState<AccentThemeValue>(defaultAccentThemeId);
 
   useEffect(() => {
-    const stored = readStoredAccentTheme();
-    setAccentIdState(stored);
-    applyAccentTheme(stored);
+    setAccentIdState(readStoredAccentTheme());
   }, []);
+
+  useEffect(() => {
+    applyAccentTheme(accentId, toColorScheme(resolvedTheme));
+  }, [accentId, resolvedTheme]);
 
   const setAccentId = useCallback((id: AccentThemeValue) => {
     const next = isAccentHex(id) ? id.toLowerCase() : id;
     setAccentIdState(next);
-    applyAccentTheme(next);
     persistLocal(next);
   }, []);
 

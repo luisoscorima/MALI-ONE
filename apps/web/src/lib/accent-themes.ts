@@ -77,7 +77,18 @@ export const accentThemes: AccentTheme[] = [
 export const defaultAccentThemeId: AccentThemeId = 'neutral';
 export const defaultCustomAccentHex = '#3b82f6';
 
-const APP_BACKGROUND = '#0f1419';
+export type ColorScheme = 'light' | 'dark';
+
+const APP_BACKGROUND_DARK = '#0f1419';
+const APP_BACKGROUND_LIGHT = '#fafafa';
+const NEUTRAL_PRIMARY_DARK = '#f4f4f5';
+const NEUTRAL_PRIMARY_LIGHT = '#18181b';
+const NEUTRAL_FOREGROUND_DARK = '#0f1419';
+const NEUTRAL_FOREGROUND_LIGHT = '#fafafa';
+
+export function readDocumentColorScheme(): ColorScheme {
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+}
 
 function hexToRgb(hex: string) {
   const raw = hex.replace('#', '');
@@ -109,21 +120,42 @@ export function getAccentTheme(id: AccentThemeId): AccentTheme {
 
 export { isAccentThemeId, isAccentHex, isValidAccentTheme };
 
-export function resolveAccentColors(value: AccentThemeValue): {
+export function resolveAccentColors(
+  value: AccentThemeValue,
+  colorScheme: ColorScheme = 'dark',
+): {
   primary: string;
   primaryForeground: string;
   palette: MaliGlassPalette;
   datasetAccent: string;
   themeColor: string;
 } {
+  const appBackground =
+    colorScheme === 'light' ? APP_BACKGROUND_LIGHT : APP_BACKGROUND_DARK;
+
   if (isAccentThemeId(value)) {
     const theme = getAccentTheme(value);
+    if (value === 'neutral') {
+      const primary =
+        colorScheme === 'light' ? NEUTRAL_PRIMARY_LIGHT : NEUTRAL_PRIMARY_DARK;
+      const primaryForeground =
+        colorScheme === 'light'
+          ? NEUTRAL_FOREGROUND_LIGHT
+          : NEUTRAL_FOREGROUND_DARK;
+      return {
+        primary,
+        primaryForeground,
+        palette: getMaliGlassPalette(value),
+        datasetAccent: value,
+        themeColor: appBackground,
+      };
+    }
     return {
       primary: theme.primary,
       primaryForeground: theme.primaryForeground,
       palette: getMaliGlassPalette(value),
       datasetAccent: value,
-      themeColor: value === 'neutral' ? APP_BACKGROUND : theme.primary,
+      themeColor: theme.primary,
     };
   }
 
@@ -253,8 +285,11 @@ export function applyLoginAmbientColors() {
   root.style.setProperty('--login-ambient-blue', loginAmbientColors.blue);
 }
 
-export function applyAccentTheme(value: AccentThemeValue) {
-  const resolved = resolveAccentColors(value);
+export function applyAccentTheme(
+  value: AccentThemeValue,
+  colorScheme: ColorScheme = readDocumentColorScheme(),
+) {
+  const resolved = resolveAccentColors(value, colorScheme);
   const root = document.documentElement;
   root.dataset.accent = resolved.datasetAccent;
   root.style.setProperty('--primary', resolved.primary);

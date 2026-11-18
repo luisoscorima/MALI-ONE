@@ -1,4 +1,13 @@
-import { EllipsisVertical, LogOut, Palette, Shield } from 'lucide-react';
+import {
+  Check,
+  EllipsisVertical,
+  LogOut,
+  Moon,
+  Palette,
+  Shield,
+  Sun,
+} from 'lucide-react';
+import { useTheme } from 'next-themes';
 import type { AuthUser } from '@mali-one/shared';
 import { AccentThemeSwatches } from '@/components/accent-theme-picker';
 import {
@@ -37,6 +46,47 @@ function userInitials(name?: string | null) {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+}
+
+function AppearanceControls({ compact = false }: { compact?: boolean }) {
+  const { theme, setTheme } = useTheme();
+  const active = theme === 'light' ? 'light' : 'dark';
+
+  const options = [
+    { id: 'dark' as const, label: 'Oscuro', icon: Moon },
+    { id: 'light' as const, label: 'Claro', icon: Sun },
+  ];
+
+  if (compact) {
+    return (
+      <div className="flex flex-col gap-1 px-2 pb-2">
+        {options.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTheme(id)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+          >
+            <Icon className="size-4" />
+            <span className="flex-1 text-left">{label}</span>
+            {active === id ? <Check className="size-4" /> : null}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {options.map(({ id, label, icon: Icon }) => (
+        <DropdownMenuItem key={id} onClick={() => setTheme(id)}>
+          <Icon className="size-4" />
+          {label}
+          {active === id ? <Check className="ml-auto size-4" /> : null}
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
 }
 
 export function NavUser({ user, onLogout }: Props) {
@@ -100,21 +150,37 @@ export function NavUser({ user, onLogout }: Props) {
             {isMobile ? (
               <>
                 <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <Sun className="size-3.5" />
+                  Apariencia
+                </div>
+                <AppearanceControls compact />
+                <div className="flex items-center gap-2 px-2 py-1.5 text-xs font-medium text-muted-foreground">
                   <Palette className="size-3.5" />
                   Color de interfaz
                 </div>
                 <AccentThemeSwatches className="justify-center px-3 pb-2" />
               </>
             ) : (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <Palette className="size-4" />
-                  Color de interfaz
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="p-0" collisionPadding={8}>
-                  <AccentThemeSwatches />
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
+              <>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Sun className="size-4" />
+                    Apariencia
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent collisionPadding={8}>
+                    <AppearanceControls />
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Palette className="size-4" />
+                    Color de interfaz
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="p-0" collisionPadding={8}>
+                    <AccentThemeSwatches />
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onLogout}>
