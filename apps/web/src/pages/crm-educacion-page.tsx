@@ -1345,7 +1345,7 @@ export function CrmEducacionPage() {
 }
 
 function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope }) {
-  const { toast } = useToast();
+  const toast = useToast();
   const [items, setItems] = useState<EducationLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -1407,7 +1407,7 @@ function AssociatePaymentPanel({
 }: {
   initialCycleId?: string;
 }) {
-  const { toast } = useToast();
+  const toast = useToast();
   const [cycleId, setCycleId] = useState(initialCycleId);
   const [provider, setProvider] = useState('all');
   const [code, setCode] = useState('');
@@ -1518,7 +1518,7 @@ function AssociatePaymentPanel({
 }
 
 function ActivityPanel() {
-  const { toast } = useToast();
+  const toast = useToast();
   const [cycleId, setCycleId] = useState('');
   const [channel, setChannel] = useState('call');
   const [result, setResult] = useState('attempted');
@@ -1629,7 +1629,7 @@ function ActivityPanel() {
 }
 
 function CajaPaymentPanel() {
-  const { toast } = useToast();
+  const toast = useToast();
   const [cycleId, setCycleId] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1693,7 +1693,7 @@ function CajaPaymentPanel() {
 }
 
 function BillingPanel() {
-  const { toast } = useToast();
+  const toast = useToast();
   const [cycleId, setCycleId] = useState('');
   const [status, setStatus] = useState<'pending' | 'obs' | 'obs_asesor' | 'boleteado'>('obs');
   const [note, setNote] = useState('');
