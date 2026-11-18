@@ -790,7 +790,9 @@ model EducacionOpportunity {
   interestCourse    String?
   /// lead_scoring u otro score de Prospectia
   leadScore         Int?
+  /// Prospectia-first: true si hay conversación Chatwoot (cualquier inbox). Independiente de mali-whatsapp.
   cameWithInbound   Boolean  @default(false)
+  /// Puente opcional a ciclo mali-whatsapp (no define solo contacto)
   waCycleId         Int?
   waContactId       Int?
   requiresReview    Boolean  @default(false)

@@ -633,6 +633,10 @@ export const api = {
         channel: string;
         external_id: string;
         source_label: string | null;
+        from_meta?: boolean;
+        prospectia_inbox?: string | null;
+        has_prospectia_chat?: boolean;
+        linked_wa?: boolean;
         category: string;
         stage_slug: string;
         first_seen_at: string;
@@ -727,7 +731,7 @@ export const api = {
     return request<{ hits: Array<{
       provider: string; providerPaymentId: string; transactionCode: string;
       amount: number; currency: string; status: string;
-      settlementKind?: 'positive' | 'in_progress' | 'negative' | 'unknown';
+      settlementKind?: 'positive' | 'authorized' | 'in_progress' | 'negative' | 'unknown';
       customerName: string | null; customerEmail: string | null; transactedAt: string | null;
     }> }>(`/api/crm-educacion/payments/lookup?${qs}`);
   },
@@ -737,7 +741,7 @@ export const api = {
   }) => request<{
     sale: unknown;
     candidate: unknown;
-    settlementKind: 'positive' | 'in_progress' | 'negative' | 'unknown';
+    settlementKind: 'positive' | 'authorized' | 'in_progress' | 'negative' | 'unknown';
     closesCycle: boolean;
   }>('/api/crm-educacion/payments/associate', {
     method: 'POST', body: JSON.stringify(body),

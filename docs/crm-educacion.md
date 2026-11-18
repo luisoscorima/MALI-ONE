@@ -130,7 +130,7 @@ La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp,
 
 Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor retenido y cambiar la etapa comercial. **Asociar pago** (columna Acciones) no exige `venta_exitosa`: abre la pestaña Pagos con el ciclo prefijado. Columna **Pago**: identificador derivado de `EducacionSale` (`payment_link`: reportado / parcial / pagado / revertido).
 
-**Cierre del ciclo (Option A):** `venta_exitosa` / `convertido` **no** cierran solos. Cierran: pago Treasury **positivo** asociado, “cerrar sin pago”, o estados de pérdida (`perdido` / `no_interesado`). Cobros en proceso se asocian con obs sin cerrar; negativos no se asocian. Detalle alineado con mali-whatsapp `docs/PAYMENT-LOOKUP-WA.md`.
+**Cierre del ciclo (Option A):** `venta_exitosa` / `convertido` **no** cierran solos. Cierran: pago Treasury **positivo** o **Autorizada/processing** asociado, “cerrar sin pago”, o estados de pérdida (`perdido` / `no_interesado`). Autorizada cierra con obs para Caja (liquidación puede demorar días). **Por pagar** / pending / mediation se asocian con obs **sin** cerrar; negativos no se asocian. Detalle alineado con mali-whatsapp `docs/PAYMENT-LOOKUP-WA.md`.
 
 El curso o interés y el origen reciente se leen de la última captación asociada. La conversación continúa en el inbox de MALI WhatsApp.
 
@@ -262,7 +262,7 @@ Migración: `20260928120000_education_lead_statuses` en mali-whatsapp. Al abrir 
 - Por contactar es el estado por defecto de un contacto nuevo.
 - No contesta no cierra el ciclo. No interesado y Perdido sí cierran al marcarse. Venta exitosa es `is_terminal` en catálogo pero **no** setea `closed_at` (Option A: cierra con pago / sin pago).
 - **RQ0017:** no se puede pasar a Venta exitosa (ni legacy Convertido) sin nombre usable, DNI, email, teléfono o identidad WhatsApp, y categoría CA/EP del ciclo. Si faltan datos, el ciclo se queda en el estado anterior; en CRM Educación aparece un diálogo para completar y reintentar.
-- **Pagos:** lookup/associate en pestaña Pagos e internal API para WA. Política de estados Treasury: positivo → asocia (+ cierre en WA); en proceso → asocia + `billingNote`; negativo → rechazo. Identificador `payment_link` en listado de Oportunidades.
+- **Pagos:** lookup/associate en pestaña Pagos e internal API para WA. Política de estados Treasury: positivo → asocia (+ cierre); Autorizada/processing → asocia (+ cierre) + `billingNote` (Caja valida); Por pagar/pending → asocia + `billingNote` sin cerrar; negativo → rechazo. Identificador `payment_link` en listado de Oportunidades.
 
 Todavía no están solas la fecha de Promesa, el motivo de Perdido, ni las marcas Nuevo, Duplicado, Retorno y Prometió antes. Mientras tanto, un reingreso se clasifica con la regla de 60 días que ya corre en WhatsApp: Venta exitosa va a revisión; No interesado dentro de la ventana también; el resto, dentro de la ventana, sigue en el mismo ciclo.
 

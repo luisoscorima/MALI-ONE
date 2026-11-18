@@ -65,6 +65,45 @@ const LABEL_TO_STAGE: Record<string, string> = {
   obj_precio: 'perdido',
 };
 
+/** Custom attrs Chatwoot/Prospectia de anuncio Meta (CTWA). UI: ID/URL/Título/Cuerpo del anuncio Meta. */
+export const PROSPECTIA_META_CTWA_KEYS = [
+  'ctwa_source_id',
+  'ctwa_source_url',
+  'ctwa_headline',
+  'ctwa_body',
+  'ctwa_clid',
+  'ctwa_media_url',
+  'ctwa_media_type',
+  'ctwa_source_type',
+] as const;
+
+/** Inboxes Prospectia (Chatwoot account 21). No son mali-whatsapp. */
+export const PROSPECTIA_INBOXES: Record<
+  number,
+  { kind: 'web' | 'whatsapp'; label: string; categoryHint?: 'ca' | 'ep' | 'general' }
+> = {
+  39: { kind: 'web', label: 'Web' },
+  27: { kind: 'whatsapp', label: 'WA CA', categoryHint: 'ca' },
+  26: { kind: 'whatsapp', label: 'WA EP', categoryHint: 'ep' },
+  28: { kind: 'whatsapp', label: 'WA XP', categoryHint: 'general' },
+};
+
+export type ProspectiaInboxInfo = {
+  id: number;
+  kind: 'web' | 'whatsapp';
+  label: string;
+};
+
+export function resolveProspectiaInbox(
+  inboxId: number | null | undefined,
+): ProspectiaInboxInfo | null {
+  if (inboxId == null || !Number.isFinite(Number(inboxId))) return null;
+  const id = Number(inboxId);
+  const known = PROSPECTIA_INBOXES[id];
+  if (!known) return { id, kind: 'whatsapp', label: `Inbox ${id}` };
+  return { id, kind: known.kind, label: known.label };
+}
+
 export type ProspectiaEnrichment = {
   category: 'ca' | 'ep' | 'general';
   stageSlug: string;
@@ -74,7 +113,24 @@ export type ProspectiaEnrichment = {
   advisorEmail: string | null;
   teamName: string | null;
   labels: string[];
+  /** Badge binario: llegó con atribución de anuncio Meta (attrs ctwa_*). */
+  fromMeta: boolean;
+  inbox: ProspectiaInboxInfo | null;
 };
+
+/** True si hay al menos un attr CTWA/Meta no vacío. */
+export function isMetaAdFromAttrs(
+  ...bags: Array<Record<string, unknown> | null | undefined>
+): boolean {
+  for (const bag of bags) {
+    if (!bag) continue;
+    for (const key of PROSPECTIA_META_CTWA_KEYS) {
+      const value = bag[key];
+      if (value != null && String(value).trim() !== '') return true;
+    }
+  }
+  return false;
+}
 
 export function pickPrimaryLabel(labels: string[]): string | null {
   const ranked = labels
@@ -89,6 +145,7 @@ export function categoryFromProspectia(input: {
   teamName?: string | null;
   conversationAttrs?: Record<string, unknown> | null;
   contactAttrs?: Record<string, unknown> | null;
+  inboxId?: number | null;
 }): 'ca' | 'ep' | 'general' {
   const labels = input.labels.map((l) => l.toLowerCase());
   if (labels.some((l) => l.includes('_arte') || l === 'mql_cursos_de_arte' || l === 'sql_cursos_de_arte' || l === 'venta_exitosa_arte')) {
@@ -109,6 +166,10 @@ export function categoryFromProspectia(input: {
   const categoria = String(attrs.categoria ?? '').toLowerCase();
   if (categoria.includes('arte') || categoria.includes('taller')) return 'ca';
   if (categoria.includes('profesional') || categoria.includes('ext')) return 'ep';
+  const inboxHint = input.inboxId != null
+    ? PROSPECTIA_INBOXES[Number(input.inboxId)]?.categoryHint
+    : undefined;
+  if (inboxHint) return inboxHint;
   return 'general';
 }
 
@@ -137,17 +198,20 @@ export function enrichFromProspectiaConversation(input: {
   contactLeadScore?: number | null;
   assigneeEmail?: string | null;
   teamName?: string | null;
+  inboxId?: number | null;
 }): ProspectiaEnrichment {
   const labels = (input.labels ?? []).map((l) => String(l).trim()).filter(Boolean);
   const prospectiaStatus = pickPrimaryLabel(labels);
   const stageSlug = prospectiaStatus
     ? (LABEL_TO_STAGE[prospectiaStatus] ?? 'por_contactar')
     : 'por_contactar';
+  const inbox = resolveProspectiaInbox(input.inboxId);
   const category = categoryFromProspectia({
     labels,
     teamName: input.teamName,
     conversationAttrs: input.customAttributes,
     contactAttrs: input.contactAttributes,
+    inboxId: input.inboxId,
   });
   const interestCourse = interestFromAttrs(
     input.customAttributes,
@@ -163,6 +227,7 @@ export function enrichFromProspectiaConversation(input: {
   const advisorEmail = String(input.assigneeEmail ?? '')
     .trim()
     .toLowerCase();
+  const fromMeta = isMetaAdFromAttrs(input.customAttributes, input.contactAttributes);
   return {
     category,
     stageSlug,
@@ -172,5 +237,25 @@ export function enrichFromProspectiaConversation(input: {
     advisorEmail: advisorEmail && advisorEmail.includes('@') ? advisorEmail : null,
     teamName: input.teamName ?? null,
     labels,
+    fromMeta,
+    inbox,
   };
+}
+
+/**
+ * Fuente corta: Prospectia · [Web|WA CA|WA EP|WA XP] · [Meta] · [curso].
+ * Sin saturar: inbox + Meta + un interés.
+ */
+export function prospectiaSourceLabel(input: {
+  fromMeta: boolean;
+  interestCourse: string | null;
+  inboxLabel?: string | null;
+}): string {
+  const parts = [
+    'Prospectia',
+    input.inboxLabel?.trim() || null,
+    input.fromMeta ? 'Meta' : null,
+    input.interestCourse?.trim() || null,
+  ].filter(Boolean);
+  return parts.join(' · ');
 }

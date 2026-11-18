@@ -269,7 +269,10 @@ export function CrmEducacionPage() {
     lastError: null as string | null,
   });
   const [nativeSoloContacto, setNativeSoloContacto] = useState<Array<{
-    id: string; channel: string; source_label: string | null; first_seen_at: string;
+    id: string; channel: string; source_label: string | null; from_meta?: boolean;
+    prospectia_inbox?: string | null;
+    has_prospectia_chat?: boolean; linked_wa?: boolean;
+    first_seen_at: string;
     classification: string; assigned_user_label: string | null;
     prospectia_status?: string | null; interest_course?: string | null;
     contacts: { name: string | null; last_name: string | null; phone: string | null; email: string | null };
@@ -1395,9 +1398,9 @@ export function CrmEducacionPage() {
             getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />)}
         {opportunityView === 'solo_contacto' && nativeSoloContacto.length > 0 && (
           <div className="space-y-2 border-t pt-4">
-            <h3 className="text-sm font-semibold">Prospectia (maestro ONE) sin WhatsApp</h3>
+            <h3 className="text-sm font-semibold">Prospectia · solo contacto</h3>
             <p className="text-xs text-muted-foreground">
-              Leads ingeridos desde Prospectia que aún no tienen ciclo/chat vinculado.
+              Sin conversación en Prospectia (Chatwoot). Independiente de mali-whatsapp.
             </p>
             <DataTable
               columns={[
@@ -1407,7 +1410,17 @@ export function CrmEducacionPage() {
                   || row.original.contacts?.phone || '—' },
                 { id: 'interest', header: 'Interés', cell: ({ row }) => row.original.interest_course || '—' },
                 { id: 'status', header: 'Estado Prospectia', cell: ({ row }) => row.original.prospectia_status || '—' },
-                { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || 'Prospectia' },
+                { id: 'source', header: 'Fuente', cell: ({ row }) => (
+                  <span className="inline-flex flex-wrap items-center gap-1">
+                    <span>{row.original.source_label || 'Prospectia'}</span>
+                    {row.original.prospectia_inbox
+                      ? <Badge variant="secondary">{row.original.prospectia_inbox}</Badge>
+                      : null}
+                    {row.original.from_meta ? <Badge variant="secondary">Meta</Badge> : null}
+                    <Badge variant="outline">Solo contacto</Badge>
+                    {row.original.linked_wa ? <Badge variant="outline">Mali WA</Badge> : null}
+                  </span>
+                ) },
                 { id: 'advisor', header: 'Asesor', cell: ({ row }) => row.original.assigned_user_label || '—' },
               ]}
               data={nativeSoloContacto}
@@ -1478,6 +1491,10 @@ type HistorialRow = {
   first_seen_at: string;
   channel: string;
   source_label: string | null;
+  from_meta?: boolean;
+  prospectia_inbox?: string | null;
+  has_prospectia_chat?: boolean;
+  linked_wa?: boolean;
   classification: string | null;
   assigned_user_label: string | null;
   contacts: { name: string | null; last_name: string | null; phone?: string | null };
@@ -1522,6 +1539,10 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
               first_seen_at: row.first_seen_at,
               channel: row.channel,
               source_label: row.source_label,
+              from_meta: row.from_meta,
+              prospectia_inbox: row.prospectia_inbox ?? null,
+              has_prospectia_chat: row.has_prospectia_chat ?? row.came_with_inbound,
+              linked_wa: row.linked_wa ?? row.wa_cycle_id != null,
               classification: row.classification,
               assigned_user_label: row.assigned_user_label,
               contacts: row.contacts,
@@ -1552,12 +1573,29 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
         { id: 'name', header: 'Contacto', cell: ({ row }) =>
           `${row.original.contacts?.name ?? ''} ${row.original.contacts?.last_name ?? ''}`.trim()
           || row.original.contacts?.phone || '—' },
-        { id: 'channel', header: 'Canal', cell: ({ row }) =>
-          CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
+        { id: 'channel', header: 'Canal', cell: ({ row }) => (
+          <span className="inline-flex flex-wrap items-center gap-1">
+            <span>{CHANNEL_LABELS[row.original.channel] ?? row.original.channel}</span>
+            {row.original.prospectia_inbox
+              ? <Badge variant="secondary">{row.original.prospectia_inbox}</Badge>
+              : null}
+            {row.original.from_meta ? <Badge variant="secondary">Meta</Badge> : null}
+            {row.original.origin === 'one' && row.original.has_prospectia_chat === false
+              ? <Badge variant="outline">Solo contacto</Badge>
+              : null}
+            {row.original.origin === 'one' && row.original.has_prospectia_chat
+              ? <Badge variant="outline">Con chat</Badge>
+              : null}
+            {row.original.linked_wa ? <Badge variant="outline">Mali WA</Badge> : null}
+          </span>
+        ) },
         { id: 'source', header: 'Fuente', cell: ({ row }) =>
           row.original.source_label
           || (row.original.origin === 'one' ? 'Prospectia' : '—') },
-        { id: 'class', header: 'Clasificación', cell: ({ row }) => row.original.classification || '—' },
+        { id: 'class', header: 'Clasificación', cell: ({ row }) =>
+          row.original.origin === 'one'
+            ? (row.original.has_prospectia_chat ? 'con_chat' : 'solo_contacto')
+            : (row.original.classification || '—') },
         { id: 'advisor', header: 'Asesor', cell: ({ row }) => row.original.assigned_user_label || '—' },
       ]}
       data={items}
@@ -1592,7 +1630,7 @@ function AssociatePaymentPanel({
   const [busy, setBusy] = useState(false);
   const [hits, setHits] = useState<Array<{
     provider: string; transactionCode: string; amount: number; currency: string; status: string;
-    settlementKind?: 'positive' | 'in_progress' | 'negative' | 'unknown';
+    settlementKind?: 'positive' | 'authorized' | 'in_progress' | 'negative' | 'unknown';
     customerName: string | null; customerEmail: string | null;
   }>>([]);
 
@@ -1634,7 +1672,9 @@ function AssociatePaymentPanel({
       toast.success(
         result?.closesCycle === false
           ? 'Código asociado (pendiente confirmación). El ciclo no se cierra desde aquí.'
-          : 'Código asociado a la venta',
+          : selectedHit?.settlementKind === 'authorized'
+            ? 'Código asociado. Ciclo puede cerrar en WA; Caja valida la liquidación.'
+            : 'Código asociado a la venta',
       );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo asociar');
@@ -1683,6 +1723,7 @@ function AssociatePaymentPanel({
       {hits.map((hit) => {
         const active = selectedCode === hit.transactionCode;
         const blocked = hit.settlementKind === 'negative';
+        const authorized = hit.settlementKind === 'authorized';
         const pending = hit.settlementKind === 'in_progress' || hit.settlementKind === 'unknown';
         return <button key={`${hit.provider}-${hit.transactionCode}`} type="button"
           disabled={blocked}
@@ -1704,14 +1745,20 @@ function AssociatePaymentPanel({
             {hit.customerName ? ` · ${hit.customerName}` : ''}
             {hit.customerEmail ? ` · ${hit.customerEmail}` : ''}
             {blocked ? ' · No asociable'
+              : authorized ? ' · Asocia y cierra; Caja valida liquidación'
               : pending ? ' · Se asocia sin cerrar el ciclo' : ''}
           </span>
         </button>;
       })}
     </div>}
+    {selectedHit?.settlementKind === 'authorized' ? (
+      <p className="text-sm text-muted-foreground">
+        Autorizada/en liquidación: se asocia, el ciclo puede cerrar en WA y queda observación para que Caja confirme.
+      </p>
+    ) : null}
     {selectedHit && (selectedHit.settlementKind === 'in_progress' || selectedHit.settlementKind === 'unknown') ? (
       <p className="text-sm text-muted-foreground">
-        Cobro aún no liquidado: se asociará con observación; el cierre comercial queda para cuando esté confirmado.
+        Cobro aún no pagado (p. ej. Por pagar): se asociará con observación; el ciclo no cierra hasta confirmación.
       </p>
     ) : null}
   </div>;

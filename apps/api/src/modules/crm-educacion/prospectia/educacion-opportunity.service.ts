@@ -6,17 +6,55 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
+function enrichmentOf(payload: unknown): {
+  fromMeta?: boolean;
+  inbox?: { id?: number; kind?: string; label?: string } | null;
+} | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const enrichment = (payload as { enrichment?: unknown }).enrichment;
+  if (!enrichment || typeof enrichment !== 'object') return null;
+  return enrichment as {
+    fromMeta?: boolean;
+    inbox?: { id?: number; kind?: string; label?: string } | null;
+  };
+}
+
+function fromMetaFlag(sourceLabel: string | null, payload: unknown): boolean {
+  if (sourceLabel && /(^|·\s)Meta(\s·|$)/.test(sourceLabel)) return true;
+  return enrichmentOf(payload)?.fromMeta === true;
+}
+
+function inboxLabelOf(sourceLabel: string | null, payload: unknown): string | null {
+  const fromPayload = enrichmentOf(payload)?.inbox?.label?.trim();
+  if (fromPayload) return fromPayload;
+  if (!sourceLabel) return null;
+  const known = ['Web', 'WA CA', 'WA EP', 'WA XP'];
+  for (const label of known) {
+    if (sourceLabel.includes(`· ${label}`) || sourceLabel.endsWith(label)) return label;
+  }
+  return null;
+}
+
 export type OpportunityListItem = {
   id: string;
   channel: string;
   external_id: string;
   source_label: string | null;
+  /** Prospectia con atribución anuncio Meta (ctwa_*). */
+  from_meta: boolean;
+  /** Inbox Prospectia corto: Web | WA CA | WA EP | WA XP */
+  prospectia_inbox: string | null;
+  /** Alias honesto de came_with_inbound: hay conversación en Prospectia/Chatwoot. */
+  has_prospectia_chat: boolean;
+  /** Puente a mali-whatsapp; no define solo contacto. */
+  linked_wa: boolean;
   category: string;
   stage_slug: string;
   advisor_email: string | null;
   prospectia_status: string | null;
   interest_course: string | null;
   lead_score: number | null;
+  /** @deprecated Prefer has_prospectia_chat (mismo valor). */
   came_with_inbound: boolean;
   wa_cycle_id: number | null;
   wa_contact_id: number | null;
@@ -143,15 +181,12 @@ export class EducacionOpportunityService {
       return { linked: false as const, reason: 'not_found' as const, opportunity: null };
     }
 
+    // cameWithInbound es verdad Prospectia (Chatwoot); el puente WA no la pisa.
     const updated = await this.prisma.educacionOpportunity.update({
       where: { id: opportunity.id },
       data: {
         waCycleId: input.waCycleId,
         waContactId: input.waContactId ?? opportunity.waContactId,
-        cameWithInbound:
-          input.markInbound === false
-            ? opportunity.cameWithInbound
-            : true,
         lastInteractionAt: new Date(),
       },
       include: { person: true },
@@ -194,7 +229,7 @@ export class EducacionOpportunityService {
     }
     const view = String(params.view ?? '').trim().toLowerCase();
     if (view === 'solo_contacto') {
-      where.waCycleId = null;
+      // Prospectia-first: sin conversación Chatwoot. Independiente de mali-whatsapp.
       where.cameWithInbound = false;
       where.closedAt = null;
     } else if (view === 'open') {
@@ -224,6 +259,7 @@ export class EducacionOpportunityService {
     channel: string;
     externalId: string;
     sourceLabel: string | null;
+    payload?: unknown;
     category: string;
     stageSlug: string;
     advisorEmail: string | null;
@@ -250,6 +286,10 @@ export class EducacionOpportunityService {
       channel: row.channel,
       external_id: row.externalId,
       source_label: row.sourceLabel,
+      from_meta: fromMetaFlag(row.sourceLabel, row.payload),
+      prospectia_inbox: inboxLabelOf(row.sourceLabel, row.payload),
+      has_prospectia_chat: row.cameWithInbound,
+      linked_wa: row.waCycleId != null,
       category: row.category,
       stage_slug: row.stageSlug,
       advisor_email: row.advisorEmail,
@@ -263,7 +303,7 @@ export class EducacionOpportunityService {
       first_seen_at: row.createdAt.toISOString(),
       last_interaction_at: row.lastInteractionAt?.toISOString() ?? null,
       closed_at: row.closedAt?.toISOString() ?? null,
-      classification: row.waCycleId ? 'linked_wa' : 'solo_contacto',
+      classification: row.cameWithInbound ? 'con_chat' : 'solo_contacto',
       assigned_user_label: row.advisorEmail,
       person: {
         id: row.person.id,

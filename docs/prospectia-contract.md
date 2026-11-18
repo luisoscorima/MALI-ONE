@@ -107,6 +107,37 @@ Contacto (definiciones):
 
 - `curso_arte`, `curso_profesional`, `sede`, `rango_de_edad`, `institucion`, `tipo_institucion`, `nivel_educativo`, campos de cobranza…
 
+## Atribución Meta (badge binario)
+
+Attrs de conversación (no siempre en `custom_attribute_definitions`):
+
+`ctwa_source_id`, `ctwa_source_url`, `ctwa_headline`, `ctwa_body`, `ctwa_clid`, `ctwa_media_url`, `ctwa_media_type`, `ctwa_source_type`.
+
+Si alguno viene no vacío → `enrichment.fromMeta=true` y `sourceLabel` incluye `Meta` (p.ej. `Prospectia · Meta · …`). UI: badge **Meta** en Historial / Solo contacto. Sin paridad Instant Form vs CTWA de WA.
+
+## Inbox Prospectia (poca info, útil)
+
+| id | kind | label corto |
+|----|------|-------------|
+| 39 | web | Web |
+| 27 | whatsapp | WA CA |
+| 26 | whatsapp | WA EP |
+| 28 | whatsapp | WA XP |
+
+Va en `enrichment.inbox` + `sourceLabel` (`Prospectia · WA CA · Meta · …`) y API `prospectia_inbox`.
+
+## Solo contacto vs con chat (Prospectia-first)
+
+Inboxes Chatwoot (no son mali-whatsapp): Web Mali + 3 WhatsApp Prospectia.
+
+| Flag | Criterio |
+|------|----------|
+| `has_prospectia_chat` / `cameWithInbound` | Hay conversación Chatwoot (`primaryConversation` con id) |
+| `solo_contacto` | `cameWithInbound=false` (sin conversación Prospectia) |
+| `linked_wa` | `waCycleId` set (puente opcional; **no** redefine solo contacto) |
+
+El link-cycle desde mali-whatsapp no pisa `cameWithInbound`.
+
 ## Qué guarda ONE en la ingesta
 
 `EducacionOpportunity`:
@@ -116,7 +147,8 @@ Contacto (definiciones):
 - `prospectiaStatus` = etiqueta primaria
 - `interestCourse` = curso/interés
 - `leadScore`, `category` (`ca`\|`ep`\|`general`), `stageSlug`
-- `payload` = `{ contact, conversation, enrichment }`
+- `sourceLabel` = `Prospectia` · opcional `Meta` · opcional curso
+- `payload` = `{ contact, conversation, enrichment }` (`enrichment.fromMeta`)
 
 ## Notas de implementación
 

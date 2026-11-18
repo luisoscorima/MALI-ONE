@@ -6,7 +6,10 @@ import {
   ProspectiaClientService,
   type ProspectiaContact,
 } from './prospectia-client.service';
-import { enrichFromProspectiaConversation } from './prospectia-mapping';
+import {
+  enrichFromProspectiaConversation,
+  prospectiaSourceLabel,
+} from './prospectia-mapping';
 
 const CURSOR_ID = 'default';
 const CHANNEL = 'prospectia';
@@ -188,6 +191,7 @@ export class ProspectiaIngestService {
             ? extras.advisorEmail
             : conversation?.meta?.assignee?.email ?? null,
         teamName: conversation?.meta?.team?.name ?? null,
+        inboxId: conversation?.inbox_id ?? null,
       }),
     };
     if (extras?.category === 'ca' || extras?.category === 'ep' || extras?.category === 'general') {
@@ -223,6 +227,8 @@ export class ProspectiaIngestService {
       include: { person: true },
     });
 
+    /** Solo contacto Prospectia = sin conversación Chatwoot. No mira mali-whatsapp. */
+    const hasProspectiaChat = Boolean(conversation?.id);
     const opportunityData = {
       category: enrichment.category,
       stageSlug: enrichment.stageSlug,
@@ -230,10 +236,13 @@ export class ProspectiaIngestService {
       prospectiaStatus: enrichment.prospectiaStatus,
       interestCourse: enrichment.interestCourse,
       leadScore: enrichment.leadScore,
+      cameWithInbound: hasProspectiaChat,
       lastInteractionAt,
-      sourceLabel: enrichment.interestCourse
-        ? `Prospectia · ${enrichment.interestCourse}`
-        : 'Prospectia',
+      sourceLabel: prospectiaSourceLabel({
+        fromMeta: enrichment.fromMeta,
+        interestCourse: enrichment.interestCourse,
+        inboxLabel: enrichment.inbox?.label ?? null,
+      }),
       payload,
     };
 
@@ -260,7 +269,6 @@ export class ProspectiaIngestService {
         personId: person.id,
         channel: CHANNEL,
         externalId,
-        cameWithInbound: false,
         ...opportunityData,
       },
     });

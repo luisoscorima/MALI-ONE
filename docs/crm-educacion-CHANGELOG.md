@@ -4,6 +4,10 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Associate pagos: `Autorizada` / `authorized` / `processing` cierran ciclo (`settlementKind: authorized` + obs); `Por pagar` / pending / mediation siguen sin cerrar. Caja valida liquidación antes de postventa.
+- Inbox Prospectia en fuente: Web / WA CA / WA EP / WA XP (`enrichment.inbox`, `prospectia_inbox`).
+- Prospectia-first: `cameWithInbound` = hay conversación Chatwoot; solo contacto no mira mali-whatsapp; `linked_wa` aparte; link-cycle no pisa el flag.
+- Badge binario Prospectia · Meta: attrs `ctwa_*` → `fromMeta` / `sourceLabel` + badge en Historial y Solo contacto.
 - Prospectia solo en ONE: check/ingest/import nativos; se quitó match/sync proxy a WA y el botón «Match Prospectia (WA)». WA solo `link-cycle` al inbound.
 - Prospectia como medio de ingreso (ONE): `EducacionPerson` / `EducacionOpportunity` / poller; import manual; Historial + Solo contacto. Solo env nueva: `PROSPECTIA_API_ACCESS_TOKEN`.
 - Enriquecimiento Prospectia (Chatwoot) desde API live: etiquetas→`prospectiaStatus`/`stageSlug`, attrs→`interestCourse`/`leadScore`, assignee→`advisorEmail`; payload `{ contact, conversation, enrichment }`. Contrato: [prospectia-contract.md](./prospectia-contract.md).

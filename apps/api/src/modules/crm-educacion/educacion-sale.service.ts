@@ -5,6 +5,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
   classifyTreasurySettlementStatus,
+  settlementClosesCycle,
+  settlementNeedsConfirmationNote,
   type TreasurySettlementKind,
 } from './treasury-settlement.util';
 
@@ -357,8 +359,8 @@ export class EducacionSaleService {
           + 'El ciclo sigue abierto; reintenta con otro medio o marca perdido si corresponde.',
       );
     }
-    // unknown se trata como en_proceso: asocia sin cerrar.
-    const closesCycle = settlementKind === 'positive';
+    // positive + authorized (Autorizada/processing) → cierra ciclo; por_pagar/pending/unknown no.
+    const closesCycle = settlementClosesCycle(settlementKind);
     const amount = input.amountAgreed && input.amountAgreed > 0
       ? input.amountAgreed
       : hit.amount;
@@ -369,7 +371,7 @@ export class EducacionSaleService {
       amountAgreed: amount,
       itemLabel: input.itemLabel || 'Curso',
     });
-    const pendingObs = !closesCycle
+    const pendingObs = settlementNeedsConfirmationNote(settlementKind)
       ? `Asociado en estado «${hit.status}» — pendiente confirmación Treasury`
       : null;
     await this.prisma.educacionSale.update({
