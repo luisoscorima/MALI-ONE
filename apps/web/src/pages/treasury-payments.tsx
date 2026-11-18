@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { FileSpreadsheet, Pencil, Plus, RefreshCw, Store } from 'lucide-react';
+import { FileSpreadsheet, Link2, Pencil, Plus, RefreshCw, Store } from 'lucide-react';
 import type { TreasuryPaymentDto, TreasuryPaymentsDto, TreasuryTargetInput } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { CopyableValue } from '@/components/copyable-value';
@@ -288,6 +288,7 @@ export function TreasuryPayments({
                     <TableHead>Comercio</TableHead>
                     <TableHead>Pedido</TableHead>
                     <TableHead>Código de transacción</TableHead>
+                    <TableHead>Edu</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="text-right">Importe</TableHead>
@@ -318,6 +319,20 @@ export function TreasuryPayments({
                       <TableCell className="max-w-[10rem] truncate tabular-nums">{p.orderNumber}</TableCell>
                       <TableCell className="max-w-[14rem]">
                         <CopyableValue value={p.transactionCode} label="Código de transacción" />
+                      </TableCell>
+                      <TableCell className="w-10">
+                        {p.educationLink ? (
+                          <span
+                            className="inline-flex text-emerald-700 dark:text-emerald-300"
+                            title={`Educación · ciclo #${p.educationLink.waCycleId} · ${p.educationLink.status}`}
+                            aria-label={`Vinculado a Educación, ciclo ${p.educationLink.waCycleId}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Link2 className="size-4" aria-hidden />
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">{dash}</span>
+                        )}
                       </TableCell>
                       <TableCell className="max-w-[12rem] truncate">
                         {p.customerName || dash}
@@ -541,6 +556,14 @@ export function TreasuryPayments({
               />
               <DetailRow label="Pedido" value={detail.orderNumber} copyable />
               <DetailRow label="Código de transacción" value={detail.transactionCode} mono copyable />
+              <DetailRow
+                label="CRM Educación"
+                value={
+                  detail.educationLink
+                    ? `Vinculado · ciclo #${detail.educationLink.waCycleId} · ${detail.educationLink.status}`
+                    : dash
+                }
+              />
               <DetailRow label="Cliente" value={detail.customerName || dash} />
               <DetailRow label="Email" value={detail.customerEmail || dash} />
 

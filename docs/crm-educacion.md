@@ -12,7 +12,7 @@
 | **Estabilidad** | WA mensajería siempre up | Cambios en WA aditivos; riesgo de refactor en ONE |
 
 Glosario: **medio de ingreso** (captación) ≠ **medio de comunicación** (actividad) ≠ **venta** ≠ **aplicación de pago** (Caja).  
-`venta_exitosa` = compromiso comercial, no cobro verificado.
+`venta_exitosa` = compromiso comercial, no cobro verificado. El ciclo no cierra solo con esa etapa (Option A: pago / sin pago / pérdida).
 
 Plan canónico: `orden_proceso_leads_crm_8aaad038.plan.md` (Cursor plans).  
 Roles: [crm-educacion-roles.md](./crm-educacion-roles.md).
@@ -123,7 +123,11 @@ La pestaña **Oportunidades** trabaja sobre ciclos comerciales de MALI WhatsApp,
 - **Requieren revisión**: separa asesores retenidos por confirmar y conflictos comerciales de reingreso.
 - **Sin asignar**: ciclos abiertos sin asesor responsable.
 
-Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor retenido y cambiar la etapa comercial. Seleccionar un estado terminal cierra el ciclo. El curso o interés y el origen reciente se leen de la última captación asociada. La conversación continúa operándose en el inbox de MALI WhatsApp.
+Desde la tabla se puede asignar o reasignar al asesor, confirmar al asesor retenido y cambiar la etapa comercial. **Asociar pago** (columna Acciones) no exige `venta_exitosa`: abre la pestaña Pagos con el ciclo prefijado. Columna **Pago**: identificador derivado de `EducacionSale` (`payment_link`: reportado / parcial / pagado / revertido).
+
+**Cierre del ciclo (Option A):** `venta_exitosa` / `convertido` **no** cierran solos. Cierran: pago Treasury **positivo** asociado, “cerrar sin pago”, o estados de pérdida (`perdido` / `no_interesado`). Cobros en proceso se asocian con obs sin cerrar; negativos no se asocian. Detalle alineado con mali-whatsapp `docs/PAYMENT-LOOKUP-WA.md`.
+
+El curso o interés y el origen reciente se leen de la última captación asociada. La conversación continúa en el inbox de MALI WhatsApp.
 
 ## Checklist go-live
 
@@ -206,7 +210,7 @@ Definición: `EDUCATION_LEAD_STATUSES` en mali-whatsapp (`api/src/leads/leads.ty
 | 2 | Contactado | `contactado` | El asesor ya escribió o llamó. |
 | 3 | Evaluando | `evaluando` | La persona respondió y está mirando curso, horario o precio. |
 | 4 | Promesa | `promesa` | Hay una fecha concreta de pago o inscripción. |
-| 5 | Venta exitosa | `venta_exitosa` | Se inscribió. El ciclo se cierra. |
+| 5 | Venta exitosa | `venta_exitosa` | Compromiso comercial (RQ0017). El ciclo **sigue abierto** hasta pago positivo, “cerrar sin pago”, o pérdida. |
 
 ## Intento o cierre
 
@@ -215,8 +219,8 @@ Desde Contactado el ciclo puede desviarse. Eso no adelanta la inscripción.
 | Estado | Slug | Ciclo | Qué significa |
 |--------|------|-------|----------------|
 | No contesta | `no_contesta` | Sigue abierto | Hubo intento y no hubo respuesta. Se reintenta. Si responde, pasa a Evaluando. Si se agotan los intentos, cierra en Perdido. |
-| No interesado | `no_interesado` | Cierra | Dijo que no. |
-| Perdido | `perdido` | Cierra | Se cierra sin venta. Lleva un motivo: no contestó más, promesa vencida, dejó de responder o dato inválido. |
+| No interesado | `no_interesado` | Cierra al marcar | Dijo que no. |
+| Perdido | `perdido` | Cierra al marcar | Se cierra sin venta. Lleva un motivo: no contestó más, promesa vencida, dejó de responder o dato inválido. |
 
 Promesa exige fecha. Si esa fecha pasa, el ciclo cierra en Perdido con motivo «promesa vencida».
 
@@ -231,7 +235,7 @@ El asesor no las elige. Van junto a cualquier etapa.
 | Retorno | Reaparece alguien que estaba en No interesado. Ese contacto se excluye de un masivo de la misma promo. |
 | Prometió antes | Vuelve después de una promesa vencida. El ciclo nuevo arranca en Por contactar. |
 
-La ventana de trabajo es de **60 días** desde el último mensaje del cliente. Una venta recién cerrada no abre otro ciclo sola: queda en revisión. Pasada la ventana, sí abre ciclo nuevo.
+La ventana de trabajo es de **60 días** desde el último mensaje del cliente. Una venta **con ciclo cerrado** (`closed_at`) no reabre sola con chat orgánico; captación comercial explícita sí puede abrir ciclo nuevo. `venta_exitosa` sin pago aún (ciclo abierto) sigue siendo el mismo ciclo dentro de la ventana.
 
 ## Catálogo anterior
 
@@ -251,8 +255,9 @@ Migración: `20260928120000_education_lead_statuses` en mali-whatsapp. Al abrir 
 
 - Las ocho etiquetas viven en el área `educacion` y se asignan desde CRM Educación (filtro de categoría CA/EP/General aparte).
 - Por contactar es el estado por defecto de un contacto nuevo.
-- No contesta no cierra el ciclo. No interesado, Perdido y Venta exitosa sí (`is_terminal`).
+- No contesta no cierra el ciclo. No interesado y Perdido sí cierran al marcarse. Venta exitosa es `is_terminal` en catálogo pero **no** setea `closed_at` (Option A: cierra con pago / sin pago).
 - **RQ0017:** no se puede pasar a Venta exitosa (ni legacy Convertido) sin nombre usable, DNI, email, teléfono o identidad WhatsApp, y categoría CA/EP del ciclo. Si faltan datos, el ciclo se queda en el estado anterior; en CRM Educación aparece un diálogo para completar y reintentar.
+- **Pagos:** lookup/associate en pestaña Pagos e internal API para WA. Política de estados Treasury: positivo → asocia (+ cierre en WA); en proceso → asocia + `billingNote`; negativo → rechazo. Identificador `payment_link` en listado de Oportunidades.
 
 Todavía no están solas la fecha de Promesa, el motivo de Perdido, ni las marcas Nuevo, Duplicado, Retorno y Prometió antes. Mientras tanto, un reingreso se clasifica con la regla de 60 días que ya corre en WhatsApp: Venta exitosa va a revisión; No interesado dentro de la ventana también; el resto, dentro de la ventana, sigue en el mismo ciclo.
 

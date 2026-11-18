@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Option A: `venta_exitosa` no cierra ciclo; cierre por pago positivo / sin pago / pérdida. Columna **Pago** (`payment_link` desde `EducacionSale`) en Oportunidades. Associate: positivo / en_proceso (+obs) / negativo (rechazo). Internal `GET sales/by-cycle/:id` para WA.
 - F0: docs destino/roles; inventario consumidores; sync widget `area=educacion`+categoría; retry WA; higiene attrs.
 - F1: `stale` / `solo_contacto`; Historial; UI Promesa fecha / Perdido motivo.
 - F2: actividades UI + API; spike Anura; asesor ≠ chat documentado.

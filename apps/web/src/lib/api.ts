@@ -91,6 +91,13 @@ export type EducationLeadCounts = {
 };
 export type EducationCycleView =
   | 'open' | 'closed' | 'review' | 'unassigned' | 'stale' | 'solo_contacto';
+export type EducationPaymentLink = {
+  saleId: string;
+  waCycleId: number;
+  status: 'reportado' | 'parcial' | 'pagado' | 'revertido';
+  code: string | null;
+};
+
 export type EducationCycle = {
   id: number;
   area: EducationArea | string;
@@ -116,6 +123,8 @@ export type EducationCycle = {
   lead_score: number | null;
   requires_review: boolean;
   conversation_id: number | null;
+  /** Identificador pago↔ciclo (EducacionSale). */
+  payment_link?: EducationPaymentLink | null;
   contacts: {
     id: number;
     person_id: number;
@@ -645,13 +654,19 @@ export const api = {
     return request<{ hits: Array<{
       provider: string; providerPaymentId: string; transactionCode: string;
       amount: number; currency: string; status: string;
+      settlementKind?: 'positive' | 'in_progress' | 'negative' | 'unknown';
       customerName: string | null; customerEmail: string | null; transactedAt: string | null;
     }> }>(`/api/crm-educacion/payments/lookup?${qs}`);
   },
   associateCrmEducationPayment: (body: {
     waCycleId: number; waContactId?: number; transactionCode: string;
     amountAgreed?: number; itemLabel?: string;
-  }) => request('/api/crm-educacion/payments/associate', {
+  }) => request<{
+    sale: unknown;
+    candidate: unknown;
+    settlementKind: 'positive' | 'in_progress' | 'negative' | 'unknown';
+    closesCycle: boolean;
+  }>('/api/crm-educacion/payments/associate', {
     method: 'POST', body: JSON.stringify(body),
   }),
   applyCrmEducationPayment: (body: {

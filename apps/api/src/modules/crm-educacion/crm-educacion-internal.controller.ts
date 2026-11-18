@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
   UnauthorizedException,
@@ -84,5 +86,18 @@ export class CrmEducacionInternalController {
       itemLabel: body.itemLabel,
       actorEmail: body.actorEmail || 'mali-whatsapp@system',
     });
+  }
+
+  /** Identificador pago↔ciclo para inbox WA. */
+  @Public()
+  @Get('sales/by-cycle/:waCycleId')
+  async saleLinkByCycle(
+    @Param('waCycleId', ParseIntPipe) waCycleId: number,
+    @Headers('x-crm-educacion-service-token') headerToken?: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.assertServiceToken(headerToken, authorization);
+    const sale = await this.sales.getByCycle(waCycleId);
+    return { payment_link: this.sales.paymentLinkOf(sale) };
   }
 }

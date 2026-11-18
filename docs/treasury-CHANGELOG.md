@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Columna **Edu** en Ventas Niubiz: indicador de vínculo a CRM Educación (`EducacionSale` / aplicaciones) por código de transacción; detalle con ciclo WA.
 - Exportar XLSX por vista: botón en Ventas Niubiz, PagoEfectivo (Niubiz) y Mercado Pago; un archivo / una hoja con los filtros activos (máx. 20 000 filas).
 - Catálogo de tesorería en DB: `TreasuryTarget` con alias MALI (`name`), nombre portal (`externalName`), `paycashEnabled`, moneda opcional en merchant; unique `(sourceId, reference)`. Seed de 5 comercios Niubiz. Sync/PayCash leen el catálogo (se retira `niubiz-merchants.json`). Pagos con `targetId`. Modelo `TreasuryAccessGrant` (ACL futuro usuario→fuente/target; sin enforcement aún). CRUD comercios = crear/editar/desactivar, sin hard-delete. Migración `20261118060000_treasury_target_catalog`.
 - Sync Niubiz acotada a comercios activos del catálogo. Cron cada 15 minutos (Ventas; PagoEfectivo a +7 min) con rango por defecto de los últimos 10 días Lima; sigue desactivado hasta `NIUBIZ_SYNC_ENABLED=true`.

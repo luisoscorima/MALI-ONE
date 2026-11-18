@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { EducacionSaleService } from '../crm-educacion/educacion-sale.service';
 import { niubizEmailFromRecord, readNiubizXlsx, NiubizPayment } from './niubiz-import';
 import { samePaymentPayload } from './payment-payload';
 import { TreasuryPaymentQueryDto } from './dto/treasury.dto';
@@ -16,7 +17,10 @@ import {
 
 @Injectable()
 export class TreasuryPaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly educationSales: EducacionSaleService,
+  ) {}
 
   async importXlsx(actor: { id: string; email: string }, buffer: Buffer) {
     const rows = await readNiubizXlsx(buffer);
@@ -185,6 +189,9 @@ export class TreasuryPaymentsService {
       }),
     ]);
     const aliasByCode = new Map(catalog.map((m) => [m.reference, m.name]));
+    const eduLinks = await this.educationSales.linksByTransactionCodes(
+      payments.map((p) => p.transactionCode),
+    );
     return {
       total,
       page,
@@ -199,12 +206,22 @@ export class TreasuryPaymentsService {
         paycashEnabled: m.paycashEnabled,
       })),
       states: states.map((s) => s.status),
-      payments: payments.map(({ target, ...p }) => ({
-        ...p,
-        merchantAlias: target.name || aliasByCode.get(p.merchantCode) || null,
-        amount: p.amount.toFixed(2),
-        customerEmail: this.paymentEmail(p),
-      })),
+      payments: payments.map(({ target, ...p }) => {
+        const educationLink = eduLinks.get(p.transactionCode) ?? null;
+        return {
+          ...p,
+          merchantAlias: target.name || aliasByCode.get(p.merchantCode) || null,
+          amount: p.amount.toFixed(2),
+          customerEmail: this.paymentEmail(p),
+          educationLink: educationLink
+            ? {
+                waCycleId: educationLink.waCycleId,
+                status: educationLink.status,
+                code: educationLink.code,
+              }
+            : null,
+        };
+      }),
     };
   }
 

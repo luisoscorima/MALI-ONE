@@ -72,6 +72,12 @@ export interface TreasuryPaymentDto {
   settledOn: string | null;
   updatedAt: string;
   payload: Record<string, unknown> | null;
+  /** Vinculado a ciclo CRM Educación (EducacionSale). */
+  educationLink?: {
+    waCycleId: number;
+    status: 'reportado' | 'parcial' | 'pagado' | 'revertido';
+    code: string | null;
+  } | null;
 }
 
 export interface TreasuryPaymentsDto {

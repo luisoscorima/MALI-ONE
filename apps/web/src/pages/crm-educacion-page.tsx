@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Columns3, Download, Plus, Save, UsersRound } from 'lucide-react';
+import { Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
@@ -8,7 +8,8 @@ import { useToast } from '@/contexts/toast-context';
 import {
   api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationCategoryScope,
   type EducationContact, type EducationCycle, type EducationCycleCounts, type EducationCycleView,
-  type EducationLead, type EducationManagementCatalog, type EducationSlaReport,
+  type EducationLead, type EducationManagementCatalog, type EducationPaymentLink,
+  type EducationSlaReport,
 } from '@/lib/api';
 import {
   Badge, Button, DataTable, Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -17,6 +18,7 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
+import { TreasuryStatusBadge } from './treasury-status';
 
 const EDUCATION_AREA: EducationArea = 'educacion';
 
@@ -42,6 +44,32 @@ function worksEducation(areas: string[]) {
     || areas.includes('educacion_ca')
     || areas.includes('educacion_ep')
     || areas.length === 0;
+}
+
+function paymentLinkLabel(status: EducationPaymentLink['status']) {
+  if (status === 'pagado') return 'Pagado';
+  if (status === 'parcial') return 'Parcial';
+  if (status === 'revertido') return 'Revertido';
+  return 'Asociado';
+}
+
+function PaymentLinkMark({ link }: { link?: EducationPaymentLink | null }) {
+  if (!link) return <span className="text-muted-foreground">—</span>;
+  const title = [
+    paymentLinkLabel(link.status),
+    link.code ? `· ${link.code}` : null,
+    `ciclo #${link.waCycleId}`,
+  ].filter(Boolean).join(' ');
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-sm"
+      title={title}
+      aria-label={title}
+    >
+      <Link2 className="size-4 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden />
+      <span className="text-xs text-muted-foreground">{paymentLinkLabel(link.status)}</span>
+    </span>
+  );
 }
 const CHANNEL_LABELS: Record<string, string> = {
   meta_lead_form: 'Formulario Meta', meta_ctwa: 'Anuncio a WhatsApp',
@@ -682,6 +710,8 @@ export function CrmEducacionPage() {
       />;
     } },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
+    { id: 'payment', header: 'Pago', cell: ({ row }) =>
+      <PaymentLinkMark link={row.original.payment_link} /> },
     { id: 'actions', header: 'Acciones', cell: ({ row }) => {
       const cycle = row.original;
       return <div className="flex flex-wrap gap-1">
@@ -1415,6 +1445,7 @@ function AssociatePaymentPanel({
   const [busy, setBusy] = useState(false);
   const [hits, setHits] = useState<Array<{
     provider: string; transactionCode: string; amount: number; currency: string; status: string;
+    settlementKind?: 'positive' | 'in_progress' | 'negative' | 'unknown';
     customerName: string | null; customerEmail: string | null;
   }>>([]);
 
@@ -1449,17 +1480,24 @@ function AssociatePaymentPanel({
     }
     setBusy(true);
     try {
-      await api.associateCrmEducationPayment({
+      const result = await api.associateCrmEducationPayment({
         waCycleId,
         transactionCode,
-      });
-      toast.success('Código asociado a la venta');
+      }) as { closesCycle?: boolean };
+      toast.success(
+        result?.closesCycle === false
+          ? 'Código asociado (pendiente confirmación). El ciclo no se cierra desde aquí.'
+          : 'Código asociado a la venta',
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo asociar');
     } finally {
       setBusy(false);
     }
   }
+
+  const selectedHit = hits.find((h) => h.transactionCode === selectedCode);
+  const selectedBlocked = selectedHit?.settlementKind === 'negative';
 
   return <div className="max-w-xl space-y-4 rounded-md border p-4">
     <p className="text-sm font-medium">Asociar pago a oportunidad</p>
@@ -1488,7 +1526,8 @@ function AssociatePaymentPanel({
       <Button type="button" variant="outline" disabled={busy || code.trim().length < 4} onClick={() => void lookup()}>
         Buscar
       </Button>
-      <Button type="button" disabled={busy || (!selectedCode && code.trim().length < 4) || !cycleId}
+      <Button type="button"
+        disabled={busy || selectedBlocked || (!selectedCode && code.trim().length < 4) || !cycleId}
         onClick={() => void associate()}>
         Asociar a oportunidad
       </Button>
@@ -1496,24 +1535,38 @@ function AssociatePaymentPanel({
     {hits.length > 0 && <div className="max-h-56 space-y-2 overflow-y-auto">
       {hits.map((hit) => {
         const active = selectedCode === hit.transactionCode;
+        const blocked = hit.settlementKind === 'negative';
+        const pending = hit.settlementKind === 'in_progress' || hit.settlementKind === 'unknown';
         return <button key={`${hit.provider}-${hit.transactionCode}`} type="button"
+          disabled={blocked}
           className={`w-full rounded-md border px-3 py-2 text-left text-sm ${
-            active ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
+            blocked ? 'cursor-not-allowed opacity-60'
+              : active ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
           }`}
           onClick={() => {
+            if (blocked) return;
             setSelectedCode(hit.transactionCode);
             setCode(hit.transactionCode);
           }}>
-          <span className="font-medium">{hit.provider} · {hit.transactionCode}</span>
-          <br />
-          <span className="text-muted-foreground">
-            {hit.amount} {hit.currency} · {hit.status}
+          <span className="flex flex-wrap items-center gap-2 font-medium">
+            <span>{hit.provider} · {hit.transactionCode}</span>
+            <TreasuryStatusBadge status={hit.status} />
+          </span>
+          <span className="mt-0.5 block text-muted-foreground">
+            {hit.amount} {hit.currency}
             {hit.customerName ? ` · ${hit.customerName}` : ''}
             {hit.customerEmail ? ` · ${hit.customerEmail}` : ''}
+            {blocked ? ' · No asociable'
+              : pending ? ' · Se asocia sin cerrar el ciclo' : ''}
           </span>
         </button>;
       })}
     </div>}
+    {selectedHit && (selectedHit.settlementKind === 'in_progress' || selectedHit.settlementKind === 'unknown') ? (
+      <p className="text-sm text-muted-foreground">
+        Cobro aún no liquidado: se asociará con observación; el cierre comercial queda para cuando esté confirmado.
+      </p>
+    ) : null}
   </div>;
 }
 

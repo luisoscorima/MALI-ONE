@@ -4,6 +4,7 @@ import {
   WhatsappCrmClientService,
 } from '../crm/whatsapp-crm-client.service';
 import { EDUCATION_WRITE_AREA, toWhatsAppAreaQuery } from './education-scope';
+import { EducacionSaleService } from './educacion-sale.service';
 
 function pageNumber(raw: string | undefined, fallback: number, maximum: number): number {
   if (raw === undefined) return fallback;
@@ -16,7 +17,10 @@ function pageNumber(raw: string | undefined, fallback: number, maximum: number):
 
 @Injectable()
 export class CrmEducacionService {
-  constructor(private readonly crm: WhatsappCrmClientService) {}
+  constructor(
+    private readonly crm: WhatsappCrmClientService,
+    private readonly sales: EducacionSaleService,
+  ) {}
 
   private ensureConfigured() {
     if (!this.crm.configured) {
@@ -81,10 +85,10 @@ export class CrmEducacionService {
     });
   }
 
-  cycles(query: { categoria?: string; channel?: string; q?: string; view?: string;
+  async cycles(query: { categoria?: string; channel?: string; q?: string; view?: string;
     page?: string; limit?: string }) {
     this.ensureConfigured();
-    return this.crm.fetchEducationCycles({
+    const payload = await this.crm.fetchEducationCycles({
       area: toWhatsAppAreaQuery(query.categoria),
       channel: query.channel,
       q: query.q,
@@ -92,6 +96,19 @@ export class CrmEducacionService {
       page: pageNumber(query.page, 1, 1000000),
       limit: pageNumber(query.limit, 50, 200),
     });
+    const items = Array.isArray((payload as { items?: unknown[] })?.items)
+      ? ((payload as { items: Array<{ id?: number }> }).items)
+      : [];
+    const links = await this.sales.linksByCycleIds(
+      items.map((item) => Number(item.id)).filter((id) => Number.isInteger(id) && id > 0),
+    );
+    return {
+      ...payload,
+      items: items.map((item) => ({
+        ...item,
+        payment_link: links.get(Number(item.id)) ?? null,
+      })),
+    };
   }
 
   sla(query: { categoria?: string; from?: string; to?: string }) {

@@ -18,6 +18,12 @@
 |------|-----|
 | `/treasury` | Finanzas → Verificación de pagos (Niubiz: Ventas por defecto; `?tab=paycash` abre PagoEfectivo) |
 
+### Vínculo con CRM Educación
+
+En el listado de **Ventas Niubiz**, columna **Edu**: ícono si el `transactionCode` está en `EducacionSale.reportedTxnCode` o en una `EducacionPaymentApplication` activa. Tooltip / detalle: ciclo WA (`waCycleId`) y estado del vínculo (`reportado` \| `parcial` \| `pagado` \| `revertido`). Los cobros sin venta educativa no se bloquean (celda vacía).
+
+La asociación asesor→ciclo no ocurre en Treasury (lookup/associate viven en CRM Educación / proxy WA). Clasificación de estados para asociar: ver `crm-educacion` y mali-whatsapp `PAYMENT-LOOKUP-WA.md`.
+
 ## API
 
 | Método | Ruta | Uso |

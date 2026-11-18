@@ -3,6 +3,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import {
+  classifyTreasurySettlementStatus,
+  type TreasurySettlementKind,
+} from './treasury-settlement.util';
 
 type LookupHit = {
   provider: 'niubiz' | 'paycash' | 'mercadopago';
@@ -11,10 +15,44 @@ type LookupHit = {
   amount: number;
   currency: string;
   status: string;
+  settlementKind: TreasurySettlementKind;
   customerName: string | null;
   customerEmail: string | null;
   transactedAt: string | null;
 };
+
+/** Identificador visual: venta↔Treasury (asesor / Caja). */
+export type EducationPaymentLink = {
+  saleId: string;
+  waCycleId: number;
+  /** reportado = código asociado; resto = estado Caja. */
+  status: 'reportado' | 'parcial' | 'pagado' | 'revertido';
+  code: string | null;
+};
+
+function toPaymentLink(sale: {
+  id: string;
+  waCycleId: number;
+  paymentStatus: string;
+  reportedTxnCode: string | null;
+  applications?: Array<{ transactionCode: string; reversedAt: Date | null }>;
+}): EducationPaymentLink | null {
+  const activeApp = sale.applications?.find((a) => !a.reversedAt);
+  const code = activeApp?.transactionCode ?? sale.reportedTxnCode ?? null;
+  const hasLink = Boolean(code) || (sale.applications?.length ?? 0) > 0;
+  if (!hasLink) return null;
+  const raw = sale.paymentStatus?.trim().toLowerCase() ?? '';
+  const status: EducationPaymentLink['status'] =
+    raw === 'parcial' || raw === 'pagado' || raw === 'revertido'
+      ? raw
+      : 'reportado';
+  return {
+    saleId: sale.id,
+    waCycleId: sale.waCycleId,
+    status,
+    code,
+  };
+}
 
 @Injectable()
 export class EducacionSaleService {
@@ -25,6 +63,86 @@ export class EducacionSaleService {
       where: { waCycleId },
       include: { items: true, applications: { orderBy: { createdAt: 'desc' } } },
     });
+  }
+
+  paymentLinkOf(
+    sale: {
+      id: string;
+      waCycleId: number;
+      paymentStatus: string;
+      reportedTxnCode: string | null;
+      applications?: Array<{ transactionCode: string; reversedAt: Date | null }>;
+    } | null | undefined,
+  ): EducationPaymentLink | null {
+    if (!sale) return null;
+    return toPaymentLink(sale);
+  }
+
+  async linksByCycleIds(cycleIds: number[]): Promise<Map<number, EducationPaymentLink>> {
+    const ids = [...new Set(cycleIds.filter((id) => Number.isInteger(id) && id > 0))];
+    const map = new Map<number, EducationPaymentLink>();
+    if (!ids.length) return map;
+    const sales = await this.prisma.educacionSale.findMany({
+      where: { waCycleId: { in: ids } },
+      select: {
+        id: true,
+        waCycleId: true,
+        paymentStatus: true,
+        reportedTxnCode: true,
+        applications: {
+          select: { transactionCode: true, reversedAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    for (const sale of sales) {
+      const link = toPaymentLink(sale);
+      if (link) map.set(sale.waCycleId, link);
+    }
+    return map;
+  }
+
+  async linksByTransactionCodes(
+    codes: string[],
+  ): Promise<Map<string, EducationPaymentLink>> {
+    const normalized = [
+      ...new Set(
+        codes.map((c) => String(c ?? '').trim()).filter((c) => c.length >= 4),
+      ),
+    ];
+    const map = new Map<string, EducationPaymentLink>();
+    if (!normalized.length) return map;
+    const sales = await this.prisma.educacionSale.findMany({
+      where: {
+        OR: [
+          { reportedTxnCode: { in: normalized } },
+          {
+            applications: {
+              some: { transactionCode: { in: normalized }, reversedAt: null },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        waCycleId: true,
+        paymentStatus: true,
+        reportedTxnCode: true,
+        applications: {
+          select: { transactionCode: true, reversedAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    for (const sale of sales) {
+      const link = toPaymentLink(sale);
+      if (!link) continue;
+      if (sale.reportedTxnCode) map.set(sale.reportedTxnCode, link);
+      for (const app of sale.applications) {
+        if (!app.reversedAt) map.set(app.transactionCode, link);
+      }
+    }
+    return map;
   }
 
   async upsertSale(input: {
@@ -156,6 +274,7 @@ export class EducacionSaleService {
         amount: Number(p.amount),
         currency: String(p.currency),
         status: p.status,
+        settlementKind: classifyTreasurySettlementStatus(p.status),
         customerName: p.customerName,
         customerEmail: p.customerEmail,
         transactedAt: p.transactedAt?.toISOString() ?? null,
@@ -167,6 +286,7 @@ export class EducacionSaleService {
         amount: Number(p.amount),
         currency: String(p.currency),
         status: p.status,
+        settlementKind: classifyTreasurySettlementStatus(p.status),
         customerName: null,
         customerEmail: p.customerEmail,
         transactedAt: (p.paidAt ?? p.purchasedAt)?.toISOString() ?? null,
@@ -178,6 +298,7 @@ export class EducacionSaleService {
         amount: Number(p.grossAmount),
         currency: String(p.currency || 'PEN'),
         status: p.status,
+        settlementKind: classifyTreasurySettlementStatus(p.status),
         customerName: p.payerName,
         customerEmail: p.payerEmail,
         transactedAt: p.createdAtMp?.toISOString() ?? null,
@@ -194,11 +315,25 @@ export class EducacionSaleService {
     itemLabel?: string;
     actorEmail: string;
   }) {
-    const { hits } = await this.lookupTransaction(input.transactionCode);
-    const hit = hits[0];
+    const code = String(input.transactionCode ?? '').trim();
+    const { hits } = await this.lookupTransaction(code);
+    const exact = hits.find(
+      (h) => h.transactionCode.toLowerCase() === code.toLowerCase(),
+    );
+    const hit = exact ?? hits[0];
     if (!hit) {
       throw new NotFoundException('No se encontró la operación en Treasury');
     }
+    const settlementKind = hit.settlementKind
+      ?? classifyTreasurySettlementStatus(hit.status);
+    if (settlementKind === 'negative') {
+      throw new BadRequestException(
+        `No se puede asociar un cobro en estado «${hit.status}» (denegado/anulado/expirado). `
+          + 'El ciclo sigue abierto; reintenta con otro medio o marca perdido si corresponde.',
+      );
+    }
+    // unknown se trata como en_proceso: asocia sin cerrar.
+    const closesCycle = settlementKind === 'positive';
     const amount = input.amountAgreed && input.amountAgreed > 0
       ? input.amountAgreed
       : hit.amount;
@@ -209,11 +344,28 @@ export class EducacionSaleService {
       amountAgreed: amount,
       itemLabel: input.itemLabel || 'Curso',
     });
+    const pendingObs = !closesCycle
+      ? `Asociado en estado «${hit.status}» — pendiente confirmación Treasury`
+      : null;
     await this.prisma.educacionSale.update({
       where: { id: sale.id },
-      data: { reportedTxnCode: hit.transactionCode },
+      data: {
+        reportedTxnCode: hit.transactionCode,
+        ...(pendingObs
+          ? {
+              billingNote: sale.billingNote
+                ? `${sale.billingNote} | ${pendingObs}`
+                : pendingObs,
+            }
+          : {}),
+      },
     });
-    return { sale: await this.getByCycle(input.waCycleId), candidate: hit };
+    return {
+      sale: await this.getByCycle(input.waCycleId),
+      candidate: hit,
+      settlementKind,
+      closesCycle,
+    };
   }
 
   async applyPayment(input: {
