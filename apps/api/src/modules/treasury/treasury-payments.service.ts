@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
-import { readNiubizXlsx, NiubizPayment } from './niubiz-import';
+import { niubizEmailFromRecord, readNiubizXlsx, NiubizPayment } from './niubiz-import';
 import { samePaymentPayload } from './payment-payload';
 import { TreasuryPaymentQueryDto } from './dto/treasury.dto';
 
@@ -100,6 +100,24 @@ export class TreasuryPaymentsService {
       this.prisma.treasuryPayment.findMany({ where: { provider: 'niubiz_sales' }, distinct: ['merchantCode'], select: { merchantCode: true, merchantName: true }, orderBy: { merchantCode: 'asc' } }),
       this.prisma.treasuryPayment.findMany({ where: { provider: 'niubiz_sales' }, distinct: ['status'], select: { status: true }, orderBy: { status: 'asc' } }),
     ]);
-    return { total, page, pageSize: 50, lastImport, merchants, states: states.map(s => s.status), payments: payments.map(p => ({ ...p, amount: p.amount.toFixed(2) })) };
+    return {
+      total,
+      page,
+      pageSize: 50,
+      lastImport,
+      merchants,
+      states: states.map(s => s.status),
+      payments: payments.map(p => ({
+        ...p,
+        amount: p.amount.toFixed(2),
+        customerEmail:
+          p.customerEmail ??
+          niubizEmailFromRecord(
+            p.payload && typeof p.payload === 'object' && !Array.isArray(p.payload)
+              ? (p.payload as Record<string, unknown>)
+              : null,
+          ),
+      })),
+    };
   }
 }

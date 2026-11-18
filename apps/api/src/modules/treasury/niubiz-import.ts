@@ -42,16 +42,56 @@ export function niubizDate(value: string, dateOnly = false): Date {
   return dateOnly ? utc : new Date(stamp + '-05:00');
 }
 
+const EMAIL_FIELDS = [
+  'Email tarjetahabiente',
+  'Correo',
+  'Email',
+  'E-mail',
+  'Correo electrónico',
+];
+
+function cellText(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === 'string' || typeof raw === 'number') {
+    const value = String(raw).trim();
+    return value || null;
+  }
+  if (typeof raw !== 'object') return null;
+  const record = raw as Record<string, unknown>;
+  // ExcelJS hyperlink / rich text / formula result.
+  if (typeof record.text === 'string' && record.text.trim()) return record.text.trim();
+  if (typeof record.result === 'string' || typeof record.result === 'number') {
+    const value = String(record.result).trim();
+    if (value) return value;
+  }
+  if (Array.isArray(record.richText)) {
+    const value = record.richText
+      .map((part) => (part && typeof part === 'object' && 'text' in part ? String(part.text ?? '') : ''))
+      .join('')
+      .trim();
+    if (value) return value;
+  }
+  if (typeof record.hyperlink === 'string') {
+    const link = record.hyperlink.replace(/^mailto:/i, '').trim();
+    if (link) return link;
+  }
+  return null;
+}
+
 function optionalText(data: Map<string, unknown>, names: string[], max: number): string | null {
   for (const name of names) {
-    const raw = data.get(normalized(name));
-    if (raw == null) continue;
-    if (typeof raw !== 'string' && typeof raw !== 'number') continue;
-    const value = String(raw).trim();
+    const value = cellText(data.get(normalized(name)));
     if (!value) continue;
     return value.slice(0, max);
   }
   return null;
+}
+
+/** Reads the cardholder email from a Niubiz row or stored portal payload. */
+export function niubizEmailFromRecord(record: Record<string, unknown> | null | undefined): string | null {
+  if (!record) return null;
+  const data = new Map(Object.entries(record).map(([key, value]) => [normalized(key), value]));
+  return optionalText(data, EMAIL_FIELDS, 250);
 }
 
 function maskedLastDigits(pan: string | null): string | null {
@@ -81,10 +121,10 @@ export function parseNiubizRows(rows: Record<string, unknown>[]): NiubizPayment[
     const data = new Map(Object.entries(row).map(([k, v]) => [normalized(k), v]));
     const field = (name: string, max: number, optional = false) => {
       const raw = data.get(normalized(name));
-      if (raw != null && typeof raw !== 'string' && typeof raw !== 'number') {
+      const value = cellText(raw) ?? '';
+      if (raw != null && !value && typeof raw !== 'string' && typeof raw !== 'number') {
         throw new BadRequestException(`Fila ${index + 3}: campo ${name} inválido.`);
       }
-      const value = raw == null ? '' : String(raw).trim();
       if ((!optional && !value) || value.length > max) {
         throw new BadRequestException(`Fila ${index + 3}: revisa ${name}.`);
       }
@@ -109,7 +149,7 @@ export function parseNiubizRows(rows: Record<string, unknown>[]): NiubizPayment[
       throw new BadRequestException(`Fila ${index + 3}: importe inválido.`);
     }
     const settled = field('Fecha de Liquidación', 10, true);
-    const customerEmail = optionalText(data, ['Correo', 'Email', 'E-mail', 'Correo electrónico'], 250);
+    const customerEmail = optionalText(data, EMAIL_FIELDS, 250);
     const cardBrand = optionalText(data, ['Marca', 'Marca tarjeta', 'Brand'], 80);
     const cardType = optionalText(
       data,
@@ -176,7 +216,8 @@ export async function readNiubizXlsx(buffer: Buffer): Promise<NiubizPayment[]> {
     if (!row.hasValues) continue;
     const record: Record<string, unknown> = {};
     headers.forEach((header, column) => {
-      record[header] = row.getCell(column + 1).value;
+      const cell = row.getCell(column + 1);
+      record[header] = cellText(cell.value) ?? cell.text?.trim() ?? cell.value;
     });
     rows.push(record);
   }

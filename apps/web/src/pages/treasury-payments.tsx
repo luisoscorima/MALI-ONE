@@ -269,9 +269,7 @@ export function TreasuryPayments({
                         <span className="block font-medium tabular-nums">{p.merchantCode}</span>
                         <span className="text-xs text-muted-foreground">{p.merchantName || dash}</span>
                       </TableCell>
-                      <TableCell className="max-w-[12rem]">
-                        <CopyableValue value={p.orderNumber} label="Pedido" mono={false} />
-                      </TableCell>
+                      <TableCell className="max-w-[10rem] truncate tabular-nums">{p.orderNumber}</TableCell>
                       <TableCell className="max-w-[14rem]">
                         <CopyableValue value={p.transactionCode} label="Código de transacción" />
                       </TableCell>
