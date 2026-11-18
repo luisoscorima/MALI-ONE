@@ -1,0 +1,28 @@
+---
+description: Despliegue solo por git + docker compose; nunca migraciones ni cp directos en prod
+alwaysApply: true
+---
+
+# Despliegue en producción
+
+## Prohibido
+
+- Aplicar migraciones Prisma a mano en el servidor (`prisma migrate deploy`, `migrate resolve`, SQL ad-hoc sobre el historial de migraciones).
+- Editar, borrar o reescribir migraciones ya aplicadas en producción.
+- Subir o sobrescribir archivos en el servidor con `cp`, `scp`, `rsync` de trabajo local, edición directa en el host, o parches fuera de git.
+- “Arreglar rápido” en prod con cambios locales que no pasaron por commit.
+
+Esos atajos generan checksums rotos, P3008/P3009, drift con git y estados irreproducibles.
+
+## Flujo obligatorio
+
+1. Cambios (código + migraciones) en local.
+2. `commit` + `push` al remoto.
+3. En el servidor: `git pull` (o el flujo de deploy del repo).
+4. `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` (o el comando de compose documentado).
+5. Dejar que el entrypoint de la API ejecute `prisma migrate deploy` al arrancar.
+
+## Datos / hotfixes
+
+- Correcciones de **datos** en prod (UPDATE puntuales) solo si no tocan `_prisma_migrations` ni archivos del repo.
+- Si hace falta un hotfix de código o schema: commit → push → pull → compose; nunca `cp` ni migrate manual.

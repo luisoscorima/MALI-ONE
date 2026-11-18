@@ -174,7 +174,7 @@ export function TreasuryPayments({
             {exporting ? 'Exportando…' : 'Exportar'}
           </Button>
           <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
-            <RefreshCw className="size-4" aria-hidden="true" /> Actualizar Ventas Niubiz
+            <RefreshCw className="size-4" aria-hidden="true" /> Actualizar ventas
           </Button>
           <Button variant="outline" size="sm" onClick={() => onMerchantsOpenChange(true)}>
             <Store className="size-4" aria-hidden="true" /> Comercios
@@ -394,13 +394,13 @@ export function TreasuryPayments({
           <DialogHeader>
             <DialogTitle>Comercios Niubiz</DialogTitle>
             <DialogDescription>
-              Catálogo del sync: {merchantCount ?? data?.merchants.filter((m) => m.active).length ?? '…'} activos.
-              Sin borrado; desactiva para sacar del sync.
+              Catálogo de códigos de comercio:{' '}
+              {merchantCount ?? data?.merchants.filter((m) => m.active).length ?? '…'} activos.
+              Desactiva para omitir su sincronización con Niubiz o PagoEfectivo.
             </DialogDescription>
           </DialogHeader>
           {isAdmin && !merchantEdit && (
             <Button
-              variant="outline"
               size="sm"
               className="self-start"
               onClick={() => {
@@ -457,11 +457,11 @@ export function TreasuryPayments({
                 />
               </label>
               <p className="text-sm text-muted-foreground">
-                Nombre Niubiz:{' '}
-                {merchantEdit.input.externalName?.trim() || 'Pendiente (lo trae el próximo sync)'}
+                Nombre en Niubiz:{' '}
+                {merchantEdit.input.externalName?.trim() || 'Por sincronizar'}
               </p>
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="merchant-active" className="text-sm">Activo en sync</label>
+                <label htmlFor="merchant-active" className="text-sm">Sincronizar con Ventas Niubiz</label>
                 <Switch
                   id="merchant-active"
                   checked={merchantEdit.input.active}
@@ -469,7 +469,7 @@ export function TreasuryPayments({
                 />
               </div>
               <div className="flex items-center justify-between gap-3">
-                <label htmlFor="merchant-paycash" className="text-sm">PagoEfectivo (CIP)</label>
+                <label htmlFor="merchant-paycash" className="text-sm">Sincronizar con PagoEfectivo</label>
                 <Switch
                   id="merchant-paycash"
                   checked={!!merchantEdit.input.paycashEnabled}
@@ -493,8 +493,8 @@ export function TreasuryPayments({
                     <span className="tabular-nums text-muted-foreground">{m.merchantCode}</span>
                     {m.merchantName ? <span className="block text-xs text-muted-foreground">{m.merchantName}</span> : null}
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {m.active ? 'Activo en sync' : 'Inactivo'}
-                      {m.paycashEnabled ? ' · CIP' : ''}
+                      {m.active ? 'Sincronizando ventas' : 'Desactivado'}
+                      {m.paycashEnabled ? ' · PagoEfectivo' : ''}
                     </span>
                   </div>
                   {isAdmin && (

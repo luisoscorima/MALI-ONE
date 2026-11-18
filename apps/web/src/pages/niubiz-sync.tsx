@@ -13,12 +13,12 @@ import {
 } from '@/components/ui';
 
 const labels: Record<string, string> = {
-  idle: 'Sin ejecuciones',
-  running: 'Sincronizando',
+  idle: 'Sin actualizaciones',
+  running: 'Actualizando',
   completed: 'Completada',
   partial: 'Completada con errores',
   failed: 'No se pudo completar',
-  interrupted: 'Ejecución interrumpida',
+  interrupted: 'Actualización interrumpida',
 };
 
 const errors: Record<string, string> = {
@@ -74,7 +74,7 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
         seen.current = version;
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'No se pudo consultar la sincronización.');
+          setError(err instanceof Error ? err.message : 'No se pudo consultar el estado.');
         }
       }
       if (!cancelled) timer = setTimeout(poll, running ? 5000 : 15000);
@@ -107,9 +107,9 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Actualizar Ventas Niubiz</DialogTitle>
+          <DialogTitle>Actualizar ventas Niubiz</DialogTitle>
           <DialogDescription>
-            {sourceName}. Consulta las ventas directamente en Niubiz.
+            {sourceName}. Consulta las ventas desde Niubiz Comercio.
           </DialogDescription>
         </DialogHeader>
 
@@ -121,27 +121,27 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
 
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              Consulta los {data?.merchantCount ?? 5} comercios del conector y guarda los pagos sin
-              duplicarlos. Sin fechas, actualiza los últimos 10 días.
+              Actualiza los {data?.merchantCount ?? 5} comercios activos y guarda los pagos sin
+              duplicarlos. Si no se selecciona fecha, actualiza los últimos 10 días.
             </p>
             {data && (
               <p className="text-sm">
-                {data.configured ? 'Conexión configurada' : 'Falta configurar la conexión en el servidor'} ·{' '}
-                {data.scheduled ? 'Programada cada 15 minutos' : 'Programación desactivada'}
+                {data.configured ? 'Conexión lista' : 'Conexión pendiente en el servidor'} ·{' '}
+                {data.scheduled ? 'Actualización cada 15 minutos' : 'Actualización automática desactivada'}
               </p>
             )}
             {user?.role === 'admin' && (
               <div className="flex flex-col gap-3">
                 <label className="grid gap-1 text-sm">
-                  Sincronizar desde
+                  Desde
                   <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
                 </label>
                 <label className="grid gap-1 text-sm">
-                  Sincronizar hasta
+                  Hasta
                   <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
                 </label>
                 <Button disabled={!data?.configured || syncRunning} onClick={() => void sync()}>
-                  {syncRunning ? 'Sincronizando…' : 'Sincronizar pagos'}
+                  {syncRunning ? 'Actualizando…' : 'Actualizar ahora'}
                 </Button>
               </div>
             )}
@@ -155,8 +155,8 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
                 <p>
                   {labels[run.status] ?? run.status} ·{' '}
                   {run.results.filter((r) => r.status === 'ok').length}/{data?.merchantCount} comercios
-                  consultados correctamente
-                  {run.fromDate && ` · ${run.fromDate} al ${run.toDate}`}
+                  actualizados correctamente
+                  {run.fromDate && ` · del ${run.fromDate} al ${run.toDate}`}
                 </p>
                 <p>
                   {run.results.reduce((sum, r) => sum + (r.createdCount ?? 0), 0)} pagos nuevos ·{' '}
