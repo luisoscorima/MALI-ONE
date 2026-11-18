@@ -45,6 +45,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -878,115 +879,118 @@ export function AdminUsersPage() {
         </Card>
       )}
 
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[1080px]">
-            <TableHeader>
-              <TableRow className="text-muted">
-                <TableHead className="p-4">Email</TableHead>
-                <TableHead className="p-4">Nombre</TableHead>
-                <TableHead className="p-4">OU</TableHead>
-                <TableHead className="p-4">Último acceso</TableHead>
-                <TableHead className="p-4">Estado</TableHead>
-                <TableHead className="p-4">Acciones</TableHead>
+      <TableShell
+        footer={
+          <>
+            {loading && users.length > 0 ? (
+              <div className="flex items-center gap-2 border-t border-border p-4 text-sm text-muted">
+                <Spinner className="h-4 w-4" /> Cargando...
+              </div>
+            ) : null}
+            {nextPageToken && !loading ? (
+              <div className="border-t border-border p-4">
+                <Button
+                  variant="outline"
+                  onClick={() => void loadUsers(debouncedQuery, nextPageToken)}
+                >
+                  Cargar más
+                </Button>
+              </div>
+            ) : null}
+          </>
+        }
+      >
+        <Table className="min-w-[1080px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Nombre</TableHead>
+              <TableHead>OU</TableHead>
+              <TableHead>Último acceso</TableHead>
+              <TableHead>Estado</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          {loading && users.length === 0 ? (
+            <TableBody>
+              <TableSkeleton rows={6} cols={6} />
+            </TableBody>
+          ) : users.length === 0 ? (
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <EmptyState
+                    title="No se encontraron usuarios"
+                    description="Prueba otra búsqueda o crea un usuario nuevo."
+                  />
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            {loading && users.length === 0 ? (
-              <TableBody>
-                <TableSkeleton rows={6} cols={6} />
-              </TableBody>
-            ) : users.length === 0 ? (
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={6}>
-                    <EmptyState
-                      title="No se encontraron usuarios"
-                      description="Prueba otra búsqueda o crea un usuario nuevo."
-                    />
+            </TableBody>
+          ) : (
+            <TableBody>
+              {users.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>{u.primaryEmail}</TableCell>
+                  <TableCell>
+                    {u.name.givenName} {u.name.familyName}
+                  </TableCell>
+                  <TableCell className="text-muted">{u.orgUnitPath}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted">
+                    {formatDate(u.lastLoginTime ?? null)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={!u.suspended}
+                        disabled={togglingStatus === u.primaryEmail}
+                        onCheckedChange={(active) =>
+                          void handleToggleActive(u, active)
+                        }
+                        aria-label={
+                          u.suspended
+                            ? `Reactivar ${u.primaryEmail}`
+                            : `Suspender ${u.primaryEmail}`
+                        }
+                      />
+                      <span className="text-xs text-muted">
+                        {u.suspended ? 'Inactivo' : 'Activo'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <IconActionButton
+                        label="Editar usuario"
+                        onClick={() => startEdit(u)}
+                      >
+                        <Pencil className="size-4" />
+                      </IconActionButton>
+                      <IconActionButton
+                        label="Resetear contraseña"
+                        onClick={() => openResetDialog(u.primaryEmail)}
+                      >
+                        <KeyRound className="size-4" />
+                      </IconActionButton>
+                      <IconActionButton
+                        label="Cerrar sesiones"
+                        onClick={() => void handleSignOut(u.primaryEmail)}
+                      >
+                        <LogOut className="size-4" />
+                      </IconActionButton>
+                      <IconActionButton
+                        label="Abrir en Google Admin"
+                        href={googleAdminUserSecurityUrl(u.id)}
+                      >
+                        <GoogleAdminIcon />
+                      </IconActionButton>
+                    </div>
                   </TableCell>
                 </TableRow>
-              </TableBody>
-            ) : (
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id} className="border-border/60">
-                    <TableCell className="p-4">{u.primaryEmail}</TableCell>
-                    <TableCell className="p-4">
-                      {u.name.givenName} {u.name.familyName}
-                    </TableCell>
-                    <TableCell className="p-4 text-muted">{u.orgUnitPath}</TableCell>
-                    <TableCell className="p-4 whitespace-nowrap text-muted">
-                      {formatDate(u.lastLoginTime ?? null)}
-                    </TableCell>
-                    <TableCell className="p-4">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!u.suspended}
-                          disabled={togglingStatus === u.primaryEmail}
-                          onCheckedChange={(active) =>
-                            void handleToggleActive(u, active)
-                          }
-                          aria-label={
-                            u.suspended
-                              ? `Reactivar ${u.primaryEmail}`
-                              : `Suspender ${u.primaryEmail}`
-                          }
-                        />
-                        <span className="text-xs text-muted">
-                          {u.suspended ? 'Inactivo' : 'Activo'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-4">
-                      <div className="flex items-center gap-1">
-                        <IconActionButton
-                          label="Editar usuario"
-                          onClick={() => startEdit(u)}
-                        >
-                          <Pencil className="size-4" />
-                        </IconActionButton>
-                        <IconActionButton
-                          label="Resetear contraseña"
-                          onClick={() => openResetDialog(u.primaryEmail)}
-                        >
-                          <KeyRound className="size-4" />
-                        </IconActionButton>
-                        <IconActionButton
-                          label="Cerrar sesiones"
-                          onClick={() => void handleSignOut(u.primaryEmail)}
-                        >
-                          <LogOut className="size-4" />
-                        </IconActionButton>
-                        <IconActionButton
-                          label="Abrir en Google Admin"
-                          href={googleAdminUserSecurityUrl(u.id)}
-                        >
-                          <GoogleAdminIcon />
-                        </IconActionButton>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            )}
-          </Table>
-        </div>
-        {loading && users.length > 0 && (
-          <div className="flex items-center gap-2 border-t border-border p-4 text-sm text-muted">
-            <Spinner className="h-4 w-4" /> Cargando...
-          </div>
-        )}
-        {nextPageToken && !loading && (
-          <div className="border-t border-border p-4">
-            <Button
-              variant="outline"
-              onClick={() => void loadUsers(debouncedQuery, nextPageToken)}
-            >
-              Cargar más
-            </Button>
-          </div>
-        )}
-      </Card>
+              ))}
+            </TableBody>
+          )}
+        </Table>
+      </TableShell>
         </TabsContent>
       </Tabs>
     </div>

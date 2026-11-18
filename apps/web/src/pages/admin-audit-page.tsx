@@ -8,13 +8,13 @@ import { PageHeader } from '@/components/page-header';
 import {
   Badge,
   Button,
-  Card,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const ACTION_LABELS: Record<string, string> = {
@@ -96,79 +96,80 @@ export function AdminAuditPage() {
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}
 
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <Table className="min-w-[880px]">
-            <TableHeader>
-              <TableRow className="text-muted">
-                <TableHead className="p-4">Fecha</TableHead>
-                <TableHead className="p-4">Actor</TableHead>
-                <TableHead className="p-4">Acción</TableHead>
-                <TableHead className="p-4">Objetivo</TableHead>
-                <TableHead className="p-4">Detalle</TableHead>
+      <TableShell
+        footer={
+          nextCursor ? (
+            <div className="border-t border-border p-4">
+              <Button
+                variant="outline"
+                disabled={loadingMore}
+                onClick={() => void loadLogs(nextCursor)}
+              >
+                {loadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner className="h-4 w-4" /> Cargando...
+                  </span>
+                ) : (
+                  'Cargar más'
+                )}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
+        <Table className="min-w-[880px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Actor</TableHead>
+              <TableHead>Acción</TableHead>
+              <TableHead>Objetivo</TableHead>
+              <TableHead>Detalle</TableHead>
+            </TableRow>
+          </TableHeader>
+          {loading && logs.length === 0 ? (
+            <TableBody>
+              <TableSkeleton rows={8} cols={5} />
+            </TableBody>
+          ) : logs.length === 0 ? (
+            <TableBody>
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <EmptyState
+                    title="Sin registros"
+                    description="Las acciones administrativas aparecerán aquí."
+                  />
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            {loading && logs.length === 0 ? (
-              <TableBody>
-                <TableSkeleton rows={8} cols={5} />
-              </TableBody>
-            ) : logs.length === 0 ? (
-              <TableBody>
-                <TableRow>
-                  <TableCell colSpan={5}>
-                    <EmptyState
-                      title="Sin registros"
-                      description="Las acciones administrativas aparecerán aquí."
-                    />
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            ) : (
-              <TableBody>
-                {logs.map((log) => {
-                  const detail = describePayload(log.action, log.payload);
-                  return (
-                    <TableRow key={log.id} className="border-border/60">
-                      <TableCell className="p-4 whitespace-nowrap text-muted">
-                        {formatDate(log.createdAt)}
-                      </TableCell>
-                      <TableCell className="p-4">{log.actorEmail}</TableCell>
-                      <TableCell className="p-4">
-                        <Badge variant="secondary">
-                          {ACTION_LABELS[log.action] ?? log.action}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="p-4 text-muted">
-                        {log.targetEmail ?? '—'}
-                      </TableCell>
-                      <TableCell className="p-4 text-sm text-muted">
-                        {detail ?? '—'}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            )}
-          </Table>
-        </div>
-        {nextCursor && (
-          <div className="border-t border-border p-4">
-            <Button
-              variant="outline"
-              disabled={loadingMore}
-              onClick={() => void loadLogs(nextCursor)}
-            >
-              {loadingMore ? (
-                <span className="flex items-center gap-2">
-                  <Spinner className="h-4 w-4" /> Cargando...
-                </span>
-              ) : (
-                'Cargar más'
-              )}
-            </Button>
-          </div>
-        )}
-      </Card>
+            </TableBody>
+          ) : (
+            <TableBody>
+              {logs.map((log) => {
+                const detail = describePayload(log.action, log.payload);
+                return (
+                  <TableRow key={log.id}>
+                    <TableCell className="whitespace-nowrap text-muted">
+                      {formatDate(log.createdAt)}
+                    </TableCell>
+                    <TableCell>{log.actorEmail}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {ACTION_LABELS[log.action] ?? log.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted">
+                      {log.targetEmail ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted">
+                      {detail ?? '—'}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          )}
+        </Table>
+      </TableShell>
     </div>
   );
 }

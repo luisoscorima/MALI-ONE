@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { PagoEfectivoPaymentDto, PagoEfectivoPaymentsDto, PagoEfectivoSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { CopyableValue } from '@/components/copyable-value';
 import { Spinner } from '@/components/feedback';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PE', {
   timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short',
@@ -77,18 +78,19 @@ export function PagoEfectivoPayments({ sourceId, sourceName, updateOpen, onUpdat
       : data && <>
         <p className="text-sm"><span className="font-medium tabular-nums">{data.total}</span> {data.total === 1 ? 'operación' : 'operaciones'}</p>
         {data.payments.length === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Todavía no hay operaciones guardadas.</div>
-          : <div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow>
+          : <TableShell><Table><TableHeader><TableRow>
             <TableHead>Fecha</TableHead><TableHead>CIP</TableHead><TableHead>Operación</TableHead><TableHead>Cliente</TableHead>
             <TableHead className="text-right">Importe</TableHead><TableHead className="text-right">Neto</TableHead><TableHead>Estado</TableHead>
           </TableRow></TableHeader><TableBody>{data.payments.map(payment => <TableRow key={payment.id} tabIndex={0} className="cursor-pointer"
             onClick={() => setDetail(payment)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(payment); } }}>
             <TableCell className="whitespace-nowrap">{formatDate(payment.createdAtPe)}</TableCell>
-            <TableCell className="font-mono text-xs">{payment.cip || '—'}</TableCell><TableCell className="font-mono text-xs">{payment.transactionId}</TableCell>
+            <TableCell><CopyableValue value={payment.cip} label="CIP" /></TableCell>
+            <TableCell><CopyableValue value={payment.transactionId} label="Operación" /></TableCell>
             <TableCell className="max-w-[14rem] truncate">{payment.payerName || payment.payerEmail || '—'}</TableCell>
             <TableCell className="text-right tabular-nums">{money(payment.currency, payment.amount)}</TableCell>
             <TableCell className="text-right tabular-nums">{money(payment.currency, payment.netAmount)}</TableCell>
             <TableCell><Badge variant="secondary">{payment.status}</Badge></TableCell>
-          </TableRow>)}</TableBody></Table></div>}
+          </TableRow>)}</TableBody></Table></TableShell>}
         {data.total > 0 && <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={filters.page <= 1} onClick={() => setFilters(old => ({ ...old, page: old.page - 1 }))}>Anterior</Button>
           <span className="text-sm">Página {data.page} de {totalPages}</span><Button variant="outline" disabled={filters.page >= totalPages} onClick={() => setFilters(old => ({ ...old, page: old.page + 1 }))}>Siguiente</Button></div>}
       </>}
@@ -108,18 +110,35 @@ export function PagoEfectivoPayments({ sourceId, sourceName, updateOpen, onUpdat
       </div></DialogContent></Dialog>
 
     <Dialog open={detail !== null} onOpenChange={open => !open && setDetail(null)}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Detalle de operación</DialogTitle><DialogDescription>{detail ? `Operación ${detail.transactionId}` : sourceName}</DialogDescription></DialogHeader>
-      {detail && <dl className="grid gap-3 text-sm"><Row label="Importe" value={money(detail.currency, detail.amount)} /><Row label="Neto" value={money(detail.currency, detail.netAmount)} />
-        <Row label="Comisión" value={money(detail.currency, detail.feeAmount)} /><Row label="Estado" value={detail.status} /><Row label="CIP" value={detail.cip || '—'} />
-        <Row label="Fecha" value={formatDate(detail.createdAtPe)} /><Row label="Pago" value={detail.paidAt ? formatDate(detail.paidAt) : '—'} />
-        <Row label="Transferencia" value={detail.transferredAt ? formatDate(detail.transferredAt) : '—'} /><Row label="Cliente" value={detail.payerName || '—'} />
-        <Row label="Email" value={detail.payerEmail || '—'} /><Row label="Canal" value={detail.paymentChannel || '—'} /><Row label="Entidad financiera" value={detail.financialEntity || '—'} />
-        <Row label="Descripción" value={detail.description || '—'} /><Row label="Referencia" value={detail.externalReference || '—'} />
+      {detail && <dl className="grid gap-3 text-sm">
+        <Row label="Operación" value={detail.transactionId} copyable />
+        <Row label="Importe" value={money(detail.currency, detail.amount)} />
+        <Row label="Neto" value={money(detail.currency, detail.netAmount)} />
+        <Row label="Comisión" value={money(detail.currency, detail.feeAmount)} />
+        <Row label="Estado" value={detail.status} />
+        <Row label="CIP" value={detail.cip || '—'} copyable />
+        <Row label="Fecha" value={formatDate(detail.createdAtPe)} />
+        <Row label="Pago" value={detail.paidAt ? formatDate(detail.paidAt) : '—'} />
+        <Row label="Transferencia" value={detail.transferredAt ? formatDate(detail.transferredAt) : '—'} />
+        <Row label="Cliente" value={detail.payerName || '—'} />
+        <Row label="Email" value={detail.payerEmail || '—'} />
+        <Row label="Canal" value={detail.paymentChannel || '—'} />
+        <Row label="Entidad financiera" value={detail.financialEntity || '—'} />
+        <Row label="Descripción" value={detail.description || '—'} />
+        <Row label="Referencia" value={detail.externalReference || '—'} copyable />
         {detail.payload && <div className="grid gap-1"><dt className="text-xs font-medium uppercase text-muted-foreground">Registro del portal</dt><dd><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs">{JSON.stringify(detail.payload, null, 2)}</pre></dd></div>}
       </dl>}
     </DialogContent></Dialog>
   </section>;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return <div className="grid gap-1 border-b pb-2 last:border-0"><dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>;
+function Row({ label, value, copyable }: { label: string; value: string; copyable?: boolean }) {
+  return (
+    <div className="grid gap-1 border-b pb-2 last:border-0">
+      <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+      <dd className="break-words">
+        {copyable ? <CopyableValue value={value} label={label} /> : value}
+      </dd>
+    </div>
+  );
 }

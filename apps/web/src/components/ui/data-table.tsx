@@ -14,7 +14,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  type TableDensity,
 } from '@/components/ui/table';
+import { TableShell } from '@/components/ui/table-shell';
 
 export type DataTableColumnMeta = {
   className?: string;
@@ -35,6 +37,7 @@ type DataTableProps<TData, TValue = unknown> = {
   containerClassName?: string;
   toolbar?: ReactNode;
   footer?: ReactNode;
+  density?: TableDensity;
 };
 
 export function DataTable<TData, TValue = unknown>({
@@ -50,6 +53,7 @@ export function DataTable<TData, TValue = unknown>({
   containerClassName,
   toolbar,
   footer,
+  density = 'compact',
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -65,82 +69,83 @@ export function DataTable<TData, TValue = unknown>({
   }
 
   return (
-    <div className={cn('space-y-4', containerClassName)}>
-      {toolbar}
-      <div className="overflow-x-auto rounded-md border">
-        <Table className={tableClassName} style={tableStyle}>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const meta = metaOf(header.column);
-                  return (
-                    <TableHead
-                      key={header.id}
-                      className={cn(meta?.className, meta?.headerClassName)}
-                    >
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => {
-                const original = row.original;
-                const expanded = Boolean(isRowExpanded?.(original));
+    <TableShell
+      density={density}
+      toolbar={toolbar}
+      footer={footer}
+      className={containerClassName}
+    >
+      <Table density={density} className={tableClassName} style={tableStyle}>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                const meta = metaOf(header.column);
                 return (
-                  <Fragment key={row.id}>
-                    <TableRow
-                      data-state={expanded ? 'selected' : undefined}
-                      className={onRowClick ? 'cursor-pointer' : undefined}
-                      onClick={
-                        onRowClick ? () => onRowClick(original) : undefined
-                      }
-                    >
-                      {row.getVisibleCells().map((cell) => {
-                        const meta = metaOf(cell.column);
-                        return (
-                          <TableCell
-                            key={cell.id}
-                            className={cn(meta?.className, meta?.cellClassName)}
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                    {expanded && renderExpandedRow ? (
-                      <TableRow className="bg-muted/20 hover:bg-muted/20">
-                        <TableCell colSpan={colCount} className="p-0">
-                          {renderExpandedRow(original)}
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </Fragment>
+                  <TableHead
+                    key={header.id}
+                    className={cn(meta?.className, meta?.headerClassName)}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
                 );
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={colCount} className="h-24 text-center">
-                  {emptyMessage}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      {footer}
-    </div>
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.length ? (
+            table.getRowModel().rows.map((row) => {
+              const original = row.original;
+              const expanded = Boolean(isRowExpanded?.(original));
+              return (
+                <Fragment key={row.id}>
+                  <TableRow
+                    data-state={expanded ? 'selected' : undefined}
+                    className={onRowClick ? 'cursor-pointer' : undefined}
+                    onClick={
+                      onRowClick ? () => onRowClick(original) : undefined
+                    }
+                  >
+                    {row.getVisibleCells().map((cell) => {
+                      const meta = metaOf(cell.column);
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={cn(meta?.className, meta?.cellClassName)}
+                        >
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext(),
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                  {expanded && renderExpandedRow ? (
+                    <TableRow className="bg-muted/20 hover:bg-muted/20">
+                      <TableCell colSpan={colCount} className="p-0">
+                        {renderExpandedRow(original)}
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </Fragment>
+              );
+            })
+          ) : (
+            <TableRow>
+              <TableCell colSpan={colCount} className="h-24 text-center">
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableShell>
   );
 }

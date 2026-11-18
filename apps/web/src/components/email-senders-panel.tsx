@@ -13,7 +13,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  Card,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,6 +27,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const df = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' });
@@ -115,65 +115,63 @@ export function EmailSendersPanel({ senders, onChange }: Props) {
         </Button>
       </div>
 
-      <Card className="gap-0 overflow-hidden py-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Correo</TableHead>
-                <TableHead>Agregado</TableHead>
-                <TableHead className="w-28 text-right">Acciones</TableHead>
+      <TableShell>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Correo</TableHead>
+              <TableHead>Agregado</TableHead>
+              <TableHead className="w-28 text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {senders.map((sender) => (
+              <TableRow key={sender.id}>
+                <TableCell>
+                  <div className="flex min-w-56 items-center gap-2 font-medium">
+                    <Mail className="size-4 text-muted-foreground" aria-hidden />
+                    {sender.email}
+                  </div>
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {df.format(new Date(sender.createdAt))}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      aria-label={`Editar ${sender.email}`}
+                      onClick={() => openEdit(sender)}
+                    >
+                      <Pencil className="size-4" aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      aria-label={`Eliminar ${sender.email}`}
+                      disabled={senders.length <= 1}
+                      title={senders.length <= 1 ? 'Debe quedar al menos un remitente' : undefined}
+                      onClick={() => setDeleteTarget(sender)}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </Button>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {senders.map((sender) => (
-                <TableRow key={sender.id}>
-                  <TableCell>
-                    <div className="flex min-w-56 items-center gap-2 font-medium">
-                      <Mail className="size-4 text-muted-foreground" aria-hidden />
-                      {sender.email}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {df.format(new Date(sender.createdAt))}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        aria-label={`Editar ${sender.email}`}
-                        onClick={() => openEdit(sender)}
-                      >
-                        <Pencil className="size-4" aria-hidden />
-                      </Button>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        aria-label={`Eliminar ${sender.email}`}
-                        disabled={senders.length <= 1}
-                        title={senders.length <= 1 ? 'Debe quedar al menos un remitente' : undefined}
-                        onClick={() => setDeleteTarget(sender)}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!senders.length ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
-                    No hay remitentes. Agrega un correo @mali.pe para habilitar campañas.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+            ))}
+            {!senders.length ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                  No hay remitentes. Agrega un correo @mali.pe para habilitar campañas.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </TableShell>
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-md">

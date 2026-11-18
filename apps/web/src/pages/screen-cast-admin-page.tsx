@@ -82,6 +82,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -1208,7 +1209,7 @@ export function ScreenCastAdminPage() {
               description="Crea una lista y añade imágenes o videos."
             />
           ) : (
-            <div className="rounded-md border">
+            <TableShell>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1255,7 +1256,7 @@ export function ScreenCastAdminPage() {
                                   : `Activar ${p.name}`
                               }
                             />
-                            <span className="text-sm text-muted">
+                            <span className="text-sm text-muted-foreground">
                               {p.activo ? 'Activa' : 'Inactiva'}
                             </span>
                           </div>
@@ -1294,7 +1295,7 @@ export function ScreenCastAdminPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
+            </TableShell>
           )}
           </section>
 
@@ -1384,7 +1385,7 @@ export function ScreenCastAdminPage() {
           ) : filteredMonitors.length === 0 ? (
             <EmptyState title="Sin coincidencias" description="Prueba otra búsqueda o restablece los filtros." />
           ) : (
-            <div className="rounded-md border">
+            <TableShell>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1476,7 +1477,7 @@ export function ScreenCastAdminPage() {
                               <span className="truncate">{m.playlistName}</span>
                             </button>
                           ) : (
-                            <span className="text-muted">Sin asignar</span>
+                            <span className="text-muted-foreground">Sin asignar</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -1531,7 +1532,7 @@ export function ScreenCastAdminPage() {
                   })}
                 </TableBody>
               </Table>
-            </div>
+            </TableShell>
           )}
           </section>
 

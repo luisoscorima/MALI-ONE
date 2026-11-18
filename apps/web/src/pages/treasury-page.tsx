@@ -43,6 +43,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -412,7 +413,7 @@ export function TreasuryPage() {
                         description="Añade los registros que se consultarán en esta fuente. Puedes registrar una referencia por cada moneda."
                       />
                     ) : (
-                      <div className="overflow-x-auto rounded-xl border border-border">
+                      <TableShell>
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -455,7 +456,7 @@ export function TreasuryPage() {
                             ))}
                           </TableBody>
                         </Table>
-                      </div>
+                      </TableShell>
                     )}
                   </div>
                 </>

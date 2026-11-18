@@ -23,7 +23,7 @@ import type {
   InternalCampaignDto,
   NewsletterDto,
 } from '@mali-one/shared';
-import { AlertBanner, Spinner, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, Spinner, TableShellSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -31,7 +31,6 @@ import { api } from '@/lib/api';
 import {
   Badge,
   Button,
-  Card,
   Checkbox,
   Dialog,
   DialogContent,
@@ -55,6 +54,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const MalichimpCampaignStatsPanel = lazy(() =>
@@ -726,7 +726,7 @@ export function WorkspaceInternalCampaigns() {
     }
   }
 
-  if (loading) return <TableSkeleton rows={5} />;
+  if (loading) return <TableShellSkeleton rows={5} cols={10} />;
 
   return (
     <div className="space-y-4">
@@ -776,12 +776,11 @@ export function WorkspaceInternalCampaigns() {
         </AlertBanner>
       ) : null}
 
-      <Card className="gap-0 overflow-hidden py-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[7.5rem]">Vista</TableHead>
+      <TableShell>
+        <Table className="min-w-[1100px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[7.5rem]">Vista</TableHead>
                 <TableHead>Campaña</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviados</TableHead>
@@ -923,10 +922,9 @@ export function WorkspaceInternalCampaigns() {
                   </TableCell>
                 </TableRow>
               ) : null}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+          </TableBody>
+        </Table>
+      </TableShell>
 
       <Dialog
         open={open}

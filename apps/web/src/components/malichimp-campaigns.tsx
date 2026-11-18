@@ -25,7 +25,7 @@ import type {
   MalichimpStatsDto,
   NewsletterDto,
 } from '@mali-one/shared';
-import { AlertBanner, Spinner, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, Spinner, TableShellSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -33,7 +33,6 @@ import { api } from '@/lib/api';
 import {
   Badge,
   Button,
-  Card,
   Checkbox,
   Dialog,
   DialogContent,
@@ -57,6 +56,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const MalichimpCampaignStatsPanel = lazy(() =>
@@ -892,7 +892,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
-  if (loading) return <TableSkeleton rows={5} />;
+  if (loading) return <TableShellSkeleton rows={5} cols={10} />;
 
   return (
     <div className="space-y-4">
@@ -935,12 +935,11 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
         </AlertBanner>
       ) : null}
 
-      <Card className="gap-0 overflow-hidden py-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[7.5rem]">Vista</TableHead>
+      <TableShell>
+        <Table className="min-w-[1100px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[7.5rem]">Vista</TableHead>
                 <TableHead>Campaña</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviados</TableHead>
@@ -1070,10 +1069,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                   </TableCell>
                 </TableRow>
               ) : null}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+          </TableBody>
+        </Table>
+      </TableShell>
 
       <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) resetForm(); }}>
         <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">

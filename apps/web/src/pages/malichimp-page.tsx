@@ -58,6 +58,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -473,8 +474,8 @@ export function MalichimpPage() {
           </Select>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
+        <TableShell>
+          <Table className="min-w-[960px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Contacto</TableHead>
@@ -535,7 +536,7 @@ export function MalichimpPage() {
               )}
             </TableBody>
           </Table>
-        </div>
+        </TableShell>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">
           <span className="text-muted-foreground">{nf.format(total)} resultado{total === 1 ? '' : 's'}</span>
@@ -795,7 +796,7 @@ export function MalichimpPage() {
                       </ul>
                     </div>
                     {xlsxPreview.report.sample.length ? (
-                      <div className="overflow-hidden rounded-lg border">
+                      <TableShell>
                         <Table>
                           <TableHeader>
                             <TableRow>
@@ -818,7 +819,7 @@ export function MalichimpPage() {
                             ))}
                           </TableBody>
                         </Table>
-                      </div>
+                      </TableShell>
                     ) : null}
                   </div>
                 ) : null}

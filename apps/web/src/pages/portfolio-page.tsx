@@ -55,7 +55,11 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import {
+  AlertBanner,
+  EmptyState,
+  TableShellSkeleton,
+} from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import {
   Badge,
@@ -74,12 +78,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -606,7 +612,7 @@ function DashboardSection() {
     void load();
   }, [load]);
 
-  if (loading) return <TableSkeleton rows={6} />;
+  if (loading) return <TableShellSkeleton rows={6} cols={4} />;
   if (error) return <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>;
   if (!data) return null;
 
@@ -692,7 +698,7 @@ function DashboardSection() {
         {data.upcomingMilestones.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin hitos próximos.</p>
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
+          <TableShell>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -717,7 +723,7 @@ function DashboardSection() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableShell>
         )}
       </Card>
     </div>
@@ -1077,7 +1083,7 @@ function ProjectsSection() {
       {error ? <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner> : null}
 
       {loading ? (
-        <TableSkeleton rows={6} />
+        <TableShellSkeleton rows={6} cols={8} />
       ) : view === 'kanban' ? (
         statuses.length === 0 ? (
           <EmptyState
@@ -1115,7 +1121,7 @@ function ProjectsSection() {
             }
           />
         ) : (
-          <div className="overflow-x-auto rounded-lg border">
+          <TableShell>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1203,7 +1209,7 @@ function ProjectsSection() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableShell>
         )
       ) : (
         <div>
@@ -2005,7 +2011,7 @@ function TasksSection() {
         </TabsList>
 
         {loading ? (
-          <TableSkeleton rows={6} />
+          <TableShellSkeleton rows={6} cols={7} />
         ) : (
           <>
             <TabsContent value="kanban" className="mt-4">
@@ -2174,7 +2180,7 @@ function TasksSection() {
                   description="Crea tu primera tarea para empezar."
                 />
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
+                <TableShell>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -2272,7 +2278,7 @@ function TasksSection() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                </TableShell>
               )}
             </TabsContent>
           </>
@@ -2748,7 +2754,19 @@ function OperationSection({ onGoTasks }: { onGoTasks: () => void }) {
     }
   }
 
-  if (loading) return <TableSkeleton rows={4} />;
+  if (loading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="flex flex-col gap-3 p-4">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </Card>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

@@ -18,6 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const MEDIA_EXT = /\.(jpe?g|png|gif|mp4)$/i;
@@ -157,7 +158,7 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
           </Button>
         ) : null}
 
-        <div className="max-h-80 overflow-auto rounded-md border">
+        <TableShell frameClassName="max-h-80 overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -169,14 +170,14 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-muted">
+                  <TableCell colSpan={3} className="text-muted-foreground">
                     Cargando…
                   </TableCell>
                 </TableRow>
               )}
               {!loading && visible.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-muted">
+                  <TableCell colSpan={3} className="text-muted-foreground">
                     Sin archivos multimedia en esta carpeta
                   </TableCell>
                 </TableRow>
@@ -217,7 +218,7 @@ export function ScreenCastS3Picker({ open, onOpenChange, onSelect }: Props) {
                 ))}
             </TableBody>
           </Table>
-        </div>
+        </TableShell>
       </DialogContent>
     </Dialog>
   );

@@ -74,6 +74,8 @@ export {
   TableHeader,
   TableRow,
 } from './table';
+export type { TableDensity } from './table';
+export { TableShell } from './table-shell';
 export { DataTable } from './data-table';
 export type { DataTableColumnMeta } from './data-table';
 export {

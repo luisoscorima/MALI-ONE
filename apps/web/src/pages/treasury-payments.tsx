@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, Store } from 'lucide-react';
 import type { TreasuryPaymentDto, TreasuryPaymentsDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { CopyableValue } from '@/components/copyable-value';
 import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import {
   Button,
@@ -17,6 +18,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 import { Spinner } from '@/components/feedback';
 import { NiubizUpdateDialog } from './niubiz-sync';
@@ -232,7 +234,7 @@ export function TreasuryPayments({
           {data.payments.length === 0 ? (
             <EmptyPayments hasFilters={hasFilters} onUpdate={() => onUpdateOpenChange(true)} />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <TableShell>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -267,9 +269,11 @@ export function TreasuryPayments({
                         <span className="block font-medium tabular-nums">{p.merchantCode}</span>
                         <span className="text-xs text-muted-foreground">{p.merchantName || dash}</span>
                       </TableCell>
-                      <TableCell className="max-w-[10rem] truncate tabular-nums">{p.orderNumber}</TableCell>
-                      <TableCell className="max-w-[10rem] truncate font-mono text-xs">
-                        {p.transactionCode}
+                      <TableCell className="max-w-[12rem]">
+                        <CopyableValue value={p.orderNumber} label="Pedido" mono={false} />
+                      </TableCell>
+                      <TableCell className="max-w-[14rem]">
+                        <CopyableValue value={p.transactionCode} label="Código de transacción" />
                       </TableCell>
                       <TableCell className="max-w-[12rem] truncate">
                         {p.customerName || dash}
@@ -293,7 +297,7 @@ export function TreasuryPayments({
                   ))}
                 </TableBody>
               </Table>
-            </div>
+            </TableShell>
           )}
 
           {data.total > 0 && (
@@ -373,10 +377,11 @@ export function TreasuryPayments({
                 label="Comercio"
                 value={`${detail.merchantCode}${detail.merchantName ? ` · ${detail.merchantName}` : ''}`}
               />
-              <DetailRow label="Pedido" value={detail.orderNumber} />
-              <DetailRow label="Código de transacción" value={detail.transactionCode} mono />
+              <DetailRow label="Pedido" value={detail.orderNumber} copyable />
+              <DetailRow label="Código de transacción" value={detail.transactionCode} mono copyable />
               <DetailRow label="Cliente" value={detail.customerName || dash} />
               <DetailRow label="Email" value={detail.customerEmail || dash} />
+
               <DetailRow label="Importe" value={`${detail.currency} ${detail.amount}`} />
               <div className="grid gap-1 border-b border-border pb-2">
                 <dt className="text-xs font-medium uppercase text-muted-foreground">Estado</dt>
@@ -417,15 +422,19 @@ function DetailRow({
   label,
   value,
   mono,
+  copyable,
 }: {
   label: string;
   value: string;
   mono?: boolean;
+  copyable?: boolean;
 }) {
   return (
     <div className="grid gap-1 border-b border-border pb-2 last:border-0">
       <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
-      <dd className={mono ? 'break-all font-mono text-xs' : 'break-words'}>{value}</dd>
+      <dd className={mono && !copyable ? 'break-all font-mono text-xs' : 'break-words'}>
+        {copyable ? <CopyableValue value={value} label={label} mono={Boolean(mono)} /> : value}
+      </dd>
     </div>
   );
 }

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { NiubizPayCashPaymentDto, NiubizPayCashPaymentsDto, NiubizPayCashSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { CopyableValue } from '@/components/copyable-value';
 import { useAuth } from '@/contexts/auth-context';
 import { Spinner } from '@/components/feedback';
 import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-  Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+  Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
 
 const emptyFilters = { q: '', status: '', from: '', to: '', page: 1 };
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PE', {
@@ -131,7 +132,7 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
       : error ? <div role="alert" className="space-y-2 text-sm"><p>{error}</p><Button variant="outline" onClick={() => setRevision(v => v + 1)}>Reintentar</Button></div>
       : data && <>
         <p className="text-sm" role="status"><span className="font-medium tabular-nums">{data.total}</span> {data.total === 1 ? 'operación guardada' : 'operaciones guardadas'}</p>
-        {data.payments.length ? <div className="overflow-x-auto rounded-xl border border-border"><Table><TableHeader><TableRow>
+        {data.payments.length ? <TableShell><Table><TableHeader><TableRow>
           <TableHead>Fecha de compra</TableHead><TableHead>Fecha de pago</TableHead>
           <TableHead>Código CIP</TableHead><TableHead>Cliente</TableHead><TableHead>Moneda</TableHead>
           <TableHead className="text-right">Importe pedido</TableHead><TableHead>Estado</TableHead>
@@ -139,11 +140,11 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
           onClick={() => setDetail(payment)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(payment); } }}>
           <TableCell className="whitespace-nowrap">{formatDate(payment.purchasedAt)}</TableCell>
           <TableCell className="whitespace-nowrap">{payment.paidAt ? formatDate(payment.paidAt) : '—'}</TableCell>
-          <TableCell className="font-mono text-xs">{payment.cip}</TableCell>
+          <TableCell><CopyableValue value={payment.cip} label="CIP" /></TableCell>
           <TableCell className="max-w-[15rem] truncate">{payment.customerEmail || '—'}</TableCell>
           <TableCell>{payment.currency}</TableCell><TableCell className="text-right tabular-nums">{payment.amount}</TableCell>
           <TableCell><TreasuryStatusBadge status={payment.status} /></TableCell>
-        </TableRow>)}</TableBody></Table></div>
+        </TableRow>)}</TableBody></Table></TableShell>
           : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {hasFilters ? 'No hay operaciones para estos filtros.' : 'Todavía no hay operaciones guardadas. Actualiza PagoEfectivo para consultar Niubiz.'}
           </div>}
@@ -175,6 +176,7 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
     <Dialog open={detail !== null} onOpenChange={open => !open && setDetail(null)}><DialogContent>
       <DialogHeader><DialogTitle>Operación PagoEfectivo</DialogTitle><DialogDescription>CIP {detail?.cip}</DialogDescription></DialogHeader>
       {detail && <dl className="grid gap-2 text-sm">
+        <div><dt className="text-muted-foreground">CIP</dt><dd><CopyableValue value={detail.cip} label="CIP" /></dd></div>
         <div><dt className="text-muted-foreground">Cliente</dt><dd>{detail.customerEmail || '—'}</dd></div>
         <div><dt className="text-muted-foreground">Importe</dt><dd>{detail.currency} {detail.amount}</dd></div>
         <div><dt className="text-muted-foreground">Marca</dt><dd>{detail.brand}</dd></div>

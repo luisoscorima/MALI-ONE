@@ -18,7 +18,7 @@ import {
 } from '@mali-one/shared';
 import { LandingEditor } from '@/components/landing-editor';
 import { PageHeader } from '@/components/page-header';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
@@ -34,6 +34,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Textarea,
 } from '@/components/ui';
 
@@ -463,25 +464,26 @@ export function LandingsPage() {
           ) : null}
         </div>
       ) : loading ? (
-        <TableSkeleton rows={4} />
+        <TableShellSkeleton rows={4} cols={4} />
       ) : items.length === 0 ? (
         <EmptyState
           title="Sin landings"
           description="Crea la landing piloto con la plantilla de Gestión Cultural."
         />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Landing</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Publicación</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
+        <TableShell>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Landing</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Publicación</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
                 <TableCell>
                   <div className="font-medium">{item.name}</div>
                   <div className="font-mono text-xs text-muted-foreground">/landing/{item.slug}/</div>
@@ -523,9 +525,10 @@ export function LandingsPage() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        </TableShell>
       )}
     </div>
   );

@@ -1,5 +1,15 @@
 import { Inbox, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Card, Skeleton } from '@/components/ui';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { TableShell } from '@/components/ui/table-shell';
 import { cn } from '@/lib/utils';
 
 export function Spinner({ className }: { className?: string }) {
@@ -136,18 +146,57 @@ export function EmptyState({
   );
 }
 
-export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
+/** Filas skeleton para usar dentro de `TableBody`. */
+export function TableSkeleton({
+  rows = 5,
+  cols = 5,
+}: {
+  rows?: number;
+  cols?: number;
+}) {
   return (
     <>
       {Array.from({ length: rows }).map((_, row) => (
-        <tr key={row} className="border-b border-border/40">
+        <TableRow key={row}>
           {Array.from({ length: cols }).map((_, col) => (
-            <td key={col} className="p-4">
+            <TableCell key={col}>
               <Skeleton className="h-4 w-full" />
-            </td>
+            </TableCell>
           ))}
-        </tr>
+        </TableRow>
       ))}
     </>
+  );
+}
+
+/** Loading completo con el shell estándar (cuando aún no hay `<Table>` montada). */
+export function TableShellSkeleton({
+  rows = 5,
+  cols = 5,
+  density = 'comfortable',
+  toolbar,
+}: {
+  rows?: number;
+  cols?: number;
+  density?: 'comfortable' | 'compact';
+  toolbar?: ReactNode;
+}) {
+  return (
+    <TableShell density={density} toolbar={toolbar}>
+      <Table density={density}>
+        <TableHeader>
+          <TableRow>
+            {Array.from({ length: cols }).map((_, col) => (
+              <TableHead key={col}>
+                <Skeleton className="h-4 w-24" />
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableSkeleton rows={rows} cols={cols} />
+        </TableBody>
+      </Table>
+    </TableShell>
   );
 }

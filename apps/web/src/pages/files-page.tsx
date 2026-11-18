@@ -20,7 +20,11 @@ import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/format-bytes';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import {
+  AlertBanner,
+  EmptyState,
+  TableShellSkeleton,
+} from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import { FilesFolderPickerDialog } from '@/components/files-folder-picker-dialog';
 import { FilesItemInfoDialog } from '@/components/files-item-info-dialog';
@@ -47,6 +51,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 type SortKey = 'name' | 'size' | 'lastModified';
@@ -575,7 +580,7 @@ export function FilesPage() {
       ) : null}
 
       {loading ? (
-        <TableSkeleton rows={8} />
+        <TableShellSkeleton rows={8} cols={5} />
       ) : sortedItems.length === 0 ? (
         <EmptyState
           title={trashMode ? 'Papelera vacía' : 'Carpeta vacía'}
@@ -587,10 +592,6 @@ export function FilesPage() {
         />
       ) : (
         <div
-          className={cn(
-            'overflow-x-auto rounded-lg border transition-colors',
-            dragOver && !trashMode && 'border-primary ring-2 ring-primary/20',
-          )}
           onDragOver={(e) => {
             if (trashMode) return;
             e.preventDefault();
@@ -603,17 +604,23 @@ export function FilesPage() {
             if (!trashMode) void handleUpload(e.dataTransfer.files);
           }}
         >
-          {!trashMode ? (
-            <p
-              className={cn(
-                'border-b px-3 py-2 text-center text-xs text-muted-foreground',
-                dragOver && 'bg-primary/5 text-primary',
-              )}
-            >
-              Arrastra archivos aquí para subirlos a esta carpeta
-            </p>
-          ) : null}
-          <Table>
+          <TableShell
+            frameClassName={cn(
+              'transition-colors',
+              dragOver && !trashMode && 'border-primary ring-2 ring-primary/20',
+            )}
+          >
+            {!trashMode ? (
+              <p
+                className={cn(
+                  'border-b px-3 py-2 text-center text-xs text-muted-foreground',
+                  dragOver && 'bg-primary/5 text-primary',
+                )}
+              >
+                Arrastra archivos aquí para subirlos a esta carpeta
+              </p>
+            ) : null}
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">
@@ -783,6 +790,7 @@ export function FilesPage() {
               ))}
             </TableBody>
           </Table>
+          </TableShell>
         </div>
       )}
 

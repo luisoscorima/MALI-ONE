@@ -37,6 +37,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -1140,11 +1141,11 @@ export function LinksPage() {
             </div>
           )}
         </div>
-        <div className="overflow-x-auto">
+        <TableShell className="space-y-0" frameClassName="rounded-none border-0">
           <Table className="min-w-[760px]">
             <TableHeader>
-              <TableRow className="text-muted">
-                <TableHead className="w-10 p-4">
+              <TableRow>
+                <TableHead className="w-10">
                   <Checkbox
                     checked={
                       links.length > 0 &&
@@ -1165,13 +1166,13 @@ export function LinksPage() {
                     disabled={listLoading || links.length === 0}
                   />
                 </TableHead>
-                <TableHead className="p-4">Identificador</TableHead>
-                <TableHead className="p-4">Tipo</TableHead>
-                <TableHead className="p-4">Etiquetas</TableHead>
-                <TableHead className="p-4">Destino</TableHead>
-                <TableHead className="p-4">Clics</TableHead>
-                <TableHead className="p-4">Acciones</TableHead>
-                <TableHead className="p-4">Creación</TableHead>
+                <TableHead>Identificador</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Etiquetas</TableHead>
+                <TableHead>Destino</TableHead>
+                <TableHead>Clics</TableHead>
+                <TableHead>Acciones</TableHead>
+                <TableHead>Creación</TableHead>
               </TableRow>
             </TableHeader>
             {listLoading ? (
@@ -1202,14 +1203,14 @@ export function LinksPage() {
                       key={link.id}
                       className={link.archivedAt ? 'border-border/60 opacity-80' : 'border-border/60'}
                     >
-                      <TableCell className="p-4">
+                      <TableCell>
                         <Checkbox
                           checked={selectedIds.includes(link.id)}
                           onCheckedChange={() => toggleLinkSelection(link.id)}
                           aria-label={`Seleccionar ${link.slug}`}
                         />
                       </TableCell>
-                      <TableCell className="p-4">
+                      <TableCell>
                         <a
                           href={link.shortUrl}
                           className="font-medium text-primary underline"
@@ -1219,7 +1220,7 @@ export function LinksPage() {
                           {link.slug}
                         </a>
                       </TableCell>
-                      <TableCell className="p-4">
+                      <TableCell>
                         <div className="flex flex-wrap items-center gap-1">
                           <span
                             className={
@@ -1239,7 +1240,7 @@ export function LinksPage() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="p-4">
+                      <TableCell>
                         {link.tags.length > 0 ? (
                           <div className="flex max-w-[10rem] flex-wrap gap-1">
                             {link.tags.map((tag) => (
@@ -1258,7 +1259,7 @@ export function LinksPage() {
                           <span className="text-xs text-muted">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs p-4" title={dest.secondary ?? dest.primary}>
+                      <TableCell className="max-w-xs" title={dest.secondary ?? dest.primary}>
                         <p className="truncate font-medium">{dest.primary}</p>
                         {dest.secondary && (
                           <p className="truncate text-xs text-muted">
@@ -1266,7 +1267,7 @@ export function LinksPage() {
                           </p>
                         )}
                       </TableCell>
-                      <TableCell className="p-4">
+                      <TableCell>
                         <button
                           type="button"
                           className="font-medium text-primary underline-offset-2 hover:underline"
@@ -1275,7 +1276,7 @@ export function LinksPage() {
                           {link.clickCount}
                         </button>
                       </TableCell>
-                      <TableCell className="p-4">
+                      <TableCell>
                         <div className="flex items-center gap-1">
                           <IconActionButton
                             label="Estadísticas"
@@ -1321,7 +1322,7 @@ export function LinksPage() {
                         </div>
                       </TableCell>
                       <TableCell
-                        className="max-w-[15rem] p-4 text-xs text-muted"
+                        className="max-w-[15rem] text-xs text-muted"
                         title={link.createdBy?.email}
                       >
                         <p className="truncate">
@@ -1338,7 +1339,7 @@ export function LinksPage() {
               </TableBody>
             )}
           </Table>
-        </div>
+        </TableShell>
         {!listLoading && (totalPages > 1 || total > pageSize) && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
             <span className="text-sm text-muted">

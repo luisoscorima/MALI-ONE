@@ -30,6 +30,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   Textarea,
   TabsContent,
@@ -287,37 +288,39 @@ export function CatalogEducacionPage() {
             ) : sedes.length === 0 ? (
               <EmptyState title="Sin sedes" description="Agrega la primera sede del catálogo." />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="p-4">Nombre</TableHead>
-                    <TableHead className="p-4">Distrito</TableHead>
-                    <TableHead className="p-4">Dirección</TableHead>
-                    <TableHead className="p-4">Estado</TableHead>
-                    <TableHead className="p-4">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sedes.map((sede) => (
-                    <TableRow key={sede.id}>
-                      <TableCell className="p-4 font-medium">{sede.nombre}</TableCell>
-                      <TableCell className="p-4 text-sm">{sede.distrito?.nombre || '—'}</TableCell>
-                      <TableCell className="p-4 text-sm text-muted">{sede.direccion || '—'}</TableCell>
-                      <TableCell className="p-4 text-sm">{sede.activo ? 'Activa' : 'Inactiva'}</TableCell>
-                      <TableCell className="p-4">
-                        <div className="flex gap-2">
-                          <Button type="button" size="sm" variant="outline" onClick={() => setSedeEdit(sede)}>
-                            <Pencil className="size-4" /> Editar
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => void removeSede(sede)}>
-                            <Trash2 className="size-4" /> Eliminar
-                          </Button>
-                        </div>
-                      </TableCell>
+              <TableShell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Distrito</TableHead>
+                      <TableHead>Dirección</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {sedes.map((sede) => (
+                      <TableRow key={sede.id}>
+                        <TableCell className="font-medium">{sede.nombre}</TableCell>
+                        <TableCell className="text-sm">{sede.distrito?.nombre || '—'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{sede.direccion || '—'}</TableCell>
+                        <TableCell className="text-sm">{sede.activo ? 'Activa' : 'Inactiva'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button type="button" size="sm" variant="outline" onClick={() => setSedeEdit(sede)}>
+                              <Pencil className="size-4" /> Editar
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => void removeSede(sede)}>
+                              <Trash2 className="size-4" /> Eliminar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableShell>
             )}
           </Card>
         </TabsContent>
@@ -333,35 +336,37 @@ export function CatalogEducacionPage() {
             ) : distritos.length === 0 ? (
               <EmptyState title="Sin distritos" description="Agrega el primer distrito." />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="p-4">Nombre</TableHead>
-                    <TableHead className="p-4">Brochure</TableHead>
-                    <TableHead className="p-4">Sedes</TableHead>
-                    <TableHead className="p-4">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {distritos.map((distrito) => (
-                    <TableRow key={distrito.id}>
-                      <TableCell className="p-4 font-medium">{distrito.nombre}</TableCell>
-                      <TableCell className="max-w-xs truncate p-4 text-sm text-muted">{distrito.brochureUrl || '—'}</TableCell>
-                      <TableCell className="p-4 text-sm">{distrito.sedes}</TableCell>
-                      <TableCell className="p-4">
-                        <div className="flex gap-2">
-                          <Button type="button" size="sm" variant="outline" onClick={() => setDistritoEdit(distrito)}>
-                            <Pencil className="size-4" /> Editar
-                          </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => void removeDistrito(distrito)}>
-                            <Trash2 className="size-4" /> Eliminar
-                          </Button>
-                        </div>
-                      </TableCell>
+              <TableShell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Brochure</TableHead>
+                      <TableHead>Sedes</TableHead>
+                      <TableHead>Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {distritos.map((distrito) => (
+                      <TableRow key={distrito.id}>
+                        <TableCell className="font-medium">{distrito.nombre}</TableCell>
+                        <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{distrito.brochureUrl || '—'}</TableCell>
+                        <TableCell className="text-sm">{distrito.sedes}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button type="button" size="sm" variant="outline" onClick={() => setDistritoEdit(distrito)}>
+                              <Pencil className="size-4" /> Editar
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => void removeDistrito(distrito)}>
+                              <Trash2 className="size-4" /> Eliminar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableShell>
             )}
           </Card>
         </TabsContent>
@@ -488,52 +493,54 @@ function LeadStatusesPanel() {
         ) : rows.length === 0 ? (
           <EmptyState title="Sin estados" description="Agrega el primer estado para este número." />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="p-4">Orden</TableHead>
-                <TableHead className="p-4">Estado</TableHead>
-                <TableHead className="p-4">Identificador</TableHead>
-                <TableHead className="p-4">Comportamiento</TableHead>
-                <TableHead className="p-4">Disponibilidad</TableHead>
-                <TableHead className="p-4">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((status) => (
-                <TableRow key={status.id} className={!status.active ? 'opacity-60' : undefined}>
-                  <TableCell className="p-4 tabular-nums">{status.sort_order}</TableCell>
-                  <TableCell className="p-4 font-medium">{status.label}</TableCell>
-                  <TableCell className="p-4 font-mono text-xs text-muted-foreground">{status.slug}</TableCell>
-                  <TableCell className="p-4">
-                    <div className="flex flex-wrap gap-1">
-                      {status.is_default ? <Badge>Inicial</Badge> : null}
-                      {status.is_terminal ? <Badge variant="secondary">Cierra ciclo</Badge> : null}
-                      {!status.is_default && !status.is_terminal ? <span className="text-sm text-muted-foreground">En curso</span> : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="p-4">{status.active ? 'Activo' : 'Inactivo'}</TableCell>
-                  <TableCell className="p-4">
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => setEditing(status)}>
-                        <Pencil className="size-4" /> Editar
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={status.active && status.is_default}
-                        onClick={() => void toggleActive(status)}
-                      >
-                        {status.active ? <Power className="size-4" /> : <RotateCcw className="size-4" />}
-                        {status.active ? 'Desactivar' : 'Reactivar'}
-                      </Button>
-                    </div>
-                  </TableCell>
+          <TableShell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Orden</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Identificador</TableHead>
+                  <TableHead>Comportamiento</TableHead>
+                  <TableHead>Disponibilidad</TableHead>
+                  <TableHead>Acciones</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {rows.map((status) => (
+                  <TableRow key={status.id} className={!status.active ? 'opacity-60' : undefined}>
+                    <TableCell className="tabular-nums">{status.sort_order}</TableCell>
+                    <TableCell className="font-medium">{status.label}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{status.slug}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {status.is_default ? <Badge>Inicial</Badge> : null}
+                        {status.is_terminal ? <Badge variant="secondary">Cierra ciclo</Badge> : null}
+                        {!status.is_default && !status.is_terminal ? <span className="text-sm text-muted-foreground">En curso</span> : null}
+                      </div>
+                    </TableCell>
+                    <TableCell>{status.active ? 'Activo' : 'Inactivo'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => setEditing(status)}>
+                          <Pencil className="size-4" /> Editar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={status.active && status.is_default}
+                          onClick={() => void toggleActive(status)}
+                        >
+                          {status.active ? <Power className="size-4" /> : <RotateCcw className="size-4" />}
+                          {status.active ? 'Desactivar' : 'Reactivar'}
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableShell>
         )}
       </Card>
       <LeadStatusDialog
@@ -715,55 +722,57 @@ function OfertaPanel({
       ) : rows.length === 0 ? (
         <EmptyState title={`Sin ${kind}`} description={`Agrega el primer ${label}.`} />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="p-4">Nombre</TableHead>
-              {showArea ? <TableHead className="p-4">Área</TableHead> : null}
-              {showCursos ? <TableHead className="p-4">Cursos</TableHead> : null}
-              <TableHead className="p-4">Precio</TableHead>
-              <TableHead className="p-4">Descuento</TableHead>
-              <TableHead className="p-4">Horario</TableHead>
-              <TableHead className="p-4">Estado</TableHead>
-              <TableHead className="p-4">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="p-4 font-medium">{row.nombre}</TableCell>
-                {showArea ? (
-                  <TableCell className="p-4 text-sm text-muted">
-                    {row.area
-                      ? row.area.parentNombre
-                        ? `${row.area.parentNombre} · ${row.area.nombre}`
-                        : row.area.nombre
-                      : '—'}
-                  </TableCell>
-                ) : null}
-                {showCursos ? (
-                  <TableCell className="max-w-xs p-4 text-sm text-muted">
-                    {row.cursos?.length ? row.cursos.map((curso) => curso.nombre).join(', ') : '—'}
-                  </TableCell>
-                ) : null}
-                <TableCell className="p-4">{money(row.precio)}</TableCell>
-                <TableCell className="p-4">{row.descuento || '—'}</TableCell>
-                <TableCell className="p-4">{row.horario || '—'}</TableCell>
-                <TableCell className="p-4">{row.activo ? 'Activo' : 'Inactivo'}</TableCell>
-                <TableCell className="p-4">
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={() => onEdit(row)}>
-                      <Pencil className="size-4" /> Editar
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => onDelete(row)}>
-                      <Trash2 className="size-4" /> Eliminar
-                    </Button>
-                  </div>
-                </TableCell>
+        <TableShell>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                {showArea ? <TableHead>Área</TableHead> : null}
+                {showCursos ? <TableHead>Cursos</TableHead> : null}
+                <TableHead>Precio</TableHead>
+                <TableHead>Descuento</TableHead>
+                <TableHead>Horario</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.id}>
+                  <TableCell className="font-medium">{row.nombre}</TableCell>
+                  {showArea ? (
+                    <TableCell className="text-sm text-muted-foreground">
+                      {row.area
+                        ? row.area.parentNombre
+                          ? `${row.area.parentNombre} · ${row.area.nombre}`
+                          : row.area.nombre
+                        : '—'}
+                    </TableCell>
+                  ) : null}
+                  {showCursos ? (
+                    <TableCell className="max-w-xs text-sm text-muted-foreground">
+                      {row.cursos?.length ? row.cursos.map((curso) => curso.nombre).join(', ') : '—'}
+                    </TableCell>
+                  ) : null}
+                  <TableCell>{money(row.precio)}</TableCell>
+                  <TableCell>{row.descuento || '—'}</TableCell>
+                  <TableCell>{row.horario || '—'}</TableCell>
+                  <TableCell>{row.activo ? 'Activo' : 'Inactivo'}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={() => onEdit(row)}>
+                        <Pencil className="size-4" /> Editar
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => onDelete(row)}>
+                        <Trash2 className="size-4" /> Eliminar
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableShell>
       )}
     </Card>
   );

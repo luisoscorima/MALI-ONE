@@ -3,7 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Columns3, Download, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import {
   api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationCategoryScope,
@@ -1119,7 +1119,7 @@ export function CrmEducacionPage() {
           </DropdownMenu>
           <span className="text-sm text-muted-foreground">{contactTotal} contactos</span>
         </div>
-        {contactLoading ? <TableSkeleton rows={8} cols={7} /> : contacts.length === 0 ?
+        {contactLoading ? <TableShellSkeleton rows={8} cols={7} density="compact" /> : contacts.length === 0 ?
           <EmptyState title="Sin contactos" description="No hay contactos para estos filtros." /> :
           <DataTable
             columns={contactColumns}
@@ -1222,12 +1222,12 @@ export function CrmEducacionPage() {
         </div>
         {opportunityView === 'review' && <div className="space-y-2">
           <h3 className="text-sm font-semibold">Asesor por confirmar</h3>
-          {cycleLoading ? <TableSkeleton rows={5} cols={7} /> : cycles.length === 0 ?
+          {cycleLoading ? <TableShellSkeleton rows={5} cols={7} density="compact" /> : cycles.length === 0 ?
             <EmptyState title="Sin asesores por confirmar" description="No hay ciclos pendientes de confirmación." /> :
             <DataTable columns={cycleColumns} data={cycles}
               getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />}
         </div>}
-        {opportunityView !== 'review' && (cycleLoading ? <TableSkeleton rows={8} cols={7} /> : cycles.length === 0 ?
+        {opportunityView !== 'review' && (cycleLoading ? <TableShellSkeleton rows={8} cols={7} density="compact" /> : cycles.length === 0 ?
           <EmptyState title="Sin oportunidades" description="No hay ciclos comerciales para estos filtros." /> :
           <DataTable columns={cycleColumns} data={cycles}
             getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />)}
@@ -1246,7 +1246,7 @@ export function CrmEducacionPage() {
             </p>
           </div>
           {reviewEntryError && <AlertBanner variant="error">{reviewEntryError}</AlertBanner>}
-          {reviewEntryLoading ? <TableSkeleton rows={5} cols={6} /> : reviewEntries.length === 0 ?
+          {reviewEntryLoading ? <TableShellSkeleton rows={5} cols={6} density="compact" /> : reviewEntries.length === 0 ?
             <EmptyState title="Sin conflictos comerciales" description="No hay captaciones pendientes de decisión." /> :
             <DataTable columns={reviewEntryColumns} data={reviewEntries}
               getRowId={(lead) => String(lead.id)} tableClassName="min-w-full" />}

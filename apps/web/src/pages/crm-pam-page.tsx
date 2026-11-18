@@ -9,7 +9,7 @@ import type {
 } from '@mali-one/shared';
 import { PAM_DEFAULT_PAYMENT_METHOD, formatLimaDateTime } from '@mali-one/shared';
 import { PageHeader } from '@/components/page-header';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -40,6 +40,13 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const EMPTY_NEW_PAYMENT = {
@@ -1323,7 +1330,7 @@ export function CrmPamPage() {
           </div>
 
           {loading ? (
-            <TableSkeleton rows={8} cols={8} />
+            <TableShellSkeleton rows={8} cols={8} density="compact" />
           ) : contacts.length === 0 ? (
             <EmptyState
               title="Sin contactos"
@@ -1616,40 +1623,42 @@ export function CrmPamPage() {
                       No hay avisos pendientes en la ventana actual.
                     </p>
                   ) : (
-                    <div className="max-h-80 overflow-auto rounded-md border border-border/50">
-                      <table className="w-full text-left text-sm">
-                        <thead className="sticky top-0 bg-background text-muted-foreground">
-                          <tr>
-                            <th className="px-3 py-2 font-medium">Nombre</th>
-                            <th className="px-3 py-2 font-medium">Correo</th>
-                            <th className="px-3 py-2 font-medium">Plan</th>
-                            <th className="px-3 py-2 font-medium">Frec.</th>
-                            <th className="px-3 py-2 font-medium">MP</th>
-                            <th className="px-3 py-2 font-medium">Caduca</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/40">
+                    <TableShell
+                      density="compact"
+                      className="space-y-0"
+                      frameClassName="max-h-80 overflow-auto"
+                    >
+                      <Table density="compact">
+                        <TableHeader className="sticky top-0 z-10 bg-card">
+                          <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Correo</TableHead>
+                            <TableHead>Plan</TableHead>
+                            <TableHead>Frec.</TableHead>
+                            <TableHead>MP</TableHead>
+                            <TableHead>Caduca</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {expiryPreview.candidates.map((c) => (
-                            <tr key={c.id}>
-                              <td className="px-3 py-2">
+                            <TableRow key={c.id}>
+                              <TableCell>
                                 {c.nombres} {c.apellidos}
-                              </td>
-                              <td className="px-3 py-2 font-mono text-xs">
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
                                 {c.correo}
-                              </td>
-                              <td className="px-3 py-2">{c.plan}</td>
-                              <td className="px-3 py-2">{c.frecuencia}</td>
-                              <td className="px-3 py-2">
-                                {c.mpStatus ?? '—'}
-                              </td>
-                              <td className="px-3 py-2">
+                              </TableCell>
+                              <TableCell>{c.plan}</TableCell>
+                              <TableCell>{c.frecuencia}</TableCell>
+                              <TableCell>{c.mpStatus ?? '—'}</TableCell>
+                              <TableCell>
                                 {formatDate(c.expiryDate)}
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        </TableBody>
+                      </Table>
+                    </TableShell>
                   )}
                   <div className="flex flex-wrap justify-end gap-2">
                     <Button
@@ -2038,7 +2047,7 @@ export function CrmPamPage() {
           ) : null}
 
           {paymentsLoading ? (
-            <TableSkeleton rows={8} cols={7} />
+            <TableShellSkeleton rows={8} cols={7} density="compact" />
           ) : payments.length === 0 ? (
             <EmptyState
               title="Sin pagos"

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MercadoPagoPaymentDto, MercadoPagoPaymentsDto, MercadoPagoSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
+import { CopyableValue } from '@/components/copyable-value';
 import { Spinner } from '@/components/feedback';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PE', {
   timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short',
@@ -91,19 +92,19 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
       : data && <>
         <p className="text-sm"><span className="font-medium tabular-nums">{data.total}</span> {data.total === 1 ? 'operación' : 'operaciones'}</p>
         {data.payments.length === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">Todavía no hay ventas guardadas.</div>
-          : <div className="overflow-x-auto rounded-xl border"><Table><TableHeader><TableRow>
+          : <TableShell><Table><TableHeader><TableRow>
             <TableHead>Fecha</TableHead><TableHead>Operación</TableHead><TableHead>Descripción</TableHead><TableHead>Cliente</TableHead>
             <TableHead className="text-right">Venta</TableHead><TableHead className="text-right">Neto</TableHead><TableHead>Estado</TableHead>
           </TableRow></TableHeader><TableBody>{data.payments.map(payment => <TableRow key={payment.id} tabIndex={0} className="cursor-pointer"
             onClick={() => setDetail(payment)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setDetail(payment); } }}>
             <TableCell className="whitespace-nowrap">{formatDate(payment.createdAtMp)}</TableCell>
-            <TableCell className="font-mono text-xs">{payment.paymentId}</TableCell>
+            <TableCell><CopyableValue value={payment.paymentId} label="Operación" /></TableCell>
             <TableCell className="max-w-[15rem] truncate">{payment.description || '—'}</TableCell>
             <TableCell className="max-w-[14rem] truncate">{payment.payerName || payment.payerEmail || '—'}</TableCell>
             <TableCell className="text-right tabular-nums">{money(payment.currency, payment.grossAmount)}</TableCell>
             <TableCell className="text-right tabular-nums">{money(payment.currency, payment.netAmount)}</TableCell>
             <TableCell><Badge variant="secondary">{payment.status}</Badge></TableCell>
-          </TableRow>)}</TableBody></Table></div>}
+          </TableRow>)}</TableBody></Table></TableShell>}
         {data.total > 0 && <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={filters.page <= 1} onClick={() => setFilters(old => ({ ...old, page: old.page - 1 }))}>Anterior</Button>
           <span className="text-sm">Página {data.page} de {totalPages}</span><Button variant="outline" disabled={filters.page >= totalPages} onClick={() => setFilters(old => ({ ...old, page: old.page + 1 }))}>Siguiente</Button></div>}
       </>}
@@ -123,18 +124,33 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
 
     <Dialog open={detail !== null} onOpenChange={open => !open && setDetail(null)}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Detalle de operación</DialogTitle><DialogDescription>{detail ? `Operación ${detail.paymentId}` : sourceName}</DialogDescription></DialogHeader>
       {detail && <dl className="grid gap-3 text-sm">
-        <Row label="Venta" value={money(detail.currency, detail.grossAmount)} /><Row label="Total recibido" value={money(detail.currency, detail.netAmount)} />
-        <Row label="Costos" value={money(detail.currency, detail.feeAmount)} /><Row label="Estado" value={`${detail.status}${detail.statusDetail ? ` · ${detail.statusDetail}` : ''}`} />
-        <Row label="Fecha" value={formatDate(detail.createdAtMp)} /><Row label="Liberación" value={detail.releasedAt ? formatDate(detail.releasedAt) : '—'} />
+        <Row label="Operación" value={detail.paymentId} copyable />
+        <Row label="Venta" value={money(detail.currency, detail.grossAmount)} />
+        <Row label="Total recibido" value={money(detail.currency, detail.netAmount)} />
+        <Row label="Costos" value={money(detail.currency, detail.feeAmount)} />
+        <Row label="Estado" value={`${detail.status}${detail.statusDetail ? ` · ${detail.statusDetail}` : ''}`} />
+        <Row label="Fecha" value={formatDate(detail.createdAtMp)} />
+        <Row label="Liberación" value={detail.releasedAt ? formatDate(detail.releasedAt) : '—'} />
         <Row label="Medio de pago" value={[detail.issuerName, detail.paymentMethodId, detail.paymentTypeId, detail.cardLastDigits ? `•••• ${detail.cardLastDigits}` : null].filter(Boolean).join(' · ') || '—'} />
-        <Row label="Cuotas" value={detail.installments ? String(detail.installments) : '—'} /><Row label="Cliente" value={detail.payerName || '—'} />
-        <Row label="Email" value={detail.payerEmail || '—'} /><Row label="Descripción" value={detail.description || '—'} /><Row label="Referencia" value={detail.externalReference || '—'} />
+        <Row label="Cuotas" value={detail.installments ? String(detail.installments) : '—'} />
+        <Row label="Cliente" value={detail.payerName || '—'} />
+        <Row label="Email" value={detail.payerEmail || '—'} />
+        <Row label="Descripción" value={detail.description || '—'} />
+        <Row label="Referencia" value={detail.externalReference || '—'} copyable />
+        {detail.merchantOrderId ? <Row label="Orden" value={detail.merchantOrderId} copyable /> : null}
         {detail.payload && <div className="grid gap-1"><dt className="text-xs font-medium uppercase text-muted-foreground">Registro del portal</dt><dd><pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 font-mono text-xs">{JSON.stringify(detail.payload, null, 2)}</pre></dd></div>}
       </dl>}
     </DialogContent></Dialog>
   </section>;
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return <div className="grid gap-1 border-b pb-2 last:border-0"><dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>;
+function Row({ label, value, copyable }: { label: string; value: string; copyable?: boolean }) {
+  return (
+    <div className="grid gap-1 border-b pb-2 last:border-0">
+      <dt className="text-xs font-medium uppercase text-muted-foreground">{label}</dt>
+      <dd className="break-words">
+        {copyable ? <CopyableValue value={value} label={label} /> : value}
+      </dd>
+    </div>
+  );
 }

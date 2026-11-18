@@ -6,7 +6,7 @@ import type {
   BsaleOfficeDto,
 } from '@mali-one/shared';
 import { PageHeader } from '@/components/page-header';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import { downloadKardexXlsx } from '@/lib/bsale-kardex-export';
@@ -21,6 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 
 const PREVIEW_PAGE_SIZE = 50;
@@ -420,7 +421,7 @@ export function BsaleKardexPage() {
             {elapsedSec > 0 ? ` · ${elapsedSec}s` : ''}
             … Esto puede tardar varios minutos la primera vez.
           </p>
-          <TableSkeleton rows={8} cols={8} />
+          <TableShellSkeleton rows={8} cols={9} />
         </div>
       ) : !result ? (
         <EmptyState
@@ -438,8 +439,8 @@ export function BsaleKardexPage() {
             {result.totalMovements} movimientos · {result.from} → {result.to} ·{' '}
             {result.officeIds.length} almacén(es)
           </p>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <Table>
+          <TableShell>
+            <Table className="min-w-[960px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
@@ -467,7 +468,7 @@ export function BsaleKardexPage() {
                     </TableCell>
                     <TableCell>
                       <span className="block">{row.documentLabel}</span>
-                      <span className="text-xs text-muted">
+                      <span className="text-xs text-muted-foreground">
                         {row.documentNumber}
                       </span>
                     </TableCell>
@@ -488,7 +489,7 @@ export function BsaleKardexPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+          </TableShell>
           {pageCount > 1 && (
             <div className="flex items-center justify-between gap-2">
               <Button

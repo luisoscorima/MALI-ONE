@@ -17,7 +17,7 @@ import {
   type NewsletterEditorHandle,
 } from '@/components/newsletter-editor';
 import { PageHeader } from '@/components/page-header';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
@@ -39,6 +39,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -324,15 +325,16 @@ export function NewslettersPage() {
 
           <TabsContent value="boletines" className="mt-6 space-y-6">
             {loading ? (
-              <TableSkeleton rows={4} />
+              <TableShellSkeleton rows={4} cols={5} />
             ) : newsletters.length === 0 ? (
               <EmptyState
                 title="Sin boletines"
                 description="Crea el primero con el editor visual drag & drop."
               />
             ) : (
-              <Table>
-                <TableHeader>
+              <TableShell>
+                <Table>
+                  <TableHeader>
                   <TableRow>
                     <TableHead className="w-[320px] max-w-[320px]">Título</TableHead>
                     <TableHead className="w-[200px] max-w-[200px]">Slug</TableHead>
@@ -427,8 +429,9 @@ export function NewslettersPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </TableShell>
             )}
           </TabsContent>
         </Tabs>

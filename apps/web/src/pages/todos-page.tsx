@@ -39,7 +39,11 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { AlertBanner, EmptyState, TableSkeleton } from '@/components/feedback';
+import {
+  AlertBanner,
+  EmptyState,
+  TableShellSkeleton,
+} from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import {
   Badge,
@@ -63,6 +67,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
   Tabs,
   TabsContent,
   TabsList,
@@ -626,7 +631,7 @@ export function TodosPage() {
         </TabsList>
 
         {loading ? (
-          <TableSkeleton rows={6} />
+          <TableShellSkeleton rows={6} cols={7} />
         ) : (
           <>
             <TabsContent value="kanban" className="mt-4">
@@ -788,7 +793,7 @@ export function TodosPage() {
                   description="Crea tu primera tarea para empezar."
                 />
               ) : (
-                <div className="overflow-x-auto rounded-lg border">
+                <TableShell>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -894,7 +899,7 @@ export function TodosPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                </TableShell>
               )}
             </TabsContent>
           </>

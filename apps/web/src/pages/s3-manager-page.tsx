@@ -38,6 +38,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableShell,
 } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
@@ -259,169 +260,171 @@ export function S3ManagerPage() {
           )}
         </Card>
 
-        <Card className="overflow-hidden p-0">
-          <div className="space-y-3 border-b border-border px-4 py-3">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <button type="button" onClick={() => navigateToPrefix('')}>
-                      {selectedBucket ?? '—'}
-                    </button>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                {breadcrumbs.map((crumb, index) => (
-                  <React.Fragment key={crumb.prefix}>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      {index === breadcrumbs.length - 1 ? (
-                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink asChild>
-                          <button
-                            type="button"
-                            onClick={() => navigateToPrefix(crumb.prefix)}
-                          >
-                            {crumb.label}
-                          </button>
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                  </React.Fragment>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
-            <div className="relative max-w-md">
-              <Search
-                className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted"
-                aria-hidden
-              />
-              <Input
-                className="pl-8"
-                placeholder="Buscar archivos o carpetas en esta ubicación…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+        <TableShell
+          className="min-w-0"
+          toolbar={
+            <div className="space-y-3">
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <button type="button" onClick={() => navigateToPrefix('')}>
+                        {selectedBucket ?? '—'}
+                      </button>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  {breadcrumbs.map((crumb, index) => (
+                    <React.Fragment key={crumb.prefix}>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        {index === breadcrumbs.length - 1 ? (
+                          <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink asChild>
+                            <button
+                              type="button"
+                              onClick={() => navigateToPrefix(crumb.prefix)}
+                            >
+                              {crumb.label}
+                            </button>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </React.Fragment>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+              <div className="relative max-w-md">
+                <Search
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted"
+                  aria-hidden
+                />
+                <Input
+                  className="pl-8"
+                  placeholder="Buscar archivos o carpetas en esta ubicación…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table className="min-w-[560px]">
-              <TableHeader>
-                <TableRow className="text-muted">
-                  <TableHead className="p-4">Nombre</TableHead>
-                  <TableHead className="p-4">Tamaño</TableHead>
-                  <TableHead className="p-4">Modificado</TableHead>
-                  <TableHead className="p-4">Acciones</TableHead>
+          }
+          footer={
+            nextToken && !loadingObjects ? (
+              <div className="border-t border-border p-4">
+                <Button
+                  variant="outline"
+                  onClick={() => void loadObjects(true, nextToken)}
+                >
+                  Cargar más
+                </Button>
+              </div>
+            ) : null
+          }
+        >
+          <Table className="min-w-[560px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Tamaño</TableHead>
+                <TableHead>Modificado</TableHead>
+                <TableHead>Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loadingObjects && items.length === 0 ? (
+                <TableSkeleton rows={5} cols={4} />
+              ) : filteredItems.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    <EmptyState
+                      title={
+                        searchQuery.trim()
+                          ? 'Sin coincidencias'
+                          : 'Carpeta vacía'
+                      }
+                      description={
+                        searchQuery.trim()
+                          ? `No hay archivos ni carpetas que coincidan con "${searchQuery.trim()}".`
+                          : 'No hay archivos en esta ubicación.'
+                      }
+                    />
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loadingObjects && items.length === 0 ? (
-                  <TableSkeleton rows={5} cols={4} />
-                ) : filteredItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4}>
-                      <EmptyState
-                        title={
-                          searchQuery.trim()
-                            ? 'Sin coincidencias'
-                            : 'Carpeta vacía'
-                        }
-                        description={
-                          searchQuery.trim()
-                            ? `No hay archivos ni carpetas que coincidan con "${searchQuery.trim()}".`
-                            : 'No hay archivos en esta ubicación.'
-                        }
-                      />
+              ) : (
+                filteredItems.map((item) => (
+                  <TableRow key={item.key}>
+                    <TableCell>
+                      {item.isFolder ? (
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 font-medium text-primary hover:underline"
+                          onClick={() => openFolder(item)}
+                        >
+                          <Folder size={16} />
+                          {item.name}
+                        </button>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          {isPreviewImage(item.name) && selectedBucket ? (
+                            <S3ImageThumb
+                              bucket={selectedBucket}
+                              item={item}
+                              onOpen={() => void openPreview(item)}
+                            />
+                          ) : (
+                            <span className="text-muted">📄</span>
+                          )}
+                          {isPreviewImage(item.name) ? (
+                            <button
+                              type="button"
+                              className="font-medium hover:underline"
+                              onClick={() => void openPreview(item)}
+                            >
+                              {item.name}
+                            </button>
+                          ) : (
+                            item.name
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted">
+                      {formatBytes(item.size)}
+                    </TableCell>
+                    <TableCell className="text-muted">
+                      {formatDate(item.lastModified)}
+                    </TableCell>
+                    <TableCell>
+                      {!item.isFolder && (
+                        <div className="flex items-center gap-1">
+                          <IconActionButton
+                            label="Descargar"
+                            onClick={() => void handleDownload(item)}
+                          >
+                            <Download className="size-4" />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Copiar enlace público"
+                            onClick={() => void handleCopyPublicUrl(item)}
+                          >
+                            <Link2 className="size-4" />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Eliminar"
+                            variant="danger"
+                            onClick={() => void handleDelete(item)}
+                          >
+                            <Trash2 className="size-4" />
+                          </IconActionButton>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filteredItems.map((item) => (
-                    <TableRow key={item.key} className="border-border/60">
-                      <TableCell className="p-4">
-                        {item.isFolder ? (
-                          <button
-                            type="button"
-                            className="flex items-center gap-2 font-medium text-primary hover:underline"
-                            onClick={() => openFolder(item)}
-                          >
-                            <Folder size={16} />
-                            {item.name}
-                          </button>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            {isPreviewImage(item.name) && selectedBucket ? (
-                              <S3ImageThumb
-                                bucket={selectedBucket}
-                                item={item}
-                                onOpen={() => void openPreview(item)}
-                              />
-                            ) : (
-                              <span className="text-muted">📄</span>
-                            )}
-                            {isPreviewImage(item.name) ? (
-                              <button
-                                type="button"
-                                className="font-medium hover:underline"
-                                onClick={() => void openPreview(item)}
-                              >
-                                {item.name}
-                              </button>
-                            ) : (
-                              item.name
-                            )}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="p-4 text-muted">
-                        {formatBytes(item.size)}
-                      </TableCell>
-                      <TableCell className="p-4 text-muted">
-                        {formatDate(item.lastModified)}
-                      </TableCell>
-                      <TableCell className="p-4">
-                        {!item.isFolder && (
-                          <div className="flex items-center gap-1">
-                            <IconActionButton
-                              label="Descargar"
-                              onClick={() => void handleDownload(item)}
-                            >
-                              <Download className="size-4" />
-                            </IconActionButton>
-                            <IconActionButton
-                              label="Copiar enlace público"
-                              onClick={() => void handleCopyPublicUrl(item)}
-                            >
-                              <Link2 className="size-4" />
-                            </IconActionButton>
-                            <IconActionButton
-                              label="Eliminar"
-                              variant="danger"
-                              onClick={() => void handleDelete(item)}
-                            >
-                              <Trash2 className="size-4" />
-                            </IconActionButton>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {nextToken && !loadingObjects && (
-            <div className="border-t border-border p-4">
-              <Button
-                variant="outline"
-                onClick={() => void loadObjects(true, nextToken)}
-              >
-                Cargar más
-              </Button>
-            </div>
-          )}
-        </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableShell>
       </div>
 
       <Dialog
