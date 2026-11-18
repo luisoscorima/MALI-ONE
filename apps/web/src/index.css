@@ -68,40 +68,41 @@
   --mali-letter-2: #a996ff;
   --mali-glow-panel: #3a78ff;
   --mali-glow-letter: #74a9ff;
-  --background: #fafafa;
-  --foreground: #18181b;
+  /* Light brand: cool slate/azul Mali + base para glass */
+  --background: #eef3fb;
+  --foreground: #142033;
   --login-ambient-emerald: #34d399;
   --login-ambient-violet: #a78bfa;
   --login-ambient-blue: #3b82f6;
-  --card: #ffffff;
-  --card-foreground: #18181b;
-  --popover: #ffffff;
-  --popover-foreground: #18181b;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --accent: #f4f4f5;
-  --accent-foreground: #18181b;
+  --card: #f8fbff;
+  --card-foreground: #142033;
+  --popover: #f8fbff;
+  --popover-foreground: #142033;
+  --primary: #142033;
+  --primary-foreground: #f3f7fd;
+  --secondary: #d7e2f2;
+  --secondary-foreground: #142033;
+  --muted: #dde6f4;
+  --muted-foreground: #5a6b84;
+  --accent: #d9e4f4;
+  --accent-foreground: #142033;
   --destructive: #ef4444;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #18181b;
-  --chart-1: #18181b;
+  --border: #c3d0e4;
+  --input: #c3d0e4;
+  --ring: #5b8def;
+  --chart-1: #3b82f6;
   --chart-2: #22c55e;
   --chart-3: #ef4444;
-  --chart-4: #71717a;
-  --chart-5: #a1a1aa;
-  --sidebar: #f4f4f5;
-  --sidebar-foreground: #18181b;
-  --sidebar-primary: #18181b;
-  --sidebar-primary-foreground: #fafafa;
-  --sidebar-accent: #e4e4e7;
-  --sidebar-accent-foreground: #18181b;
-  --sidebar-border: #e4e4e7;
-  --sidebar-ring: #18181b;
+  --chart-4: #8879ff;
+  --chart-5: #35d8ff;
+  --sidebar: #c5d3e8;
+  --sidebar-foreground: #142033;
+  --sidebar-primary: #142033;
+  --sidebar-primary-foreground: #f3f7fd;
+  --sidebar-accent: #b3c4dc;
+  --sidebar-accent-foreground: #142033;
+  --sidebar-border: #a8bad4;
+  --sidebar-ring: #5b8def;
 }
 
 .dark {
@@ -156,6 +157,203 @@ body {
 
 .text-muted {
   color: var(--muted-foreground);
+}
+
+/* ── Light shell: glassmorphism Mali (solo sin .dark) ── */
+@keyframes mali-glass-drift-cyan {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(4%, 3%) scale(1.08);
+    opacity: 0.78;
+  }
+}
+
+@keyframes mali-glass-drift-violet {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-3%, 4%) scale(1.06);
+    opacity: 0.7;
+  }
+}
+
+@keyframes mali-glass-drift-magenta {
+  0%,
+  100% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translate(-50%, -3%) scale(1.07);
+    opacity: 0.62;
+  }
+}
+
+.mali-glass-ambient {
+  display: none;
+}
+
+html:not(.dark) .mali-glass-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 12% 18%, rgb(53 216 255 / 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 55% at 88% 12%, rgb(136 121 255 / 0.2), transparent 50%),
+    radial-gradient(ellipse 65% 50% at 70% 88%, rgb(207 95 255 / 0.14), transparent 55%),
+    linear-gradient(155deg, #d4e0f2 0%, #e8eef8 42%, #ece8f6 100%) !important;
+}
+
+html:not(.dark) .mali-glass-ambient {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+html:not(.dark) .mali-glass-shell > :not(.mali-glass-ambient) {
+  position: relative;
+  z-index: 1;
+}
+
+.mali-glass-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+  will-change: transform, opacity;
+}
+
+.mali-glass-orb-cyan {
+  top: -8%;
+  left: -6%;
+  width: min(28rem, 55vw);
+  height: min(28rem, 55vw);
+  background: color-mix(in srgb, var(--mali-glass-0) 55%, transparent);
+  animation: mali-glass-drift-cyan 14s ease-in-out infinite;
+}
+
+.mali-glass-orb-violet {
+  top: 8%;
+  right: -10%;
+  width: min(26rem, 50vw);
+  height: min(26rem, 50vw);
+  background: color-mix(in srgb, var(--mali-glass-2) 50%, transparent);
+  animation: mali-glass-drift-violet 17s ease-in-out infinite;
+}
+
+.mali-glass-orb-magenta {
+  bottom: -12%;
+  left: 55%;
+  width: min(24rem, 48vw);
+  height: min(24rem, 48vw);
+  background: color-mix(in srgb, var(--mali-glass-3) 45%, transparent);
+  animation: mali-glass-drift-magenta 16s ease-in-out infinite;
+}
+
+html:not(.dark) .mali-glass-shell [data-slot='sidebar-inner'],
+html:not(.dark) [data-slot='sidebar'][data-mobile='true'] {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      145deg,
+      rgb(255 255 255 / 0.42) 0%,
+      rgb(200 218 242 / 0.38) 48%,
+      rgb(180 196 228 / 0.45) 100%
+    );
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.55),
+    inset -1px -1px 0 rgb(136 121 255 / 0.1),
+    0 0 0 1px rgb(91 141 239 / 0.14),
+    0 12px 36px -18px rgb(20 32 51 / 0.35);
+}
+
+html:not(.dark) .mali-glass-shell [data-slot='sidebar-inner'] {
+  border-radius: 1rem;
+}
+
+html:not(.dark) .mali-glass-shell [data-slot='sidebar-inner']::before,
+html:not(.dark) [data-slot='sidebar'][data-mobile='true']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgb(60 230 255 / 0.55),
+    rgb(216 243 255 / 0.35) 38%,
+    rgb(174 181 255 / 0.4) 70%,
+    rgb(214 99 255 / 0.45)
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+html:not(.dark) .mali-glass-shell [data-slot='sidebar-inner'] > *,
+html:not(.dark) [data-slot='sidebar'][data-mobile='true'] > * {
+  position: relative;
+  z-index: 1;
+}
+
+html:not(.dark) .mali-glass-inset {
+  background:
+    linear-gradient(
+      165deg,
+      rgb(255 255 255 / 0.72) 0%,
+      rgb(244 248 255 / 0.64) 55%,
+      rgb(236 240 252 / 0.7) 100%
+    ) !important;
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow:
+    inset 1px 1px 0 rgb(255 255 255 / 0.65),
+    0 0 0 1px rgb(91 141 239 / 0.1),
+    0 16px 40px -24px rgb(20 32 51 / 0.28) !important;
+}
+
+html:not(.dark) .mali-glass-shell [data-slot='card'] {
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    0 0 0 1px rgb(91 141 239 / 0.08);
+}
+
+html:not(.dark) .mali-glass-header {
+  background: color-mix(in srgb, var(--background) 55%, transparent);
+  border-color: rgb(91 141 239 / 0.14);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mali-glass-orb-cyan,
+  .mali-glass-orb-violet,
+  .mali-glass-orb-magenta {
+    animation: none;
+  }
 }
 
 /* Login page */

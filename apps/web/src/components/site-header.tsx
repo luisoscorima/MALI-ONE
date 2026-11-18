@@ -34,7 +34,7 @@ export function SiteHeader() {
     .filter((item) => isNavItemActive(pathname, item))
     .sort((a, b) => b.to.length - a.to.length)[0];
   return (
-    <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm md:hidden">
+    <header className="mali-glass-header flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm md:hidden">
       <SidebarLogoTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 h-4!" />
       <div className="min-w-0">

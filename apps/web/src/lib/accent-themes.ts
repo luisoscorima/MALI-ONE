@@ -80,11 +80,11 @@ export const defaultCustomAccentHex = '#3b82f6';
 export type ColorScheme = 'light' | 'dark';
 
 const APP_BACKGROUND_DARK = '#0f1419';
-const APP_BACKGROUND_LIGHT = '#fafafa';
+const APP_BACKGROUND_LIGHT = '#eef3fb';
 const NEUTRAL_PRIMARY_DARK = '#f4f4f5';
-const NEUTRAL_PRIMARY_LIGHT = '#18181b';
+const NEUTRAL_PRIMARY_LIGHT = '#142033';
 const NEUTRAL_FOREGROUND_DARK = '#0f1419';
-const NEUTRAL_FOREGROUND_LIGHT = '#fafafa';
+const NEUTRAL_FOREGROUND_LIGHT = '#f3f7fd';
 
 export function readDocumentColorScheme(): ColorScheme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
