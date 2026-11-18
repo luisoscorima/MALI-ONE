@@ -49,6 +49,22 @@ export class TreasuryPaymentsService {
       if (payloads && payloads.length !== rows.length) {
         throw new BadRequestException('El lote y el registro del portal no coinciden.');
       }
+      // Refresh portal names from Niubiz payload so operators never type them.
+      const portalNameByCode = new Map<string, string>();
+      for (const row of rows) {
+        const name = row.merchantName?.trim();
+        if (name && !portalNameByCode.has(row.merchantCode)) portalNameByCode.set(row.merchantCode, name);
+      }
+      for (const [code, portalName] of portalNameByCode) {
+        const target = byCode.get(code);
+        if (!target || target.externalName === portalName) continue;
+        await tx.treasuryTarget.update({
+          where: { id: target.id },
+          data: { externalName: portalName },
+        });
+        target.externalName = portalName;
+      }
+
       let createdCount = 0;
       let updatedCount = 0;
       for (const [index, row] of rows.entries()) {

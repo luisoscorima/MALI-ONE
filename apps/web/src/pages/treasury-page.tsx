@@ -201,8 +201,9 @@ export function TreasuryPage() {
       await api.saveTreasuryTarget(
         targetEdit.sourceId,
         {
-          ...targetEdit.input,
-          externalName: targetEdit.input.externalName || null,
+          name: targetEdit.input.name,
+          reference: targetEdit.input.reference,
+          active: targetEdit.input.active,
           currency: kind === 'bank_account' ? targetEdit.input.currency ?? 'PEN' : null,
           paycashEnabled: false,
         },
@@ -655,19 +656,10 @@ export function TreasuryPage() {
                   Sin espacios. El código no se puede cambiar después de crear.
                 </p>
                 {provider?.targetKind === 'merchant' && (
-                  <label className="grid gap-2 text-sm font-medium">
-                    Nombre en el portal
-                    <Input
-                      maxLength={200}
-                      value={targetEdit.input.externalName ?? ''}
-                      onChange={(e) =>
-                        setTargetEdit({
-                          ...targetEdit,
-                          input: { ...targetEdit.input, externalName: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    Nombre en el portal:{' '}
+                    {targetEdit.input.externalName?.trim() || 'Pendiente (lo trae el próximo sync)'}
+                  </p>
                 )}
                 {provider?.targetKind === 'bank_account' && (
                   <div className="grid gap-2">

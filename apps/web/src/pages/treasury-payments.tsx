@@ -419,10 +419,12 @@ export function TreasuryPayments({
                 if (merchantSaving) return;
                 setMerchantSaving(true);
                 setMerchantError('');
-                void api
+                  void api
                   .saveTreasuryTarget(sourceId, {
-                    ...merchantEdit.input,
-                    externalName: merchantEdit.input.externalName || null,
+                    name: merchantEdit.input.name,
+                    reference: merchantEdit.input.reference,
+                    active: merchantEdit.input.active,
+                    paycashEnabled: merchantEdit.input.paycashEnabled,
                     currency: null,
                   }, merchantEdit.id)
                   .then(() => {
@@ -454,14 +456,10 @@ export function TreasuryPayments({
                   onChange={(e) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, reference: e.target.value } })}
                 />
               </label>
-              <label className="grid gap-1.5 text-sm">
-                <span className="font-medium">Nombre Niubiz</span>
-                <Input
-                  maxLength={200}
-                  value={merchantEdit.input.externalName ?? ''}
-                  onChange={(e) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, externalName: e.target.value } })}
-                />
-              </label>
+              <p className="text-sm text-muted-foreground">
+                Nombre Niubiz:{' '}
+                {merchantEdit.input.externalName?.trim() || 'Pendiente (lo trae el próximo sync)'}
+              </p>
               <div className="flex items-center justify-between gap-3">
                 <label htmlFor="merchant-active" className="text-sm">Activo en sync</label>
                 <Switch

@@ -136,10 +136,13 @@ export class TreasuryService {
         });
       }
 
+      // Portal name comes from Niubiz sync/import, never from the form.
+      const externalName = existing ? existing.externalName : null;
+
       const data = {
         name: input.name,
         reference: input.reference,
-        externalName: input.externalName ?? null,
+        externalName,
         currency: kind === 'bank_account' ? input.currency! : null,
         active: input.active,
         paycashEnabled,

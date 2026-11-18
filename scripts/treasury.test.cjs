@@ -70,7 +70,7 @@ test('no permite editar una cuenta a través de otra fuente', async () => {
 test('deriva el tipo del proveedor y audita dentro de la transacción sin copiar referencia', async () => {
   const cases = [
     ['bcp', 'bank_account', { ...target, reference: '001234' }, '001234'],
-    ['niubiz_sales', 'merchant', { name: 'Cursos', reference: '650177853', active: true, paycashEnabled: true }, '650177853'],
+    ['niubiz_sales', 'merchant', { name: 'CURSOSDELMALI', reference: '650177853', active: true, paycashEnabled: true }, '650177853'],
   ];
   for (const [provider, kind, input, expectedRef] of cases) {
     let saved;
