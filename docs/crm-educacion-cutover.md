@@ -23,3 +23,11 @@
 - `GET /api/crm-educacion/commercial-authority` → `{ authority: "wa" }` (env `COMMERCIAL_AUTHORITY`).
 - Tabla `EducacionChannelEvent` lista para outbox WA→ONE (aún sin productor en WA).
 - UI asesor sigue siendo mali-whatsapp.
+
+## Piloto Prospectia (no es cutover global)
+
+Canal Prospectia escribe `EducacionOpportunity` en ONE sin poner `COMMERCIAL_AUTHORITY=one`.
+
+- WA no crea orígenes Prospectia ni hace match/check (evita dual-write y rastro en WA).
+- Inbound WA → `POST .../internal/opportunities/link-cycle` si ya existe oportunidad ONE.
+- Criterio para generalizar F4: equivalencia en ensayo, luego otros canales.

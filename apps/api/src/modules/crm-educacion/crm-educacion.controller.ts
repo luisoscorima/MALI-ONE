@@ -10,6 +10,8 @@ import { CrmEducacionService } from './crm-educacion.service';
 import { EducacionActivityService } from './educacion-activity.service';
 import { EducacionSaleService } from './educacion-sale.service';
 import { EDUCATION_CATEGORY_SCOPES, EDUCATION_WRITE_AREA } from './education-scope';
+import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
+import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
 
 class ListContactsQuery {
   @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
@@ -101,8 +103,33 @@ class ManualLeadBody {
   @IsOptional() @IsString() @MaxLength(200) curso?: string;
 }
 
+class ProspectiaImportBody {
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
+  @IsOptional() @IsString() @MaxLength(64) username?: string;
+  @IsOptional() @IsString() @MaxLength(128) whatsapp_user_id?: string;
+  @IsOptional() @IsIn(['ca', 'ep', 'general']) category?: 'ca' | 'ep' | 'general';
+  @IsOptional() @IsString() @MaxLength(150) name?: string;
+  @IsOptional() @IsString() @MaxLength(150) last_name?: string;
+  @IsOptional() @IsEmail() @MaxLength(255) email?: string;
+}
+
+class ProspectiaIngestBody {
+  @IsOptional() @IsIn(['incremental', 'backfill']) mode?: 'incremental' | 'backfill';
+  @IsOptional() @IsInt() @Min(1) maxPages?: number;
+}
+
+class ListOpportunitiesQuery {
+  @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
+  @IsOptional() @IsString() @MaxLength(32) channel?: string;
+  @IsOptional() @IsString() @MaxLength(120) q?: string;
+  @IsOptional() @IsIn(['recent', 'solo_contacto', 'open', 'closed', 'unassigned', 'all']) view?: string;
+  @IsOptional() @IsString() page?: string;
+  @IsOptional() @IsString() limit?: string;
+}
+
 class ActivityBody {
-  @IsInt() @Min(1) waCycleId!: number;
+  @IsOptional() @IsInt() @Min(1) waCycleId?: number;
+  @IsOptional() @IsString() @MaxLength(40) opportunityId?: string;
   @IsOptional() @IsInt() @Min(1) waContactId?: number;
   @IsIn(['call', 'email', 'whatsapp', 'other']) channel!: string;
   @IsOptional() @IsIn(['inbound', 'outbound']) direction?: string;
@@ -147,21 +174,13 @@ export class CrmEducacionController {
     private readonly crm: CrmEducacionService,
     private readonly activities: EducacionActivityService,
     private readonly sales: EducacionSaleService,
+    private readonly opportunities: EducacionOpportunityService,
+    private readonly prospectiaIngest: ProspectiaIngestService,
   ) {}
 
   @Get('contacts')
   contacts(@Query() query: ListContactsQuery) {
     return this.crm.contacts(query);
-  }
-
-  @Post('prospectia/sync')
-  prospectiaSync() {
-    return this.crm.startProspectiaSync();
-  }
-
-  @Get('prospectia/sync')
-  prospectiaSyncStatus() {
-    return this.crm.prospectiaSyncStatus();
   }
 
   @Post('prospectia/check')
@@ -213,9 +232,50 @@ export class CrmEducacionController {
       authority,
       messaging: 'whatsapp',
       note: authority === 'wa'
-        ? 'Motor comercial en mali-whatsapp; mensajería no se tumba en cutover.'
+        ? 'Motor comercial en mali-whatsapp; Prospectia ingresa nativo en ONE. Mensajería no se tumba en cutover.'
         : 'Motor comercial en ONE; WA solo canal + hechos.',
     };
+  }
+
+  @Get('opportunities')
+  listOpportunities(@Query() query: ListOpportunitiesQuery) {
+    return this.opportunities.list({
+      categoria: query.categoria,
+      channel: query.channel,
+      q: query.q,
+      view: query.view,
+      page: query.page ? Number(query.page) : undefined,
+      limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+
+  @Post('prospectia/ingest')
+  prospectiaIngestStart(@Body() body: ProspectiaIngestBody) {
+    return this.prospectiaIngest.start({
+      mode: body.mode ?? 'incremental',
+      maxPages: body.maxPages,
+    });
+  }
+
+  @Get('prospectia/ingest')
+  prospectiaIngestStatus() {
+    return this.prospectiaIngest.status();
+  }
+
+  @Post('prospectia/import')
+  prospectiaImport(@Body() body: ProspectiaImportBody) {
+    if (!body.phone && !body.username && !body.whatsapp_user_id) {
+      throw new BadRequestException('Indica phone, username o whatsapp_user_id');
+    }
+    return this.prospectiaIngest.importByLookup({
+      phone: body.phone,
+      username: body.username,
+      whatsapp_user_id: body.whatsapp_user_id,
+      category: body.category,
+      name: body.name,
+      lastName: body.last_name,
+      email: body.email,
+    });
   }
 
   @Patch('contacts/:id/management')
@@ -239,7 +299,17 @@ export class CrmEducacionController {
   }
 
   @Get('activities')
-  listActivities(@Query('waCycleId', ParseIntPipe) waCycleId: number) {
+  listActivities(
+    @Query('waCycleId') waCycleIdRaw?: string,
+    @Query('opportunityId') opportunityId?: string,
+  ) {
+    const waCycleId = waCycleIdRaw ? Number(waCycleIdRaw) : NaN;
+    if (opportunityId?.trim()) {
+      return this.activities.listByOpportunity(opportunityId.trim());
+    }
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      throw new BadRequestException('Indica waCycleId u opportunityId');
+    }
     return this.activities.listByCycle(waCycleId);
   }
 

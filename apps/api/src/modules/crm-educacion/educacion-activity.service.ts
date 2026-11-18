@@ -18,8 +18,17 @@ export class EducacionActivityService {
     });
   }
 
+  listByOpportunity(opportunityId: string) {
+    return this.prisma.educacionCrmActivity.findMany({
+      where: { opportunityId },
+      orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
   async create(input: {
-    waCycleId: number;
+    waCycleId?: number;
+    opportunityId?: string;
     waContactId?: number | null;
     channel: string;
     direction?: string;
@@ -36,13 +45,22 @@ export class EducacionActivityService {
     if (!RESULTS.includes(input.result as (typeof RESULTS)[number])) {
       throw new BadRequestException('result inválido');
     }
+    const waCycleId =
+      input.waCycleId != null && Number.isInteger(input.waCycleId) && input.waCycleId > 0
+        ? input.waCycleId
+        : null;
+    const opportunityId = input.opportunityId?.trim() || null;
+    if (!waCycleId && !opportunityId) {
+      throw new BadRequestException('Indica waCycleId u opportunityId');
+    }
     const occurredAt = new Date(input.occurredAt);
     if (Number.isNaN(occurredAt.getTime())) {
       throw new BadRequestException('occurredAt inválida');
     }
     return this.prisma.educacionCrmActivity.create({
       data: {
-        waCycleId: input.waCycleId,
+        waCycleId,
+        opportunityId,
         waContactId: input.waContactId ?? null,
         channel: input.channel,
         direction: input.direction === 'inbound' ? 'inbound' : 'outbound',

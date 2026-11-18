@@ -24,7 +24,8 @@ type LookupHit = {
 /** Identificador visual: venta↔Treasury (asesor / Caja). */
 export type EducationPaymentLink = {
   saleId: string;
-  waCycleId: number;
+  waCycleId: number | null;
+  opportunityId: string | null;
   /** reportado = código asociado; resto = estado Caja. */
   status: 'reportado' | 'parcial' | 'pagado' | 'revertido';
   code: string | null;
@@ -32,7 +33,8 @@ export type EducationPaymentLink = {
 
 function toPaymentLink(sale: {
   id: string;
-  waCycleId: number;
+  waCycleId: number | null;
+  opportunityId?: string | null;
   paymentStatus: string;
   reportedTxnCode: string | null;
   applications?: Array<{ transactionCode: string; reversedAt: Date | null }>;
@@ -49,6 +51,7 @@ function toPaymentLink(sale: {
   return {
     saleId: sale.id,
     waCycleId: sale.waCycleId,
+    opportunityId: sale.opportunityId ?? null,
     status,
     code,
   };
@@ -59,8 +62,15 @@ export class EducacionSaleService {
   constructor(private readonly prisma: PrismaService) {}
 
   getByCycle(waCycleId: number) {
-    return this.prisma.educacionSale.findUnique({
+    return this.prisma.educacionSale.findFirst({
       where: { waCycleId },
+      include: { items: true, applications: { orderBy: { createdAt: 'desc' } } },
+    });
+  }
+
+  getByOpportunity(opportunityId: string) {
+    return this.prisma.educacionSale.findFirst({
+      where: { opportunityId },
       include: { items: true, applications: { orderBy: { createdAt: 'desc' } } },
     });
   }
@@ -68,7 +78,8 @@ export class EducacionSaleService {
   paymentLinkOf(
     sale: {
       id: string;
-      waCycleId: number;
+      waCycleId: number | null;
+      opportunityId?: string | null;
       paymentStatus: string;
       reportedTxnCode: string | null;
       applications?: Array<{ transactionCode: string; reversedAt: Date | null }>;
@@ -87,6 +98,7 @@ export class EducacionSaleService {
       select: {
         id: true,
         waCycleId: true,
+        opportunityId: true,
         paymentStatus: true,
         reportedTxnCode: true,
         applications: {
@@ -97,7 +109,7 @@ export class EducacionSaleService {
     });
     for (const sale of sales) {
       const link = toPaymentLink(sale);
-      if (link) map.set(sale.waCycleId, link);
+      if (link && sale.waCycleId != null) map.set(sale.waCycleId, link);
     }
     return map;
   }
@@ -126,6 +138,7 @@ export class EducacionSaleService {
       select: {
         id: true,
         waCycleId: true,
+        opportunityId: true,
         paymentStatus: true,
         reportedTxnCode: true,
         applications: {
@@ -146,7 +159,8 @@ export class EducacionSaleService {
   }
 
   async upsertSale(input: {
-    waCycleId: number;
+    waCycleId?: number;
+    opportunityId?: string;
     waContactId?: number | null;
     advisorEmail?: string;
     amountAgreed: number;
@@ -161,16 +175,26 @@ export class EducacionSaleService {
     if (!(input.amountAgreed > 0)) {
       throw new BadRequestException('amountAgreed debe ser > 0');
     }
+    const waCycleId =
+      input.waCycleId != null && Number.isInteger(input.waCycleId) && input.waCycleId > 0
+        ? input.waCycleId
+        : null;
+    const opportunityId = input.opportunityId?.trim() || null;
+    if (!waCycleId && !opportunityId) {
+      throw new BadRequestException('Indica waCycleId u opportunityId');
+    }
     const amount = new Prisma.Decimal(input.amountAgreed);
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.educacionSale.findUnique({
-        where: { waCycleId: input.waCycleId },
-      });
+      const existing = waCycleId
+        ? await tx.educacionSale.findFirst({ where: { waCycleId } })
+        : await tx.educacionSale.findFirst({ where: { opportunityId: opportunityId! } });
       if (existing) {
         await tx.educacionSaleItem.deleteMany({ where: { saleId: existing.id } });
         return tx.educacionSale.update({
           where: { id: existing.id },
           data: {
+            waCycleId: waCycleId ?? existing.waCycleId,
+            opportunityId: opportunityId ?? existing.opportunityId,
             waContactId: input.waContactId ?? existing.waContactId,
             advisorEmail: input.advisorEmail ?? existing.advisorEmail,
             amountAgreed: amount,
@@ -192,7 +216,8 @@ export class EducacionSaleService {
       }
       return tx.educacionSale.create({
         data: {
-          waCycleId: input.waCycleId,
+          waCycleId,
+          opportunityId,
           waContactId: input.waContactId ?? null,
           advisorEmail: input.advisorEmail ?? null,
           amountAgreed: amount,

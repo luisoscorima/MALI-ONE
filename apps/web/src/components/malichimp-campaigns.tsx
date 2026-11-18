@@ -975,7 +975,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                 <TableHead>Campaña</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviados</TableHead>
-                <TableHead>Entregados</TableHead>
+                <TableHead>% entrega</TableHead>
                 <TableHead>% apertura</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -1025,7 +1025,13 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     </Badge>
                   </TableCell>
                   <TableCell>{nf.format(campaign.sent)} / {nf.format(campaign.totalRecipients)}</TableCell>
-                  <TableCell>{nf.format(campaign.delivered)}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {pf.format(
+                      campaign.sent > 0
+                        ? campaign.delivered / campaign.sent
+                        : 0,
+                    )}
+                  </TableCell>
                   <TableCell className="tabular-nums">
                     {pf.format(
                       campaign.delivered > 0

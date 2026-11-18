@@ -44,7 +44,6 @@ export type EducationContact = {
   requires_review?: boolean;
   lead_status_id?: number | null;
   lead_status_label?: string | null;
-  prospectia_match?: ProspectiaMatch | null;
 };
 export type EducationLead = {
   id: number;
@@ -83,7 +82,6 @@ export type EducationLead = {
   assigned_user_label: string | null;
   requires_review: boolean;
   lead_status_id: number | null;
-  prospectia_match: ProspectiaMatch | null;
 };
 export type EducationLeadCounts = {
   recent: number; new_number: number; duplicate: number; reassignable: number; conflict: number;
@@ -93,7 +91,8 @@ export type EducationCycleView =
   | 'open' | 'closed' | 'review' | 'unassigned' | 'stale' | 'solo_contacto';
 export type EducationPaymentLink = {
   saleId: string;
-  waCycleId: number;
+  waCycleId: number | null;
+  opportunityId?: string | null;
   status: 'reportado' | 'parcial' | 'pagado' | 'revertido';
   code: string | null;
 };
@@ -578,12 +577,80 @@ export const api = {
       '/api/crm-educacion/prospectia/check',
       { method: 'POST', body: JSON.stringify({ subjects }) },
     ),
-  syncCrmEducationProspectia: () =>
-    request<{ started: boolean }>('/api/crm-educacion/prospectia/sync', { method: 'POST', body: '{}' }),
-  getCrmEducationProspectiaSync: () =>
-    request<{ running: boolean; processed: number; total: number; finished_at: string | null }>(
-      '/api/crm-educacion/prospectia/sync',
+  startCrmEducationProspectiaIngest: (body?: { mode?: 'incremental' | 'backfill'; maxPages?: number }) =>
+    request<{ started: boolean; reason?: string }>(
+      '/api/crm-educacion/prospectia/ingest',
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
     ),
+  getCrmEducationProspectiaIngest: () =>
+    request<{
+      enabled: boolean;
+      running: boolean;
+      lastPolledAt: string | null;
+      lastPage: number;
+      lastRunStatus: string;
+      lastRunAt: string | null;
+      lastError: string | null;
+      processedTotal: number;
+      lastRunCreated: number;
+      lastRunUpdated: number;
+      lastRunSkipped: number;
+    }>('/api/crm-educacion/prospectia/ingest'),
+  importCrmEducationProspectia: (body: {
+    phone?: string;
+    username?: string;
+    whatsapp_user_id?: string;
+    category?: 'ca' | 'ep' | 'general';
+    name?: string;
+    last_name?: string;
+    email?: string;
+  }) =>
+    request<{
+      ok: boolean;
+      match: string;
+      opportunity: {
+        id: string;
+        channel: string;
+        external_id: string;
+        contacts: { name: string | null; last_name: string | null; phone: string | null; email: string | null };
+        assigned_user_label: string | null;
+      } | null;
+    }>('/api/crm-educacion/prospectia/import', {
+      method: 'POST', body: JSON.stringify(body),
+    }),
+  listCrmEducationOpportunities: (params: {
+    categoria?: EducationCategoryScope; channel?: string; q?: string;
+    view?: 'recent' | 'solo_contacto' | 'open' | 'closed' | 'unassigned' | 'all';
+    page?: number; limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== '') qs.set(key, String(value));
+    }
+    return request<{
+      items: Array<{
+        id: string;
+        channel: string;
+        external_id: string;
+        source_label: string | null;
+        category: string;
+        stage_slug: string;
+        first_seen_at: string;
+        classification: string;
+        assigned_user_label: string | null;
+        prospectia_status: string | null;
+        interest_course: string | null;
+        lead_score: number | null;
+        came_with_inbound: boolean;
+        wa_cycle_id: number | null;
+        contacts: {
+          name: string | null; last_name: string | null;
+          phone: string | null; email: string | null;
+        };
+      }>;
+      total: number; page: number; limit: number; pages: number;
+    }>(`/api/crm-educacion/opportunities?${qs}`);
+  },
   listCrmEducationContacts: (params: {
     categoria?: EducationCategoryScope; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;
@@ -702,13 +769,18 @@ export const api = {
     request<{ authority: 'wa' | 'one'; messaging: string; note: string }>(
       '/api/crm-educacion/commercial-authority',
     ),
-  listCrmEducationActivities: (waCycleId: number) =>
-    request<Array<{
+  listCrmEducationActivities: (waCycleId?: number, opportunityId?: string) => {
+    const qs = new URLSearchParams();
+    if (waCycleId) qs.set('waCycleId', String(waCycleId));
+    if (opportunityId) qs.set('opportunityId', opportunityId);
+    return request<Array<{
       id: string; channel: string; direction: string; occurredAt: string;
       result: string; notes: string | null; actorEmail: string | null;
-    }>>(`/api/crm-educacion/activities?waCycleId=${waCycleId}`),
+    }>>(`/api/crm-educacion/activities?${qs}`);
+  },
   createCrmEducationActivity: (body: {
-    waCycleId: number; waContactId?: number; channel: string; direction?: string;
+    waCycleId?: number; opportunityId?: string; waContactId?: number;
+    channel: string; direction?: string;
     occurredAt: string; result: string; notes?: string;
   }) => request('/api/crm-educacion/activities', {
     method: 'POST', body: JSON.stringify(body),

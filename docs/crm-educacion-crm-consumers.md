@@ -9,11 +9,11 @@ Fecha: 2026-11-18. Solo inventario; no implica cutover.
 | `EducationLeadWorkflowService` | ciclos, management, distribute, review, SLA, stale/solo_contacto |
 | `LeadsService` / webhooks Meta-TikTok | orígenes, entradas, captación |
 | Inbox conversaciones | asignación chat (≠ asesor comercial); refleja ciclo |
-| Prospectia sync/check | snapshot en entradas |
+| `MaliOneOpportunityLinkService` | post-`recordEntry` → ONE `link-cycle` (aditivo) |
 | CRM API (`/api/crm/education/*`) | contrato HTTP para ONE |
 | PAM sync (`/api/crm/sync`) | identidad/attrs PAM (mismo `people`) |
 
-## MALI ONE (proxy / dominio nuevo)
+## MALI ONE (proxy / dominio nuevo + piloto Prospectia)
 
 | Consumidor | Qué usa |
 |------------|---------|
@@ -21,9 +21,14 @@ Fecha: 2026-11-18. Solo inventario; no implica cutover.
 | Widget `EducacionLead` | `POST /api/crm/origins` channel=widget |
 | `EducacionSaleService` | venta, lookup/associate/apply Treasury |
 | `EducacionActivityService` | actividades multi-canal |
+| `ProspectiaClientService` | check/lookup Chatwoot (sin proxy WA) |
+| `ProspectiaIngestService` | poller → `EducacionPerson` + `EducacionOpportunity` |
+| `EducacionOpportunityService` | listado / link-cycle / Solo contacto ONE |
 | Catálogo estados | proxy CRUD statuses WA |
 | CRM PAM | personas compartidas (cutover: alinear maestro) |
 
 ## Destino post-cutover
 
 Escrituras comerciales → ONE. WA conserva mensajería + outbox de hechos de canal. Ver [crm-educacion-cutover.md](./crm-educacion-cutover.md).
+
+Piloto actual: solo canal Prospectia con autoridad ONE; el resto sigue en WA hasta F4.

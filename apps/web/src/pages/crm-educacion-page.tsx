@@ -75,7 +75,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   meta_lead_form: 'Formulario Meta', meta_ctwa: 'Anuncio a WhatsApp',
   widget: 'Widget web', tiktok: 'TikTok', import: 'Importación',
   manual: 'Manual', organic_wa: 'WhatsApp orgánico',
-  mali_one_link: 'Enlace / QR MALI ONE', other: 'Otro',
+  mali_one_link: 'Enlace / QR MALI ONE', prospectia: 'Prospectia', other: 'Otro',
 };
 const SALE_MISSING_LABELS: Record<string, string> = {
   nombre: 'Nombre',
@@ -119,12 +119,12 @@ const EMPTY_MANUAL_LEAD: ManualLeadDraft = {
 };
 const FIXED_COLUMNS = [
   ['name', 'Nombre'], ['categoria', 'Categoría'], ['last_name', 'Apellido'],
-  ['phone', 'Teléfono'], ['prospectia', 'Prospectia'], ['wa_identity', 'Usuario WhatsApp'], ['email', 'Email'], ['dni', 'DNI'],
+  ['phone', 'Teléfono'], ['wa_identity', 'Usuario WhatsApp'], ['email', 'Email'], ['dni', 'DNI'],
   ['segments', 'Segmentos'], ['advisor', 'Asesor'], ['lead_status', 'Estado del lead'],
 ] as const;
-const STORAGE_KEY = 'crm-educacion-contact-cols-v5';
-const PREVIOUS_STORAGE_KEY = 'crm-educacion-contact-cols-v4';
-const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v3';
+const STORAGE_KEY = 'crm-educacion-contact-cols-v6';
+const PREVIOUS_STORAGE_KEY = 'crm-educacion-contact-cols-v5';
+const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v4';
 const PAGE_SIZE = 50;
 
 function storedColumns(): Set<string> {
@@ -134,7 +134,8 @@ function storedColumns(): Set<string> {
     if (Array.isArray(value)) {
       const visible = new Set(value.filter((v): v is string => typeof v === 'string'));
       if (visible.has('area')) { visible.delete('area'); visible.add('categoria'); }
-      if (!saved) { visible.add('wa_identity'); visible.add('prospectia'); }
+      visible.delete('prospectia');
+      if (!saved) { visible.add('wa_identity'); }
       return visible;
     }
   } catch { /* Prefer defaults when storage is invalid. */ }
@@ -192,13 +193,6 @@ function LeadStatusSelect({
       </SelectContent>
     </Select>
   );
-}
-
-function prospectiaLabel(match: string | null | undefined) {
-  if (!match) return <span className="text-xs text-muted-foreground">Sin consultar</span>;
-  if (match === 'exists') return <Badge>Prospectia</Badge>;
-  if (match === 'missing') return <span className="text-xs text-muted-foreground">No existe</span>;
-  return <span className="text-xs text-muted-foreground">No verificado</span>;
 }
 
 type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email' | 'segment_slugs' | 'attributes'> & {
@@ -264,12 +258,23 @@ export function CrmEducacionPage() {
   const [managementSaving, setManagementSaving] = useState(false);
   const [distributing, setDistributing] = useState(false);
   const [paymentCyclePrefill, setPaymentCyclePrefill] = useState('');
-  const [syncingProspectia, setSyncingProspectia] = useState(false);
-  const [prospectiaWatch, setProspectiaWatch] = useState(0);
-  const [prospectiaSync, setProspectiaSync] = useState({
-    running: false, processed: 0, total: 0, finished_at: null as string | null,
+  const [ingestingProspectia, setIngestingProspectia] = useState(false);
+  const [prospectiaIngestWatch, setProspectiaIngestWatch] = useState(0);
+  const [prospectiaIngest, setProspectiaIngest] = useState({
+    enabled: false,
+    running: false,
+    lastRunStatus: 'idle',
+    lastRunAt: null as string | null,
+    lastRunCreated: 0,
+    lastError: null as string | null,
   });
-  const prospectiaWasRunning = useRef(false);
+  const [nativeSoloContacto, setNativeSoloContacto] = useState<Array<{
+    id: string; channel: string; source_label: string | null; first_seen_at: string;
+    classification: string; assigned_user_label: string | null;
+    prospectia_status?: string | null; interest_course?: string | null;
+    contacts: { name: string | null; last_name: string | null; phone: string | null; email: string | null };
+  }>>([]);
+  const [nativeSoloTotal, setNativeSoloTotal] = useState(0);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible])); }, [visible]);
   useEffect(() => {
@@ -467,6 +472,40 @@ export function CrmEducacionPage() {
     void updateManagement(contactId, { lead_status_id: statusId, lead_id: leadId });
   }, [managementCatalog.statuses, toast, updateManagement]);
 
+  async function importFromProspectia() {
+    if (!manualLeadDraft.phone.trim()) {
+      toast.error('Teléfono requerido para traer desde Prospectia');
+      return;
+    }
+    setManualLeadSaving(true);
+    try {
+      const result = await api.importCrmEducationProspectia({
+        phone: manualLeadDraft.phone.trim(),
+        category: manualLeadDraft.categoria,
+        name: manualLeadDraft.name.trim() || undefined,
+        last_name: manualLeadDraft.last_name.trim() || undefined,
+        email: manualLeadDraft.email.trim() || undefined,
+      });
+      if (!result.ok || !result.opportunity) {
+        toast.error(
+          result.match === 'missing'
+            ? 'No hay contacto en Prospectia con ese teléfono'
+            : 'No se pudo verificar Prospectia (unverified o API caída)',
+        );
+        return;
+      }
+      toast.success(`Oportunidad Prospectia en ONE (${result.opportunity.id.slice(0, 8)}…)`);
+      setManualLeadOpen(false);
+      setManualLeadDraft(EMPTY_MANUAL_LEAD);
+      setTab('opportunities');
+      setOpportunityView('solo_contacto');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al importar de Prospectia');
+    } finally {
+      setManualLeadSaving(false);
+    }
+  }
+
   async function submitManualLead() {
     if (!manualLeadDraft.name.trim()) {
       toast.error('Nombre requerido');
@@ -552,47 +591,72 @@ export function CrmEducacionPage() {
     } catch (error) { toast.error(error instanceof Error ? error.message : 'No se pudo revisar el conflicto'); }
   }, [loadContacts, loadCycles, loadReviewEntries, toast]);
 
-  const reloadAfterProspectia = useRef({ loadContacts, loadCycles });
-  reloadAfterProspectia.current = { loadContacts, loadCycles };
   useEffect(() => {
     let cancel = false;
     let timer = 0;
-    async function poll() {
+    async function pollIngest() {
       try {
-        const status = await api.getCrmEducationProspectiaSync();
+        const status = await api.getCrmEducationProspectiaIngest();
         if (cancel) return;
-        setProspectiaSync(status);
+        setProspectiaIngest({
+          enabled: status.enabled,
+          running: status.running,
+          lastRunStatus: status.lastRunStatus,
+          lastRunAt: status.lastRunAt,
+          lastRunCreated: status.lastRunCreated,
+          lastError: status.lastError,
+        });
         if (status.running) {
-          prospectiaWasRunning.current = true;
-          timer = window.setTimeout(() => void poll(), 2000);
+          timer = window.setTimeout(() => void pollIngest(), 2500);
           return;
         }
-        if (prospectiaWasRunning.current) {
-          prospectiaWasRunning.current = false;
-          toast.success('Prospectia sincronizado');
-          const reload = reloadAfterProspectia.current;
-          await Promise.all([reload.loadContacts(), reload.loadCycles()]);
-        }
-        setSyncingProspectia(false);
-      } catch (error) {
-        if (!cancel) {
-          setSyncingProspectia(false);
-          toast.error(error instanceof Error ? error.message : 'No se pudo consultar el avance de Prospectia');
-        }
+        setIngestingProspectia(false);
+      } catch {
+        if (!cancel) setIngestingProspectia(false);
       }
     }
-    void poll();
+    void pollIngest();
     return () => { cancel = true; window.clearTimeout(timer); };
-  }, [prospectiaWatch, toast]);
+  }, [prospectiaIngestWatch]);
 
-  async function syncProspectia() {
-    setSyncingProspectia(true);
+  useEffect(() => {
+    if (opportunityView !== 'solo_contacto') {
+      setNativeSoloContacto([]);
+      setNativeSoloTotal(0);
+      return;
+    }
+    let cancelled = false;
+    void api.listCrmEducationOpportunities({
+      categoria, channel: 'prospectia', view: 'solo_contacto', page: 1, limit: PAGE_SIZE,
+    }).then((data) => {
+      if (cancelled) return;
+      setNativeSoloContacto(data.items);
+      setNativeSoloTotal(data.total);
+    }).catch(() => {
+      if (!cancelled) {
+        setNativeSoloContacto([]);
+        setNativeSoloTotal(0);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [opportunityView, categoria, cyclePage]);
+
+  async function ingestProspectia() {
+    setIngestingProspectia(true);
     try {
-      await api.syncCrmEducationProspectia();
-      setProspectiaWatch((value) => value + 1);
+      const result = await api.startCrmEducationProspectiaIngest({ mode: 'incremental' });
+      if (!result.started) {
+        setIngestingProspectia(false);
+        toast.error(result.reason === 'already_running'
+          ? 'Ingesta Prospectia ya en curso'
+          : 'Falta PROSPECTIA_API_ACCESS_TOKEN');
+        return;
+      }
+      setProspectiaIngestWatch((v) => v + 1);
+      toast.success('Ingesta Prospectia iniciada (maestro ONE)');
     } catch (error) {
-      setSyncingProspectia(false);
-      toast.error(error instanceof Error ? error.message : 'No se pudo sincronizar Prospectia');
+      setIngestingProspectia(false);
+      toast.error(error instanceof Error ? error.message : 'No se pudo iniciar la ingesta');
     }
   }
 
@@ -625,8 +689,6 @@ export function CrmEducacionPage() {
       <Badge variant="secondary">{categoryLabel(row.original.categoria, row.original.categorias)}</Badge> });
     if (visible.has('last_name')) cols.push({ id: 'last_name', header: 'Apellido', cell: ({ row }) => row.original.last_name || '—' });
     if (visible.has('phone')) cols.push({ id: 'phone', header: 'Teléfono', cell: ({ row }) => row.original.phone || '—' });
-    if (visible.has('prospectia')) cols.push({ id: 'prospectia', header: 'Prospectia', cell: ({ row }) =>
-      prospectiaLabel(row.original.prospectia_match) });
     if (visible.has('wa_identity')) cols.push({ id: 'wa_identity', header: 'Usuario WhatsApp', cell: ({ row }) =>
       <div className="min-w-36">
         <div>{waUsername(row.original.wa_username) || (row.original.whatsapp_user_id ? 'Número privado' : '—')}</div>
@@ -1013,7 +1075,7 @@ export function CrmEducacionPage() {
         <DialogHeader>
           <DialogTitle>Registrar lead</DialogTitle>
           <DialogDescription>
-            Históricos, solo llamada u orgánicos sin chat de WhatsApp. Si ya existe, no se crea otro.
+            Históricos, solo llamada u orgánicos sin chat. También puedes traer un lead que solo exista en Prospectia (maestro ONE).
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -1079,7 +1141,7 @@ export function CrmEducacionPage() {
             Ábrelo en Contactos u Oportunidades; no se creó un lead nuevo.
           </p>
         )}
-        <DialogFooter>
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
             disabled={manualLeadSaving}
@@ -1087,8 +1149,15 @@ export function CrmEducacionPage() {
           >
             Cancelar
           </Button>
+          <Button
+            variant="outline"
+            disabled={manualLeadSaving}
+            onClick={() => void importFromProspectia()}
+          >
+            Traer desde Prospectia
+          </Button>
           <Button disabled={manualLeadSaving} onClick={() => void submitManualLead()}>
-            Registrar
+            Registrar en WA
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1291,20 +1360,27 @@ export function CrmEducacionPage() {
             <UsersRound className="mr-1 size-4" />
             {distributing ? 'Asignando…' : 'Asignar automáticamente'}
           </Button>}
-          <Button variant="outline" disabled={syncingProspectia || prospectiaSync.running}
-            onClick={() => void syncProspectia()}>
-            {prospectiaSync.running && prospectiaSync.total > 0
-              ? `Sincronizando ${prospectiaSync.processed.toLocaleString('es-PE')} de ${prospectiaSync.total.toLocaleString('es-PE')}`
-              : syncingProspectia || prospectiaSync.running
-                ? 'Sincronizando…'
-                : 'Sincronizar Prospectia'}
+          <Button variant="outline"
+            disabled={ingestingProspectia || prospectiaIngest.running || !prospectiaIngest.enabled}
+            onClick={() => void ingestProspectia()}>
+            {ingestingProspectia || prospectiaIngest.running
+              ? 'Ingestando…'
+              : 'Ingestar Prospectia'}
           </Button>
-          {prospectiaSync.finished_at && !prospectiaSync.running && (
+          {prospectiaIngest.lastRunAt && !prospectiaIngest.running && (
             <span className="text-sm text-muted-foreground">
-              Última sincronización: {formatDate(prospectiaSync.finished_at)}
+              Última ingesta: {formatDate(prospectiaIngest.lastRunAt)}
+              {prospectiaIngest.lastRunCreated
+                ? ` (+${prospectiaIngest.lastRunCreated})`
+                : ''}
             </span>
           )}
-          <span className="text-sm text-muted-foreground">{cycleTotal} oportunidades</span>
+          <span className="text-sm text-muted-foreground">
+            {cycleTotal} oportunidades
+            {opportunityView === 'solo_contacto' && nativeSoloTotal > 0
+              ? ` · ${nativeSoloTotal} Prospectia ONE`
+              : ''}
+          </span>
         </div>
         {opportunityView === 'review' && <div className="space-y-2">
           <h3 className="text-sm font-semibold">Asesor por confirmar</h3>
@@ -1314,9 +1390,32 @@ export function CrmEducacionPage() {
               getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />}
         </div>}
         {opportunityView !== 'review' && (cycleLoading ? <TableShellSkeleton rows={8} cols={7} density="compact" /> : cycles.length === 0 ?
-          <EmptyState title="Sin oportunidades" description="No hay ciclos comerciales para estos filtros." /> :
+          <EmptyState title="Sin oportunidades WA" description="No hay ciclos comerciales para estos filtros." /> :
           <DataTable columns={cycleColumns} data={cycles}
             getRowId={(cycle) => String(cycle.id)} tableClassName="min-w-full" />)}
+        {opportunityView === 'solo_contacto' && nativeSoloContacto.length > 0 && (
+          <div className="space-y-2 border-t pt-4">
+            <h3 className="text-sm font-semibold">Prospectia (maestro ONE) sin WhatsApp</h3>
+            <p className="text-xs text-muted-foreground">
+              Leads ingeridos desde Prospectia que aún no tienen ciclo/chat vinculado.
+            </p>
+            <DataTable
+              columns={[
+                { id: 'when', header: 'Fecha', cell: ({ row }) => formatDate(row.original.first_seen_at) },
+                { id: 'name', header: 'Contacto', cell: ({ row }) =>
+                  `${row.original.contacts?.name ?? ''} ${row.original.contacts?.last_name ?? ''}`.trim()
+                  || row.original.contacts?.phone || '—' },
+                { id: 'interest', header: 'Interés', cell: ({ row }) => row.original.interest_course || '—' },
+                { id: 'status', header: 'Estado Prospectia', cell: ({ row }) => row.original.prospectia_status || '—' },
+                { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || 'Prospectia' },
+                { id: 'advisor', header: 'Asesor', cell: ({ row }) => row.original.assigned_user_label || '—' },
+              ]}
+              data={nativeSoloContacto}
+              getRowId={(row) => row.id}
+              tableClassName="min-w-full"
+            />
+          </div>
+        )}
         <div className="flex items-center justify-end gap-3 text-sm">
           <span>Página {cyclePage} de {Math.max(1, Math.ceil(cycleTotal / PAGE_SIZE))}</span>
           <Button variant="outline" disabled={cyclePage <= 1}
@@ -1374,9 +1473,20 @@ export function CrmEducacionPage() {
   </div>;
 }
 
+type HistorialRow = {
+  id: string;
+  first_seen_at: string;
+  channel: string;
+  source_label: string | null;
+  classification: string | null;
+  assigned_user_label: string | null;
+  contacts: { name: string | null; last_name: string | null; phone?: string | null };
+  origin: 'wa' | 'one';
+};
+
 function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope }) {
   const toast = useToast();
-  const [items, setItems] = useState<EducationLead[]>([]);
+  const [items, setItems] = useState<HistorialRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -1384,11 +1494,45 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void api.listCrmEducationLeads({ categoria, view: 'recent', page, limit: PAGE_SIZE })
-      .then((data) => {
+    void Promise.all([
+      api.listCrmEducationLeads({ categoria, view: 'recent', page, limit: PAGE_SIZE }),
+      api.listCrmEducationOpportunities({
+        categoria, channel: 'prospectia', view: 'all', page: 1, limit: PAGE_SIZE,
+      }).catch(() => ({ items: [], total: 0, page: 1, limit: PAGE_SIZE, pages: 1 })),
+    ])
+      .then(([wa, one]) => {
         if (cancelled) return;
-        setItems(data.items);
-        setTotal(data.total);
+        const waRows: HistorialRow[] = wa.items.map((row) => ({
+          id: `wa-${row.id}`,
+          first_seen_at: row.first_seen_at,
+          channel: row.channel,
+          source_label: row.source_label,
+          classification: row.classification,
+          assigned_user_label: row.assigned_user_label,
+          contacts: {
+            name: row.contacts?.name ?? null,
+            last_name: row.contacts?.last_name ?? null,
+            phone: row.contacts?.phone,
+          },
+          origin: 'wa',
+        }));
+        const oneRows: HistorialRow[] = page === 1
+          ? one.items.map((row) => ({
+              id: `one-${row.id}`,
+              first_seen_at: row.first_seen_at,
+              channel: row.channel,
+              source_label: row.source_label,
+              classification: row.classification,
+              assigned_user_label: row.assigned_user_label,
+              contacts: row.contacts,
+              origin: 'one',
+            }))
+          : [];
+        const merged = [...oneRows, ...waRows].sort(
+          (a, b) => new Date(b.first_seen_at).getTime() - new Date(a.first_seen_at).getTime(),
+        );
+        setItems(merged);
+        setTotal(wa.total + (page === 1 ? one.total : 0));
       })
       .catch((error) => {
         if (!cancelled) toast.error(error instanceof Error ? error.message : 'Error al cargar historial');
@@ -1406,19 +1550,22 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
       columns={[
         { id: 'when', header: 'Fecha', cell: ({ row }) => formatDate(row.original.first_seen_at) },
         { id: 'name', header: 'Contacto', cell: ({ row }) =>
-          `${row.original.contacts?.name ?? ''} ${row.original.contacts?.last_name ?? ''}`.trim() || '—' },
+          `${row.original.contacts?.name ?? ''} ${row.original.contacts?.last_name ?? ''}`.trim()
+          || row.original.contacts?.phone || '—' },
         { id: 'channel', header: 'Canal', cell: ({ row }) =>
           CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
-        { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || '—' },
+        { id: 'source', header: 'Fuente', cell: ({ row }) =>
+          row.original.source_label
+          || (row.original.origin === 'one' ? 'Prospectia' : '—') },
         { id: 'class', header: 'Clasificación', cell: ({ row }) => row.original.classification || '—' },
         { id: 'advisor', header: 'Asesor', cell: ({ row }) => row.original.assigned_user_label || '—' },
       ]}
       data={items}
-      getRowId={(row) => String(row.id)}
+      getRowId={(row) => row.id}
       tableClassName="min-w-full"
     />
     <div className="flex items-center justify-end gap-3 text-sm">
-      <span>Página {page} de {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+      <span>Página {page} de {Math.max(1, Math.ceil(Math.max(total, 1) / PAGE_SIZE))}</span>
       <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
       <Button variant="outline" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
     </div>

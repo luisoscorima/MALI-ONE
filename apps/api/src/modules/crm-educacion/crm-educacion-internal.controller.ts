@@ -10,9 +10,12 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IsInt, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min,
+} from 'class-validator';
 import { Public } from '../../core/guards/public.decorator';
 import { EducacionSaleService } from './educacion-sale.service';
+import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
 
 class InternalAssociateBody {
   @IsInt() @Min(1) waCycleId!: number;
@@ -23,14 +26,23 @@ class InternalAssociateBody {
   @IsOptional() @IsString() @MaxLength(200) actorEmail?: string;
 }
 
+class InternalLinkCycleBody {
+  @IsInt() @Min(1) waCycleId!: number;
+  @IsOptional() @IsInt() @Min(1) waContactId?: number;
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
+  @IsOptional() @IsEmail() @MaxLength(255) email?: string;
+  @IsOptional() @IsBoolean() markInbound?: boolean;
+}
+
 /**
- * Lookup/asociación de pagos para mali-whatsapp (asesor no entra a Treasury).
+ * Lookup/asociación de pagos + link ciclo↔oportunidad Prospectia para mali-whatsapp.
  * Auth: `x-crm-educacion-service-token` o Bearer = CRM_EDUCACION_SERVICE_TOKEN.
  */
 @Controller('crm-educacion/internal')
 export class CrmEducacionInternalController {
   constructor(
     private readonly sales: EducacionSaleService,
+    private readonly opportunities: EducacionOpportunityService,
     private readonly config: ConfigService,
   ) {}
 
@@ -99,5 +111,26 @@ export class CrmEducacionInternalController {
     this.assertServiceToken(headerToken, authorization);
     const sale = await this.sales.getByCycle(waCycleId);
     return { payment_link: this.sales.paymentLinkOf(sale) };
+  }
+
+  /**
+   * Vincula ciclo WA a oportunidad Prospectia nativa en ONE (piloto autoridad).
+   * Aditivo: si no hay match, linked=false y el chat sigue.
+   */
+  @Public()
+  @Post('opportunities/link-cycle')
+  linkCycle(
+    @Body() body: InternalLinkCycleBody,
+    @Headers('x-crm-educacion-service-token') headerToken?: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.assertServiceToken(headerToken, authorization);
+    return this.opportunities.linkCycle({
+      waCycleId: body.waCycleId,
+      waContactId: body.waContactId,
+      phone: body.phone,
+      email: body.email,
+      markInbound: body.markInbound !== false,
+    });
   }
 }

@@ -4,10 +4,20 @@ import { CrmEducacionInternalController } from './crm-educacion-internal.control
 import { CrmEducacionService } from './crm-educacion.service';
 import { EducacionActivityService } from './educacion-activity.service';
 import { EducacionSaleService } from './educacion-sale.service';
+import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
+import { ProspectiaClientService } from './prospectia/prospectia-client.service';
+import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
 
 @Module({
   controllers: [CrmEducacionController, CrmEducacionInternalController],
-  providers: [CrmEducacionService, EducacionActivityService, EducacionSaleService],
-  exports: [EducacionSaleService],
+  providers: [
+    CrmEducacionService,
+    EducacionActivityService,
+    EducacionSaleService,
+    ProspectiaClientService,
+    ProspectiaIngestService,
+    EducacionOpportunityService,
+  ],
+  exports: [EducacionSaleService, EducacionOpportunityService, ProspectiaIngestService],
 })
 export class CrmEducacionModule {}

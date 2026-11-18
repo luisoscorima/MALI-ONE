@@ -751,13 +751,93 @@ model EducacionLead {
   @@index([utmCampaign])
 }
 
-/// Actividad multicanal (llamada, email, etc.) ligada a ciclo WA. Destino: ONE.
+/// Persona comercial nativa ONE (piloto Prospectia / cutover parcial).
+model EducacionPerson {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  /// Teléfono E.164 (+51…)
+  phone         String?
+  email         String?
+  name          String?
+  lastName      String?
+  waContactId   Int?
+  opportunities EducacionOpportunity[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([waContactId])
+}
+
+/// Oportunidad comercial nativa ONE. Canal prospectia = maestro ONE (piloto).
+model EducacionOpportunity {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  personId          String
+  person            EducacionPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
+  /// prospectia | (futuros canales nativos)
+  channel           String
+  /// ID estable en sistema origen (Prospectia contact id)
+  externalId        String
+  /// ca | ep | general
+  category          String   @default("general")
+  stageSlug         String   @default("por_contactar")
+  advisorEmail      String?
+  /// Etiqueta comercial Prospectia (venta_exitosa_arte, mql_ep, no_contesta…)
+  prospectiaStatus  String?
+  /// Curso/interés (custom attr conversación o contacto)
+  interestCourse    String?
+  /// lead_scoring u otro score de Prospectia
+  leadScore         Int?
+  cameWithInbound   Boolean  @default(false)
+  waCycleId         Int?
+  waContactId       Int?
+  requiresReview    Boolean  @default(false)
+  lastInteractionAt DateTime?
+  closedAt          DateTime?
+  sourceLabel       String?
+  /// Snapshot enriquecido: contact + conversation (labels, custom_attributes, assignee, team)
+  payload           Json?
+  activities        EducacionCrmActivity[]
+  sales             EducacionSale[]
+
+  @@unique([channel, externalId])
+  @@index([waCycleId])
+  @@index([waContactId])
+  @@index([cameWithInbound, closedAt])
+  @@index([category, createdAt])
+  @@index([advisorEmail])
+  @@index([channel, createdAt])
+  @@index([prospectiaStatus])
+  @@index([interestCourse])
+}
+
+/// Cursor / estado del poller Prospectia → ONE.
+model EducacionProspectiaCursor {
+  id                 String    @id @default("default")
+  updatedAt          DateTime  @updatedAt
+  lastPolledAt       DateTime?
+  lastPage           Int       @default(0)
+  lastSeenExternalId String?
+  lastRunStatus      String    @default("idle") // idle | running | ok | error
+  lastRunAt          DateTime?
+  lastError          String?
+  processedTotal     Int       @default(0)
+  lastRunCreated     Int       @default(0)
+  lastRunUpdated     Int       @default(0)
+  lastRunSkipped     Int       @default(0)
+}
+
+/// Actividad multicanal (llamada, email, etc.). waCycleId y/o opportunityId.
 model EducacionCrmActivity {
   id            String   @id @default(cuid())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  /// ID del ciclo en mali-whatsapp (education_lead_cycles.id)
-  waCycleId     Int
+  /// ID del ciclo en mali-whatsapp (education_lead_cycles.id); opcional si hay opportunityId
+  waCycleId     Int?
+  opportunityId String?
+  opportunity   EducacionOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   waContactId   Int?
   channel       String   // call | email | whatsapp | other
   direction     String   @default("outbound") // inbound | outbound
@@ -771,15 +851,18 @@ model EducacionCrmActivity {
   externalSystem String? // anura | manual | ses
 
   @@index([waCycleId, occurredAt])
+  @@index([opportunityId, occurredAt])
   @@index([externalSystem, externalRef])
 }
 
-/// Venta educativa (compromiso). Anclada a ciclo WA hasta cutover.
+/// Venta educativa (compromiso). Anclada a ciclo WA y/o oportunidad ONE.
 model EducacionSale {
   id              String   @id @default(cuid())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-  waCycleId       Int
+  waCycleId       Int?
+  opportunityId   String?
+  opportunity     EducacionOpportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
   waContactId     Int?
   advisorEmail    String?
   currency        String   @default("PEN")
@@ -801,6 +884,7 @@ model EducacionSale {
   applications    EducacionPaymentApplication[]
 
   @@unique([waCycleId])
+  @@unique([opportunityId])
   @@index([paymentStatus])
   @@index([billingStatus])
   @@index([reportedTxnCode])

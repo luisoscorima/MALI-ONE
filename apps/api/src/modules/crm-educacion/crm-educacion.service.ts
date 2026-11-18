@@ -5,6 +5,7 @@ import {
 } from '../crm/whatsapp-crm-client.service';
 import { EDUCATION_WRITE_AREA, toWhatsAppAreaQuery } from './education-scope';
 import { EducacionSaleService } from './educacion-sale.service';
+import { ProspectiaClientService } from './prospectia/prospectia-client.service';
 
 function pageNumber(raw: string | undefined, fallback: number, maximum: number): number {
   if (raw === undefined) return fallback;
@@ -20,6 +21,7 @@ export class CrmEducacionService {
   constructor(
     private readonly crm: WhatsappCrmClientService,
     private readonly sales: EducacionSaleService,
+    private readonly prospectia: ProspectiaClientService,
   ) {}
 
   private ensureConfigured() {
@@ -135,22 +137,12 @@ export class CrmEducacionService {
       enabled: false,
       matches: Object.fromEntries(subjects.map((subject) => [subject.key, 'unverified' as const])),
     });
-    if (!this.crm.configured) return unverified();
+    if (!this.prospectia.enabled) return unverified();
     try {
-      return await this.crm.checkEducationProspectia(subjects);
+      return await this.prospectia.checkSubjects(subjects);
     } catch {
       return unverified();
     }
-  }
-
-  startProspectiaSync() {
-    this.ensureConfigured();
-    return this.crm.startEducationProspectiaSync();
-  }
-
-  prospectiaSyncStatus() {
-    this.ensureConfigured();
-    return this.crm.educationProspectiaSyncStatus();
   }
 
   async management(id: number, body: {

@@ -39,16 +39,18 @@ Panel de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño)
 
 | Ruta | Uso |
 |------|-----|
-| `/admin/crm-educacion` | Contactos, oportunidades, SLA, sync Prospectia |
+| `/admin/crm-educacion` | Contactos, oportunidades, SLA, ingesta Prospectia |
 
 ## API
 
-Prefijo `/api/crm-educacion`: contacts, leads, cycles, sla, catalogs, management, distribute, review, manual lead, prospectia sync/check.
+Prefijo `/api/crm-educacion`: contacts, leads, cycles, opportunities, sla, catalogs, management, distribute, review, manual lead, prospectia check/ingest/import.
 
 ## Datos (Prisma)
 
 - `EducacionLead` (captación local + estado sync WA/Sheets)
-- Ciclos/estados/SLA: mali-whatsapp
+- `EducacionPerson` / `EducacionOpportunity` (piloto Prospectia nativo ONE)
+- `EducacionProspectiaCursor` (poller)
+- Ciclos/estados/SLA: mali-whatsapp (resto de canales)
 - Catálogo apoyo: modelos `EducacionCatalog*`
 
 ## Conexiones externas
@@ -58,7 +60,7 @@ Prefijo `/api/crm-educacion`: contacts, leads, cycles, sla, catalogs, management
 | **mali-whatsapp** | CRM educación, orígenes, SLA, estados |
 | **Google Sheets** (opcional) | Espejo EP/CA/Diseño si `EDUCACION_LEADS_SHEETS_ENABLED` |
 | **WordPress / landings** | Origen de captura del formulario |
-| **Prospectia** | Sync/check endpoints |
+| **Prospectia** | Instancia [Chatwoot](https://www.chatwoot.com/) (AttachMedia). Medio de ingreso maestro en ONE (sin rastro en WA). Contrato: [prospectia-contract.md](./prospectia-contract.md) |
 
 ## Variables de entorno
 
@@ -67,6 +69,8 @@ WHATSAPP_CRM_BASE_URL=
 WHATSAPP_CRM_SERVICE_TOKEN=
 CRM_EDUCACION_SERVICE_TOKEN=
 COMMERCIAL_AUTHORITY=wa
+PROSPECTIA_API_ACCESS_TOKEN=
+PROSPECTIA_ACCOUNT_ID=21
 EDUCACION_LEADS_SHEETS_ENABLED=false
 GOOGLE_SHEETS_LEADS_EP_ID=
 GOOGLE_SHEETS_LEADS_TAB_EP=EP
@@ -76,8 +80,9 @@ GOOGLE_SHEETS_LEADS_DISENO_ID=
 GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
 ```
 
-`CRM_EDUCACION_SERVICE_TOKEN`: WA → ONE lookup/asociar pagos (`x-crm-educacion-service-token`).  
-`COMMERCIAL_AUTHORITY`: `wa` (transición) | `one` (post-cutover). Ver [crm-educacion-cutover.md](./crm-educacion-cutover.md).
+`CRM_EDUCACION_SERVICE_TOKEN`: WA → ONE (pagos F3; también `link-cycle` Prospectia).  
+`COMMERCIAL_AUTHORITY`: `wa` | `one` (cutover global F4).  
+`PROSPECTIA_API_ACCESS_TOKEN` / `PROSPECTIA_ACCOUNT_ID`: Chatwoot (account default `21`).
 
 ## Permisos
 
@@ -312,7 +317,7 @@ Estados usados aquí:
 | Estado Condensado / estado asesor | Etapa del ciclo (`por_contactar` … `venta_exitosa`, etc.) |
 | Lead “nuevo” vs “duplicado” (manual) | Clasificación de sistema: `new` / `duplicate` / `conflict` / `reassignable` (ventana 60 días) |
 | Solo info Meta sin WhatsApp | Canal Instant Form / TikTok + etiqueta **Solo contacto** (`came_with_inbound` = no) |
-| ProspectIA como medio | Match post-captación; puede copiar asesor si aplica; no es un CRM paralelo |
+| ProspectIA como medio | **Ingesta nativa ONE** (`channel=prospectia`); no es un CRM paralelo |
 | FUENTE = META / ORGÁNICO / RRSS | Canal de origen + categoría CA/EP/General (no “campaña” como fuente) |
 | “Área” CA / EP / tres números | **Categoría** dentro del área única `educacion` (ficha canónica) |
 

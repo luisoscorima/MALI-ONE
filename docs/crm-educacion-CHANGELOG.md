@@ -4,6 +4,10 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Prospectia solo en ONE: check/ingest/import nativos; se quitó match/sync proxy a WA y el botón «Match Prospectia (WA)». WA solo `link-cycle` al inbound.
+- Prospectia como medio de ingreso (ONE): `EducacionPerson` / `EducacionOpportunity` / poller; import manual; Historial + Solo contacto. Solo env nueva: `PROSPECTIA_API_ACCESS_TOKEN`.
+- Enriquecimiento Prospectia (Chatwoot) desde API live: etiquetas→`prospectiaStatus`/`stageSlug`, attrs→`interestCourse`/`leadScore`, assignee→`advisorEmail`; payload `{ contact, conversation, enrichment }`. Contrato: [prospectia-contract.md](./prospectia-contract.md).
+- Revalidación live contratos Chatwoot (2026-11-18): 16/16 labels; shapes `agents`/`custom_attribute_definitions` = array raíz; `lead_scoring`/`categoria` en payload conversación aunque no siempre en definiciones; fallback `contact.last_lead_scoring`.
 - Option A: `venta_exitosa` no cierra ciclo; cierre por pago positivo / sin pago / pérdida. Columna **Pago** (`payment_link` desde `EducacionSale`) en Oportunidades. Associate: positivo / en_proceso (+obs) / negativo (rechazo). Internal `GET sales/by-cycle/:id` para WA.
 - F0: docs destino/roles; inventario consumidores; sync widget `area=educacion`+categoría; retry WA; higiene attrs.
 - F1: `stale` / `solo_contacto`; Historial; UI Promesa fecha / Perdido motivo.

@@ -41,7 +41,7 @@ Convención de nombres: kebab-case alineado a `apps/api/src/modules/<modulo>/` (
 | Boletines | [newsletters.md](./newsletters.md) | [CHANGELOG](./newsletters-CHANGELOG.md) |
 | MALICHIMP | [malichimp.md](./malichimp.md) | [CHANGELOG](./malichimp-CHANGELOG.md) |
 | CRM PAM | [crm-pam.md](./crm-pam.md) | [CHANGELOG](./crm-pam-CHANGELOG.md) |
-| CRM Educación | [crm-educacion.md](./crm-educacion.md) · [roles](./crm-educacion-roles.md) · [consumidores](./crm-educacion-crm-consumers.md) · [cutover](./crm-educacion-cutover.md) | [CHANGELOG](./crm-educacion-CHANGELOG.md) |
+| CRM Educación | [crm-educacion.md](./crm-educacion.md) · [roles](./crm-educacion-roles.md) · [consumidores](./crm-educacion-crm-consumers.md) · [cutover](./crm-educacion-cutover.md) · [Prospectia contrato](./prospectia-contract.md) | [CHANGELOG](./crm-educacion-CHANGELOG.md) |
 | Catálogo Educación | [catalog-educacion.md](./catalog-educacion.md) | [CHANGELOG](./catalog-educacion-CHANGELOG.md) |
 | PAM (admin / ledger) | [pam.md](./pam.md) | [CHANGELOG](./pam-CHANGELOG.md) |
 
