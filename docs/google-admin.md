@@ -36,7 +36,7 @@ Campañas internas (`/api/internal-communications`, permiso `workspace_users`):
 - `GET /newsletters`, `GET /newsletters/:id`, `POST /newsletters/draft`
 - `GET /campaigns`, `GET /campaigns/:id`, `GET /campaigns/:id/view`, `GET /campaigns/:id/stats`
 - `POST /campaigns` — `{ name, newsletterId, draftNewsletterId?, subject, fromEmail, replyTo, orgUnitPaths, excludeOrgUnitPaths?, activeDays?, scheduledAt? }`
-- `POST /campaigns/:id/duplicate`, `POST /campaigns/:id/send`
+- `POST /campaigns/:id/duplicate`, `DELETE /campaigns/:id` (solo borradores; libera boletín huérfano en draft), `POST /campaigns/:id/send`
 
 ## Datos (Prisma)
 

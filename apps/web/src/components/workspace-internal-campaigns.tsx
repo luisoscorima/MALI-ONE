@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Trash2,
 } from 'lucide-react';
 import type {
   EmailSenderDto,
@@ -360,6 +361,7 @@ export function WorkspaceInternalCampaigns() {
   const [creatingNewsletter, setCreatingNewsletter] = useState(false);
   const [refreshingContent, setRefreshingContent] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [recipientQuery, setRecipientQuery] = useState('');
   const [campaignPreview, setCampaignPreview] =
@@ -615,6 +617,32 @@ export function WorkspaceInternalCampaigns() {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo duplicar la campaña');
     } finally {
       setDuplicatingId(null);
+    }
+  }
+
+  async function deleteDraftCampaign(campaign: InternalCampaignDto) {
+    const ok = await confirm({
+      title: `¿Eliminar el borrador “${campaign.name}”?`,
+      description:
+        'Si el boletín solo lo usaba esta campaña y sigue en borrador, también se eliminará.',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    setDeletingId(campaign.id);
+    try {
+      await api.deleteInternalCampaign(campaign.id);
+      if (draftCampaignId === campaign.id) {
+        setOpen(false);
+        resetForm();
+      }
+      await load(true);
+      toast.success('Borrador eliminado');
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo eliminar');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -907,6 +935,19 @@ export function WorkspaceInternalCampaigns() {
                           <Copy className="size-4" aria-hidden />
                         )}
                       </IconActionButton>
+                      {campaign.status === 'draft' ? (
+                        <IconActionButton
+                          label="Eliminar"
+                          onClick={() => void deleteDraftCampaign(campaign)}
+                          disabled={deletingId === campaign.id}
+                        >
+                          {deletingId === campaign.id ? (
+                            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                          ) : (
+                            <Trash2 className="size-4" aria-hidden />
+                          )}
+                        </IconActionButton>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>

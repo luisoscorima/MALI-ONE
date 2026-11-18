@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, ExternalLink, Mail, Newspaper, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  ExternalLink,
+  Loader2,
+  Mail,
+  Newspaper,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import type {
   EmailSenderDto,
@@ -67,6 +76,7 @@ export function NewslettersPage() {
   const [senders, setSenders] = useState<EmailSenderDto[]>([]);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const [mode, setMode] = useState<EditorMode>('closed');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -256,10 +266,18 @@ export function NewslettersPage() {
     }
   }
 
-  async function copyUrl(slugValue: string) {
-    const url = `${window.location.origin}/n/${slugValue}`;
-    await navigator.clipboard.writeText(url);
-    toast.success('URL copiada');
+  async function handleDuplicate(n: NewsletterDto) {
+    setDuplicatingId(n.id);
+    try {
+      const draft = await api.duplicateNewsletter(n.id);
+      await load();
+      toast.success('Boletín duplicado como borrador');
+      await openEdit(draft.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo duplicar');
+    } finally {
+      setDuplicatingId(null);
+    }
   }
 
   return (
@@ -397,26 +415,30 @@ export function NewslettersPage() {
                         >
                           <Pencil className="size-4" />
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void handleDuplicate(n)}
+                          disabled={duplicatingId === n.id}
+                          title="Duplicar"
+                        >
+                          {duplicatingId === n.id ? (
+                            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+                          ) : (
+                            <Copy className="size-4" />
+                          )}
+                        </Button>
                         {n.status === 'published' ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void copyUrl(n.slug)}
-                              title="Copiar URL"
+                          <Button size="sm" variant="ghost" asChild>
+                            <a
+                              href={`/n/${n.slug}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir URL pública"
                             >
-                              <Copy className="size-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" asChild>
-                              <a
-                                href={`/n/${n.slug}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <ExternalLink className="size-4" />
-                              </a>
-                            </Button>
-                          </>
+                              <ExternalLink className="size-4" />
+                            </a>
+                          </Button>
                         ) : null}
                         <Button
                           size="sm"

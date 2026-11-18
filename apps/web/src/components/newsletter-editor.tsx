@@ -98,7 +98,7 @@ function brandAssetsFor(
 const MALI_PINK = '#e2187d';
 const MALI_BLACK = '#111111';
 const MALI_BLUE = '#0084ca';
-const MALI_TEAL = '#2f9e8f';
+const MALI_TEAL = '#63277f';
 const MALI_NAVY = '#1a3d8f';
 const IMG_SQ =
   'https://placehold.co/520x520/e8e8e8/999999?text=Imagen';

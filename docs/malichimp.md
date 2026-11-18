@@ -114,6 +114,7 @@ El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [n
 - `POST /api/malichimp/campaigns/preview`
 - `POST /api/malichimp/campaigns` — administrador; admite `draftNewsletterId` si el contenido es un borrador creado aquí
 - `POST /api/malichimp/campaigns/{id}/duplicate` — administrador
+- `DELETE /api/malichimp/campaigns/{id}` — administrador; solo borradores (libera boletín huérfano en draft)
 - `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador duplicado, administrador
 - `GET /api/email-delivery/senders` — autenticado (selector de campañas)
 - `POST|PATCH|DELETE /api/email-delivery/senders…` — administrador (UI en Boletines)

@@ -37,6 +37,11 @@ export class NewslettersAdminController {
     return this.newsletters.create((req.user as User).id, body);
   }
 
+  @Post(':id/duplicate')
+  duplicate(@Req() req: Request, @Param('id') id: string) {
+    return this.newsletters.duplicate((req.user as User).id, id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateNewsletterDto) {
     return this.newsletters.update(id, body);

@@ -8,6 +8,7 @@
 
 ### Added
 
+- Eliminar campañas en **borrador** (`DELETE /api/malichimp/campaigns/:id`); si el boletín ligado está en borrador y sin otras campañas, también se elimina.
 - Personalización por destinatario en el dispatcher SES: `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` se sustituyen con el primer nombre del contacto; sin nombre usa `estimado(a)`.
 - Importación administrativa por XLSX con plantilla, preview, consentimiento, grupos del lote y apply transaccional.
 - Persistencia en disco de previews ZIP/XLSX (TTL 30 min) recuperable tras reinicio en el mismo host.

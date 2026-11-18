@@ -28,7 +28,7 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 
 ## API
 
-Admin: `/api/newsletters` CRUD.
+Admin: `/api/newsletters` CRUD + `POST /api/newsletters/:id/duplicate`.
 Público: `GET /n/:slug`.
 
 Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.

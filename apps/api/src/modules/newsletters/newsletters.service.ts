@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   Injectable,
@@ -13,6 +14,19 @@ import {
   CreateNewsletterDto,
   UpdateNewsletterDto,
 } from './dto/newsletter.dto';
+
+function duplicateLabel(value: string, maxLength: number): string {
+  const suffix = ' — copia';
+  return `${value.slice(0, maxLength - suffix.length).trimEnd()}${suffix}`;
+}
+
+function duplicateNewsletterSlug(value: string): string {
+  const suffix = `copia-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
+  const base = value
+    .slice(0, 80 - suffix.length - 1)
+    .replace(/-+$/g, '');
+  return `${base}-${suffix}`;
+}
 
 @Injectable()
 export class NewslettersService {
@@ -132,6 +146,24 @@ export class NewslettersService {
         ...(dto.status !== undefined
           ? { status: dto.status as NewsletterStatus }
           : {}),
+      },
+    });
+  }
+
+  async duplicate(userId: string, id: string) {
+    const source = await this.prisma.newsletter.findUnique({ where: { id } });
+    if (!source) throw new NotFoundException('Boletín no encontrado');
+
+    return this.prisma.newsletter.create({
+      data: {
+        slug: duplicateNewsletterSlug(source.slug),
+        title: duplicateLabel(source.title, 200),
+        subject: source.subject.slice(0, 200),
+        htmlBody: source.htmlBody,
+        designJson: source.designJson,
+        brand: source.brand,
+        status: NewsletterStatus.draft,
+        createdById: userId,
       },
     });
   }

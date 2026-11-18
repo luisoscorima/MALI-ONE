@@ -519,6 +519,12 @@ export const api = {
       { method: 'POST', body: '{}' },
     ),
 
+  deleteMalichimpCampaign: (id: string) =>
+    request<{ ok: boolean }>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    ),
+
   previewMalichimpAudience: (
     body: import('@mali-one/shared').MalichimpAudiencePreviewRequestDto,
   ) => request<import('@mali-one/shared').MalichimpAudiencePreviewDto>(
@@ -1703,6 +1709,12 @@ export const api = {
       method: 'DELETE',
     }),
 
+  duplicateNewsletter: (id: string) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/newsletters/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST' },
+    ),
+
   getInternalAudience: (activeDays = 30) =>
     request<import('@mali-one/shared').InternalAudienceDto>(
       `/api/internal-communications/audience?activeDays=${activeDays}`,
@@ -1755,6 +1767,12 @@ export const api = {
     request<import('@mali-one/shared').InternalCampaignDetailDto>(
       `/api/internal-communications/campaigns/${encodeURIComponent(id)}/duplicate`,
       { method: 'POST', body: '{}' },
+    ),
+
+  deleteInternalCampaign: (id: string) =>
+    request<{ ok: boolean }>(
+      `/api/internal-communications/campaigns/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
     ),
 
   createInternalCampaign: (

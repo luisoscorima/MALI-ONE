@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -109,6 +110,11 @@ export class InternalCommunicationsController {
     @Param('id') id: string,
   ) {
     return this.communications.duplicateCampaign(req.user.id, id);
+  }
+
+  @Delete('campaigns/:id')
+  deleteDraftCampaign(@Param('id') id: string) {
+    return this.communications.deleteDraftCampaign(id);
   }
 
   @Post('campaigns/:id/send')

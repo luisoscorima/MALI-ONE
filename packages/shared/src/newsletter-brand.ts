@@ -94,7 +94,7 @@ export function buildNewsletterBrandFooter(
 <table data-mali-brand-footer="cursos_arte" role="presentation" style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
     <tr>
-      <td style="background-color:#2f9e8f;padding:28px 24px;color:#ffffff">
+      <td style="background-color:#63277f;padding:28px 24px;color:#ffffff">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
           <tr>
             <td valign="top" style="width:50%;padding-right:12px;color:#ffffff">

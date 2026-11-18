@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -125,6 +126,12 @@ export class MalichimpController {
     @Param('id') id: string,
   ) {
     return this.malichimp.duplicateCampaign(req.user.id, id);
+  }
+
+  @Delete('campaigns/:id')
+  @Roles(UserRole.admin)
+  deleteDraftCampaign(@Param('id') id: string) {
+    return this.malichimp.deleteDraftCampaign(id);
   }
 
   @Post('campaigns/:id/send')

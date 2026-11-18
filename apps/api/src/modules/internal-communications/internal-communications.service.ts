@@ -428,6 +428,37 @@ export class InternalCommunicationsService {
     return this.getCampaign(draftId);
   }
 
+  async deleteDraftCampaign(id: string) {
+    const campaign = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: AUDIENCE_AREA },
+      select: {
+        id: true,
+        status: true,
+        newsletterId: true,
+        newsletter: { select: { id: true, status: true } },
+      },
+    });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+    if (campaign.status !== EmailCampaignStatus.draft) {
+      throw new BadRequestException(
+        'Solo se pueden eliminar campañas en borrador',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.emailCampaign.delete({ where: { id: campaign.id } });
+      if (campaign.newsletter.status !== NewsletterStatus.draft) return;
+      const remaining = await tx.emailCampaign.count({
+        where: { newsletterId: campaign.newsletterId },
+      });
+      if (remaining === 0) {
+        await tx.newsletter.delete({ where: { id: campaign.newsletterId } });
+      }
+    });
+
+    return { ok: true as const };
+  }
+
   async campaigns() {
     const rows = await this.prisma.$queryRaw<Array<{
       id: string;

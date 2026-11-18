@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Trash2,
   X,
 } from 'lucide-react';
 import type {
@@ -400,6 +401,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
   const [creatingNewsletter, setCreatingNewsletter] = useState(false);
   const [showAdvancedSender, setShowAdvancedSender] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [campaignPreview, setCampaignPreview] = useState<MalichimpCampaignDetailDto | null>(null);
   const [statsCampaign, setStatsCampaign] = useState<MalichimpCampaignDto | null>(null);
@@ -768,6 +770,32 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     }
   }
 
+  async function deleteDraftCampaign(campaign: MalichimpCampaignDto) {
+    const ok = await confirm({
+      title: `¿Eliminar el borrador “${campaign.name}”?`,
+      description:
+        'Si el boletín solo lo usaba esta campaña y sigue en borrador, también se eliminará.',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
+    setDeletingId(campaign.id);
+    try {
+      await api.deleteMalichimpCampaign(campaign.id);
+      if (draftCampaignId === campaign.id) {
+        setOpen(false);
+        resetForm();
+      }
+      await load(true);
+      toast.success('Borrador eliminado');
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo eliminar');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function openCampaignPreview(campaignId: string) {
     setPreviewCampaignId(campaignId);
     try {
@@ -1054,6 +1082,19 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                             <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
                           ) : (
                             <Copy className="size-4" aria-hidden />
+                          )}
+                        </IconActionButton>
+                      ) : null}
+                      {campaign.status === 'draft' && isAdmin ? (
+                        <IconActionButton
+                          label="Eliminar"
+                          onClick={() => void deleteDraftCampaign(campaign)}
+                          disabled={deletingId === campaign.id}
+                        >
+                          {deletingId === campaign.id ? (
+                            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                          ) : (
+                            <Trash2 className="size-4" aria-hidden />
                           )}
                         </IconActionButton>
                       ) : null}
