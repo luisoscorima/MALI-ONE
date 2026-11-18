@@ -371,8 +371,6 @@ export function TreasuryPayments({
       <NiubizUpdateDialog
         open={updateOpen}
         onOpenChange={onUpdateOpenChange}
-        sourceName={sourceName}
-        lastImport={data?.lastImport ?? null}
         onUpdated={() => {
           setSearch('');
           setFilters({ ...emptyFilters });

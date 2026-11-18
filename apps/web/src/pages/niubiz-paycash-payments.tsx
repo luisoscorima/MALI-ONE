@@ -139,7 +139,7 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
           {exporting ? 'Exportando…' : 'Exportar'}
         </Button>
         <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
-          <RefreshCw className="size-4" aria-hidden="true" /> Actualizar PagoEfectivo
+          <RefreshCw className="size-4" aria-hidden="true" /> Actualizar
         </Button>
       </div>
     </div>
@@ -190,27 +190,63 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
         </div>}
       </>}
     <Dialog open={updateOpen} onOpenChange={onUpdateOpenChange}><DialogContent>
-      <DialogHeader><DialogTitle>Actualizar PagoEfectivo</DialogTitle><DialogDescription>
-        Consulta por API todas las operaciones de 650177853 · CURSOSDELMALI y guarda los cambios sin duplicar CIP.
-      </DialogDescription></DialogHeader>
-      {status && <p className="text-sm">
-        {status.configured ? 'Conexión Niubiz configurada' : 'Falta configurar Niubiz Comercio en el servidor'}
-        {' · '}
-        {status.scheduled ? 'Programada cada 15 minutos' : 'Programación desactivada'}
-      </p>}
-      {user?.role === 'admin' && <Button disabled={!status?.configured || busy || run?.status === 'running'} onClick={() => {
-        setBusy(true); setSyncError('');
-        void api.syncNiubizPayCash().then(() => api.niubizPayCashStatus()).then(setStatus)
-          .catch(err => setSyncError(err instanceof Error ? err.message : 'No se pudo iniciar la actualización.'))
-          .finally(() => setBusy(false));
-      }}>{busy || run?.status === 'running' ? 'Actualizando…' : 'Sincronizar operaciones'}</Button>}
+      <DialogHeader>
+        <DialogTitle>Actualizar PagoEfectivo</DialogTitle>
+        <DialogDescription>
+          Consulta las operaciones CIP desde Niubiz Comercio
+          {status
+            ? ` (${[status.merchantAlias, status.merchantCode].filter(Boolean).join(' · ')})`
+            : ''}
+          {' '}y las guarda sin duplicar.
+        </DialogDescription>
+      </DialogHeader>
+      {status && (
+        <p className="text-sm text-muted-foreground">
+          {!status.configured
+            ? 'Conexión pendiente en el servidor'
+            : status.scheduled
+              ? 'Actualización cada 15 minutos'
+              : 'Actualización automática desactivada'}
+        </p>
+      )}
+      {user?.role === 'admin' && (
+        <Button
+          disabled={!status?.configured || busy || run?.status === 'running'}
+          onClick={() => {
+            setBusy(true);
+            setSyncError('');
+            void api.syncNiubizPayCash().then(() => api.niubizPayCashStatus()).then(setStatus)
+              .catch(err => setSyncError(err instanceof Error ? err.message : 'No se pudo iniciar la actualización.'))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy || run?.status === 'running' ? 'Actualizando…' : 'Actualizar ahora'}
+        </Button>
+      )}
       {syncError && <p role="alert" className="text-sm text-destructive">{syncError}</p>}
-      {run && <div role="status" className="space-y-1 text-sm">
-        <p>{run.status === 'completed' ? 'Última actualización completada' : run.status === 'running' ? 'Actualización en curso' : run.status === 'interrupted' ? 'Actualización interrumpida' : 'La última actualización falló'}
-          {run.finishedAt && ` · ${formatDate(run.finishedAt)}`}</p>
-        {run.status === 'completed' && <p>{run.rowCount} operaciones · {run.createdCount} nuevas · {run.updatedCount} actualizadas</p>}
-        {run.errorCode && <p className="text-destructive">{errorText[run.errorCode] ?? 'La consulta falló. Las operaciones anteriores se conservan; vuelve a intentar.'}</p>}
-      </div>}
+      {run && (
+        <div role="status" className="space-y-1 text-sm">
+          <p>
+            {run.status === 'completed'
+              ? 'Completada'
+              : run.status === 'running'
+                ? 'Actualizando'
+                : run.status === 'interrupted'
+                  ? 'Actualización interrumpida'
+                  : 'No se pudo completar'}
+            {run.finishedAt ? ` · ${formatDate(run.finishedAt)}` : ''}
+            {run.status === 'completed'
+              ? ` · ${run.rowCount} operaciones · ${run.createdCount} nuevas · ${run.updatedCount} actualizadas`
+              : ''}
+          </p>
+          {run.errorCode && (
+            <p className="text-destructive">
+              {errorText[run.errorCode] ??
+                'No se pudo completar. Las operaciones ya guardadas se mantienen; vuelve a intentar.'}
+            </p>
+          )}
+        </div>
+      )}
     </DialogContent></Dialog>
     <Dialog open={detail !== null} onOpenChange={open => !open && setDetail(null)}><DialogContent>
       <DialogHeader><DialogTitle>Operación PagoEfectivo</DialogTitle><DialogDescription>CIP {detail?.cip}</DialogDescription></DialogHeader>

@@ -34,19 +34,10 @@ const errors: Record<string, string> = {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sourceName: string;
-  lastImport: { createdAt: string; rowCount: number; origin: string } | null;
   onUpdated: () => void;
 };
 
-const formatStamp = (value: string) =>
-  new Intl.DateTimeFormat('es-PE', {
-    timeZone: 'America/Lima',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(value));
-
-export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport, onUpdated }: Props) {
+export function NiubizUpdateDialog({ open, onOpenChange, onUpdated }: Props) {
   const { user } = useAuth();
   const [data, setData] = useState<NiubizSyncStatusDto | null>(null);
   const [error, setError] = useState('');
@@ -102,6 +93,9 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
   const run = data?.lastRun;
   const failed = run?.results.filter((r) => r.status !== 'ok') ?? [];
   const syncRunning = busy || run?.status === 'running';
+  const created = run?.results.reduce((sum, r) => sum + (r.createdCount ?? 0), 0) ?? 0;
+  const updated = run?.results.reduce((sum, r) => sum + (r.updatedCount ?? 0), 0) ?? 0;
+  const okCount = run?.results.filter((r) => r.status === 'ok').length ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -109,87 +103,77 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
         <DialogHeader>
           <DialogTitle>Actualizar ventas Niubiz</DialogTitle>
           <DialogDescription>
-            {sourceName}. Consulta las ventas desde Niubiz Comercio.
+            Consulta las ventas desde Niubiz Comercio. Actualiza los{' '}
+            {data?.merchantCount ?? 5} comercios activos sin duplicar pagos. Sin fecha, toma los
+            últimos 10 días.
           </DialogDescription>
         </DialogHeader>
 
-        {lastImport && (
-          <p className="text-xs text-muted-foreground">
-            Última actualización: {formatStamp(lastImport.createdAt)} · {lastImport.rowCount} operaciones
-          </p>
-        )}
-
         <div className="flex flex-col gap-3">
+          {data && (
             <p className="text-sm text-muted-foreground">
-              Actualiza los {data?.merchantCount ?? 5} comercios activos y guarda los pagos sin
-              duplicarlos. Si no se selecciona fecha, actualiza los últimos 10 días.
+              {!data.configured
+                ? 'Conexión pendiente en el servidor'
+                : data.scheduled
+                  ? 'Actualización cada 15 minutos'
+                  : 'Actualización automática desactivada'}
             </p>
-            {data && (
-              <p className="text-sm">
-                {data.configured ? 'Conexión lista' : 'Conexión pendiente en el servidor'} ·{' '}
-                {data.scheduled ? 'Actualización cada 15 minutos' : 'Actualización automática desactivada'}
+          )}
+          {user?.role === 'admin' && (
+            <div className="flex flex-col gap-3">
+              <label className="grid gap-1 text-sm">
+                Desde
+                <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm">
+                Hasta
+                <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              </label>
+              <Button disabled={!data?.configured || syncRunning} onClick={() => void sync()}>
+                {syncRunning ? 'Actualizando…' : 'Actualizar ahora'}
+              </Button>
+            </div>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {run && (
+            <div className="space-y-2 text-sm" role="status">
+              <p>
+                {labels[run.status] ?? run.status} · {okCount}/{data?.merchantCount} comercios
+                {run.fromDate ? ` · del ${run.fromDate} al ${run.toDate}` : ''} · {created}{' '}
+                pagos nuevos · {updated} actualizados
               </p>
-            )}
-            {user?.role === 'admin' && (
-              <div className="flex flex-col gap-3">
-                <label className="grid gap-1 text-sm">
-                  Desde
-                  <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-                </label>
-                <label className="grid gap-1 text-sm">
-                  Hasta
-                  <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-                </label>
-                <Button disabled={!data?.configured || syncRunning} onClick={() => void sync()}>
-                  {syncRunning ? 'Actualizando…' : 'Actualizar ahora'}
-                </Button>
-              </div>
-            )}
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            {run && (
-              <div className="space-y-2 text-sm" role="status">
-                <p>
-                  {labels[run.status] ?? run.status} ·{' '}
-                  {run.results.filter((r) => r.status === 'ok').length}/{data?.merchantCount} comercios
-                  actualizados correctamente
-                  {run.fromDate && ` · del ${run.fromDate} al ${run.toDate}`}
+              {run.errorCode && (
+                <p className="text-destructive">
+                  {errors[run.errorCode] ??
+                    'No se pudo completar. Los pagos ya guardados se mantienen; puedes reintentar el mismo periodo.'}
                 </p>
-                <p>
-                  {run.results.reduce((sum, r) => sum + (r.createdCount ?? 0), 0)} pagos nuevos ·{' '}
-                  {run.results.reduce((sum, r) => sum + (r.updatedCount ?? 0), 0)} actualizados
-                </p>
-                {run.errorCode && (
-                  <p className="text-destructive">
-                    {errors[run.errorCode] ??
-                      'La sincronización falló. Los comercios ya guardados se conservan; puedes reintentar el mismo rango.'}
-                  </p>
-                )}
-                {run.status === 'interrupted' && (
-                  <p>La ejecución anterior perdió la conexión. Puedes volver a ejecutar el mismo rango.</p>
-                )}
-                {failed.length > 0 && (
-                  <details>
-                    <summary className="cursor-pointer">
-                      Ver {failed.length} comercios pendientes de revisión
-                    </summary>
-                    <ul className="mt-2 space-y-1">
-                      {failed.map((r) => (
-                        <li key={r.merchant}>
-                          {r.merchant}:{' '}
-                          {r.status === 'EXPORT_INCOMPLETE'
-                            ? 'Demasiados resultados; selecciona un rango menor.'
-                            : 'Consulta fallida; reintenta el rango.'}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            )}
+              )}
+              {run.status === 'interrupted' && (
+                <p>La actualización anterior se cortó. Puedes volver a intentar el mismo periodo.</p>
+              )}
+              {failed.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer">
+                    Ver {failed.length} comercios con problemas
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {failed.map((r) => (
+                      <li key={r.merchant}>
+                        {r.merchant}:{' '}
+                        {r.status === 'EXPORT_INCOMPLETE'
+                          ? 'Hay demasiados resultados; elige un periodo más corto.'
+                          : 'No se pudo consultar; vuelve a intentar.'}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
