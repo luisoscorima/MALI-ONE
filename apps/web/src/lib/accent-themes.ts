@@ -80,11 +80,11 @@ export const defaultCustomAccentHex = '#3b82f6';
 export type ColorScheme = 'light' | 'dark';
 
 const APP_BACKGROUND_DARK = '#0f1419';
-const APP_BACKGROUND_LIGHT = '#d5deec';
+const APP_BACKGROUND_LIGHT = '#f4f4f5';
 const NEUTRAL_PRIMARY_DARK = '#f4f4f5';
-const NEUTRAL_PRIMARY_LIGHT = '#142033';
+const NEUTRAL_PRIMARY_LIGHT = '#18181b';
 const NEUTRAL_FOREGROUND_DARK = '#0f1419';
-const NEUTRAL_FOREGROUND_LIGHT = '#f3f7fd';
+const NEUTRAL_FOREGROUND_LIGHT = '#fafafa';
 
 export function readDocumentColorScheme(): ColorScheme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
@@ -299,10 +299,6 @@ export function applyAccentTheme(
   root.style.setProperty('--sidebar-primary-foreground', resolved.primaryForeground);
   root.style.setProperty('--sidebar-ring', resolved.primary);
   root.style.setProperty('--chart-1', resolved.primary);
-  /* Wash del canvas: glow del acento (neutro usa el glass Mali) */
-  root.style.setProperty('--shell-accent', resolved.palette.glowPanel);
-  root.style.setProperty('--shell-accent-soft', resolved.palette.glass[1]);
-  root.style.setProperty('--shell-accent-deep', resolved.palette.glass[3]);
   applyThemeColorMeta(resolved.themeColor);
   applyMaliGlassCssVars(resolved.palette);
   applyThemedFavicon(resolved.palette);
