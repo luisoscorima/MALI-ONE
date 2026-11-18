@@ -68,20 +68,29 @@ test('no permite editar una cuenta a través de otra fuente', async () => {
 });
 
 test('deriva el tipo del proveedor y audita dentro de la transacción sin copiar referencia', async () => {
-  for (const [provider, kind] of [['bcp', 'bank_account'], ['niubiz_sales', 'merchant']]) {
+  const cases = [
+    ['bcp', 'bank_account', { ...target, reference: '001234' }, '001234'],
+    ['niubiz_sales', 'merchant', { name: 'Cursos', reference: '650177853', active: true, paycashEnabled: true }, '650177853'],
+  ];
+  for (const [provider, kind, input, expectedRef] of cases) {
     let saved;
     let audit;
     const service = serviceFor({
       treasurySource: { findUnique: async () => ({ ...source, provider }) },
-      treasuryTarget: { create: async ({ data }) => { saved = data; return { ...data, id: 'target-1' }; } },
+      treasuryTarget: {
+        create: async ({ data }) => { saved = data; return { ...data, id: 'target-1' }; },
+        updateMany: async () => ({ count: 0 }),
+        count: async () => 1,
+      },
       adminAuditLog: { create: async ({ data }) => { audit = data; } },
     });
-    await service.saveTarget(actor, source.id, target);
+    await service.saveTarget(actor, source.id, input);
     assert.equal(saved.kind, kind);
-    assert.equal(saved.reference, '001234');
+    assert.equal(saved.reference, expectedRef);
+    assert.equal(saved.currency, kind === 'bank_account' ? 'PEN' : null);
     assert.equal(audit.actorId, actor.id);
     assert.equal(audit.payload.targetId, 'target-1');
-    assert.ok(!JSON.stringify(audit).includes('001234'));
+    assert.ok(!JSON.stringify(audit).includes(expectedRef));
   }
 });
 
@@ -104,8 +113,8 @@ test('inventario vacío informa conectores pendientes, sin saldos ni sincronizac
   const service = new TreasuryService({ treasurySource: { findMany: async () => [] } });
   const overview = await service.overview();
   assert.equal(overview.collectionEnabled, false);
-  assert.equal(overview.syncIntervalMinutes, 60);
+  assert.equal(overview.syncIntervalMinutes, 15);
   assert.equal(overview.timezone, 'America/Lima');
   assert.deepEqual(overview.sources, []);
-  assert.equal(overview.providers.length, 7);
+  assert.equal(overview.providers.length, 6);
 });

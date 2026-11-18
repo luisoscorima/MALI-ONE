@@ -36,10 +36,6 @@ async function main() {
         (String(item.login?.password || '').startsWith('APP_USR-') ? item.login.password : null);
       if (!accessToken) throw new Error();
       process.stdout.write(JSON.stringify({ accessToken }));
-    } else if (provider === 'pagoefectivo') {
-      const result = { accessKey: get('access_key'), secretKey: get('secret_key'), serviceId: get('id_service') };
-      if (!result.accessKey || !result.secretKey || !result.serviceId) throw new Error();
-      process.stdout.write(JSON.stringify(result));
     } else {
       throw new Error();
     }

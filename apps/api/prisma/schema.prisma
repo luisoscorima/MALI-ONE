@@ -37,11 +37,10 @@ enum AppModule {
 
 enum TreasuryProvider {
   bcp
+  interbank
   niubiz_sales
-  niubiz_settlements
   diners
   expressnet
-  pagoefectivo
   mercadopago
 }
 
@@ -57,21 +56,20 @@ enum TreasuryCurrency {
 
 /// Portal access. Credentials stay in Vaultwarden; vaultItemId is only a pointer.
 model TreasurySource {
-  id                   String                 @id @default(cuid())
-  provider             TreasuryProvider
-  name                 String                 @db.VarChar(120)
-  legalEntity          String                 @db.VarChar(160)
+  id                  String                @id @default(cuid())
+  provider            TreasuryProvider
+  name                String                @db.VarChar(120)
+  legalEntity         String                @db.VarChar(160)
   /// Vaultwarden item UUID for this portal login. Not a secret.
-  vaultItemId          String?                @db.VarChar(36)
-  active               Boolean                @default(true)
-  syncIntervalMinutes  Int                    @default(60)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  targets              TreasuryTarget[]
-  mercadoPagoPayments  MercadoPagoPayment[]
-  mercadoPagoSync      MercadoPagoSyncState?
-  pagoEfectivoPayments PagoEfectivoPayment[]
-  pagoEfectivoSync     PagoEfectivoSyncState?
+  vaultItemId         String?               @db.VarChar(36)
+  active              Boolean               @default(true)
+  syncIntervalMinutes Int                   @default(60)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  targets             TreasuryTarget[]
+  accessGrants        TreasuryAccessGrant[]
+  mercadoPagoPayments MercadoPagoPayment[]
+  mercadoPagoSync     MercadoPagoSyncState?
 
   @@unique([provider, name])
 }
@@ -125,65 +123,44 @@ model MercadoPagoPayment {
   @@index([sourceId, status])
 }
 
-model PagoEfectivoSyncState {
-  sourceId   String         @id
-  source     TreasurySource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  runId      String?
-  status     String         @default("idle")
-  startedAt  DateTime?
-  finishedAt DateTime?
-  leaseUntil DateTime?
-  fromDate   String?
-  toDate     String?
-  errorCode  String?
-  rowCount   Int            @default(0)
-}
-
-model PagoEfectivoPayment {
-  id                String           @id @default(cuid())
-  sourceId          String
-  source            TreasurySource   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  transactionId     String           @db.VarChar(100)
-  cip               String?          @db.VarChar(80)
-  externalReference String?          @db.VarChar(160)
-  description       String?          @db.VarChar(300)
-  status            String           @db.VarChar(60)
-  currency          TreasuryCurrency
-  amount            Decimal          @db.Decimal(18, 2)
-  feeAmount         Decimal?         @db.Decimal(18, 2)
-  netAmount         Decimal?         @db.Decimal(18, 2)
-  payerName         String?          @db.VarChar(250)
-  payerEmail        String?          @db.VarChar(250)
-  paymentChannel    String?          @db.VarChar(100)
-  financialEntity   String?          @db.VarChar(120)
-  createdAtPe       DateTime
-  paidAt            DateTime?
-  transferredAt     DateTime?
-  lastUpdatedAtPe   DateTime
-  /// Sanitized portal sale. Card numbers and payer identity documents are removed.
-  payload           Json?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  @@unique([sourceId, transactionId])
-  @@index([sourceId, createdAtPe, id])
-  @@index([sourceId, status])
-  @@index([sourceId, cip])
-}
-
 model TreasuryTarget {
-  id        String             @id @default(cuid())
-  sourceId  String
-  source    TreasurySource     @relation(fields: [sourceId], references: [id], onDelete: Restrict)
-  kind      TreasuryTargetKind
-  name      String             @db.VarChar(120)
-  reference String             @db.VarChar(64)
-  currency  TreasuryCurrency
-  active    Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id              String                @id @default(cuid())
+  sourceId        String
+  source          TreasurySource        @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  kind            TreasuryTargetKind
+  /// MALI ONE alias shown in UI and filters.
+  name            String                @db.VarChar(120)
+  /// External portal code (Niubiz merchant id, bank account number). Immutable after create.
+  reference       String                @db.VarChar(64)
+  /// Name as shown in the portal (e.g. CURSOSDELMALI).
+  externalName    String?               @db.VarChar(200)
+  /// Required for bank_account; null for merchant (currency lives on each payment).
+  currency        TreasuryCurrency?
+  active          Boolean               @default(true)
+  /// Niubiz only: at most one target per source feeds the PagoEfectivo CIP tab.
+  paycashEnabled  Boolean               @default(false)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  payments        TreasuryPayment[]
+  accessGrants    TreasuryAccessGrant[]
 
-  @@unique([sourceId, reference, currency])
+  @@unique([sourceId, reference])
+  @@index([sourceId, active])
+}
+
+/// Future ACL: user may see a whole source (targetId null) or one target. Not enforced yet.
+model TreasuryAccessGrant {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceId  String
+  source    TreasurySource  @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  targetId  String?
+  target    TreasuryTarget? @relation(fields: [targetId], references: [id], onDelete: Restrict)
+  createdAt DateTime        @default(now())
+
+  @@index([userId])
+  @@index([sourceId])
 }
 
 model NiubizSyncState {
@@ -252,6 +229,9 @@ model TreasuryPaymentImport {
 model TreasuryPayment {
   id              String                @id @default(cuid())
   provider        TreasuryProvider
+  targetId        String
+  target          TreasuryTarget        @relation(fields: [targetId], references: [id], onDelete: Restrict)
+  /// Denormalized portal code for exports and filters.
   merchantCode    String                @db.VarChar(64)
   merchantName    String                @db.VarChar(200)
   transactionCode String                @db.VarChar(100)
@@ -274,9 +254,10 @@ model TreasuryPayment {
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
-  @@unique([provider, merchantCode, transactionCode])
+  @@unique([targetId, transactionCode])
   @@index([transactedAt, id])
   @@index([merchantCode, status])
+  @@index([provider, merchantCode])
 }
 
 enum TodoPriority {
@@ -368,25 +349,26 @@ enum LinkType {
 }
 
 model User {
-  id                  String               @id @default(cuid())
-  googleId            String               @unique
-  email               String               @unique
+  id                  String                @id @default(cuid())
+  googleId            String                @unique
+  email               String                @unique
   name                String
   picture             String?
-  role                UserRole             @default(operator)
+  role                UserRole              @default(operator)
   qrDefaultStyle      Json?
   accentTheme         String?
-  createdAt           DateTime             @default(now())
+  createdAt           DateTime              @default(now())
   shortLinks          ShortLink[]
-  auditLogs           AdminAuditLog[]      @relation("ActorAuditLogs")
+  auditLogs           AdminAuditLog[]       @relation("ActorAuditLogs")
   moduleAccess        UserModuleAccess[]
   newsletters         Newsletter[]
-  landingsCreated     LandingPage[]        @relation("LandingCreatedBy")
-  landingsUpdated     LandingPage[]        @relation("LandingUpdatedBy")
+  landingsCreated     LandingPage[]         @relation("LandingCreatedBy")
+  landingsUpdated     LandingPage[]         @relation("LandingUpdatedBy")
   emailCampaigns      EmailCampaign[]
   todoItems           TodoItem[]
   portfolioProjects   PortfolioProject[]
   operationalServices OperationalService[]
+  treasuryAccess      TreasuryAccessGrant[]
 }
 
 model UserModuleAccess {
@@ -1051,25 +1033,25 @@ model EmailEvent {
 
 /// Contact database imported from Mailchimp. It remains independent from the WhatsApp CRM.
 model MalichimpContact {
-  id              String                 @id @default(cuid())
-  email           String                 @unique @db.VarChar(320)
-  firstName       String?                @db.VarChar(160)
-  lastName        String?                @db.VarChar(160)
-  phone           String?                @db.VarChar(80)
-  institutionName String?                @db.VarChar(300)
-  jobTitle        String?                @db.VarChar(200)
-  city            String?                @db.VarChar(160)
-  country         String?                @db.VarChar(120)
-  classification  String?                @db.VarChar(160)
-  source          String?                @db.VarChar(240)
+  id              String                        @id @default(cuid())
+  email           String                        @unique @db.VarChar(320)
+  firstName       String?                       @db.VarChar(160)
+  lastName        String?                       @db.VarChar(160)
+  phone           String?                       @db.VarChar(80)
+  institutionName String?                       @db.VarChar(300)
+  jobTitle        String?                       @db.VarChar(200)
+  city            String?                       @db.VarChar(160)
+  country         String?                       @db.VarChar(120)
+  classification  String?                       @db.VarChar(160)
+  source          String?                       @db.VarChar(240)
   status          MalichimpContactStatus
   optInAt         DateTime?
   confirmedAt     DateTime?
   statusChangedAt DateTime?
   /// Sparse segmentation fields retained without creating dozens of mostly empty columns.
   attributes      Json?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
   tags            MalichimpContactTag[]
   groupOptions    MalichimpContactGroupOption[]
 
@@ -1115,13 +1097,13 @@ model MalichimpGroup {
 
 /// A selectable option inside a Mailchimp group category (for example, "Consejo").
 model MalichimpGroupOption {
-  id             String                         @id @default(cuid())
+  id             String                        @id @default(cuid())
   groupId        String
-  group          MalichimpGroup                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name           String                         @db.VarChar(200)
-  normalizedName String                         @db.VarChar(200)
-  createdAt      DateTime                       @default(now())
-  updatedAt      DateTime                       @updatedAt
+  group          MalichimpGroup                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name           String                        @db.VarChar(200)
+  normalizedName String                        @db.VarChar(200)
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
   contacts       MalichimpContactGroupOption[]
 
   @@unique([groupId, normalizedName])

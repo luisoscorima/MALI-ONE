@@ -5,6 +5,12 @@ import { Prisma, User } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
 import { sanitizePaymentPayload } from './payment-payload';
+import {
+  assertExportSize,
+  buildTreasuryXlsx,
+  exportFilename,
+  limaStamp,
+} from './treasury-xlsx';
 
 const apiBase = 'https://api.mercadopago.com';
 const pageSize = 50;
@@ -160,25 +166,125 @@ export class MercadoPagoSyncService {
       lastUpdatedAtMp: new Date(payment.date_last_updated), payload: sanitizePaymentPayload(payment) };
   }
 
+  private listWhere(sourceId: string, query: MercadoPagoPaymentQueryDto): Prisma.MercadoPagoPaymentWhereInput {
+    if (query.from && query.to && query.from > query.to) {
+      throw new BadRequestException('La fecha inicial debe ser anterior o igual a la final.');
+    }
+    const search = query.q?.trim();
+    return {
+      sourceId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(search
+        ? {
+            OR: [
+              { paymentId: { contains: search } },
+              { description: { contains: search, mode: 'insensitive' } },
+              { payerName: { contains: search, mode: 'insensitive' } },
+              { payerEmail: { contains: search, mode: 'insensitive' } },
+              { externalReference: { contains: search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(query.from || query.to
+        ? {
+            createdAtMp: {
+              ...(query.from ? { gte: new Date(`${query.from}T00:00:00-05:00`) } : {}),
+              ...(query.to
+                ? { lt: new Date(new Date(`${query.to}T00:00:00-05:00`).getTime() + 86400000) }
+                : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
   async list(sourceId: string, query: MercadoPagoPaymentQueryDto) {
     await this.source(sourceId);
     const page = query.page ?? 1;
-    const search = query.q?.trim();
-    const where: Prisma.MercadoPagoPaymentWhereInput = { sourceId,
-      ...(query.status ? { status: query.status } : {}),
-      ...(search ? { OR: [{ paymentId: { contains: search } }, { description: { contains: search, mode: 'insensitive' } },
-        { payerName: { contains: search, mode: 'insensitive' } }, { payerEmail: { contains: search, mode: 'insensitive' } },
-        { externalReference: { contains: search, mode: 'insensitive' } }] } : {}),
-      ...(query.from || query.to ? { createdAtMp: {
-        ...(query.from ? { gte: new Date(`${query.from}T00:00:00-05:00`) } : {}),
-        ...(query.to ? { lt: new Date(new Date(`${query.to}T00:00:00-05:00`).getTime() + 86400000) } : {}),
-      } } : {}) };
+    const where = this.listWhere(sourceId, query);
     const [total, payments, states] = await this.prisma.$transaction([
       this.prisma.mercadoPagoPayment.count({ where }),
-      this.prisma.mercadoPagoPayment.findMany({ where, orderBy: [{ createdAtMp: 'desc' }, { id: 'desc' }], skip: (page - 1) * 50, take: 50 }),
-      this.prisma.mercadoPagoPayment.findMany({ where: { sourceId }, distinct: ['status'], select: { status: true }, orderBy: { status: 'asc' } }),
+      this.prisma.mercadoPagoPayment.findMany({
+        where,
+        orderBy: [{ createdAtMp: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * 50,
+        take: 50,
+      }),
+      this.prisma.mercadoPagoPayment.findMany({
+        where: { sourceId },
+        distinct: ['status'],
+        select: { status: true },
+        orderBy: { status: 'asc' },
+      }),
     ]);
-    return { total, page, pageSize: 50, states: states.map(s => s.status), payments: payments.map(p => ({ ...p,
-      grossAmount: p.grossAmount.toFixed(2), netAmount: p.netAmount?.toFixed(2) ?? null, feeAmount: p.feeAmount?.toFixed(2) ?? null })) };
+    return {
+      total,
+      page,
+      pageSize: 50,
+      states: states.map((s) => s.status),
+      payments: payments.map((p) => ({
+        ...p,
+        grossAmount: p.grossAmount.toFixed(2),
+        netAmount: p.netAmount?.toFixed(2) ?? null,
+        feeAmount: p.feeAmount?.toFixed(2) ?? null,
+      })),
+    };
+  }
+
+  async exportXlsx(sourceId: string, query: MercadoPagoPaymentQueryDto) {
+    await this.source(sourceId);
+    const where = this.listWhere(sourceId, query);
+    const total = await this.prisma.mercadoPagoPayment.count({ where });
+    assertExportSize(total);
+    const payments = await this.prisma.mercadoPagoPayment.findMany({
+      where,
+      orderBy: [{ createdAtMp: 'desc' }, { id: 'desc' }],
+    });
+    const buffer = await buildTreasuryXlsx(
+      'Mercado Pago',
+      [
+        { key: 'createdAtMp', header: 'Fecha', width: 20 },
+        { key: 'paymentId', header: 'Operación', width: 18 },
+        { key: 'description', header: 'Descripción', width: 28 },
+        { key: 'payerName', header: 'Cliente', width: 24 },
+        { key: 'payerEmail', header: 'Email', width: 28 },
+        { key: 'currency', header: 'Moneda', width: 10 },
+        { key: 'grossAmount', header: 'Venta', width: 12 },
+        { key: 'netAmount', header: 'Neto', width: 12 },
+        { key: 'feeAmount', header: 'Costos', width: 12 },
+        { key: 'status', header: 'Estado', width: 14 },
+        { key: 'statusDetail', header: 'Detalle estado', width: 18 },
+        { key: 'externalReference', header: 'Referencia', width: 18 },
+        { key: 'merchantOrderId', header: 'Orden', width: 16 },
+        { key: 'paymentMethodId', header: 'Medio', width: 14 },
+        { key: 'paymentTypeId', header: 'Tipo pago', width: 14 },
+        { key: 'issuerName', header: 'Emisor', width: 16 },
+        { key: 'cardLastDigits', header: 'Tarjeta', width: 10 },
+        { key: 'installments', header: 'Cuotas', width: 10 },
+        { key: 'releasedAt', header: 'Liberación', width: 20 },
+      ],
+      payments.map((p) => ({
+        createdAtMp: limaStamp(p.createdAtMp),
+        paymentId: p.paymentId,
+        description: p.description,
+        payerName: p.payerName,
+        payerEmail: p.payerEmail,
+        currency: p.currency,
+        grossAmount: p.grossAmount.toFixed(2),
+        netAmount: p.netAmount?.toFixed(2) ?? '',
+        feeAmount: p.feeAmount?.toFixed(2) ?? '',
+        status: p.status,
+        statusDetail: p.statusDetail,
+        externalReference: p.externalReference,
+        merchantOrderId: p.merchantOrderId,
+        paymentMethodId: p.paymentMethodId,
+        paymentTypeId: p.paymentTypeId,
+        issuerName: p.issuerName,
+        cardLastDigits: p.cardLastDigits,
+        installments: p.installments,
+        releasedAt: limaStamp(p.releasedAt),
+      })),
+    );
+    return { buffer, filename: exportFilename('mercadopago', query.from, query.to) };
   }
 }

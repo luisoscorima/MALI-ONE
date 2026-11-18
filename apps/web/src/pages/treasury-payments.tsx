@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { RefreshCw, Store } from 'lucide-react';
-import type { TreasuryPaymentDto, TreasuryPaymentsDto } from '@mali-one/shared';
+import { FormEvent, useEffect, useState } from 'react';
+import { FileSpreadsheet, Pencil, Plus, RefreshCw, Store } from 'lucide-react';
+import type { TreasuryPaymentDto, TreasuryPaymentsDto, TreasuryTargetInput } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { CopyableValue } from '@/components/copyable-value';
+import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/contexts/toast-context';
 import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import {
   Button,
@@ -12,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -48,6 +51,7 @@ function cardLabel(p: TreasuryPaymentDto) {
 }
 
 type Props = {
+  sourceId: string;
   sourceName: string;
   refreshKey: number;
   updateOpen: boolean;
@@ -56,7 +60,16 @@ type Props = {
   onMerchantsOpenChange: (open: boolean) => void;
 };
 
+const blankMerchant: TreasuryTargetInput = {
+  name: '',
+  reference: '',
+  externalName: '',
+  active: true,
+  paycashEnabled: false,
+};
+
 export function TreasuryPayments({
+  sourceId,
   sourceName,
   refreshKey,
   updateOpen,
@@ -64,14 +77,21 @@ export function TreasuryPayments({
   merchantsOpen,
   onMerchantsOpenChange,
 }: Props) {
+  const toast = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [data, setData] = useState<TreasuryPaymentsDto | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [search, setSearch] = useState('');
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<TreasuryPaymentDto | null>(null);
   const [merchantCount, setMerchantCount] = useState<number | null>(null);
+  const [merchantEdit, setMerchantEdit] = useState<{ id?: string; input: TreasuryTargetInput } | null>(null);
+  const [merchantSaving, setMerchantSaving] = useState(false);
+  const [merchantError, setMerchantError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +137,23 @@ export function TreasuryPayments({
     setFilters((f) => ({ ...f, [key]: value, page: 1 }));
   }
 
+  async function exportXlsx() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key !== 'page' && value) params.set(key, String(value));
+      });
+      await api.exportTreasuryPayments(params);
+      toast.success('Exportación lista');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo exportar');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const hasFilters = !!(filters.q || filters.merchant || filters.status || filters.from || filters.to);
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const showCard = !!data?.payments.some((p) => cardLabel(p));
@@ -127,6 +164,15 @@ export function TreasuryPayments({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <h3 id="payments-title" className="text-lg font-semibold">Ventas Niubiz</h3>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting || loading || !data?.total}
+            onClick={() => void exportXlsx()}
+          >
+            <FileSpreadsheet className="size-4" aria-hidden="true" />
+            {exporting ? 'Exportando…' : 'Exportar'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
             <RefreshCw className="size-4" aria-hidden="true" /> Actualizar Ventas Niubiz
           </Button>
@@ -175,8 +221,8 @@ export function TreasuryPayments({
             >
               <option value="">Todos los comercios</option>
               {data?.merchants.map((m) => (
-                <option key={m.merchantCode} value={m.merchantCode}>
-                  {m.merchantCode} · {m.merchantName}
+                <option key={m.targetId} value={m.merchantCode}>
+                  {m.alias} · {m.merchantCode}
                 </option>
               ))}
             </select>
@@ -266,8 +312,8 @@ export function TreasuryPayments({
                     >
                       <TableCell className="whitespace-nowrap tabular-nums">{date(p.transactedAt)}</TableCell>
                       <TableCell>
-                        <span className="block font-medium tabular-nums">{p.merchantCode}</span>
-                        <span className="text-xs text-muted-foreground">{p.merchantName || dash}</span>
+                        <span className="block font-medium">{p.merchantAlias || p.merchantName || dash}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">{p.merchantCode}</span>
                       </TableCell>
                       <TableCell className="max-w-[10rem] truncate tabular-nums">{p.orderNumber}</TableCell>
                       <TableCell className="max-w-[14rem]">
@@ -334,25 +380,147 @@ export function TreasuryPayments({
         }}
       />
 
-      <Dialog open={merchantsOpen} onOpenChange={onMerchantsOpenChange}>
+      <Dialog
+        open={merchantsOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMerchantEdit(null);
+            setMerchantError('');
+          }
+          onMerchantsOpenChange(open);
+        }}
+      >
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Comercios de esta fuente</DialogTitle>
+            <DialogTitle>Comercios Niubiz</DialogTitle>
             <DialogDescription>
-              El conector consulta {merchantCount ?? '…'} códigos. La lista muestra los que ya tienen
-              operaciones guardadas.
+              Catálogo del sync: {merchantCount ?? data?.merchants.filter((m) => m.active).length ?? '…'} activos.
+              Sin borrado; desactiva para sacar del sync.
             </DialogDescription>
           </DialogHeader>
-          {!data?.merchants.length ? (
-            <p className="text-sm text-muted-foreground">
-              Todavía no hay comercios con operaciones. Actualiza pagos para poblar esta lista.
-            </p>
+          {isAdmin && !merchantEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              onClick={() => {
+                setMerchantError('');
+                setMerchantEdit({ input: { ...blankMerchant } });
+              }}
+            >
+              <Plus className="size-4" /> Añadir comercio
+            </Button>
+          )}
+          {merchantEdit ? (
+            <form
+              className="grid gap-3"
+              onSubmit={(event: FormEvent) => {
+                event.preventDefault();
+                if (merchantSaving) return;
+                setMerchantSaving(true);
+                setMerchantError('');
+                void api
+                  .saveTreasuryTarget(sourceId, {
+                    ...merchantEdit.input,
+                    externalName: merchantEdit.input.externalName || null,
+                    currency: null,
+                  }, merchantEdit.id)
+                  .then(() => {
+                    toast.success(merchantEdit.id ? 'Comercio actualizado' : 'Comercio creado');
+                    setMerchantEdit(null);
+                    setRevision((v) => v + 1);
+                  })
+                  .catch((err) => setMerchantError(err instanceof Error ? err.message : 'No se pudo guardar.'))
+                  .finally(() => setMerchantSaving(false));
+              }}
+            >
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Alias MALI ONE</span>
+                <Input
+                  required
+                  maxLength={120}
+                  value={merchantEdit.input.name}
+                  onChange={(e) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, name: e.target.value } })}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Código Niubiz</span>
+                <Input
+                  required
+                  maxLength={9}
+                  pattern="\d{9}"
+                  disabled={!!merchantEdit.id}
+                  value={merchantEdit.input.reference}
+                  onChange={(e) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, reference: e.target.value } })}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm">
+                <span className="font-medium">Nombre Niubiz</span>
+                <Input
+                  maxLength={200}
+                  value={merchantEdit.input.externalName ?? ''}
+                  onChange={(e) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, externalName: e.target.value } })}
+                />
+              </label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="merchant-active" className="text-sm">Activo en sync</label>
+                <Switch
+                  id="merchant-active"
+                  checked={merchantEdit.input.active}
+                  onCheckedChange={(active) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, active } })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="merchant-paycash" className="text-sm">PagoEfectivo (CIP)</label>
+                <Switch
+                  id="merchant-paycash"
+                  checked={!!merchantEdit.input.paycashEnabled}
+                  onCheckedChange={(paycashEnabled) => setMerchantEdit({ ...merchantEdit, input: { ...merchantEdit.input, paycashEnabled } })}
+                />
+              </div>
+              {merchantError && <p role="alert" className="text-sm text-destructive">{merchantError}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={merchantSaving}>{merchantSaving ? 'Guardando…' : 'Guardar'}</Button>
+                <Button type="button" variant="ghost" disabled={merchantSaving} onClick={() => setMerchantEdit(null)}>Cancelar</Button>
+              </div>
+            </form>
+          ) : !data?.merchants.length ? (
+            <p className="text-sm text-muted-foreground">Todavía no hay comercios en el catálogo.</p>
           ) : (
             <ul className="divide-y divide-border rounded-xl border border-border">
               {data.merchants.map((m) => (
-                <li key={m.merchantCode} className="flex flex-col gap-0.5 px-3 py-2 text-sm">
-                  <span className="font-medium tabular-nums">{m.merchantCode}</span>
-                  <span className="text-muted-foreground">{m.merchantName || 'Sin nombre'}</span>
+                <li key={m.targetId} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="block font-medium">{m.alias}</span>
+                    <span className="tabular-nums text-muted-foreground">{m.merchantCode}</span>
+                    {m.merchantName ? <span className="block text-xs text-muted-foreground">{m.merchantName}</span> : null}
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      {m.active ? 'Activo en sync' : 'Inactivo'}
+                      {m.paycashEnabled ? ' · CIP' : ''}
+                    </span>
+                  </div>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Editar ${m.alias}`}
+                      onClick={() => {
+                        setMerchantError('');
+                        setMerchantEdit({
+                          id: m.targetId,
+                          input: {
+                            name: m.alias,
+                            reference: m.merchantCode,
+                            externalName: m.merchantName,
+                            active: m.active,
+                            paycashEnabled: m.paycashEnabled,
+                          },
+                        });
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -373,7 +541,7 @@ export function TreasuryPayments({
               <DetailRow label="Fecha" value={date(detail.transactedAt)} />
               <DetailRow
                 label="Comercio"
-                value={`${detail.merchantCode}${detail.merchantName ? ` · ${detail.merchantName}` : ''}`}
+                value={[detail.merchantAlias, detail.merchantCode, detail.merchantName].filter(Boolean).join(' · ')}
               />
               <DetailRow label="Pedido" value={detail.orderNumber} copyable />
               <DetailRow label="Código de transacción" value={detail.transactionCode} mono copyable />

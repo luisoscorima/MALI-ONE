@@ -45,8 +45,6 @@ export class MercadoPagoPaymentQueryDto {
   to?: string;
 }
 
-export class PagoEfectivoPaymentQueryDto extends MercadoPagoPaymentQueryDto {}
-
 export class TreasurySourceInputDto {
   @IsEnum(TreasuryProvider)
   provider!: TreasuryProvider;
@@ -91,9 +89,25 @@ export class TreasuryTargetInputDto {
   })
   reference!: string;
 
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value == null || value === '') return null;
+    return typeof value === 'string' ? value.trim() : value;
+  })
+  @ValidateIf((_, value) => value != null)
+  @IsString()
+  @Length(1, 200)
+  externalName?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value != null)
   @IsEnum(TreasuryCurrency)
-  currency!: TreasuryCurrency;
+  currency?: TreasuryCurrency | null;
 
   @IsBoolean()
   active!: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  paycashEnabled?: boolean;
 }

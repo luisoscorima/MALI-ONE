@@ -1,23 +1,35 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, Req, Res, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { AppModule, User } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
-import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto, MercadoPagoPaymentQueryDto, PagoEfectivoPaymentQueryDto } from './dto/treasury.dto';
+import { TreasurySourceInputDto, TreasuryTargetInputDto, TreasuryPaymentQueryDto, MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { TreasuryService } from './treasury.service';
 import { NiubizSyncService } from './niubiz-sync.service';
 import { Roles } from '../../core/guards/roles.decorator';
 import { MercadoPagoSyncService } from './mercadopago-sync.service';
-import { PagoEfectivoSyncService } from './pagoefectivo-sync.service';
 import { NiubizPayCashService } from './niubiz-paycash.service';
+
+function sendXlsx(res: Response, file: { buffer: Buffer; filename: string }) {
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
+  res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+  return res.send(file.buffer);
+}
 
 @Controller('treasury')
 @RequireModule(AppModule.treasury)
 export class TreasuryController {
-  constructor(private readonly treasury: TreasuryService, private readonly payments: TreasuryPaymentsService,
-    private readonly niubiz: NiubizSyncService, private readonly mercadoPago: MercadoPagoSyncService,
-    private readonly pagoEfectivo: PagoEfectivoSyncService,
-    private readonly niubizPayCash: NiubizPayCashService) {}
+  constructor(
+    private readonly treasury: TreasuryService,
+    private readonly payments: TreasuryPaymentsService,
+    private readonly niubiz: NiubizSyncService,
+    private readonly mercadoPago: MercadoPagoSyncService,
+    private readonly niubizPayCash: NiubizPayCashService,
+  ) {}
 
   @Get('niubiz/paycash/status')
   niubizPayCashStatus() { return this.niubizPayCash.status(); }
@@ -28,6 +40,11 @@ export class TreasuryController {
 
   @Get('niubiz/paycash/payments')
   niubizPayCashPayments(@Query() query: TreasuryPaymentQueryDto) { return this.niubizPayCash.list(query); }
+
+  @Get('niubiz/paycash/payments/export')
+  async exportNiubizPayCash(@Query() query: TreasuryPaymentQueryDto, @Res() res: Response) {
+    return sendXlsx(res, await this.niubizPayCash.exportXlsx(query));
+  }
 
   @Get('mercadopago/:sourceId/status')
   mercadoPagoStatus(@Param('sourceId') sourceId: string) { return this.mercadoPago.status(sourceId); }
@@ -43,18 +60,13 @@ export class TreasuryController {
     return this.mercadoPago.list(sourceId, query);
   }
 
-  @Get('pagoefectivo/:sourceId/status')
-  pagoEfectivoStatus(@Param('sourceId') sourceId: string) { return this.pagoEfectivo.status(sourceId); }
-
-  @Post('pagoefectivo/:sourceId/sync')
-  @Roles('admin')
-  syncPagoEfectivo(@Param('sourceId') sourceId: string) {
-    return this.pagoEfectivo.start(sourceId);
-  }
-
-  @Get('pagoefectivo/:sourceId/payments')
-  pagoEfectivoPayments(@Param('sourceId') sourceId: string, @Query() query: PagoEfectivoPaymentQueryDto) {
-    return this.pagoEfectivo.listPayments(sourceId, query);
+  @Get('mercadopago/:sourceId/payments/export')
+  async exportMercadoPago(
+    @Param('sourceId') sourceId: string,
+    @Query() query: MercadoPagoPaymentQueryDto,
+    @Res() res: Response,
+  ) {
+    return sendXlsx(res, await this.mercadoPago.exportXlsx(sourceId, query));
   }
 
   @Get('niubiz/status')
@@ -68,6 +80,11 @@ export class TreasuryController {
 
   @Get('payments')
   listPayments(@Query() query: TreasuryPaymentQueryDto) { return this.payments.list(query); }
+
+  @Get('payments/export')
+  async exportPayments(@Query() query: TreasuryPaymentQueryDto, @Res() res: Response) {
+    return sendXlsx(res, await this.payments.exportXlsx(query));
+  }
 
   @Post('payments/import-niubiz')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))

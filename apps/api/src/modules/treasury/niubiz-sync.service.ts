@@ -6,7 +6,7 @@ import { PrismaService } from '../../core/prisma/prisma.service';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { parseNiubizRows } from './niubiz-import';
 import { sanitizePaymentPayload } from './payment-payload';
-import merchants from './niubiz-merchants.json';
+import { listNiubizMerchants } from './niubiz-merchants';
 
 const base = 'https://api.niubiz.pe/api.backoffice.merchant';
 /** Vault access + runtime. Item UUID comes from TreasurySource (env fallback only). */
@@ -41,7 +41,8 @@ export class NiubizSyncService {
   }
 
   async status() {
-    const [lastRun, vaultItemId] = await Promise.all([
+    const [{ merchants }, lastRun, vaultItemId] = await Promise.all([
+      listNiubizMerchants(this.prisma, { activeOnly: true }),
       this.prisma.niubizSyncState.findUnique({ where: { id: 'niubiz' } }),
       this.resolveVaultItemId(),
     ]);
@@ -57,8 +58,8 @@ export class NiubizSyncService {
     };
   }
 
-  // Every two hours in Lima; disabled until the first production login is verified.
-  @Cron('0 0 */2 * * *', { timeZone: 'America/Lima' })
+  // Every 15 minutes in Lima; disabled until the first production login is verified.
+  @Cron('0 */15 * * * *', { timeZone: 'America/Lima' })
   async scheduled() {
     if (process.env.NIUBIZ_SYNC_ENABLED !== 'true') return;
     try {
@@ -78,6 +79,10 @@ export class NiubizSyncService {
         'Configura el ID del elemento Vaultwarden en la fuente Niubiz (Editar fuente).',
       );
     }
+    const { merchants } = await listNiubizMerchants(this.prisma, { activeOnly: true });
+    if (!merchants.length) {
+      throw new BadRequestException('No hay comercios Niubiz activos en el catálogo.');
+    }
     let url: URL;
     try {
       url = new URL(process.env.FINANCE_VAULT_URL!);
@@ -88,7 +93,8 @@ export class NiubizSyncService {
       throw new ServiceUnavailableException('Vaultwarden requiere una URL HTTPS sin credenciales.');
     }
     const to = range.to ?? limaDay();
-    const from = range.from ?? limaDay(new Date(Date.now() - 31 * 86400000));
+    // Default: last 10 Lima calendar days (today inclusive) to refresh recent statuses.
+    const from = range.from ?? limaDay(new Date(Date.now() - 9 * 86400000));
     for (const day of [from, to]) {
       const parsed = new Date(`${day}T00:00:00Z`);
       if (
@@ -125,7 +131,7 @@ export class NiubizSyncService {
     });
     if (!locked.count) throw new ConflictException('Ya existe una sincronización en curso.');
     // The durable lease survives process crashes; the UI marks an expired run interrupted.
-    void this.run(runId, from, to, vaultItemId, actor).catch(() =>
+    void this.run(runId, from, to, vaultItemId, merchants.map((m) => m.reference), actor).catch(() =>
       this.logger.error('NIUBIZ_RUN_STATE_WRITE_FAILED'),
     );
     return { runId };
@@ -195,6 +201,7 @@ export class NiubizSyncService {
     from: string,
     to: string,
     vaultItemId: string,
+    merchants: string[],
     actor?: { id: string; email: string },
   ) {
     const results: Result[] = [];

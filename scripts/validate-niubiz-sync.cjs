@@ -9,11 +9,6 @@ if (target.hostname !== '127.0.0.1' || target.port !== '55439' || target.pathnam
 const { PrismaClient } = req('@prisma/client');
 const { TreasuryPaymentsService } = require('../apps/api/dist/modules/treasury/treasury-payments.service');
 const { NiubizSyncService } = require('../apps/api/dist/modules/treasury/niubiz-sync.service');
-const merchants = require('../apps/api/dist/modules/treasury/niubiz-merchants.json');
-assert.equal(merchants.length, 77);
-assert.equal(new Set(merchants).size, 77);
-assert.deepEqual(merchants, require('./niubiz-merchants.json'));
-merchants.splice(3); // Mutates only this test process's module cache.
 const prisma = new PrismaClient();
 const service = new NiubizSyncService(prisma, new TreasuryPaymentsService(prisma));
 const token = `test.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 900 })).toString('base64url')}.test`;
@@ -22,6 +17,7 @@ let mode = 'ok';
 let requests = 0;
 let logins = 0;
 let importStart;
+let merchants = [];
 const fixture = merchant => ({ 'Código de comercio': merchant, 'Nombre de comercio': 'Test', 'Código de transaccion': 'TESTNIUBIZSYNC', 'Nro Pedido': 'TEST', Cliente: '', Correo: '', Marca: '', PAN: '', Producto: '', 'Medio de Pago': '', Moneda: 'PEN', 'Importe Pedido': '10.00', Estado: 'Liquidada', 'Fecha de Transacción': '10/10/2026 12:00:00', 'Fecha de Liquidación': '' });
 global.fetch = async (url, options) => {
   assert.equal(url, 'https://api.niubiz.pe/api.backoffice.merchant/order');
@@ -45,10 +41,35 @@ async function waitDone() {
   }
   throw new Error('Test timed out');
 }
+async function seedMerchants() {
+  const source = await prisma.treasurySource.upsert({
+    where: { provider_name: { provider: 'niubiz_sales', name: 'Niubiz Comercio' } },
+    create: { provider: 'niubiz_sales', name: 'Niubiz Comercio', legalEntity: 'Niubiz', active: true, syncIntervalMinutes: 15 },
+    update: { active: true },
+  });
+  await prisma.treasuryPayment.deleteMany({ where: { transactionCode: 'TESTNIUBIZSYNC' } });
+  await prisma.treasuryTarget.deleteMany({ where: { sourceId: source.id } });
+  merchants = ['650177853', '650178711', '650239803'];
+  for (const [index, reference] of merchants.entries()) {
+    await prisma.treasuryTarget.create({
+      data: {
+        sourceId: source.id,
+        kind: 'merchant',
+        name: `Test ${reference}`,
+        reference,
+        externalName: `PORTAL ${reference}`,
+        currency: null,
+        active: true,
+        paycashEnabled: index === 0,
+      },
+    });
+  }
+}
 async function main() {
   for (const key of ['FINANCE_VAULT_CLIENT_ID', 'FINANCE_VAULT_CLIENT_SECRET', 'FINANCE_VAULT_MASTER_PASSWORD', 'FINANCE_VAULT_NIUBIZ_ITEM_ID', 'FINANCE_RUNTIME_NODE', 'NIUBIZ_LOGIN_SCRIPT']) process.env[key] = 'test-placeholder';
   process.env.FINANCE_VAULT_URL = 'https://vault.example.test';
   process.env.NIUBIZ_SYNC_ENABLED = 'false';
+  await seedMerchants();
   await prisma.niubizSyncState.deleteMany();
   importStart = new Date();
   let release;
@@ -64,7 +85,7 @@ async function main() {
   assert.equal(run.results.reduce((n, r) => n + r.createdCount, 0), 2);
   const stored = await prisma.treasuryPayment.findMany({ where: { transactionCode: 'TESTNIUBIZSYNC' }, include: { lastImport: true } });
   assert.equal(stored.length, 2);
-  assert.ok(stored.every(p => p.lastImport.origin === 'niubiz_api'));
+  assert.ok(stored.every(p => p.lastImport.origin === 'niubiz_api' && p.targetId));
   service.login = async () => { logins++; return token; };
   mode = '401'; requests = 0; logins = 0;
   await service.start(range); run = await waitDone();
@@ -88,7 +109,7 @@ async function main() {
   assert.equal((await service.status()).lastRun.status, 'interrupted');
   assert.equal(service.expiresSoon('invalid'), true);
   assert.equal(service.expiresSoon(token), false);
-  console.log('PASS: range validation, distributed lock, API persistence, idempotence, 401 renewal, empty merchant, partial failure, 429 stop, Vault failure, interrupted run.');
+  console.log('PASS: catalog merchants, range validation, distributed lock, API persistence, idempotence, 401 renewal, empty merchant, partial failure, 429 stop, Vault failure, interrupted run.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   global.fetch = realFetch;

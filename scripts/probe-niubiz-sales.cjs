@@ -37,7 +37,7 @@ async function main() {
       }));
     } catch { console.log('TOKEN_TIMING: No se pudieron leer las fechas; validar mediante respuesta del servidor.'); }
     if (process.argv.includes('--all-merchants')) {
-      const merchants = require('./niubiz-merchants.json');
+      const merchants = ['650177853', '650178711', '650239803', '650239881', '651047392'];
       const results = [];
       for (const merchantId of merchants) {
         await new Promise(resolve => setTimeout(resolve, 1000));

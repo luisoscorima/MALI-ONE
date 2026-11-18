@@ -13,20 +13,29 @@ export class TreasuryService {
   async overview(): Promise<TreasuryOverviewDto> {
     const sources = await this.prisma.treasurySource.findMany({
       orderBy: [{ provider: 'asc' }, { name: 'asc' }],
-      include: { targets: { orderBy: [{ name: 'asc' }, { currency: 'asc' }] } },
+      include: { targets: { orderBy: [{ name: 'asc' }, { reference: 'asc' }] } },
     });
     return {
       providers: TREASURY_PROVIDERS,
-      syncIntervalMinutes: 60,
+      syncIntervalMinutes: 15,
       timezone: 'America/Lima',
       collectionEnabled: false,
       sources: sources.map((source) => ({
         ...source,
-        connectorStatus: 'pending',
+        connectorStatus: 'pending' as const,
         createdAt: source.createdAt.toISOString(),
         updatedAt: source.updatedAt.toISOString(),
-        targets: source.targets.map(({ id, sourceId, kind, name, reference, currency, active }) =>
-          ({ id, sourceId, kind, name, reference, currency, active })),
+        targets: source.targets.map((target) => ({
+          id: target.id,
+          sourceId: target.sourceId,
+          kind: target.kind,
+          name: target.name,
+          reference: target.reference,
+          externalName: target.externalName,
+          currency: target.currency,
+          active: target.active,
+          paycashEnabled: target.paycashEnabled,
+        })),
       })),
     };
   }
@@ -88,16 +97,78 @@ export class TreasuryService {
       const provider = TREASURY_PROVIDERS.find((item) => item.id === source.provider)!;
       const existing = id ? await tx.treasuryTarget.findFirst({ where: { id, sourceId } }) : null;
       if (id && !existing) throw new NotFoundException('Cuenta o comercio no encontrado en esta fuente');
-      const data = { ...input, kind: provider.targetKind };
+      if (existing && existing.reference !== input.reference) {
+        throw new BadRequestException('El código o referencia no se puede cambiar. Crea otro registro.');
+      }
+
+      const kind = provider.targetKind;
+      if (kind === 'bank_account') {
+        if (!input.currency) throw new BadRequestException('La moneda es obligatoria para cuentas bancarias.');
+      }
+      if (kind === 'merchant' && source.provider === 'niubiz_sales') {
+        if (!/^\d{9}$/.test(input.reference)) {
+          throw new BadRequestException('El código Niubiz debe tener 9 dígitos.');
+        }
+      }
+
+      const paycashEnabled = kind === 'merchant' && source.provider === 'niubiz_sales'
+        ? !!input.paycashEnabled
+        : false;
+
+      if (existing?.active && input.active === false) {
+        const activeCount = await tx.treasuryTarget.count({
+          where: { sourceId, kind: 'merchant', active: true, NOT: { id: existing.id } },
+        });
+        if (source.provider === 'niubiz_sales' && kind === 'merchant' && activeCount === 0) {
+          throw new BadRequestException('Debe quedar al menos un comercio Niubiz activo.');
+        }
+        if (existing.paycashEnabled) {
+          throw new BadRequestException(
+            'Reasigna PagoEfectivo (CIP) a otro comercio antes de desactivar este.',
+          );
+        }
+      }
+
+      if (paycashEnabled) {
+        await tx.treasuryTarget.updateMany({
+          where: { sourceId, paycashEnabled: true, ...(id ? { NOT: { id } } : {}) },
+          data: { paycashEnabled: false },
+        });
+      }
+
+      const data = {
+        name: input.name,
+        reference: input.reference,
+        externalName: input.externalName ?? null,
+        currency: kind === 'bank_account' ? input.currency! : null,
+        active: input.active,
+        paycashEnabled,
+        kind,
+      };
+
       const target = id
         ? await tx.treasuryTarget.update({ where: { id }, data })
         : await tx.treasuryTarget.create({ data: { ...data, sourceId } });
-      // Account references stay out of the general admin audit log.
+
       await this.audit(tx, actor, id ? 'TREASURY_TARGET_UPDATED' : 'TREASURY_TARGET_CREATED', {
         sourceId, targetId: target.id, kind: target.kind,
-        before: existing ? { name: existing.name, currency: existing.currency, active: existing.active } : null,
-        after: { name: target.name, currency: target.currency, active: target.active },
-        referenceChanged: existing ? existing.reference !== target.reference : false,
+        before: existing
+          ? {
+              name: existing.name,
+              externalName: existing.externalName,
+              currency: existing.currency,
+              active: existing.active,
+              paycashEnabled: existing.paycashEnabled,
+            }
+          : null,
+        after: {
+          name: target.name,
+          externalName: target.externalName,
+          currency: target.currency,
+          active: target.active,
+          paycashEnabled: target.paycashEnabled,
+        },
+        referenceChanged: false,
       });
       return { id: target.id };
     }));
@@ -112,7 +183,7 @@ export class TreasuryService {
       return await operation();
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('Ya existe una fuente con ese nombre en el portal, o una cuenta/comercio con esa referencia y moneda en la fuente.');
+        throw new ConflictException('Ya existe una fuente con ese nombre en el portal, o una cuenta/comercio con esa referencia en la fuente.');
       }
       throw error;
     }

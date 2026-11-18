@@ -121,13 +121,13 @@ export function NiubizUpdateDialog({ open, onOpenChange, sourceName, lastImport,
 
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              Consulta los {data?.merchantCount ?? 77} comercios del conector y guarda los pagos sin
-              duplicarlos. Sin fechas, actualiza los últimos 32 días.
+              Consulta los {data?.merchantCount ?? 5} comercios del conector y guarda los pagos sin
+              duplicarlos. Sin fechas, actualiza los últimos 10 días.
             </p>
             {data && (
               <p className="text-sm">
                 {data.configured ? 'Conexión configurada' : 'Falta configurar la conexión en el servidor'} ·{' '}
-                {data.scheduled ? 'Programada cada 2 horas' : 'Programación desactivada'}
+                {data.scheduled ? 'Programada cada 15 minutos' : 'Programación desactivada'}
               </p>
             )}
             {user?.role === 'admin' && (

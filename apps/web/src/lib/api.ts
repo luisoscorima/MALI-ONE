@@ -166,6 +166,32 @@ export type EducationCatalog = {
 
 const API_BASE = '';
 
+async function downloadTreasuryXlsx(path: string, fallbackName: string) {
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include' });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    const message = error.message;
+    const text = Array.isArray(message)
+      ? message.join(', ')
+      : typeof message === 'string'
+        ? message
+        : res.statusText;
+    throw new Error(text || 'No se pudo exportar');
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export class ApiRequestError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -505,13 +531,19 @@ export const api = {
   niubizPayCashStatus: () => request<import('@mali-one/shared').NiubizPayCashSyncStatusDto>('/api/treasury/niubiz/paycash/status'),
   syncNiubizPayCash: () => request<{ runId: string }>('/api/treasury/niubiz/paycash/sync', { method: 'POST', body: '{}' }),
   niubizPayCashPayments: (params: URLSearchParams) => request<import('@mali-one/shared').NiubizPayCashPaymentsDto>(`/api/treasury/niubiz/paycash/payments?${params}`),
+  exportNiubizPayCashPayments: (params: URLSearchParams) =>
+    downloadTreasuryXlsx(`/api/treasury/niubiz/paycash/payments/export?${params}`, 'niubiz-pagoefectivo.xlsx'),
   treasuryPayments: (params: URLSearchParams) => request<import('@mali-one/shared').TreasuryPaymentsDto>(`/api/treasury/payments?${params}`),
+  exportTreasuryPayments: (params: URLSearchParams) =>
+    downloadTreasuryXlsx(`/api/treasury/payments/export?${params}`, 'niubiz-ventas.xlsx'),
   mercadoPagoStatus: (sourceId: string) => request<import('@mali-one/shared').MercadoPagoSyncStatusDto>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/status`),
   syncMercadoPago: (sourceId: string, range: { from?: string; to?: string }) => request<{ runId: string }>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/sync`, { method: 'POST', body: JSON.stringify(range) }),
   mercadoPagoPayments: (sourceId: string, params: URLSearchParams) => request<import('@mali-one/shared').MercadoPagoPaymentsDto>(`/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/payments?${params}`),
-  pagoEfectivoStatus: (sourceId: string) => request<import('@mali-one/shared').PagoEfectivoSyncStatusDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/status`),
-  syncPagoEfectivo: (sourceId: string) => request<{ ready: true }>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/sync`, { method: 'POST', body: '{}' }),
-  pagoEfectivoPayments: (sourceId: string, params: URLSearchParams) => request<import('@mali-one/shared').PagoEfectivoPaymentsDto>(`/api/treasury/pagoefectivo/${encodeURIComponent(sourceId)}/payments?${params}`),
+  exportMercadoPagoPayments: (sourceId: string, params: URLSearchParams) =>
+    downloadTreasuryXlsx(
+      `/api/treasury/mercadopago/${encodeURIComponent(sourceId)}/payments/export?${params}`,
+      'mercadopago.xlsx',
+    ),
   treasuryOverview: () => request<import('@mali-one/shared').TreasuryOverviewDto>('/api/treasury'),
   saveTreasurySource: (body: import('@mali-one/shared').TreasurySourceInput, id?: string) =>
     request<{ id: string }>(`/api/treasury/sources${id ? `/${encodeURIComponent(id)}` : ''}`, {

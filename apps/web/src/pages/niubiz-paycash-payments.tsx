@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { FileSpreadsheet, RefreshCw } from 'lucide-react';
 import type { NiubizPayCashPaymentDto, NiubizPayCashPaymentsDto, NiubizPayCashSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { CopyableValue } from '@/components/copyable-value';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/contexts/toast-context';
 import { Spinner } from '@/components/feedback';
 import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -32,11 +33,13 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
   refreshKey: number;
 }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState<NiubizPayCashPaymentsDto | null>(null);
   const [filters, setFilters] = useState(emptyFilters);
   const [search, setSearch] = useState('');
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<NiubizPayCashPaymentDto | null>(null);
   const [status, setStatus] = useState<NiubizPayCashSyncStatusDto | null>(null);
@@ -94,19 +97,51 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
   const hasFilters = !!(filters.q || filters.status || filters.from || filters.to);
   const run = status?.lastRun;
 
+  async function exportXlsx() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key !== 'page' && value) params.set(key, String(value));
+      });
+      await api.exportNiubizPayCashPayments(params);
+      toast.success('Exportación lista');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo exportar');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return <section aria-label="Operaciones PagoEfectivo de Niubiz" className="flex flex-col gap-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 className="text-lg font-semibold">PagoEfectivo</h3>
-        <p className="text-sm text-muted-foreground">Comercio 650177853 · CURSOSDELMALI</p>
+        <p className="text-sm text-muted-foreground">
+          {status
+            ? `${status.merchantAlias ? `${status.merchantAlias} · ` : ''}${status.merchantCode}`
+            : 'Comercio CIP del catálogo'}
+        </p>
         {status?.lastSuccessful && <p className="mt-1 text-xs text-muted-foreground">
           Última actualización: {formatDate(status.lastSuccessful.finishedAt)} · {status.lastSuccessful.rowCount}{' '}
           {status.lastSuccessful.rowCount === 1 ? 'operación' : 'operaciones'}
         </p>}
       </div>
-      <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
-        <RefreshCw className="size-4" aria-hidden="true" /> Actualizar PagoEfectivo
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={exporting || loading || !data?.total}
+          onClick={() => void exportXlsx()}
+        >
+          <FileSpreadsheet className="size-4" aria-hidden="true" />
+          {exporting ? 'Exportando…' : 'Exportar'}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onUpdateOpenChange(true)}>
+          <RefreshCw className="size-4" aria-hidden="true" /> Actualizar PagoEfectivo
+        </Button>
+      </div>
     </div>
     <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
       <form role="search" aria-label="Buscar operaciones PagoEfectivo" className="flex flex-wrap items-end gap-3"
@@ -158,7 +193,11 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
       <DialogHeader><DialogTitle>Actualizar PagoEfectivo</DialogTitle><DialogDescription>
         Consulta por API todas las operaciones de 650177853 · CURSOSDELMALI y guarda los cambios sin duplicar CIP.
       </DialogDescription></DialogHeader>
-      {status && <p className="text-sm">{status.configured ? 'Conexión Niubiz configurada' : 'Falta configurar Niubiz Comercio en el servidor'}</p>}
+      {status && <p className="text-sm">
+        {status.configured ? 'Conexión Niubiz configurada' : 'Falta configurar Niubiz Comercio en el servidor'}
+        {' · '}
+        {status.scheduled ? 'Programada cada 15 minutos' : 'Programación desactivada'}
+      </p>}
       {user?.role === 'admin' && <Button disabled={!status?.configured || busy || run?.status === 'running'} onClick={() => {
         setBusy(true); setSyncError('');
         void api.syncNiubizPayCash().then(() => api.niubizPayCashStatus()).then(setStatus)

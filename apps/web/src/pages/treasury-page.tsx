@@ -18,7 +18,6 @@ import { useToast } from '@/contexts/toast-context';
 import { cn } from '@/lib/utils';
 import { TreasuryPayments } from './treasury-payments';
 import { MercadoPagoPayments } from './mercadopago-payments';
-import { PagoEfectivoPayments } from './pagoefectivo-payments';
 import { NiubizPayCashPayments } from './niubiz-paycash-payments';
 import { NiubizFullUpdateDialog } from './niubiz-full-update';
 import {
@@ -59,8 +58,10 @@ const blankSource: TreasurySourceInput = {
 const blankTarget: TreasuryTargetInput = {
   name: '',
   reference: '',
+  externalName: '',
   currency: 'PEN',
   active: true,
+  paycashEnabled: false,
 };
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'No se pudo completar la operación';
@@ -123,8 +124,6 @@ export function TreasuryPage() {
   const targetsTitle = provider?.targetKind === 'bank_account' ? 'Cuentas bancarias' : 'Comercios';
   const showNiubizRecords = selected?.provider === 'niubiz_sales';
   const showMercadoPagoRecords = selected?.provider === 'mercadopago';
-  const showPagoEfectivoRecords = selected?.provider === 'pagoefectivo';
-
   function openSourceUpdate(source: TreasurySourceDto) {
     setSelectedId(source.id);
     if (source.provider === 'niubiz_sales') {
@@ -161,8 +160,10 @@ export function TreasuryPage() {
         ? {
             name: target.name,
             reference: target.reference,
-            currency: target.currency,
+            externalName: target.externalName ?? '',
+            currency: target.currency ?? 'PEN',
             active: target.active,
+            paycashEnabled: target.paycashEnabled,
           }
         : { ...blankTarget },
     });
@@ -196,7 +197,17 @@ export function TreasuryPage() {
     setSaving(true);
     setFormError('');
     try {
-      await api.saveTreasuryTarget(targetEdit.sourceId, targetEdit.input, targetEdit.id);
+      const kind = data?.providers.find((item) => item.id === data.sources.find((s) => s.id === targetEdit.sourceId)?.provider)?.targetKind;
+      await api.saveTreasuryTarget(
+        targetEdit.sourceId,
+        {
+          ...targetEdit.input,
+          externalName: targetEdit.input.externalName || null,
+          currency: kind === 'bank_account' ? targetEdit.input.currency ?? 'PEN' : null,
+          paycashEnabled: false,
+        },
+        targetEdit.id,
+      );
       setTargetEdit(null);
       toast.success('Registro guardado');
       await load();
@@ -260,7 +271,7 @@ export function TreasuryPage() {
                 {data.sources.map((source) => {
                   const sourceProvider = data.providers.find((item) => item.id === source.provider);
                   const active = source.id === selectedId;
-                  const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago' || source.provider === 'pagoefectivo';
+                  const hasConnector = source.provider === 'niubiz_sales' || source.provider === 'mercadopago';
                   return (
                     <div key={source.id} className="group relative">
                       <button
@@ -336,6 +347,7 @@ export function TreasuryPage() {
                   </TabsList>
                   <TabsContent value="sales">
                     <TreasuryPayments
+                      sourceId={selected.id}
                       sourceName={selected.name}
                       refreshKey={niubizRefresh}
                       updateOpen={niubizTab === 'sales' && updateOpen}
@@ -354,13 +366,6 @@ export function TreasuryPage() {
                 </Tabs>
               ) : showMercadoPagoRecords ? (
                 <MercadoPagoPayments
-                  sourceId={selected.id}
-                  sourceName={selected.name}
-                  updateOpen={updateOpen}
-                  onUpdateOpenChange={setUpdateOpen}
-                />
-              ) : showPagoEfectivoRecords ? (
-                <PagoEfectivoPayments
                   sourceId={selected.id}
                   sourceName={selected.name}
                   updateOpen={updateOpen}
@@ -417,8 +422,8 @@ export function TreasuryPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Nombre / referencia</TableHead>
-                              <TableHead>Moneda</TableHead>
+                              <TableHead>Alias / referencia</TableHead>
+                              {provider?.targetKind === 'bank_account' ? <TableHead>Moneda</TableHead> : <TableHead>Nombre portal</TableHead>}
                               <TableHead>Estado</TableHead>
                               <TableHead>
                                 <span className="sr-only">Acciones</span>
@@ -434,13 +439,17 @@ export function TreasuryPage() {
                                     {target.reference}
                                   </span>
                                 </TableCell>
-                                <TableCell className="tabular-nums">{target.currency}</TableCell>
+                                <TableCell className="tabular-nums">
+                                  {provider?.targetKind === 'bank_account'
+                                    ? target.currency
+                                    : target.externalName || '—'}
+                                </TableCell>
                                 <TableCell>
                                   {!selected.active
                                     ? 'Fuente archivada'
                                     : target.active
-                                      ? 'En preparación'
-                                      : 'Archivado'}
+                                      ? 'Activo'
+                                      : 'Inactivo'}
                                 </TableCell>
                                 <TableCell>
                                   <Button
@@ -609,11 +618,11 @@ export function TreasuryPage() {
             <form onSubmit={saveTarget}>
               <fieldset disabled={saving} className="grid gap-4">
                 <label className="grid gap-2 text-sm font-medium">
-                  Nombre
+                  {provider?.targetKind === 'bank_account' ? 'Nombre' : 'Alias MALI ONE'}
                   <Input
                     required
                     maxLength={120}
-                    placeholder="Ej. Tienda del museo"
+                    placeholder="Ej. Ventas web"
                     value={targetEdit.input.name}
                     onChange={(e) =>
                       setTargetEdit({
@@ -632,6 +641,7 @@ export function TreasuryPage() {
                     maxLength={64}
                     pattern="[A-Za-z0-9][A-Za-z0-9._\-]{0,63}"
                     autoComplete="off"
+                    disabled={!!targetEdit.id}
                     value={targetEdit.input.reference}
                     onChange={(e) =>
                       setTargetEdit({
@@ -642,37 +652,54 @@ export function TreasuryPage() {
                   />
                 </label>
                 <p className="text-xs text-muted-foreground">
-                  Sin espacios. Se conservan los ceros iniciales.
+                  Sin espacios. El código no se puede cambiar después de crear.
                 </p>
-                <div className="grid gap-2">
-                  <label htmlFor="treasury-currency" className="text-sm font-medium">
-                    Moneda
+                {provider?.targetKind === 'merchant' && (
+                  <label className="grid gap-2 text-sm font-medium">
+                    Nombre en el portal
+                    <Input
+                      maxLength={200}
+                      value={targetEdit.input.externalName ?? ''}
+                      onChange={(e) =>
+                        setTargetEdit({
+                          ...targetEdit,
+                          input: { ...targetEdit.input, externalName: e.target.value },
+                        })
+                      }
+                    />
                   </label>
-                  <Select
-                    value={targetEdit.input.currency}
-                    disabled={saving}
-                    onValueChange={(currency) =>
-                      setTargetEdit({
-                        ...targetEdit,
-                        input: {
-                          ...targetEdit.input,
-                          currency: currency as TreasuryCurrency,
-                        },
-                      })
-                    }
-                  >
-                    <SelectTrigger id="treasury-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PEN">PEN · Soles</SelectItem>
-                      <SelectItem value="USD">USD · Dólares</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                )}
+                {provider?.targetKind === 'bank_account' && (
+                  <div className="grid gap-2">
+                    <label htmlFor="treasury-currency" className="text-sm font-medium">
+                      Moneda
+                    </label>
+                    <Select
+                      value={targetEdit.input.currency ?? 'PEN'}
+                      disabled={saving}
+                      onValueChange={(currency) =>
+                        setTargetEdit({
+                          ...targetEdit,
+                          input: {
+                            ...targetEdit.input,
+                            currency: currency as TreasuryCurrency,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger id="treasury-currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PEN">PEN · Soles</SelectItem>
+                        <SelectItem value="USD">USD · Dólares</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-3">
                   <label htmlFor="treasury-target-active" className="text-sm">
-                    Incluir en la preparación
+                    Activo
                   </label>
                   <Switch
                     id="treasury-target-active"

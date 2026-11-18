@@ -30,9 +30,14 @@ function limaDate(value: string): Date | null {
   return date;
 }
 
-export function parsePayCashExport(raw: unknown, expectedCount: number): PayCashRow[] {
+export function parsePayCashExport(
+  raw: unknown,
+  expectedCount: number,
+  merchantCode = PAYCASH_MERCHANT,
+): PayCashRow[] {
   if (!Array.isArray(raw) || !Number.isSafeInteger(expectedCount) || expectedCount < 0 ||
       expectedCount > 50000 || raw.length !== expectedCount) throw new Error('EXPORT_INCOMPLETE');
+  if (!/^\d{9}$/.test(merchantCode)) throw new Error('API_DATA_MISMATCH');
   const seen = new Set<string>();
   return raw.map((item): PayCashRow => {
     if (!item || typeof item !== 'object' || Array.isArray(item) ||
@@ -55,7 +60,7 @@ export function parsePayCashExport(raw: unknown, expectedCount: number): PayCash
         !brand || brand.length > 80 || email.length > 250 || !purchasedAt ||
         (status === 'Pagado' && !paidAt)) throw new Error('API_DATA_MISMATCH');
     seen.add(cip);
-    return { merchantCode: PAYCASH_MERCHANT, cip, customerEmail: email || null,
+    return { merchantCode, cip, customerEmail: email || null,
       currency: currency as TreasuryCurrency, amount, brand, purchasedAt, paidAt, status };
   });
 }

@@ -4,7 +4,7 @@
 
 ## Qué es
 
-**Fuentes** (portales: Niubiz, Mercado Pago, BCP, …), pagos Niubiz y ventas Mercado Pago, con UI Fuente → operaciones y acciones en modales. Targets CRUD solo para fuentes sin conector. Módulo independiente de PAM; conciliación bancaria fuera de alcance actual.
+**Fuentes oficiales con conector:** Niubiz Comercio (Ventas + PagoEfectivo) y Mercado Pago. Otras entradas del catálogo (BCP, Diners, …) son inventario pendiente. UI Fuente → operaciones y acciones en modales. Comercios Niubiz viven en `TreasuryTarget` (alias, código, nombre portal, activo, flag CIP); alta/edición/desactivar sin borrado duro. Bases ACL: `TreasuryAccessGrant` (usuario → fuente o target; enforcement pendiente). Módulo independiente de PAM; conciliación bancaria fuera de alcance actual.
 
 ## Código
 
@@ -24,11 +24,13 @@
 |--------|------|-----|
 | GET/POST/PUT | `/api/treasury`, `sources`, `targets` | Inventario |
 | GET | `/api/treasury/payments` | Listado + filtros + `q` |
+| GET | `/api/treasury/payments/export` | XLSX de Ventas Niubiz (mismos filtros, máx. 20 000 filas) |
 | POST | `/api/treasury/payments/import-niubiz` | Import XLSX |
 | GET/POST | `/api/treasury/niubiz/status`, `niubiz/sync` | Ventas Niubiz |
 | GET/POST | `/api/treasury/niubiz/paycash/payments`, `status`, `sync` | PagoEfectivo dentro de Niubiz Comercio, solo `650177853` |
+| GET | `/api/treasury/niubiz/paycash/payments/export` | XLSX de PagoEfectivo Niubiz (mismos filtros) |
 | GET/POST | `/api/treasury/mercadopago/:sourceId/payments`, `status`, `sync` | Ventas Mercado Pago por fuente |
-| GET/POST | `/api/treasury/pagoefectivo/:sourceId/payments`, `status`, `sync` | Operaciones PagoEfectivo por fuente |
+| GET | `/api/treasury/mercadopago/:sourceId/payments/export` | XLSX de Mercado Pago (mismos filtros) |
 
 ## Datos (Prisma)
 
@@ -37,7 +39,6 @@
 - `NiubizSyncState`
 - `NiubizPayCashPayment`, `NiubizPayCashSyncState`
 - `MercadoPagoPayment`, `MercadoPagoSyncState`
-- `PagoEfectivoPayment`, `PagoEfectivoSyncState`
 
 ## Conexiones externas
 
@@ -46,7 +47,6 @@
 | **Vaultwarden** | Usuario/password Niubiz vía CLI Bitwarden 2026.6.0 + Node 24 |
 | **Niubiz Comercio** | Login web + API export de Ventas y PagoEfectivo |
 | **Mercado Pago** | API oficial de pagos; credenciales productivas desde Vaultwarden |
-| **PagoEfectivo** | Credenciales oficiales en Vaultwarden; consulta de movimientos pendiente del contrato |
 | **Chromium/Playwright** | Automatización login en imagen API |
 | **PostgreSQL** | Pagos + locks distribuidos de sync |
 
@@ -66,7 +66,11 @@ Acceso a la bóveda (URL + API key + master) permanece en `.env`. El UUID del í
 
 ### PagoEfectivo dentro de Niubiz Comercio
 
-La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas Niubiz** y **PagoEfectivo**. La segunda consulta exclusivamente `650177853 · CURSOSDELMALI` con el mismo login de Niubiz; no utiliza las credenciales de la fuente independiente PagoEfectivo descrita abajo.
+La fuente **Niubiz Comercio** muestra dos pestañas: **Ventas Niubiz** y **PagoEfectivo**. La segunda consulta el comercio del catálogo con `paycashEnabled` (seed: `650177853`), con el mismo login de Niubiz. No hay fuente PagoEfectivo independiente: ese flujo CIP vive solo aquí.
+
+### Alcance futuro (ACL)
+
+`TreasuryAccessGrant` permite asignar a un usuario una **fuente completa** (`targetId` null, caso Mercado Pago) o un **target** (comercio/cuenta). Admin = acceso total. Operadores fail-closed cuando no tengan grants. El cron sigue sincronizando todos los targets activos; los grants filtrarán solo la lectura. La UI de asignación y el enforcement en API quedan pendientes.
 
 El portal llama `POST https://api.niubiz.pe/api.backoffice.merchant/pagoefectivo`. Con `export: false`, `page: 1` y `size: 10` devuelve la primera página y `data.count`; con `export: true`, devuelve el listado completo como JSON y el navegador crea el XLSX. El conector consulta ambos modos y exige que el número de filas exportadas coincida con el contador antes de persistir. Valida columnas, CIP únicos, importe, moneda, fechas de Lima y estado; un lote incompleto o inválido se rechaza íntegramente. Identidad única: comercio + CIP. No se confunden operaciones `Expirado` o `Por pagar` con pagos confirmados.
 
@@ -77,12 +81,6 @@ La actualización es manual y tiene estado y bloqueo propios. La pestaña muestr
 El elemento Vaultwarden de una fuente Mercado Pago lleva un solo secreto: el campo protegido `access_token` del panel (de prueba o productivo según el entorno). La Public Key, el número de aplicación y el usuario/contraseña del portal no intervienen en esta consulta. La sincronización manual usa `GET /v1/payments/search` en páginas de 50, buscando por `date_created` y por `date_last_updated` en el rango elegido; un mismo ID se guarda una sola vez por ejecución. Guarda la identidad `sourceId + paymentId` y muestra importe bruto, neto, comisiones, estado, cliente, medio de pago y fechas. El campo `payload` conserva el resto de la venta, sin número de tarjeta ni documento del pagador. No hay variables de entorno de Mercado Pago. No ejecuta reembolsos ni otras acciones financieras. La API busca pagos de la cuenta: todavía no se ha verificado una marca universal que permita mostrar exclusivamente los cobrados mediante links. Para ver cobros reales se necesita el Access Token productivo de la cuenta correspondiente; el de prueba solo sirve para pagos de prueba.
 
 El login web observado requiere contraseña y, en el primer acceso de un dispositivo, segundo factor. Un modo asistido solo es reutilizable si el perfil de navegador validado pertenece al servidor y se almacena de forma persistente y protegida. Transferir cookies del navegador personal no forma parte del diseño. Por ahora la conexión ejecutable usa la API oficial; la UI y persistencia pueden probarse sin credenciales mediante dobles de API.
-
-### PagoEfectivo
-
-La fuente tiene tablas, listado y detalle. El ítem de Vaultwarden guarda los tres datos que entrega PagoEfectivo: `accessKey`, `secretKey` e `idService`. No hay variables de entorno de esta API. El botón «Comprobar credenciales» solo lee ese ítem.
-
-La API pública conocida crea y consulta CIP; no es un listado de movimientos con un token fijo. La consulta de operaciones queda sin conectar hasta tener el contrato oficial de reportes. Cuando exista, la URL se escribe en el código y cada venta guarda su `payload` recortado, igual que Mercado Pago.
 
 ## Permisos
 
@@ -97,7 +95,7 @@ Módulo: `treasury`
 
 ## Estado actual: conector API + Vaultwarden preparado (4 de noviembre de 2026)
 
-La implementación actual incluye extracción API de los 77 comercios, login con credenciales de Vaultwarden, persistencia, renovación de sesión, ejecución manual desde MALI ONE y cron cada dos horas desactivado por defecto. Ver [configuración y prueba de despliegue](#niubiz-primer-despliegue). No se ha desplegado a producción. El login automático desde ese servidor debe probarse con la clave regenerada, especialmente por reCAPTCHA. Los apartados posteriores conservan el historial de las verificaciones parciales.
+La implementación actual incluye extracción API de 5 comercios activos, login con credenciales de Vaultwarden, persistencia, renovación de sesión, ejecución manual desde MALI ONE y cron cada 15 minutos desactivado por defecto. Ver [configuración y prueba de despliegue](#niubiz-primer-despliegue). No se ha desplegado a producción. El login automático desde ese servidor debe probarse con la clave regenerada, especialmente por reCAPTCHA. Los apartados posteriores conservan el historial de las verificaciones parciales.
 
 ### Interfaz: jerarquía fuente → operaciones (+ modales)
 
@@ -106,9 +104,9 @@ En **Finanzas → Verificación de pagos** (`/treasury`):
 1. **Fuentes** (página) — cada card es un acceso a un portal. Al cargar se prioriza una fuente Niubiz activa si existe.
 2. **Cabecera de la fuente** — nombre, entidad y acciones: **Editar** y, en Niubiz, **Actualizar toda la fuente**. Este último inicia las sincronizaciones independientes de Ventas Niubiz y PagoEfectivo y muestra el estado de cada una.
 3. **Operaciones** (página) — filtros y tabla; es el contenido diario de la fuente. Columnas: fecha, comercio (código + nombre), pedido, código de transacción, cliente, email, importe, estado; **Tarjeta** y **Billetera** solo si hay datos en la página. Clic en fila → modal de detalle.
-4. **Acciones por pestaña** — **Actualizar Ventas Niubiz** consulta solo `/order`; **Actualizar PagoEfectivo** consulta solo `/pagoefectivo`. El botón **Comercios** está en Ventas Niubiz. La importación XLSX se conserva como recurso de recuperación del servidor, fuera del flujo diario de la interfaz.
+4. **Acciones por pestaña** — **Actualizar Ventas Niubiz** consulta solo `/order`; **Actualizar PagoEfectivo** consulta solo `/pagoefectivo`. El botón **Comercios** está en Ventas Niubiz. **Exportar** descarga un XLSX de una hoja con los filtros activos de esa vista (Ventas Niubiz, PagoEfectivo o Mercado Pago). La importación XLSX de Niubiz se conserva como recurso de recuperación del servidor, fuera del flujo diario de la interfaz.
 
-La sync Niubiz usa la lista canónica de 77 comercios (`niubiz-merchants.json`). No hay CRUD de inventario Niubiz en la página; fuentes sin conector siguen pudiendo registrar cuentas/comercios como configuración.
+La sync Niubiz usa los `TreasuryTarget` merchant activos de la fuente Niubiz (seed inicial: `650177853`, `650178711`, `650239803`, `650239881`, `651047392`). El modal **Comercios** edita alias, nombre portal, activo y qué comercio alimenta PagoEfectivo CIP (`paycashEnabled`). Sin fechas, el cron y la sync manual usan los últimos 10 días Lima; el operador puede pedir hasta 32 días. Fuentes sin conector siguen pudiendo registrar cuentas/comercios como configuración.
 
 ### Buscador de pagos
 
@@ -140,7 +138,7 @@ Objetivo de esta fase: guardar y mostrar pagos Niubiz, con consultas cada dos ho
 
 - Pantalla `/treasury`, navegación y permiso de módulo `treasury`.
 - API autenticada `/api/treasury`: consultar inventario; crear y editar fuentes; crear y editar cuentas/comercios.
-- Fuentes previstas: BCP, Niubiz Comercio, Niubiz En Línea, Diners, Expressnet, PagoEfectivo y Mercado Pago. El catálogo describe el alcance a validar, no certifica disponibilidad de conectores ni APIs.
+- Fuentes previstas en catálogo: BCP, Interbank, Niubiz Comercio, Diners, Expressnet y Mercado Pago. PagoEfectivo CIP se cubre dentro de Niubiz Comercio (no como fuente aparte). Niubiz En línea se retiró del catálogo. El catálogo describe el alcance a validar, no certifica disponibilidad de conectores ni APIs.
 - Cada fuente identifica un acceso a un portal y su titular. Se pueden registrar varios accesos del mismo proveedor, con nombres distintos.
 - Cada cuenta/comercio tiene nombre, referencia textual (conserva ceros iniciales), moneda PEN/USD y estado de inclusión. Una referencia puede aparecer una vez por moneda dentro de una fuente. El tipo de registro se deriva del proveedor en el servidor.
 - La entidad/portal de una fuente es inmutable. Un portal distinto requiere otra fuente para evitar reasignar cuentas a otra entidad.
@@ -229,7 +227,7 @@ Pendiente para el conector: confirmar acceso a los demás comercios, límites, e
 
 El 4 de noviembre de 2026 se completó `probe-niubiz-sales.cjs <xlsx> --all-merchants` para octubre de 2026. Los 77 códigos de `scripts/niubiz-merchants.json` respondieron HTTP 200 y código de aplicación 0. Hubo 694 operaciones en cinco comercios: `651047392` (293), `650239881` (143), `650239803` (2), `650178711` (4) y `650177853` (252). Los otros 72 devolvieron listas vacías. Totales de estados: 609 `Liquidada`, 80 `Denegada`, 1 `Anulada` y 4 `Abandonada`. Se comprobó que cada fila pertenece al comercio consultado y que no hay códigos de transacción duplicados dentro de cada comercio. Solo el comercio `650177853` cuenta con el Excel independiente de referencia; las listas vacías y demás totales todavía no se contrastaron con reportes independientes.
 
-El JWT observado declara 15 minutos entre emisión y expiración. Esto es la vigencia declarada por el token, no una prueba de rechazo del servidor después de esos 15 minutos. El código público del login (`7-es2015.bc175f43d18f08bf2bbe.js`) obtiene reCAPTCHA mediante la acción `merchant/login` y envía `captchaToken` junto a usuario y contraseña a `POST /login`. No se identificó un flujo de refresh en los recursos inspeccionados. El acceso automático sigue pendiente de validar; un cron cada dos horas no puede depender de conservar este token inicial.
+El JWT observado declara 15 minutos entre emisión y expiración. Esto es la vigencia declarada por el token, no una prueba de rechazo del servidor después de esos 15 minutos. El código público del login (`7-es2015.bc175f43d18f08bf2bbe.js`) obtiene reCAPTCHA mediante la acción `merchant/login` y envía `captchaToken` junto a usuario y contraseña a `POST /login`. No se identificó un flujo de refresh en los recursos inspeccionados. El acceso automático sigue pendiente de validar; un cron periódico no puede depender de conservar este token inicial.
 
 Cadencia propuesta para Niubiz: cada 120 minutos, reconsultando siete días recientes, más una revisión diaria del mes anterior. El módulo todavía no importa estas operaciones a su base de datos ni ejecuta ese cron. Próximas entregas: obtener sesión de forma fiable, persistencia idempotente y trazabilidad por comercio, ejecución programada, y vista de operaciones/última actualización en MALI ONE. Alcance actual: terminar Niubiz antes de otros proveedores; CRM Educación queda fuera de esta etapa.
 
@@ -251,7 +249,7 @@ Relacionar cobros → liquidaciones → abonos. Admitir agrupaciones y pagos par
 
 ### 4. Vista operativa y demás entidades
 
-Mostrar importes por moneda y etapa, pendientes, diferencias, última consulta exitosa, cobertura y necesidad de intervención por fuente. Extender conectores a Diners (Ventas y Pagos), Expressnet, PagoEfectivo y Mercado Pago. Cada conector decide API oficial, archivo o navegación según cobertura verificada del contrato; no inferir que una API de cobro ofrece liquidaciones o todos los movimientos de la cuenta.
+Mostrar importes por moneda y etapa, pendientes, diferencias, última consulta exitosa, cobertura y necesidad de intervención por fuente. Extender conectores a Diners (Ventas y Pagos), Expressnet y demás pendientes del catálogo. Cada conector decide API oficial, archivo o navegación según cobertura verificada del contrato; no inferir que una API de cobro ofrece liquidaciones o todos los movimientos de la cuenta.
 
 ## Datos necesarios para iniciar el piloto
 
@@ -276,7 +274,7 @@ Esta fase guarda y muestra ventas en Finanzas → Verificación de pagos. No con
 
 - Vaultwarden entrega el usuario y contraseña de Niubiz mediante el UUID del elemento compartido. Bitwarden CLI está fijado en **2026.6.0**, versión que funcionó en la prueba local; se ejecuta con Node 24 aislado del Node de la API.
 - Chromium abre el formulario normal de Niubiz, completa sus campos y espera la respuesta de login. No resuelve ni evita desafíos CAPTCHA/MFA. El token permanece en memoria durante la ejecución. Si vence o llega un HTTP 401, intenta iniciar sesión de nuevo, con un máximo de tres logins por ejecución.
-- `POST /order` con `export:true` alimenta directamente PostgreSQL. La lista canónica está en `apps/api/src/modules/treasury/niubiz-merchants.json`: 77 comercios. No depende del Excel ni del inventario editable de fuentes.
+- `POST /order` con `export:true` alimenta directamente PostgreSQL. La lista de sync son los targets merchant activos en DB. Cada pago guarda `targetId` además del código denormalizado.
 - Identidad única: proveedor + comercio + código de transacción. Repetir el rango actualiza estados sin duplicar. Se guardan correo y PAN solo enmascarado (últimos dígitos); no se guardan PAN completo ni respuestas crudas de Niubiz.
 - Guardado atómico por comercio, estado de la última ejecución y resultados por comercio. Una consulta fallida no equivale a cero operaciones. Las ejecuciones parciales conservan los comercios guardados. Reintentar el mismo rango recupera los pendientes.
 - Dos horas entre ejecuciones programadas (00:00, 02:00, etc., Lima), consultando hoy y los 31 días anteriores. Un rango manual permite recuperar períodos anteriores, de hasta 32 días cada vez. Las operaciones anteriores a esa ventana solo se revisan mediante un rango manual.
@@ -332,7 +330,7 @@ El `.env` permite que el servicio se recupere después de un reinicio sin interv
 4. Seleccionar `2026-10-01` a `2026-10-31`, pulsar **Sincronizar pagos** y esperar el resultado de los 77 comercios. La UI consulta el avance y actualiza la tabla. La referencia autenticada previa fue de 694 operaciones en cinco comercios, incluidas 252 del `650177853`; la fuente puede haber cambiado desde esa consulta.
 5. Filtrar el comercio `650177853`, revisar cantidades/estados y repetir el rango. La segunda ejecución debe mostrar cero nuevos si la fuente no cambió. Confirmar el origen «API Niubiz» en el último lote y que los datos persisten al recargar.
 6. Si el login se bloquea, la UI mostrará un diagnóstico seguro: `VAULT_AUTH`, `VAULT_UNLOCK`, `VAULT_ITEM`, `NIUBIZ_LOGIN_REQUIRED` o fallo de runtime. Resolver esa causa antes de activar el cron. Si Niubiz exige un desafío interactivo desde el servidor, **este conector no lo supera automáticamente**: faltaría incorporar un flujo asistido o acordar un acceso API con Niubiz.
-7. Solo después de esa prueba, cambiar `NIUBIZ_SYNC_ENABLED=true` y recrear la API. La siguiente hora par de Lima ejecutará la actualización. Cambiar a `false` y recrear la API desactiva futuras ejecuciones; no borra los pagos.
+7. Solo después de esa prueba, cambiar `NIUBIZ_SYNC_ENABLED=true` y recrear la API. Ventas correrá cada 15 minutos (Lima) y PagoEfectivo a los minutos 7/22/37/52. Cambiar a `false` y recrear la API desactiva futuras ejecuciones; no borra los pagos.
 
 ## Validación de desarrollo
 

@@ -4,9 +4,12 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Exportar XLSX por vista: botón en Ventas Niubiz, PagoEfectivo (Niubiz) y Mercado Pago; un archivo / una hoja con los filtros activos (máx. 20 000 filas).
+- Catálogo de tesorería en DB: `TreasuryTarget` con alias MALI (`name`), nombre portal (`externalName`), `paycashEnabled`, moneda opcional en merchant; unique `(sourceId, reference)`. Seed de 5 comercios Niubiz. Sync/PayCash leen el catálogo (se retira `niubiz-merchants.json`). Pagos con `targetId`. Modelo `TreasuryAccessGrant` (ACL futuro usuario→fuente/target; sin enforcement aún). CRUD comercios = crear/editar/desactivar, sin hard-delete. Migración `20261118060000_treasury_target_catalog`.
+- Sync Niubiz acotada a comercios activos del catálogo. Cron cada 15 minutos (Ventas; PagoEfectivo a +7 min) con rango por defecto de los últimos 10 días Lima; sigue desactivado hasta `NIUBIZ_SYNC_ENABLED=true`.
+- Retiro completo de la fuente independiente PagoEfectivo (catálogo, UI, API, tablas y enum). CIP queda solo bajo Niubiz Comercio → PagoEfectivo. También se retira del catálogo **Niubiz · En línea** (`niubiz_settlements`). Se añade **Interbank** al catálogo (cuenta bancaria, sin conector). Migración `20261118043000_drop_pagoefectivo_source`.
 - Las pestañas Ventas Niubiz / PagoEfectivo quedan en la URL (`?tab=paycash`).
 - Niubiz Comercio incorpora la pestaña PagoEfectivo para `650177853 · CURSOSDELMALI`: consulta JSON directa, listado, filtros, detalle, actualización manual y estado independiente. Migración `20261115090000_niubiz_paycash`.
-- La fuente separada PagoEfectivo mantiene sus credenciales oficiales y su conector pendiente; no comparte el UUID de Niubiz.
 - Conectores BCP / otros portales.
 - Separar permisos consulta vs configuración si contabilidad lo pide.
 

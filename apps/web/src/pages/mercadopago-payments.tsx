@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { FileSpreadsheet } from 'lucide-react';
 import type { MercadoPagoPaymentDto, MercadoPagoPaymentsDto, MercadoPagoSyncStatusDto } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import { CopyableValue } from '@/components/copyable-value';
+import { useToast } from '@/contexts/toast-context';
 import { Spinner } from '@/components/feedback';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input,
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
@@ -16,10 +18,12 @@ const emptyFilters = { q: '', status: '', from: '', to: '', page: 1 };
 export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdateOpenChange }: {
   sourceId: string; sourceName: string; updateOpen: boolean; onUpdateOpenChange: (open: boolean) => void;
 }) {
+  const toast = useToast();
   const [filters, setFilters] = useState(emptyFilters);
   const [search, setSearch] = useState('');
   const [data, setData] = useState<MercadoPagoPaymentsDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState<MercadoPagoPaymentDto | null>(null);
   const [revision, setRevision] = useState(0);
@@ -65,7 +69,36 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const setFilter = (key: 'status' | 'from' | 'to', value: string) => setFilters(old => ({ ...old, [key]: value, page: 1 }));
 
+  async function exportXlsx() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (key !== 'page' && value) params.set(key, String(value));
+      });
+      await api.exportMercadoPagoPayments(sourceId, params);
+      toast.success('Exportación lista');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo exportar');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return <section aria-label={`Operaciones de ${sourceName}`} className="flex flex-col gap-5">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <h3 className="text-lg font-semibold">Ventas Mercado Pago</h3>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={exporting || loading || !data?.total}
+        onClick={() => void exportXlsx()}
+      >
+        <FileSpreadsheet className="size-4" aria-hidden="true" />
+        {exporting ? 'Exportando…' : 'Exportar'}
+      </Button>
+    </div>
     <form className="flex flex-col gap-3 rounded-xl border border-border p-4" onSubmit={event => {
       event.preventDefault(); setFilters(old => ({ ...old, q: search.trim(), page: 1 }));
     }}>
