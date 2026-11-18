@@ -225,7 +225,7 @@ export function CrmEducacionPage() {
   const [slaError, setSlaError] = useState('');
   const slaRequestId = useRef(0);
   const [cycleCounts, setCycleCounts] = useState<EducationCycleCounts>({
-    open: 0, closed: 0, review: 0, unassigned: 0,
+    open: 0, closed: 0, review: 0, unassigned: 0, stale: 0, solo_contacto: 0,
   });
   const [reviewEntries, setReviewEntries] = useState<EducationLead[]>([]);
   const [reviewEntryTotal, setReviewEntryTotal] = useState(0);
@@ -370,7 +370,10 @@ export function CrmEducacionPage() {
   }, [contacts, cycles]);
 
   const updateManagement = useCallback(async (contactId: number,
-    changes: { assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number }) => {
+    changes: {
+      assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number;
+      promise_at?: string | null; lost_reason?: string | null;
+    }) => {
     setManagementSaving(true);
     try {
       await api.patchCrmEducationManagement(contactId, { area: EDUCATION_AREA, ...changes });
@@ -396,6 +399,44 @@ export function CrmEducacionPage() {
     }
     finally { setManagementSaving(false); }
   }, [loadContacts, loadCycles, loadReviewEntries, seedSaleReadyPrompt, toast]);
+
+  const requestStatusChange = useCallback((
+    contactId: number,
+    leadId: number | undefined,
+    statusIdRaw: string,
+  ) => {
+    if (statusIdRaw === '__none__') {
+      void updateManagement(contactId, { lead_status_id: null, lead_id: leadId });
+      return;
+    }
+    const statusId = Number(statusIdRaw);
+    const status = managementCatalog.statuses.find((item) => item.id === statusId);
+    if (status?.slug === 'promesa') {
+      const date = window.prompt('Fecha de promesa (YYYY-MM-DD o ISO)');
+      if (!date?.trim()) {
+        toast.error('Promesa requiere fecha');
+        return;
+      }
+      void updateManagement(contactId, {
+        lead_status_id: statusId, lead_id: leadId, promise_at: date.trim(),
+      });
+      return;
+    }
+    if (status?.slug === 'perdido') {
+      const reason = window.prompt(
+        'Motivo de perdido (ej. no_contesto_mas, promesa_vencida, dejo_de_responder, dato_invalido)',
+      );
+      if (!reason?.trim()) {
+        toast.error('Perdido requiere motivo');
+        return;
+      }
+      void updateManagement(contactId, {
+        lead_status_id: statusId, lead_id: leadId, lost_reason: reason.trim(),
+      });
+      return;
+    }
+    void updateManagement(contactId, { lead_status_id: statusId, lead_id: leadId });
+  }, [managementCatalog.statuses, toast, updateManagement]);
 
   async function submitManualLead() {
     if (!manualLeadDraft.name.trim()) {
@@ -636,8 +677,7 @@ export function CrmEducacionPage() {
         value={cycle.lead_status_id ? String(cycle.lead_status_id) : '__none__'}
         disabled={Boolean(cycle.closed_at) || managementSaving}
         statuses={managementCatalog.statuses}
-        onChange={(value) => void updateManagement(cycle.contact_id,
-          { lead_status_id: value === '__none__' ? null : Number(value), lead_id: cycle.id })}
+        onChange={(value) => requestStatusChange(cycle.contact_id, cycle.id, value)}
       />;
     } },
     { id: 'last', header: 'Última actividad', cell: ({ row }) => formatDate(row.original.last_interaction_at) },
@@ -649,7 +689,7 @@ export function CrmEducacionPage() {
             { assigned_user_id: cycle.assigned_user_id!, lead_id: cycle.id })}>Confirmar asesor</Button>
         : '—';
     } },
-  ], [educationAdvisors, managementCatalog.statuses, managementSaving, updateManagement]);
+  ], [educationAdvisors, managementCatalog.statuses, managementSaving, requestStatusChange, updateManagement]);
 
   const reviewEntryColumns = useMemo<ColumnDef<EducationLead>[]>(() => [
     { id: 'area', header: 'Área', cell: () => 'Educación' },
@@ -841,9 +881,11 @@ export function CrmEducacionPage() {
               value={contact.lead_status_id ? String(contact.lead_status_id) : '__none__'}
               disabled={managementSaving}
               statuses={managementCatalog.statuses}
-              onChange={(value) => void updateManagement(contact.contact_id,
-                { lead_status_id: value === '__none__' ? null : Number(value),
-                  ...(contact.lead_id ? { lead_id: contact.lead_id } : {}) })}
+              onChange={(value) => requestStatusChange(
+                contact.contact_id,
+                contact.lead_id ?? undefined,
+                value,
+              )}
             />
           </div>
         </div>
@@ -1039,6 +1081,8 @@ export function CrmEducacionPage() {
       <TabsList>
         <TabsTrigger value="contacts">Contactos</TabsTrigger>
         <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
+        <TabsTrigger value="historial">Historial</TabsTrigger>
+        <TabsTrigger value="activities">Actividades</TabsTrigger>
         <TabsTrigger value="payments">Pagos</TabsTrigger>
         <TabsTrigger value="campaigns">Campañas</TabsTrigger>
       </TabsList>
@@ -1169,10 +1213,12 @@ export function CrmEducacionPage() {
             ['closed', 'Cerradas', cycleCounts.closed],
             ['review', 'Requieren revisión', cycleCounts.review + reviewEntryTotal],
             ['unassigned', 'Sin asignar', cycleCounts.unassigned],
+            ['stale', 'Sin gestión 3d', cycleCounts.stale ?? 0],
+            ['solo_contacto', 'Solo contacto', cycleCounts.solo_contacto ?? 0],
           ] as const).map(([key, label, count]) => <Button key={key}
             size="sm" variant={opportunityView === key ? 'default' : 'outline'}
             onClick={() => { setOpportunityView(key); setCyclePage(1); setReviewEntryPage(1); }}>
-            {label}<Badge variant={(key === 'review' || key === 'unassigned') && count > 0 ? 'destructive' : 'secondary'}
+            {label}<Badge variant={(key === 'review' || key === 'unassigned' || key === 'stale') && count > 0 ? 'destructive' : 'secondary'}
               className="ml-2">{count}</Badge>
           </Button>)}
         </div>
@@ -1259,12 +1305,391 @@ export function CrmEducacionPage() {
           </div>
         </div>}
       </TabsContent>
-      <TabsContent value="payments">
-        <EmptyState title="Pagos próximamente" description="Esta sección estará disponible más adelante." />
+      <TabsContent value="historial" className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Captaciones recientes (orígenes/entradas). Para jefes; el asesor opera etapas en WhatsApp.
+        </p>
+        <HistorialLeadsPanel categoria={categoria} />
+      </TabsContent>
+      <TabsContent value="activities" className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Registro multi-canal (llamada/email). Intento ≠ contacto efectivo.
+          Asesor comercial ≠ responsable del chat. Spike Anura disponible vía API.
+        </p>
+        <ActivityPanel />
+      </TabsContent>
+      <TabsContent value="payments" className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Transición asesor: asociar código sin entrar a Treasury.
+          Caja: aplicar importe y boleteo. Destino asesor: misma asociación desde mali-whatsapp.
+        </p>
+        <AssociatePaymentPanel />
+        <CajaPaymentPanel />
+        <BillingPanel />
       </TabsContent>
       <TabsContent value="campaigns">
         <EmptyState title="Campañas próximamente" description="Esta sección estará disponible cuando termine su configuración." />
       </TabsContent>
     </Tabs>
+  </div>;
+}
+
+function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope }) {
+  const { toast } = useToast();
+  const [items, setItems] = useState<EducationLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    void api.listCrmEducationLeads({ categoria, view: 'recent', page, limit: PAGE_SIZE })
+      .then((data) => {
+        if (cancelled) return;
+        setItems(data.items);
+        setTotal(data.total);
+      })
+      .catch((error) => {
+        if (!cancelled) toast.error(error instanceof Error ? error.message : 'Error al cargar historial');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [categoria, page, toast]);
+
+  if (loading) return <TableShellSkeleton rows={8} cols={6} density="compact" />;
+  if (!items.length) {
+    return <EmptyState title="Sin captaciones" description="No hay entradas recientes." />;
+  }
+  return <div className="space-y-3">
+    <DataTable
+      columns={[
+        { id: 'when', header: 'Fecha', cell: ({ row }) => formatDate(row.original.first_seen_at) },
+        { id: 'name', header: 'Contacto', cell: ({ row }) =>
+          `${row.original.contacts?.name ?? ''} ${row.original.contacts?.last_name ?? ''}`.trim() || '—' },
+        { id: 'channel', header: 'Canal', cell: ({ row }) =>
+          CHANNEL_LABELS[row.original.channel] ?? row.original.channel },
+        { id: 'source', header: 'Fuente', cell: ({ row }) => row.original.source_label || '—' },
+        { id: 'class', header: 'Clasificación', cell: ({ row }) => row.original.classification || '—' },
+        { id: 'advisor', header: 'Asesor', cell: ({ row }) => row.original.assigned_user_label || '—' },
+      ]}
+      data={items}
+      getRowId={(row) => String(row.id)}
+      tableClassName="min-w-full"
+    />
+    <div className="flex items-center justify-end gap-3 text-sm">
+      <span>Página {page} de {Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+      <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
+      <Button variant="outline" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
+    </div>
+  </div>;
+}
+
+function AssociatePaymentPanel() {
+  const { toast } = useToast();
+  const [cycleId, setCycleId] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [hits, setHits] = useState<Array<{
+    provider: string; transactionCode: string; amount: number; status: string;
+    customerName: string | null; customerEmail: string | null;
+  }>>([]);
+
+  async function lookup() {
+    setBusy(true);
+    try {
+      const data = await api.lookupCrmEducationPayment(code.trim());
+      setHits(data.hits);
+      if (!data.hits.length) toast.error('Sin coincidencias en Treasury');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al buscar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function associate() {
+    const waCycleId = Number(cycleId);
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      toast.error('Indica el ID de oportunidad (ciclo WA)');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.associateCrmEducationPayment({
+        waCycleId,
+        transactionCode: code.trim(),
+      });
+      toast.success('Código asociado a la venta');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo asociar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="max-w-xl space-y-4 rounded-md border p-4">
+    <div className="space-y-1">
+      <Label>ID oportunidad (ciclo WA)</Label>
+      <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 1234" />
+    </div>
+    <div className="space-y-1">
+      <Label>Código de transacción / CIP / pedido</Label>
+      <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código Treasury" />
+    </div>
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" disabled={busy || code.trim().length < 4} onClick={() => void lookup()}>
+        Validar
+      </Button>
+      <Button type="button" disabled={busy || code.trim().length < 4 || !cycleId} onClick={() => void associate()}>
+        Asociar a oportunidad
+      </Button>
+    </div>
+    {hits.length > 0 && <div className="space-y-2 text-sm">
+      {hits.map((hit) => <p key={`${hit.provider}-${hit.transactionCode}`} className="text-muted-foreground">
+        {hit.provider}: {hit.transactionCode} · {hit.amount} · {hit.status}
+        {hit.customerName ? ` · ${hit.customerName}` : ''}
+        {hit.customerEmail ? ` · ${hit.customerEmail}` : ''}
+      </p>)}
+    </div>}
+  </div>;
+}
+
+function ActivityPanel() {
+  const { toast } = useToast();
+  const [cycleId, setCycleId] = useState('');
+  const [channel, setChannel] = useState('call');
+  const [result, setResult] = useState('attempted');
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<Array<{
+    id: string; channel: string; result: string; occurredAt: string; notes: string | null;
+  }>>([]);
+  const [busy, setBusy] = useState(false);
+  const [anuraNote, setAnuraNote] = useState('');
+
+  useEffect(() => {
+    void api.getAnuraContractSpike()
+      .then((data) => setAnuraNote(data.note))
+      .catch(() => setAnuraNote(''));
+  }, []);
+
+  async function load() {
+    const waCycleId = Number(cycleId);
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      toast.error('Indica el ID de oportunidad');
+      return;
+    }
+    setBusy(true);
+    try {
+      const data = await api.listCrmEducationActivities(waCycleId);
+      setItems(data);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Error al cargar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function create() {
+    const waCycleId = Number(cycleId);
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      toast.error('Indica el ID de oportunidad');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.createCrmEducationActivity({
+        waCycleId,
+        channel,
+        result,
+        occurredAt: new Date().toISOString(),
+        notes: notes.trim() || undefined,
+      });
+      toast.success('Actividad registrada');
+      setNotes('');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo registrar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="max-w-xl space-y-4 rounded-md border p-4">
+    <div className="space-y-1">
+      <Label>ID oportunidad (ciclo WA)</Label>
+      <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 1234" />
+    </div>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1">
+        <Label>Canal</Label>
+        <Select value={channel} onValueChange={setChannel}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="call">Llamada</SelectItem>
+            <SelectItem value="email">Email</SelectItem>
+            <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            <SelectItem value="other">Otro</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1">
+        <Label>Resultado</Label>
+        <Select value={result} onValueChange={setResult}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="attempted">Intentado</SelectItem>
+            <SelectItem value="reached">Contacto efectivo</SelectItem>
+            <SelectItem value="no_answer">No contesta</SelectItem>
+            <SelectItem value="left_voicemail">Buzón</SelectItem>
+            <SelectItem value="bounced">Rebotado</SelectItem>
+            <SelectItem value="other">Otro</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    <div className="space-y-1">
+      <Label>Nota</Label>
+      <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+    </div>
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" disabled={busy} onClick={() => void load()}>Listar</Button>
+      <Button type="button" disabled={busy} onClick={() => void create()}>Registrar</Button>
+    </div>
+    {anuraNote && <p className="text-xs text-muted-foreground">Anura (spike): {anuraNote}</p>}
+    {items.length > 0 && <ul className="space-y-1 text-sm text-muted-foreground">
+      {items.map((item) => <li key={item.id}>
+        {formatDate(item.occurredAt)} · {item.channel} · {item.result}
+        {item.notes ? ` · ${item.notes}` : ''}
+      </li>)}
+    </ul>}
+  </div>;
+}
+
+function CajaPaymentPanel() {
+  const { toast } = useToast();
+  const [cycleId, setCycleId] = useState('');
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function apply() {
+    const waCycleId = Number(cycleId);
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      toast.error('Indica el ID de oportunidad');
+      return;
+    }
+    setBusy(true);
+    try {
+      const lookup = await api.lookupCrmEducationPayment(code.trim());
+      const hit = lookup.hits[0];
+      if (!hit) {
+        toast.error('Sin coincidencias');
+        return;
+      }
+      let sale = await api.getCrmEducationSaleByCycle(waCycleId);
+      if (!sale) {
+        await api.associateCrmEducationPayment({
+          waCycleId,
+          transactionCode: code.trim(),
+        });
+        sale = await api.getCrmEducationSaleByCycle(waCycleId);
+      }
+      if (!sale) {
+        toast.error('No hay venta para este ciclo');
+        return;
+      }
+      await api.applyCrmEducationPayment({
+        saleId: sale.id,
+        provider: hit.provider as 'niubiz' | 'paycash' | 'mercadopago',
+        providerPaymentId: hit.providerPaymentId,
+        transactionCode: hit.transactionCode,
+        amountApplied: hit.amount,
+        currency: hit.currency,
+      });
+      toast.success('Pago aplicado por Caja');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo aplicar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="max-w-xl space-y-4 rounded-md border p-4">
+    <h3 className="text-sm font-semibold">Caja — aplicar importe</h3>
+    <div className="space-y-1">
+      <Label>ID oportunidad</Label>
+      <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} />
+    </div>
+    <div className="space-y-1">
+      <Label>Código Treasury</Label>
+      <Input value={code} onChange={(e) => setCode(e.target.value)} />
+    </div>
+    <Button type="button" disabled={busy || code.trim().length < 4} onClick={() => void apply()}>
+      Aplicar a venta
+    </Button>
+  </div>;
+}
+
+function BillingPanel() {
+  const { toast } = useToast();
+  const [cycleId, setCycleId] = useState('');
+  const [status, setStatus] = useState<'pending' | 'obs' | 'obs_asesor' | 'boleteado'>('obs');
+  const [note, setNote] = useState('');
+  const [enrollmentRef, setEnrollmentRef] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const waCycleId = Number(cycleId);
+    if (!Number.isInteger(waCycleId) || waCycleId < 1) {
+      toast.error('Indica el ID de oportunidad');
+      return;
+    }
+    setBusy(true);
+    try {
+      const sale = await api.getCrmEducationSaleByCycle(waCycleId);
+      if (!sale) {
+        toast.error('Primero asocia una venta/pago a este ciclo');
+        return;
+      }
+      await api.patchCrmEducationSaleBilling(sale.id, {
+        billingStatus: status,
+        billingNote: note.trim() || undefined,
+        enrollmentRef: enrollmentRef.trim() || undefined,
+      });
+      toast.success('Boleteo / matrícula actualizado');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="max-w-xl space-y-4 rounded-md border p-4">
+    <h3 className="text-sm font-semibold">Postventa — OBS / boleteado / matrícula</h3>
+    <div className="space-y-1">
+      <Label>ID oportunidad</Label>
+      <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} />
+    </div>
+    <div className="space-y-1">
+      <Label>Estado boleteo</Label>
+      <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
+        <SelectTrigger><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pending">Pendiente</SelectItem>
+          <SelectItem value="obs">Proceso OBS</SelectItem>
+          <SelectItem value="obs_asesor">OBS pendiente asesor</SelectItem>
+          <SelectItem value="boleteado">Boleteado</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+    <div className="space-y-1">
+      <Label>Observación</Label>
+      <Input value={note} onChange={(e) => setNote(e.target.value)} />
+    </div>
+    <div className="space-y-1">
+      <Label>Ref. matrícula / SIGE</Label>
+      <Input value={enrollmentRef} onChange={(e) => setEnrollmentRef(e.target.value)} />
+    </div>
+    <Button type="button" disabled={busy} onClick={() => void save()}>Guardar</Button>
   </div>;
 }

@@ -2,9 +2,24 @@
 
 > Changelog: [crm-educacion-CHANGELOG.md](./crm-educacion-CHANGELOG.md) · Índice: [README.md](./README.md)
 
+## Destino vs transición (producto)
+
+| | Destino | Transición (ahora) |
+|--|---------|-------------------|
+| **Asesor** | Solo mali-whatsapp (etapa, ficha, chat, asociar código vía API) | WA para etapa/ficha/chat; CRM **solo** alta no captada + asociar código (sin Treasury) |
+| **Jefe / Caja** | CRM Educación + Treasury | Igual; CRM se puede refactorizar libre (aún no en uso masivo) |
+| **Motor comercial** | ONE | Todavía mali-whatsapp (ciclos/estados/SLA) |
+| **Estabilidad** | WA mensajería siempre up | Cambios en WA aditivos; riesgo de refactor en ONE |
+
+Glosario: **medio de ingreso** (captación) ≠ **medio de comunicación** (actividad) ≠ **venta** ≠ **aplicación de pago** (Caja).  
+`venta_exitosa` = compromiso comercial, no cobro verificado.
+
+Plan canónico: `orden_proceso_leads_crm_8aaad038.plan.md` (Cursor plans).  
+Roles: [crm-educacion-roles.md](./crm-educacion-roles.md).
+
 ## Qué es
 
-Panel operativo de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño). La captación entra por el widget de leads; la fuente de verdad de ciclos/estados/SLA es **mali-whatsapp**. MALI ONE orquesta UI, catálogo local de apoyo y sync.
+Panel de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño). En transición, ciclos/estados/SLA viven en **mali-whatsapp**; MALI ONE orquesta UI (jefes), catálogo de apoyo, captura web y (próximo) venta/cobro.
 
 ## Cómo funciona
 
@@ -50,6 +65,8 @@ Prefijo `/api/crm-educacion`: contacts, leads, cycles, sla, catalogs, management
 ```env
 WHATSAPP_CRM_BASE_URL=
 WHATSAPP_CRM_SERVICE_TOKEN=
+CRM_EDUCACION_SERVICE_TOKEN=
+COMMERCIAL_AUTHORITY=wa
 EDUCACION_LEADS_SHEETS_ENABLED=false
 GOOGLE_SHEETS_LEADS_EP_ID=
 GOOGLE_SHEETS_LEADS_TAB_EP=EP
@@ -59,13 +76,17 @@ GOOGLE_SHEETS_LEADS_DISENO_ID=
 GOOGLE_SHEETS_LEADS_TAB_DISENO=Diseno
 ```
 
+`CRM_EDUCACION_SERVICE_TOKEN`: WA → ONE lookup/asociar pagos (`x-crm-educacion-service-token`).  
+`COMMERCIAL_AUTHORITY`: `wa` (transición) | `one` (post-cutover). Ver [crm-educacion-cutover.md](./crm-educacion-cutover.md).
+
 ## Permisos
 
-Módulo: `crm_educacion`
+Módulo: `crm_educacion`. Roles: [crm-educacion-roles.md](./crm-educacion-roles.md).
 
 ## Relacionados
 
 - [widgets.md](./widgets.md), [catalog-educacion.md](./catalog-educacion.md), [landings.md](./landings.md)
+- [crm-educacion-crm-consumers.md](./crm-educacion-crm-consumers.md), [crm-educacion-cutover.md](./crm-educacion-cutover.md)
 
 ## Go-live y operación (leads)
 

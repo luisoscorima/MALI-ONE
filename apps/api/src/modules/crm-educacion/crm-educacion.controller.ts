@@ -2,11 +2,13 @@ import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch,
 import { AppModule, type User } from '@prisma/client';
 import type { Request } from 'express';
 import {
-  IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested,
+  IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { CrmEducacionService } from './crm-educacion.service';
+import { EducacionActivityService } from './educacion-activity.service';
+import { EducacionSaleService } from './educacion-sale.service';
 import { EDUCATION_CATEGORY_SCOPES, EDUCATION_WRITE_AREA } from './education-scope';
 
 class ListContactsQuery {
@@ -33,7 +35,7 @@ class ListCyclesQuery {
   @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
   @IsOptional() @IsString() @MaxLength(32) channel?: string;
   @IsOptional() @IsString() @MaxLength(120) q?: string;
-  @IsOptional() @IsIn(['open', 'closed', 'review', 'unassigned']) view?: string;
+  @IsOptional() @IsIn(['open', 'closed', 'review', 'unassigned', 'stale', 'solo_contacto']) view?: string;
   @IsOptional() @IsString() page?: string;
   @IsOptional() @IsString() limit?: string;
 }
@@ -49,6 +51,8 @@ class ManagementBody {
   @IsOptional() @IsInt() @Min(1) assigned_user_id?: number | null;
   @IsOptional() @IsInt() @Min(1) lead_status_id?: number | null;
   @IsOptional() @IsInt() @Min(1) lead_id?: number;
+  @IsOptional() @IsString() @MaxLength(40) promise_at?: string | null;
+  @IsOptional() @IsString() @MaxLength(64) lost_reason?: string | null;
 }
 
 class DistributeBody {
@@ -97,10 +101,53 @@ class ManualLeadBody {
   @IsOptional() @IsString() @MaxLength(200) curso?: string;
 }
 
+class ActivityBody {
+  @IsInt() @Min(1) waCycleId!: number;
+  @IsOptional() @IsInt() @Min(1) waContactId?: number;
+  @IsIn(['call', 'email', 'whatsapp', 'other']) channel!: string;
+  @IsOptional() @IsIn(['inbound', 'outbound']) direction?: string;
+  @IsString() occurredAt!: string;
+  @IsIn(['attempted', 'reached', 'no_answer', 'left_voicemail', 'bounced', 'other']) result!: string;
+  @IsOptional() @IsString() @MaxLength(2000) notes?: string;
+  @IsOptional() @IsString() @MaxLength(120) externalRef?: string;
+  @IsOptional() @IsString() @MaxLength(40) externalSystem?: string;
+}
+
+class AssociatePaymentBody {
+  @IsInt() @Min(1) waCycleId!: number;
+  @IsOptional() @IsInt() @Min(1) waContactId?: number;
+  @IsString() @MaxLength(120) transactionCode!: string;
+  @IsOptional() @IsNumber() amountAgreed?: number;
+  @IsOptional() @IsString() @MaxLength(200) itemLabel?: string;
+}
+
+class ApplyPaymentBody {
+  @IsString() saleId!: string;
+  @IsIn(['niubiz', 'paycash', 'mercadopago']) provider!: 'niubiz' | 'paycash' | 'mercadopago';
+  @IsString() providerPaymentId!: string;
+  @IsString() transactionCode!: string;
+  @IsNumber() amountApplied!: number;
+  @IsOptional() @IsString() currency?: string;
+}
+
+class BillingBody {
+  @IsIn(['pending', 'obs', 'obs_asesor', 'boleteado']) billingStatus!: 'pending' | 'obs' | 'obs_asesor' | 'boleteado';
+  @IsOptional() @IsString() @MaxLength(2000) billingNote?: string;
+  @IsOptional() @IsString() @MaxLength(120) enrollmentRef?: string;
+}
+
+class ReversePaymentBody {
+  @IsOptional() @IsString() @MaxLength(500) reason?: string;
+}
+
 @Controller('crm-educacion')
 @RequireModule(AppModule.crm_educacion)
 export class CrmEducacionController {
-  constructor(private readonly crm: CrmEducacionService) {}
+  constructor(
+    private readonly crm: CrmEducacionService,
+    private readonly activities: EducacionActivityService,
+    private readonly sales: EducacionSaleService,
+  ) {}
 
   @Get('contacts')
   contacts(@Query() query: ListContactsQuery) {
@@ -157,6 +204,20 @@ export class CrmEducacionController {
     return this.crm.managementCatalogs();
   }
 
+  /** F4 scaffolding: quién escribe lo comercial. Default wa hasta cutover. */
+  @Get('commercial-authority')
+  commercialAuthority() {
+    const raw = String(process.env.COMMERCIAL_AUTHORITY ?? 'wa').trim().toLowerCase();
+    const authority = raw === 'one' ? 'one' : 'wa';
+    return {
+      authority,
+      messaging: 'whatsapp',
+      note: authority === 'wa'
+        ? 'Motor comercial en mali-whatsapp; mensajería no se tumba en cutover.'
+        : 'Motor comercial en ONE; WA solo canal + hechos.',
+    };
+  }
+
   @Patch('contacts/:id/management')
   management(@Param('id', ParseIntPipe) id: number, @Body() body: ManagementBody, @Req() req: Request) {
     return this.crm.management(id, body, (req.user as User).email);
@@ -175,5 +236,74 @@ export class CrmEducacionController {
   @Post('leads/manual')
   createManualLead(@Body() body: ManualLeadBody, @Req() req: Request) {
     return this.crm.createManualLead(body, (req.user as User).email);
+  }
+
+  @Get('activities')
+  listActivities(@Query('waCycleId', ParseIntPipe) waCycleId: number) {
+    return this.activities.listByCycle(waCycleId);
+  }
+
+  @Post('activities')
+  createActivity(@Body() body: ActivityBody, @Req() req: Request) {
+    return this.activities.create({
+      ...body,
+      actorEmail: (req.user as User).email,
+    });
+  }
+
+  @Get('activities/anura-contract')
+  anuraContract() {
+    return this.activities.anuraContract();
+  }
+
+  @Get('sales/by-cycle/:waCycleId')
+  saleByCycle(@Param('waCycleId', ParseIntPipe) waCycleId: number) {
+    return this.sales.getByCycle(waCycleId);
+  }
+
+  @Get('payments/lookup')
+  lookupPayment(
+    @Query('code') code: string,
+    @Query('provider') provider?: string,
+  ) {
+    const p = String(provider ?? 'all').trim().toLowerCase();
+    const allowed = ['all', 'niubiz', 'paycash', 'mercadopago'] as const;
+    const selected = (allowed as readonly string[]).includes(p)
+      ? (p as (typeof allowed)[number])
+      : 'all';
+    return this.sales.lookupTransaction(code, selected);
+  }
+
+  @Post('payments/associate')
+  associatePayment(@Body() body: AssociatePaymentBody, @Req() req: Request) {
+    return this.sales.associateCode({
+      ...body,
+      actorEmail: (req.user as User).email,
+    });
+  }
+
+  @Post('payments/apply')
+  applyPayment(@Body() body: ApplyPaymentBody, @Req() req: Request) {
+    return this.sales.applyPayment({
+      ...body,
+      actorEmail: (req.user as User).email,
+    });
+  }
+
+  @Post('payments/applications/:id/reverse')
+  reversePayment(
+    @Param('id') id: string,
+    @Body() body: ReversePaymentBody,
+    @Req() req: Request,
+  ) {
+    return this.sales.reverseApplication(id, {
+      actorEmail: (req.user as User).email,
+      reason: body.reason,
+    });
+  }
+
+  @Patch('sales/:id/billing')
+  patchBilling(@Param('id') id: string, @Body() body: BillingBody) {
+    return this.sales.patchBilling(id, body);
   }
 }

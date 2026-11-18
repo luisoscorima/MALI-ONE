@@ -134,6 +134,8 @@ export class CrmEducacionService {
   async management(id: number, body: {
     area: string; assigned_user_id?: number | null; lead_status_id?: number | null;
     lead_id?: number;
+    promise_at?: string | null;
+    lost_reason?: string | null;
   }, actorEmail: string) {
     this.ensureConfigured();
     if (body.area !== EDUCATION_WRITE_AREA) {

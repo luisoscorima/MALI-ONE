@@ -62,19 +62,6 @@ const PAM_WIDGET_ATTR_DEFINITIONS: Array<{
   { slug: 'source', label: 'Origen', sort_order: 20 },
 ];
 
-const EDUCACION_LEAD_ATTR_DEFINITIONS: Array<{
-  slug: string;
-  label: string;
-  field_type?: string;
-  sort_order?: number;
-}> = [
-  { slug: 'fuente', label: 'Fuente Lead', sort_order: 1 },
-  { slug: 'curso', label: 'Curso', sort_order: 2 },
-  { slug: 'curso_url', label: 'URL del curso', sort_order: 3 },
-  { slug: 'programa', label: 'Programa web', sort_order: 4 },
-  { slug: 'source', label: 'Source', sort_order: 20 },
-];
-
 export type CrmSyncPayload = {
   area?: string;
   name: string;
@@ -389,12 +376,14 @@ export class WhatsappCrmClientService {
       );
     }
 
-    const area = String(lead.whatsappArea || 'educacion_ep').trim();
     const lastName = String(lead.apellidos ?? '').trim();
     const isLanding = lead.captureSource === 'landing';
+    const categoria = this.resolveEducacionCategoria(lead);
 
+    // Área canónica educacion + categoría (no educacion_ep/ca como área).
     await this.request('POST', '/api/crm/origins', {
-      area,
+      area: 'educacion',
+      categoria,
       channel: 'widget',
       external_id: String(lead.id),
       source_key: isLanding
@@ -431,32 +420,23 @@ export class WhatsappCrmClientService {
     });
   }
 
+  /** Categoría comercial ca|ep (aliases legacy whatsappArea → categoría). */
+  private resolveEducacionCategoria(lead: EducacionLead): 'ca' | 'ep' {
+    const area = String(lead.whatsappArea ?? '').trim().toLowerCase();
+    if (area === 'educacion_ca' || area === 'ca') return 'ca';
+    return 'ep';
+  }
+
   /** Segmento web para tipificación (EP / Diseño / CA). */
   private resolveEducacionPrograma(lead: EducacionLead): string {
     const url = String(lead.pageUrl ?? '').toLowerCase();
     if (url.includes('/diseno-y-comunicaciones/')) {
       return 'diseno-y-comunicaciones';
     }
-    if (lead.whatsappArea === 'educacion_ca') {
+    if (this.resolveEducacionCategoria(lead) === 'ca') {
       return 'cursos-de-arte';
     }
     return 'extension-profesional';
-  }
-
-  async ensureEducacionLeadAttributeDefinitions(area: string): Promise<void> {
-    if (!this.configured) return;
-    try {
-      await this.request('POST', '/api/crm/attribute-definitions/ensure', {
-        area,
-        definitions: EDUCACION_LEAD_ATTR_DEFINITIONS,
-      });
-    } catch (err) {
-      this.logger.warn(
-        `No se pudieron asegurar defs de atributos Educación (${area}): ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-      );
-    }
   }
 
   private setAttr(
@@ -823,6 +803,8 @@ export class WhatsappCrmClientService {
   patchEducationManagement(contactId: number, area: string, changes: {
     assigned_user_id?: number | null; lead_status_id?: number | null; lead_id?: number;
     actor_email?: string;
+    promise_at?: string | null;
+    lost_reason?: string | null;
   }) {
     return this.request('PATCH',
       `/api/crm/education/contacts/${contactId}/management?${new URLSearchParams({ area })}`,

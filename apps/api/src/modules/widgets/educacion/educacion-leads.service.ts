@@ -93,6 +93,7 @@ export class EducacionLeadsService {
     }
 
     try {
+      // Idempotente por (area, channel, external_id=lead.id) en WhatsApp.
       await this.crm.syncEducacionLeadAsync(lead);
       await this.prisma.educacionLead.update({
         where: { id: lead.id },
@@ -105,9 +106,24 @@ export class EducacionLeadsService {
         where: { id: lead.id },
         data: { waStatus: 'error', waError: message.slice(0, 500) },
       });
-      // Reintento fire-and-forget
-      this.crm.syncEducacionLead(lead);
+      // Un solo reintento diferido (evita doble fire inmediato).
+      setTimeout(() => {
+        this.crm.syncEducacionLead(lead);
+      }, 15_000);
     }
+  }
+
+  /** Reintenta leads con waStatus=error (ops / cron). Idempotente por external_id. */
+  async retryFailedWhatsappSync(limit = 50): Promise<{ retried: number }> {
+    const failed = await this.prisma.educacionLead.findMany({
+      where: { waStatus: 'error' },
+      orderBy: { updatedAt: 'asc' },
+      take: Math.min(Math.max(limit, 1), 200),
+    });
+    for (const lead of failed) {
+      await this.syncWhatsapp(lead);
+    }
+    return { retried: failed.length };
   }
 
   private async syncSheet(leadId: string): Promise<void> {

@@ -751,6 +751,115 @@ model EducacionLead {
   @@index([utmCampaign])
 }
 
+/// Actividad multicanal (llamada, email, etc.) ligada a ciclo WA. Destino: ONE.
+model EducacionCrmActivity {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  /// ID del ciclo en mali-whatsapp (education_lead_cycles.id)
+  waCycleId     Int
+  waContactId   Int?
+  channel       String   // call | email | whatsapp | other
+  direction     String   @default("outbound") // inbound | outbound
+  occurredAt    DateTime
+  receivedAt    DateTime @default(now())
+  actorEmail    String?
+  /// attempted | reached | no_answer | left_voicemail | bounced | other
+  result        String
+  notes         String?
+  externalRef   String?  // Anura CDR id, etc.
+  externalSystem String? // anura | manual | ses
+
+  @@index([waCycleId, occurredAt])
+  @@index([externalSystem, externalRef])
+}
+
+/// Venta educativa (compromiso). Anclada a ciclo WA hasta cutover.
+model EducacionSale {
+  id              String   @id @default(cuid())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  waCycleId       Int
+  waContactId     Int?
+  advisorEmail    String?
+  currency        String   @default("PEN")
+  amountAgreed    Decimal  @db.Decimal(12, 2)
+  status          String   @default("open") // open | won | cancelled
+  /// sin_verificar | parcial | pagado | revertido
+  paymentStatus   String   @default("sin_verificar")
+  /// pending | obs | obs_asesor | boleteado
+  billingStatus   String   @default("pending")
+  billingNote     String?
+  enrollmentRef   String?  // SIGE u otro
+  enrollmentAt    DateTime?
+  buyerName       String?
+  studentName     String?
+  payerName       String?
+  reportedTxnCode String?
+  notes           String?
+  items           EducacionSaleItem[]
+  applications    EducacionPaymentApplication[]
+
+  @@unique([waCycleId])
+  @@index([paymentStatus])
+  @@index([billingStatus])
+  @@index([reportedTxnCode])
+}
+
+model EducacionSaleItem {
+  id          String        @id @default(cuid())
+  saleId      String
+  sale        EducacionSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  label       String
+  catalogRef  String?
+  amount      Decimal       @db.Decimal(12, 2)
+  quantity    Int           @default(1)
+
+  @@index([saleId])
+}
+
+/// Outbox hechos de canal (WA → ONE). Scaffolding F4; productor en WA pendiente.
+model EducacionChannelEvent {
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  eventId     String    @unique
+  eventType   String
+  occurredAt  DateTime
+  receivedAt  DateTime  @default(now())
+  payload     Json
+  processedAt DateTime?
+  error       String?
+
+  @@index([processedAt])
+  @@index([eventType, occurredAt])
+}
+
+/// Aplicación confirmada de una operación Treasury a una venta.
+model EducacionPaymentApplication {
+  id                String        @id @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  saleId            String
+  sale              EducacionSale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  /// niubiz | paycash | mercadopago
+  provider          String
+  /// ID en tabla del proveedor (TreasuryPayment.id / CIP / MP paymentId)
+  providerPaymentId String
+  transactionCode   String
+  amountApplied     Decimal       @db.Decimal(12, 2)
+  currency          String        @default("PEN")
+  validatedByEmail  String
+  validatedAt       DateTime      @default(now())
+  reversedAt        DateTime?
+  reversedByEmail   String?
+  reverseReason     String?
+
+  @@index([saleId])
+  @@index([provider, providerPaymentId])
+  @@index([transactionCode])
+}
+
 model ScreenCastPlaylist {
   id                String                       @id @default(cuid())
   name              String

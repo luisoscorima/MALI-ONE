@@ -89,7 +89,8 @@ export type EducationLeadCounts = {
   recent: number; new_number: number; duplicate: number; reassignable: number; conflict: number;
   in_progress: number; unassigned: number; eligible: number;
 };
-export type EducationCycleView = 'open' | 'closed' | 'review' | 'unassigned';
+export type EducationCycleView =
+  | 'open' | 'closed' | 'review' | 'unassigned' | 'stale' | 'solo_contacto';
 export type EducationCycle = {
   id: number;
   area: EducationArea | string;
@@ -106,6 +107,8 @@ export type EducationCycle = {
   started_at: string;
   last_interaction_at: string;
   closed_at: string | null;
+  promise_at?: string | null;
+  lost_reason?: string | null;
   assigned_user_id: number | null;
   assigned_user_label: string | null;
   lead_status_id: number | null;
@@ -129,6 +132,8 @@ export type EducationCycleCounts = {
   closed: number;
   review: number;
   unassigned: number;
+  stale?: number;
+  solo_contacto?: number;
 };
 export type EducationSlaReport = {
   summary: {
@@ -629,9 +634,67 @@ export const api = {
   patchCrmEducationManagement: (id: number, body: {
     area: EducationArea; assigned_user_id?: number | null; lead_status_id?: number | null;
     lead_id?: number;
+    promise_at?: string | null;
+    lost_reason?: string | null;
   }) => request(`/api/crm-educacion/contacts/${id}/management`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
+  lookupCrmEducationPayment: (code: string, provider?: string) => {
+    const qs = new URLSearchParams({ code });
+    if (provider && provider !== 'all') qs.set('provider', provider);
+    return request<{ hits: Array<{
+      provider: string; providerPaymentId: string; transactionCode: string;
+      amount: number; currency: string; status: string;
+      customerName: string | null; customerEmail: string | null; transactedAt: string | null;
+    }> }>(`/api/crm-educacion/payments/lookup?${qs}`);
+  },
+  associateCrmEducationPayment: (body: {
+    waCycleId: number; waContactId?: number; transactionCode: string;
+    amountAgreed?: number; itemLabel?: string;
+  }) => request('/api/crm-educacion/payments/associate', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  applyCrmEducationPayment: (body: {
+    saleId: string; provider: 'niubiz' | 'paycash' | 'mercadopago';
+    providerPaymentId: string; transactionCode: string; amountApplied: number;
+    currency?: string;
+  }) => request('/api/crm-educacion/payments/apply', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  patchCrmEducationSaleBilling: (saleId: string, body: {
+    billingStatus: 'pending' | 'obs' | 'obs_asesor' | 'boleteado';
+    billingNote?: string; enrollmentRef?: string;
+  }) => request(`/api/crm-educacion/sales/${saleId}/billing`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+  getCrmEducationSaleByCycle: (waCycleId: number) =>
+    request<{
+      id: string; waCycleId: number; amountAgreed: string | number;
+      paymentStatus: string; billingStatus: string; reportedTxnCode: string | null;
+      enrollmentRef: string | null; billingNote: string | null;
+      applications: Array<{
+        id: string; provider: string; providerPaymentId: string;
+        transactionCode: string; amountApplied: string | number; reversedAt: string | null;
+      }>;
+    } | null>(`/api/crm-educacion/sales/by-cycle/${waCycleId}`),
+  getCrmEducationCommercialAuthority: () =>
+    request<{ authority: 'wa' | 'one'; messaging: string; note: string }>(
+      '/api/crm-educacion/commercial-authority',
+    ),
+  listCrmEducationActivities: (waCycleId: number) =>
+    request<Array<{
+      id: string; channel: string; direction: string; occurredAt: string;
+      result: string; notes: string | null; actorEmail: string | null;
+    }>>(`/api/crm-educacion/activities?waCycleId=${waCycleId}`),
+  createCrmEducationActivity: (body: {
+    waCycleId: number; waContactId?: number; channel: string; direction?: string;
+    occurredAt: string; result: string; notes?: string;
+  }) => request('/api/crm-educacion/activities', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
+  getAnuraContractSpike: () => request<{
+    status: string; expected_fields: string[]; mapping: Record<string, string>; note: string;
+  }>('/api/crm-educacion/activities/anura-contract'),
   distributeCrmEducation: (params: { categoria: EducationCategoryScope; channel?: string; q?: string }) =>
     request<{ assigned: number; by_area: Array<{ area: string; assigned: number }> }>(
       '/api/crm-educacion/distribute', { method: 'POST', body: JSON.stringify(params) }),

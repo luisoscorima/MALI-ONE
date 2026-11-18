@@ -86,6 +86,15 @@ export class EducacionWidgetsController {
     return this.service.getAliadosPublicConfig();
   }
 
+  @Post('leads/retry-wa-sync')
+  @RequireModule(AppModule.widget_educacion)
+  retryWaSync(@Query('limit') limit?: string) {
+    const n = Number(limit);
+    return this.leads.retryFailedWhatsappSync(
+      Number.isFinite(n) ? n : 50,
+    );
+  }
+
   @Public()
   @Post('leads')
   createLead(@Req() req: Request, @Body() body: CreateEducacionLeadDto) {
