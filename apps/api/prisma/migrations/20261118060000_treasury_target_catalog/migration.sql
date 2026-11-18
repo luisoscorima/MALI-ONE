@@ -50,14 +50,13 @@ WHERE NOT EXISTS (SELECT 1 FROM "TreasurySource" WHERE "provider" = 'niubiz_sale
 WITH src AS (
   SELECT "id" FROM "TreasurySource" WHERE "provider" = 'niubiz_sales' ORDER BY "updatedAt" DESC LIMIT 1
 ),
--- Alias (name) starts as the portal name; business labels are set later in UI.
 seed(reference, name, "externalName", "paycashEnabled") AS (
   VALUES
-    ('650177853', 'CURSOSDELMALI', 'CURSOSDELMALI', true),
-    ('650178711', 'MUSEO DE ARTE DE LIMA', 'MUSEO DE ARTE DE LIMA', false),
-    ('650239803', 'ASOCIACION MUSEO DE ARTE DE LIMA', 'ASOCIACION MUSEO DE ARTE DE LIMA', false),
-    ('650239881', 'MUSEO DE ARTE DE LIMA', 'MUSEO DE ARTE DE LIMA', false),
-    ('651047392', 'ASOCIACION MUSEO DE ARTE DE LIMA', 'ASOCIACION MUSEO DE ARTE DE LIMA', false)
+    ('650177853', 'Cursos', 'CURSOSDELMALI', true),
+    ('650178711', 'MALI 650178711', 'MUSEO DE ARTE DE LIMA', false),
+    ('650239803', 'Asociación 650239803', 'ASOCIACION MUSEO DE ARTE DE LIMA', false),
+    ('650239881', 'Ventas web', 'MUSEO DE ARTE DE LIMA', false),
+    ('651047392', 'Asociación 651047392', 'ASOCIACION MUSEO DE ARTE DE LIMA', false)
 )
 INSERT INTO "TreasuryTarget" (
   "id", "sourceId", "kind", "name", "reference", "externalName", "currency", "active", "paycashEnabled", "createdAt", "updatedAt"
