@@ -65,10 +65,13 @@ const BRAND_LOGO_ORIGIN =
   (typeof window !== 'undefined' && window.location?.origin) ||
   'https://dev.mali.pe';
 
+/** Bump when replacing files under /newsletter-brands/ so email HTML and the canvas skip stale CDN/browser caches. */
+const BRAND_ASSET_VERSION = '20261118-cursos-lila';
+
 export const NEWSLETTER_BRAND_LOGO_URLS: Record<NewsletterBrand, string> = {
-  cursos_arte: `${BRAND_LOGO_ORIGIN}/newsletter-brands/cursos_arte-logo.png`,
-  extension_profesional: `${BRAND_LOGO_ORIGIN}/newsletter-brands/extension_profesional-logo.png`,
-  museo: `${BRAND_LOGO_ORIGIN}/newsletter-brands/museo-logo.png`,
+  cursos_arte: `${BRAND_LOGO_ORIGIN}/newsletter-brands/cursos_arte-logo.png?v=${BRAND_ASSET_VERSION}`,
+  extension_profesional: `${BRAND_LOGO_ORIGIN}/newsletter-brands/extension_profesional-logo.png?v=${BRAND_ASSET_VERSION}`,
+  museo: `${BRAND_LOGO_ORIGIN}/newsletter-brands/museo-logo.png?v=${BRAND_ASSET_VERSION}`,
 };
 
 type NewsletterEditorProps = {
