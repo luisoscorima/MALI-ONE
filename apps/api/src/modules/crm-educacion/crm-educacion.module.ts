@@ -9,9 +9,10 @@ import { ProspectiaClientService } from './prospectia/prospectia-client.service'
 import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
 import { AnuraClientService } from './anura/anura-client.service';
 import { AnuraIngestService } from './anura/anura-ingest.service';
+import { AnuraWebhookController } from './anura/anura-webhook.controller';
 
 @Module({
-  controllers: [CrmEducacionController, CrmEducacionInternalController],
+  controllers: [CrmEducacionController, CrmEducacionInternalController, AnuraWebhookController],
   providers: [
     CrmEducacionService,
     EducacionActivityService,

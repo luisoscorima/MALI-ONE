@@ -345,7 +345,7 @@ export class CrmEducacionController {
 
   @Post('activities/anura/import')
   anuraImport(@Body() body: AnuraImportBody) {
-    return this.anuraIngest.importHours(body.hours ?? 24, body.limit ?? 40);
+    return this.anuraIngest.importHours(body.hours ?? 24, body.limit ?? 2000);
   }
 
   @Get('sales/by-cycle/:waCycleId')

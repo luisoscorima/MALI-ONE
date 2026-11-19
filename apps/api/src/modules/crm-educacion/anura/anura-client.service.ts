@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+/** Shape real de GET /GCAPI/rest/tenants/stats/cdrs/ (Perú, verificado 2026-11-18). */
 export type AnuraCdr = {
   id: number;
   duration?: number;
   billSeconds?: number;
+  price?: number;
   status?: string;
   direction?: string;
   calling?: string;
@@ -12,6 +14,8 @@ export type AnuraCdr = {
   calledName?: string;
   dialTime?: number;
   wasRecorded?: boolean;
+  lastAction?: string | null;
+  routePriceTypeName?: string | null;
   account?: { id?: number; name?: string | null } | null;
 };
 

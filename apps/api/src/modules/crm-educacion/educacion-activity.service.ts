@@ -80,17 +80,30 @@ export class EducacionActivityService {
   anuraContract() {
     return {
       status: 'ready',
-      expected_fields: [
-        'cdr_id', 'phone', 'agent_email', 'direction', 'started_at',
-        'ended_at', 'disposition', 'recording_url?',
+      endpoint: 'GET /GCAPI/rest/tenants/stats/cdrs/',
+      cdr_fields: [
+        'id', 'direction', 'status', 'calling', 'called', 'callingName', 'calledName',
+        'account.id', 'account.name', 'dialTime', 'duration', 'billSeconds',
+        'wasRecorded', 'routePriceTypeName', 'lastAction', 'price',
       ],
       mapping: {
-        cdr_id: 'externalRef',
-        disposition: 'result (reached|no_answer|attempted|other)',
-        agent_email: 'actorEmail',
-        started_at: 'occurredAt',
+        'cdr.id': 'externalRef + payload',
+        'cdr.direction IN|OUT': 'direction inbound|outbound',
+        'cdr.status ANSWER|NOANSWER|BUSY|CANCEL|…': 'result reached|no_answer|attempted|other',
+        'cdr.called (OUT) / calling (IN)': 'phone match → waCycleId / person',
+        'cdr.account.name (Karol-108)': 'agent display Karol (no es el lead)',
+        'cdr.calledName': 'NO es persona — etiqueta de ruta (PERU - RESTO - MOVIL)',
+        'cdr.billSeconds': 'segundos de conversación (preferido sobre duration)',
+        'cdr.dialTime': 'occurredAt',
+        'cdr completo': 'payload Json',
       },
-      note: 'Importa CDRs como actividad en ciclo WA matcheado por teléfono. No abre captación sola.',
+      webhook: {
+        url: 'POST /api/crm-educacion/webhooks/anura',
+        auth: 'Bearer ANURA_WEBHOOK_SECRET',
+        depends_on_refresh_token: false,
+        preferred_trigger: 'END + BOTH',
+      },
+      note: 'El nombre del lead no viene de Anura: se resuelve en ONE/WA por teléfono. Poll usa refresh; webhook no. Ver docs/anura-contract.md.',
     };
   }
 }

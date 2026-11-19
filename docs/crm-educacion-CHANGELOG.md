@@ -6,6 +6,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 - Associate pagos: `Autorizada` / `authorized` / `processing` cierran ciclo (`settlementKind: authorized` + obs); `Por pagar` / pending / mediation siguen sin cerrar. Caja valida liquidación antes de postventa.
 - Anura → actividades CRM: cliente CDRs + import 24h (match ciclo WA por teléfono); UI recientes + botón import. Spike con `ANURA_REFRESH_TOKEN`.
+- Anura: contrato real documentado (`docs/anura-contract.md`); `EducacionCrmActivity.payload` guarda el CDR completo; UI resume agente/persona/teléfono/segundos (billSeconds). `calledName` ≠ persona.
+- Anura webhook: `POST /api/crm-educacion/webhooks/anura` + `ANURA_WEBHOOK_SECRET` (Bearer). No depende del refresh token; trigger END → misma tabla de actividades.
 - Inbox Prospectia en fuente: Web / WA CA / WA EP / WA XP (`enrichment.inbox`, `prospectia_inbox`).
 - Prospectia-first: `cameWithInbound` = hay conversación Chatwoot; solo contacto no mira mali-whatsapp; `linked_wa` aparte; link-cycle no pisa el flag.
 - Badge binario Prospectia · Meta: attrs `ctwa_*` → `fromMeta` / `sourceLabel` + badge en Historial y Solo contacto.

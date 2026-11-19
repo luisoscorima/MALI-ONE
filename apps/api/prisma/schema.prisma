@@ -849,6 +849,8 @@ model EducacionCrmActivity {
   /// attempted | reached | no_answer | left_voicemail | bounced | other
   result        String
   notes         String?
+  /// Payload crudo del origen (p. ej. CDR Anura completo) para armar UI sin re-fetch.
+  payload       Json?
   externalRef   String?  // Anura CDR id, etc.
   externalSystem String? // anura | manual | ses
 

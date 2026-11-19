@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useSearchParams } from 'react-router-dom';
 import { Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
@@ -21,6 +22,14 @@ import {
 import { TreasuryStatusBadge } from './treasury-status';
 
 const EDUCATION_AREA: EducationArea = 'educacion';
+const CRM_TABS = [
+  'contacts', 'opportunities', 'historial', 'activities', 'payments', 'campaigns',
+] as const;
+type CrmTab = (typeof CRM_TABS)[number];
+
+function parseCrmTab(raw: string | null): CrmTab {
+  return CRM_TABS.includes(raw as CrmTab) ? (raw as CrmTab) : 'contacts';
+}
 
 const CATEGORY_SCOPE_LABELS: Record<EducationCategoryScope, string> = {
   all: 'Todas',
@@ -201,7 +210,15 @@ type DraftContact = Pick<EducationContact, 'name' | 'last_name' | 'opt_in_email'
 
 export function CrmEducacionPage() {
   const toast = useToast();
-  const [tab, setTab] = useState('contacts');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = parseCrmTab(searchParams.get('tab'));
+  const setTab = useCallback((value: string) => {
+    const next = new URLSearchParams(searchParams);
+    const parsed = parseCrmTab(value);
+    if (parsed === 'contacts') next.delete('tab');
+    else next.set('tab', parsed);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [categoria, setCategoria] = useState<EducationCategoryScope>('all');
   const [catalog, setCatalog] = useState<EducationCatalog>({ attributes: [], segments: [] });
   const [contacts, setContacts] = useState<EducationContact[]>([]);
@@ -1189,7 +1206,7 @@ export function CrmEducacionPage() {
         <Plus className="mr-1 size-4" />Registrar lead
       </Button>
     </div>
-    <Tabs value={tab} onValueChange={setTab}>
+    <Tabs value={tab} onValueChange={(value) => setTab(value)}>
       <TabsList>
         <TabsTrigger value="contacts">Contactos</TabsTrigger>
         <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
@@ -1465,8 +1482,8 @@ export function CrmEducacionPage() {
       </TabsContent>
       <TabsContent value="activities" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Registro multi-canal (llamada/email). Intento ≠ contacto efectivo.
-          Asesor comercial ≠ responsable del chat. Spike Anura disponible vía API.
+          Llamadas Anura en lenguaje humano: quién llamó, a qué persona/teléfono, si contestó y cuántos segundos.
+          El nombre del lead sale del CRM (Anura no lo trae); el agente sí (`Karol-108` → Karol).
         </p>
         <ActivityPanel />
       </TabsContent>
@@ -1773,25 +1790,6 @@ const ACTIVITY_RESULT_LABELS: Record<string, string> = {
   other: 'Otro',
 };
 
-function activityDirectionLabel(direction: string | null | undefined) {
-  if (direction === 'inbound') return 'Entrante';
-  if (direction === 'outbound') return 'Saliente';
-  return null;
-}
-
-/** Quita basura técnica de notas Anura antiguas; deja "ext → teléfono · agente · Ns". */
-function cleanAnuraNotes(notes: string | null | undefined): string | null {
-  if (!notes?.trim()) return null;
-  let text = notes.trim();
-  text = text.replace(/^Anura CDR\s+\d+\s*·\s*/i, '');
-  text = text.replace(/^(IN|OUT)\s*·\s*/i, '');
-  text = text.replace(/^(ANSWER|CANCEL|NOANSWER|BUSY|CONGESTION)\s*·\s*/i, '');
-  text = text.replace(/→00(\d+)/g, '→ +$1');
-  text = text.replace(/→(\d{11,})/g, '→ +$1');
-  text = text.replace(/(\d)→\s*\+/g, '$1 → +');
-  return text.trim() || null;
-}
-
 type AnuraActivityRow = {
   id: string;
   result: string;
@@ -1800,6 +1798,11 @@ type AnuraActivityRow = {
   waCycleId: number | null;
   externalRef: string | null;
   direction: string;
+  contactName: string | null;
+  phone: string | null;
+  agentName: string | null;
+  durationSeconds: number | null;
+  summary: string;
 };
 
 function ActivityPanel() {
@@ -1820,41 +1823,35 @@ function ActivityPanel() {
   const anuraColumns = useMemo<ColumnDef<AnuraActivityRow>[]>(() => [
     {
       id: 'when',
-      header: 'Fecha',
+      header: 'Fecha y hora',
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-sm">{formatDate(row.original.occurredAt)}</span>
       ),
     },
     {
-      id: 'direction',
-      header: 'Dirección',
-      cell: ({ row }) => activityDirectionLabel(row.original.direction) ?? '—',
-    },
-    {
-      id: 'result',
-      header: 'Resultado',
+      id: 'contact',
+      header: 'Persona',
       cell: ({ row }) => (
-        <Badge variant={row.original.result === 'reached' ? 'default' : 'secondary'}>
-          {ACTIVITY_RESULT_LABELS[row.original.result] ?? row.original.result}
-        </Badge>
+        <div>
+          <div className="font-medium">{row.original.contactName || 'Contacto sin nombre'}</div>
+          <div className="text-xs text-muted-foreground">{row.original.phone || '—'}</div>
+        </div>
       ),
     },
     {
-      id: 'detail',
-      header: 'Detalle',
-      cell: ({ row }) => cleanAnuraNotes(row.original.notes) || '—',
-    },
-    {
-      id: 'cycle',
-      header: 'Ciclo',
+      id: 'summary',
+      header: 'Qué pasó',
       cell: ({ row }) => (
-        <button
-          type="button"
-          className="font-mono text-sm underline-offset-2 hover:underline"
-          onClick={() => setCycleId(String(row.original.waCycleId ?? ''))}
-        >
-          {row.original.waCycleId ?? '—'}
-        </button>
+        <div className="max-w-xl text-sm">
+          <div>{row.original.summary}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
+            {row.original.direction === 'inbound' ? 'Entrante' : 'Saliente'}
+            {' · '}
+            {ACTIVITY_RESULT_LABELS[row.original.result] ?? row.original.result}
+            {row.original.durationSeconds != null ? ` · ${row.original.durationSeconds} s` : ''}
+            {row.original.agentName ? ` · Agente: ${row.original.agentName}` : ''}
+          </div>
+        </div>
       ),
     },
   ], []);
@@ -1870,6 +1867,12 @@ function ActivityPanel() {
         waCycleId: row.waCycleId,
         externalRef: row.externalRef,
         direction: row.direction,
+        contactName: row.contactName ?? null,
+        phone: row.phone ?? null,
+        agentName: row.agentName ?? null,
+        durationSeconds: row.durationSeconds ?? null,
+        summary: row.summary
+          || `${row.agentName || 'Un asesor'} llamó · ${ACTIVITY_RESULT_LABELS[row.result] ?? row.result}`,
       })));
     } catch {
       setAnuraRecent([]);
@@ -1931,7 +1934,7 @@ function ActivityPanel() {
   async function importAnura() {
     setBusy(true);
     try {
-      const resultImport = await api.importAnuraActivities({ hours: 24, limit: 40 });
+      const resultImport = await api.importAnuraActivities({ hours: 24, limit: 2000 });
       if (!resultImport.started) {
         toast.error('Import Anura ya en curso');
         return;
@@ -2018,7 +2021,7 @@ function ActivityPanel() {
       {items.length > 0 && <ul className="space-y-1 text-sm text-muted-foreground">
         {items.map((item) => <li key={item.id}>
           {formatDate(item.occurredAt)} · {ACTIVITY_RESULT_LABELS[item.result] ?? item.result}
-          {cleanAnuraNotes(item.notes) ? ` · ${cleanAnuraNotes(item.notes)}` : ''}
+          {item.notes?.trim() ? ` · ${item.notes.trim()}` : ''}
         </li>)}
       </ul>}
     </div>

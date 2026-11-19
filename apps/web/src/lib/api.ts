@@ -796,7 +796,11 @@ export const api = {
   listAnuraActivitiesRecent: (limit = 20) =>
     request<Array<{
       id: string; channel: string; direction: string; result: string; occurredAt: string;
-      notes: string | null; waCycleId: number | null; externalRef: string | null; externalSystem: string | null;
+      notes: string | null; payload?: unknown; waCycleId: number | null;
+      externalRef: string | null; externalSystem: string | null;
+      contactName?: string | null; phone?: string | null; agentName?: string | null;
+      agentRaw?: string | null; extension?: string | null;
+      durationSeconds?: number | null; talkSeconds?: number | null; summary?: string;
     }>>(`/api/crm-educacion/activities/anura/recent?limit=${limit}`),
   importAnuraActivities: (body?: { hours?: number; limit?: number }) =>
     request<{
