@@ -35,6 +35,10 @@ Convención de nombres: kebab-case alineado a `apps/api/src/modules/<modulo>/` (
 
 ### Contenido y CRMs
 
+Fuente de verdad de negocio (Educación), antes del detalle técnico:
+[modelo operativo](./crm-educacion/modelo-operativo.md) ·
+[checklist as-is/to-be](./crm-educacion/checklist-ratificacion.md).
+
 | Módulo | Doc | Changelog |
 |--------|-----|-----------|
 | Landings | [landings.md](./landings.md) | [CHANGELOG](./landings-CHANGELOG.md) |

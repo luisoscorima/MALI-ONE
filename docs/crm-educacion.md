@@ -2,6 +2,12 @@
 
 > Changelog: [crm-educacion-CHANGELOG.md](./crm-educacion-CHANGELOG.md) · Índice: [README.md](./README.md)
 
+> **Fuente de verdad de negocio:** [modelo operativo](./crm-educacion/modelo-operativo.md).
+> Empieza ahí. Este archivo es detalle técnico, transición e inventario.
+>
+> **Anexo (no ratificado):** [propuestas de diseño](#anexo-propuestas-de-diseño-no-ratificadas).
+> No es segunda fuente de negocio; no activa política ni cierra X/cliente/habilitación.
+
 ## Modelo operable (medios + entidades + flujos)
 
 ### Principio UX mali-whatsapp (no negociable)
@@ -729,6 +735,97 @@ RQ0001–0004 (legacy Sheets). RQ0005 → §7.
 | Sheet espejo | Flag `EDUCACION_LEADS_SHEETS_ENABLED` — apagar cuando el CRM baste |
 
 ---
+
+## Anexo: propuestas de diseño (no ratificadas)
+
+**No es la fuente de verdad de negocio.** La ruta canónica está en el
+[modelo operativo](./crm-educacion/modelo-operativo.md). Este anexo solo guarda
+precisiones candidatas para cuando esa guía esté ratificada. Sin cambios de
+comportamiento ni migraciones. Si algo aquí contradice o adelanta el modelo
+corto, gana el modelo corto.
+
+Herramientas, entidades, recorrido y quién responde por cada paso: ver el modelo.
+Aquí no se reexplica el negocio.
+
+### Propuesta: precisiones sobre lead distinto (regla del usuario)
+
+Regla aportada (ya en el modelo): lead distinto por **X tiempo** o por **nuevo
+interés tras cerrar** el anterior. X sin valor acordado.
+
+Candidatas a ratificar después (no políticas activas):
+
+1. Evaluar el tiempo al llegar una consulta comercial o al iniciar atención
+   explícita; el reloj solo no crea leads vacíos.
+2. Lead abierto: X = inactividad desde la última interacción comercial efectiva,
+   no antigüedad desde la creación.
+3. Lead cerrado: X desde el cierre; un nuevo interés puede abrir antes de X.
+4. Renuevan interacción efectiva: llamada atendida con conversación comercial,
+   respuesta sustantiva o consulta explícita. No la renuevan: intento fallido,
+   masivo, automático o editar etiqueta.
+5. Tras X con anterior abierto e inactivo: cerrar como `vencido_por_inactividad`,
+   crear otro y vincularlos; si hay promesa/próxima gestión vigente, revisión humana.
+6. Webhook/formulario repetido: mismo ID, no otro ciclo; fecha del hecho real.
+7. Consulta de comprobante/saldo/matrícula/soporte de compra existente = postventa
+   (alineado al modelo).
+8. Mismo curso en otra edición o compra posterior puede ser lead nuevo; el texto
+   del curso no basta para distinguir.
+9. Interés distinto con lead abierto antes de X: revisión humana (el modelo ya lo
+   deja abierto); compras independientes solo con autorización de jefe.
+
+No usar CA/EP como identidad del lead. Conservar referencia al ciclo anterior.
+No cambiar asesor/comisión históricos al abrir el nuevo.
+
+### Propuesta: cierre de preventa separado del cobro
+
+Candidata (el modelo ya separa acuerdo, pago reportado y validación): preventa
+termina en acuerdo de compra o salida sin venta; el cobro no controla ese cierre.
+
+Etapas abiertas sugeridas: `por_contactar`, `contactado`, `evaluando`,
+`compromiso_pendiente`. Salidas sugeridas: `venta_exitosa`, `perdido` (+motivo),
+`vencido_por_inactividad`, `descartado` (+motivo; no cuenta como perdido comercial).
+
+Datos mínimos sugeridos al ganar: aceptación, comprador/responsable, oferta,
+importe, moneda, condiciones. Alumno y pagador pueden completarse después.
+Sin oferta/precio acordados, el lead sigue abierto. «Paga mañana» puede ser
+venta exitosa con venta pendiente de pago.
+
+Destino ONE sugerido: cierre + creación de venta atómicos e idempotentes; una
+venta por lead (varios ítems del mismo acuerdo). No reabrir automáticamente por
+pago rechazado/devolución/cancelación. Corrección de cierre erróneo: jefe +
+motivo; con pagos/documentos, coordinar Caja primero.
+
+**Hoy en WA:** `venta_exitosa` permanece abierta hasta pago o cierre justificado.
+Esta separación es recomendación nueva, no comportamiento desplegado.
+
+### Propuesta: matices de venta, cobro y postventa
+
+Alineado al modelo (acuerdo ≠ reportar ≠ validar/aplicar). Matices candidatos:
+asociar código no cambia precio/ítems/asesor; Caja valida operación Treasury;
+servidor impide duplicar o exceder saldo; indicadores separados de conversión,
+venta acordada y cobro verificado.
+
+Habilitación matrícula/boleteo: pendiente de decisión en el modelo. No asumir
+que cualquier abono habilita todo. Matrícula y boleteo independientes. Devolución
+conserva historial; no reclasifica el lead ganado como perdido.
+
+### Propuesta: permisos por acción
+
+Ver [permisos propuestos](./crm-educacion-roles.md#permisos-propuestos-por-acción).
+Son anexo, no política activa. Quién responde en la ruta sencilla: §4 del modelo.
+
+### Notas de transición (técnicas)
+
+Destino: ONE gobierna persona, lead, etapas y venta; WA solicita cambios a ONE;
+sin confirmación no se anuncia éxito ni se inventa segunda escritura. Prospectia
+`prospectia_status` permanece externo si no hay escritura. Hoy: autoridad global
+en WA; leads nativos ONE + vínculos + shadow; ciclos aún no unificados.
+
+Orden cuando el modelo esté ratificado: cerrar X/continuidad → dominio
+cierre/venta + permisos → proteger pagos → equivalencia → escrituras ONE por
+alcance. No activar F4 por un flag. No recrear/cerrar masivamente ciclos históricos.
+
+Pendiente de decisión (pertenece al modelo, no a este anexo): valor de X;
+cómputo; intereses simultáneos; condiciones de habilitación matrícula/boleteo.
 
 ## Resumen ejecutivo
 

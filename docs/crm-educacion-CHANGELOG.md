@@ -4,6 +4,23 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Checklist de ratificación `crm-educacion/checklist-ratificacion.md`: as-is vs
+  to-be, decisiones abiertas (X/cliente/habilitación), 5 ejemplos, roles, y
+  diagrama Mermaid del modelo ideal. Producto se redirige solo vía modelo operativo.
+
+- Jerarquía documental: `crm-educacion/modelo-operativo.md` es la **única fuente
+  de verdad de negocio** (ruta interés→cliente). `crm-educacion.md` = técnico +
+  transición; su sección larga y los permisos finos de roles pasan a **anexo no
+  ratificado** (no segunda política). Vocabulario: **lead** / ciclo del lead;
+  `EducacionOpportunity` sigue como nombre técnico.
+
+- Modelo operativo: herramientas, entidades mínimas, recorrido, ejemplo Ana,
+  prioridades (ratificar → 5 ejemplos → mapear código → un recorrido → recién
+  anexos/UI). X, cliente e intereses simultáneos abiertos a propósito.
+
+- Anexo de propuestas (no ratificadas): precisiones de X, cierre preventa vs cobro,
+  matices pago/postventa y permisos por acción. Sin cambios de comportamiento.
+
 - Orden CRM Educación (cierre plan): widget/manual → oportunidad ONE; Prospectia setea `prospectiaContactId`+`phones`; Anura match Person/Opportunity sin abrir ciclo solo; `GET /commercial-stages` + `wa_channels_pending`; ficha con flujo Venta, SLA strip (proxy WA), deep-links; Historial replegado a Herramientas; laterales Llamadas/Pagos/Contactos.
 - Orden CRM Educación: modelo medios/flujos en docs; `commercialAuthority` + `phones`/`prospectiaContactId` en hub Persona/Oportunidad; API `GET /bandeja` + ficha; UI pestaña **Bandeja** (default) con timeline Anura/etapa ONE; laterales Llamadas/Pagos/Contactos WA/Herramientas. Principio: asesor WA no nota relocate del dato.
 - Associate pagos: `Autorizada` / `authorized` / `processing` cierran ciclo (`settlementKind: authorized` + obs); `Por pagar` / pending / mediation siguen sin cerrar. Caja valida liquidación antes de postventa.
