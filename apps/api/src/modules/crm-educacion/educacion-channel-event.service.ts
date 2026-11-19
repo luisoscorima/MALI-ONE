@@ -33,12 +33,8 @@ export class EducacionChannelEventService {
         occurredAt,
         payload,
       },
-      update: {
-        eventType,
-        occurredAt,
-        payload,
-        error: null,
-      },
+      // A retry acknowledges the original fact; never rewrite its history.
+      update: {},
     });
     return {
       id: row.id,

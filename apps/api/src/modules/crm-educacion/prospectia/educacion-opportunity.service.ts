@@ -165,48 +165,59 @@ export class EducacionOpportunityService {
     waContactId?: number;
     phone?: string;
     email?: string;
+    category?: string;
     markInbound?: boolean;
   }) {
     if (!Number.isInteger(input.waCycleId) || input.waCycleId < 1) {
       throw new BadRequestException('waCycleId inválido');
     }
-    let opportunity =
-      (input.phone ? await this.findOpenByPhone(input.phone) : null) ??
-      (input.email ? await this.findOpenByEmail(input.email) : null);
-
-    if (!opportunity) {
-      opportunity = await this.prisma.educacionOpportunity.findFirst({
-        where: { waCycleId: input.waCycleId },
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize this small binding operation, including different cycles
+      // competing for one opportunity. No network calls inside the transaction.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(20261120, 1)`;
+      const existing = await tx.educacionOpportunity.findMany({
+        where: { waCycleId: input.waCycleId }, include: { person: true }, take: 2,
+      });
+      const unmatched = (reason: string) => ({ linked: false, reason, opportunity: null });
+      if (existing.length > 1) return unmatched('ambiguous_existing_link');
+      if (existing.length === 1) {
+        const row = existing[0];
+        if ((input.category && row.category !== input.category) ||
+            (input.waContactId && row.waContactId && row.waContactId !== input.waContactId)) {
+          return unmatched('existing_link_conflict');
+        }
+        return { linked: true, reason: null, opportunity: this.toListItem(row) };
+      }
+      const identities: Prisma.EducacionPersonWhereInput[] = [];
+      const digits = String(input.phone ?? '').replace(/\D/g, '');
+      const email = String(input.email ?? '').trim().toLowerCase();
+      if (digits) identities.push({ phone: { in: [digits, `+${digits}`] } });
+      if (email) identities.push({ email });
+      if (!identities.length) return unmatched('missing_identity');
+      const candidates = await tx.educacionOpportunity.findMany({
+        where: {
+          closedAt: null, waCycleId: null,
+          channel: { in: ['prospectia', 'manual', 'widget', 'anura'] },
+          ...(input.category ? { category: input.category } : {}),
+          person: { OR: identities },
+        },
+        include: { person: true }, take: 2,
+      });
+      if (candidates.length !== 1) {
+        return unmatched(candidates.length ? 'ambiguous_match' : 'not_found');
+      }
+      const opportunity = candidates[0];
+      if (input.waContactId && opportunity.waContactId && opportunity.waContactId !== input.waContactId) {
+        return unmatched('contact_conflict');
+      }
+      const updated = await tx.educacionOpportunity.update({
+        where: { id: opportunity.id },
+        data: { waCycleId: input.waCycleId, waContactId: input.waContactId ?? opportunity.waContactId },
         include: { person: true },
       });
-    }
-    if (!opportunity) {
-      return { linked: false as const, reason: 'not_found' as const, opportunity: null };
-    }
-
-    // cameWithInbound es verdad Prospectia (Chatwoot); el puente WA no la pisa.
-    const updated = await this.prisma.educacionOpportunity.update({
-      where: { id: opportunity.id },
-      data: {
-        waCycleId: input.waCycleId,
-        waContactId: input.waContactId ?? opportunity.waContactId,
-        lastInteractionAt: new Date(),
-      },
-      include: { person: true },
+      // This is a channel binding, not a commercial interaction or a change of owner.
+      return { linked: true, reason: null, opportunity: this.toListItem(updated) };
     });
-
-    if (input.waContactId) {
-      await this.prisma.educacionPerson.update({
-        where: { id: updated.personId },
-        data: { waContactId: input.waContactId },
-      });
-    }
-
-    return {
-      linked: true as const,
-      reason: null,
-      opportunity: this.toListItem(updated),
-    };
   }
 
   async getById(id: string) {

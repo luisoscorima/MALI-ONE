@@ -24,7 +24,7 @@ Fecha: 2026-11-18. Rollback y operación para mañana.
 
 ```bash
 git log -5 --oneline
-git checkout <commit_anterior_estable>
+git checkout cb195346c5fc8fe98d55bdce2a3d8f0e19c7dedb
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build api web
 ```
 
@@ -34,6 +34,11 @@ Commits de esta ventana (referencia):
 - `13c835a` channel-event shadow ingest
 
 **WA:** revert del commit de hooks (`link-cycle` retry + channel-event shadow) si falla inbound/gestión.
+
+Referencia previa comprobada en el servidor WA: `0ce71248d67e7ce733b5700a1f41497cb8be189e`.
+No revertir ni borrar migraciones aplicadas. El nuevo trigger shadow es aditivo y
+compatible con código anterior: conserva hechos en la outbox hasta recuperar el emisor.
+No usar `compose down -v`, reset, eliminación de tablas ni limpieza de volúmenes.
 
 ## Authority
 

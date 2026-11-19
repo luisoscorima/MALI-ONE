@@ -211,6 +211,9 @@ export class EducacionBandejaService {
             const contacts = (cycle.contacts && typeof cycle.contacts === 'object')
               ? cycle.contacts as Record<string, unknown>
               : {};
+            const leadStatus = cycle.lead_status && typeof cycle.lead_status === 'object'
+              ? cycle.lead_status as { slug?: string }
+              : null;
             const badges = this.badges({
               channel: 'wa',
               authority: 'wa',
@@ -226,7 +229,7 @@ export class EducacionBandejaService {
               commercial_authority: 'wa' as const,
               channel: 'wa',
               category: String(cycle.categoria ?? cycle.category ?? 'general'),
-              stage_slug: String(cycle.lead_status_slug ?? cycle.stage_slug ?? 'por_contactar'),
+              stage_slug: String(leadStatus?.slug ?? cycle.lead_status_slug ?? cycle.stage_slug ?? 'por_contactar'),
               advisor_email: typeof cycle.assigned_user_label === 'string' ? cycle.assigned_user_label : null,
               assigned_user_label: typeof cycle.assigned_user_label === 'string' ? cycle.assigned_user_label : null,
               source_label: String(cycle.source_label ?? cycle.channel ?? 'mali-whatsapp'),

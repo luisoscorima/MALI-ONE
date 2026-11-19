@@ -12,7 +12,23 @@ Comparar 5–10 ciclos (CA/EP si hay dato):
 4. Anura: llamada en timeline o lateral; unmatched no abre ciclo.
 5. Pago: flag `payment_link` si hay `EducacionSale`.
 
-## Resultados (rellenar en smoke)
+## Ensayo previo al despliegue de correcciones
+
+Ejecutado con servicios desplegados, solo lectura, sin nombres/teléfonos ni escrituras.
+ONE servidor: `cb19534`; WA servidor: `0ce7124`. Autoridad efectiva: `wa`.
+Script repetible: `scripts/crm-education-readonly-smoke.cjs` (stdin dentro de la API).
+
+Diez ciclos con etapas distintas del valor por defecto fallaron equivalencia:
+CA: 19057, 19049, 19041, 19039, 19037 (`contactado`).
+EP: 18300, 18296 (`contactado`); 18291, 18287, 18134 (`evaluando`).
+ONE mostraba `por_contactar` en los diez; las diez fichas respondían.
+Corrección: leer `cycle.lead_status.slug` en la bandeja.
+
+El ensayo previo encontró 0 oportunidades nativas enlazadas y 0 eventos shadow.
+Por ello esta muestra verifica la proyección WA, no demuestra equivalencia de
+oportunidades nativas enlazadas. Repetir después del despliegue y documentar el resultado.
+
+## Resultados posteriores (pendientes de despliegue)
 
 | # | wa_cycle_id | etapa_WA | fila_ONE | linked | gaps |
 |---|-------------|----------|----------|--------|------|

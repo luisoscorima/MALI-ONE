@@ -28,6 +28,7 @@ class InternalAssociateBody {
 }
 
 class InternalLinkCycleBody {
+  @IsOptional() @IsString() @MaxLength(40) category?: string;
   @IsInt() @Min(1) waCycleId!: number;
   @IsOptional() @IsInt() @Min(1) waContactId?: number;
   @IsOptional() @IsString() @MaxLength(32) phone?: string;
@@ -159,6 +160,7 @@ export class CrmEducacionInternalController {
   ) {
     this.assertServiceToken(headerToken, authorization);
     return this.opportunities.linkCycle({
+      category: body.category,
       waCycleId: body.waCycleId,
       waContactId: body.waContactId,
       phone: body.phone,
