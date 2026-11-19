@@ -7,6 +7,8 @@ import { EducacionSaleService } from './educacion-sale.service';
 import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
 import { ProspectiaClientService } from './prospectia/prospectia-client.service';
 import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
+import { AnuraClientService } from './anura/anura-client.service';
+import { AnuraIngestService } from './anura/anura-ingest.service';
 
 @Module({
   controllers: [CrmEducacionController, CrmEducacionInternalController],
@@ -17,6 +19,8 @@ import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service'
     ProspectiaClientService,
     ProspectiaIngestService,
     EducacionOpportunityService,
+    AnuraClientService,
+    AnuraIngestService,
   ],
   exports: [EducacionSaleService, EducacionOpportunityService, ProspectiaIngestService],
 })

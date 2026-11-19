@@ -75,12 +75,11 @@ export class EducacionActivityService {
   }
 
   /**
-   * Spike Anura: contrato esperado. Sin API real aún.
-   * Importar CDR → create({ channel:'call', externalSystem:'anura', ... }).
+   * Contrato Anura → EducacionCrmActivity (channel=call, externalSystem=anura).
    */
   anuraContract() {
     return {
-      status: 'spike',
+      status: 'ready',
       expected_fields: [
         'cdr_id', 'phone', 'agent_email', 'direction', 'started_at',
         'ended_at', 'disposition', 'recording_url?',
@@ -91,7 +90,7 @@ export class EducacionActivityService {
         agent_email: 'actorEmail',
         started_at: 'occurredAt',
       },
-      note: 'Solo abre captación si el contexto es consulta comercial nueva; si no, solo actividad.',
+      note: 'Importa CDRs como actividad en ciclo WA matcheado por teléfono. No abre captación sola.',
     };
   }
 }

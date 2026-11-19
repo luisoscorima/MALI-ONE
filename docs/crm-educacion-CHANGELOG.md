@@ -5,6 +5,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 ## [Unreleased]
 
 - Associate pagos: `Autorizada` / `authorized` / `processing` cierran ciclo (`settlementKind: authorized` + obs); `Por pagar` / pending / mediation siguen sin cerrar. Caja valida liquidación antes de postventa.
+- Anura → actividades CRM: cliente CDRs + import 24h (match ciclo WA por teléfono); UI recientes + botón import. Spike con `ANURA_REFRESH_TOKEN`.
 - Inbox Prospectia en fuente: Web / WA CA / WA EP / WA XP (`enrichment.inbox`, `prospectia_inbox`).
 - Prospectia-first: `cameWithInbound` = hay conversación Chatwoot; solo contacto no mira mali-whatsapp; `linked_wa` aparte; link-cycle no pisa el flag.
 - Badge binario Prospectia · Meta: attrs `ctwa_*` → `fromMeta` / `sourceLabel` + badge en Historial y Solo contacto.

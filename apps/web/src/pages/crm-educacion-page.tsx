@@ -1772,20 +1772,47 @@ function ActivityPanel() {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<Array<{
     id: string; channel: string; result: string; occurredAt: string; notes: string | null;
+    waCycleId?: number | null; externalRef?: string | null; direction?: string | null;
+  }>>([]);
+  const [anuraRecent, setAnuraRecent] = useState<Array<{
+    id: string; result: string; occurredAt: string; notes: string | null;
+    waCycleId: number | null; externalRef: string | null; direction: string;
   }>>([]);
   const [busy, setBusy] = useState(false);
+  const [anuraEnabled, setAnuraEnabled] = useState(false);
   const [anuraNote, setAnuraNote] = useState('');
+
+  async function loadAnuraRecent() {
+    try {
+      const data = await api.listAnuraActivitiesRecent(20);
+      setAnuraRecent(data.map((row) => ({
+        id: row.id,
+        result: row.result,
+        occurredAt: row.occurredAt,
+        notes: row.notes,
+        waCycleId: row.waCycleId,
+        externalRef: row.externalRef,
+        direction: row.direction,
+      })));
+    } catch {
+      setAnuraRecent([]);
+    }
+  }
 
   useEffect(() => {
     void api.getAnuraContractSpike()
-      .then((data) => setAnuraNote(data.note))
+      .then((data) => {
+        setAnuraNote(data.note);
+        setAnuraEnabled(Boolean(data.runtime?.enabled));
+      })
       .catch(() => setAnuraNote(''));
+    void loadAnuraRecent();
   }, []);
 
   async function load() {
     const waCycleId = Number(cycleId);
     if (!Number.isInteger(waCycleId) || waCycleId < 1) {
-      toast.error('Indica el ID de oportunidad');
+      toast.error('Indica el ID de ciclo WA');
       return;
     }
     setBusy(true);
@@ -1802,7 +1829,7 @@ function ActivityPanel() {
   async function create() {
     const waCycleId = Number(cycleId);
     if (!Number.isInteger(waCycleId) || waCycleId < 1) {
-      toast.error('Indica el ID de oportunidad');
+      toast.error('Indica el ID de ciclo WA');
       return;
     }
     setBusy(true);
@@ -1824,54 +1851,102 @@ function ActivityPanel() {
     }
   }
 
-  return <div className="max-w-xl space-y-4 rounded-md border p-4">
-    <div className="space-y-1">
-      <Label>ID oportunidad (ciclo WA)</Label>
-      <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 1234" />
+  async function importAnura() {
+    setBusy(true);
+    try {
+      const resultImport = await api.importAnuraActivities({ hours: 24, limit: 40 });
+      if (!resultImport.started) {
+        toast.error('Import Anura ya en curso');
+        return;
+      }
+      toast.success(`Anura: ${resultImport.created} nuevas · ${resultImport.skipped} omitidas · ${resultImport.unmatched} sin ciclo`);
+      await loadAnuraRecent();
+      const firstCycle = resultImport.items?.[0]?.waCycleId;
+      if (firstCycle) setCycleId(String(firstCycle));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo importar Anura');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="space-y-4">
+    <div className="max-w-xl space-y-4 rounded-md border p-4">
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" disabled={busy || !anuraEnabled}
+          onClick={() => void importAnura()}>
+          Importar Anura 24h
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void loadAnuraRecent()}>
+          Ver recientes Anura
+        </Button>
+      </div>
+      {anuraNote && <p className="text-xs text-muted-foreground">Anura: {anuraNote}</p>}
+      {!anuraEnabled && (
+        <p className="text-xs text-muted-foreground">
+          Falta configurar ANURA_REFRESH_TOKEN (spike) o client_id/secret de Soporte.
+        </p>
+      )}
+      {anuraRecent.length > 0 && (
+        <ul className="space-y-1 text-sm text-muted-foreground">
+          {anuraRecent.map((item) => (
+            <li key={item.id}>
+              {formatDate(item.occurredAt)} · ciclo {item.waCycleId ?? '—'} · {item.direction} · {item.result}
+              {item.externalRef ? ` · CDR ${item.externalRef}` : ''}
+              {item.notes ? ` · ${item.notes}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="max-w-xl space-y-4 rounded-md border p-4">
       <div className="space-y-1">
-        <Label>Canal</Label>
-        <Select value={channel} onValueChange={setChannel}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="call">Llamada</SelectItem>
-            <SelectItem value="email">Email</SelectItem>
-            <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            <SelectItem value="other">Otro</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label>ID ciclo WA</Label>
+        <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 17089" />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label>Canal</Label>
+          <Select value={channel} onValueChange={setChannel}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="call">Llamada</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+              <SelectItem value="other">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label>Resultado</Label>
+          <Select value={result} onValueChange={setResult}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="attempted">Intentado</SelectItem>
+              <SelectItem value="reached">Contacto efectivo</SelectItem>
+              <SelectItem value="no_answer">No contesta</SelectItem>
+              <SelectItem value="left_voicemail">Buzón</SelectItem>
+              <SelectItem value="bounced">Rebotado</SelectItem>
+              <SelectItem value="other">Otro</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="space-y-1">
-        <Label>Resultado</Label>
-        <Select value={result} onValueChange={setResult}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="attempted">Intentado</SelectItem>
-            <SelectItem value="reached">Contacto efectivo</SelectItem>
-            <SelectItem value="no_answer">No contesta</SelectItem>
-            <SelectItem value="left_voicemail">Buzón</SelectItem>
-            <SelectItem value="bounced">Rebotado</SelectItem>
-            <SelectItem value="other">Otro</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label>Nota</Label>
+        <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void load()}>Listar ciclo</Button>
+        <Button type="button" disabled={busy} onClick={() => void create()}>Registrar</Button>
+      </div>
+      {items.length > 0 && <ul className="space-y-1 text-sm text-muted-foreground">
+        {items.map((item) => <li key={item.id}>
+          {formatDate(item.occurredAt)} · {item.channel} · {item.result}
+          {item.notes ? ` · ${item.notes}` : ''}
+        </li>)}
+      </ul>}
     </div>
-    <div className="space-y-1">
-      <Label>Nota</Label>
-      <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-    </div>
-    <div className="flex gap-2">
-      <Button type="button" variant="outline" disabled={busy} onClick={() => void load()}>Listar</Button>
-      <Button type="button" disabled={busy} onClick={() => void create()}>Registrar</Button>
-    </div>
-    {anuraNote && <p className="text-xs text-muted-foreground">Anura (spike): {anuraNote}</p>}
-    {items.length > 0 && <ul className="space-y-1 text-sm text-muted-foreground">
-      {items.map((item) => <li key={item.id}>
-        {formatDate(item.occurredAt)} · {item.channel} · {item.result}
-        {item.notes ? ` · ${item.notes}` : ''}
-      </li>)}
-    </ul>}
   </div>;
 }
 

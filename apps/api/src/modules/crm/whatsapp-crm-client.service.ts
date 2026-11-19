@@ -108,6 +108,8 @@ export type CrmContactRow = {
   assigned_user_label?: string | null;
   lead_status_id?: number | null;
   lead_status_label?: string | null;
+  /** Ciclo educación proyectado (contacts educación). */
+  lead_id?: number | null;
 };
 
 export type EducationLeadStatusDefinition = {

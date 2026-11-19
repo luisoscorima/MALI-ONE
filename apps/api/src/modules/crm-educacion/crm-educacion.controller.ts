@@ -12,6 +12,7 @@ import { EducacionSaleService } from './educacion-sale.service';
 import { EDUCATION_CATEGORY_SCOPES, EDUCATION_WRITE_AREA } from './education-scope';
 import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
 import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
+import { AnuraIngestService } from './anura/anura-ingest.service';
 
 class ListContactsQuery {
   @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
@@ -113,6 +114,11 @@ class ProspectiaImportBody {
   @IsOptional() @IsEmail() @MaxLength(255) email?: string;
 }
 
+class AnuraImportBody {
+  @IsOptional() @IsInt() @Min(1) hours?: number;
+  @IsOptional() @IsInt() @Min(1) limit?: number;
+}
+
 class ProspectiaIngestBody {
   @IsOptional() @IsIn(['incremental', 'backfill']) mode?: 'incremental' | 'backfill';
   @IsOptional() @IsInt() @Min(1) maxPages?: number;
@@ -176,6 +182,7 @@ export class CrmEducacionController {
     private readonly sales: EducacionSaleService,
     private readonly opportunities: EducacionOpportunityService,
     private readonly prospectiaIngest: ProspectiaIngestService,
+    private readonly anuraIngest: AnuraIngestService,
   ) {}
 
   @Get('contacts')
@@ -323,7 +330,22 @@ export class CrmEducacionController {
 
   @Get('activities/anura-contract')
   anuraContract() {
-    return this.activities.anuraContract();
+    return {
+      ...this.activities.anuraContract(),
+      status: this.anuraIngest.status().enabled ? 'ready' : 'needs_credentials',
+      runtime: this.anuraIngest.status(),
+    };
+  }
+
+  @Get('activities/anura/recent')
+  anuraRecent(@Query('limit') limitRaw?: string) {
+    const limit = limitRaw ? Number(limitRaw) : 30;
+    return this.anuraIngest.listRecent(Number.isFinite(limit) ? limit : 30);
+  }
+
+  @Post('activities/anura/import')
+  anuraImport(@Body() body: AnuraImportBody) {
+    return this.anuraIngest.importHours(body.hours ?? 24, body.limit ?? 40);
   }
 
   @Get('sales/by-cycle/:waCycleId')

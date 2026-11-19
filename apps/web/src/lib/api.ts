@@ -791,7 +791,21 @@ export const api = {
   }),
   getAnuraContractSpike: () => request<{
     status: string; expected_fields: string[]; mapping: Record<string, string>; note: string;
+    runtime?: { enabled: boolean; running: boolean; apiBase: string };
   }>('/api/crm-educacion/activities/anura-contract'),
+  listAnuraActivitiesRecent: (limit = 20) =>
+    request<Array<{
+      id: string; channel: string; direction: string; result: string; occurredAt: string;
+      notes: string | null; waCycleId: number | null; externalRef: string | null; externalSystem: string | null;
+    }>>(`/api/crm-educacion/activities/anura/recent?limit=${limit}`),
+  importAnuraActivities: (body?: { hours?: number; limit?: number }) =>
+    request<{
+      started: boolean; reason?: string; hours?: number; cdrs?: number;
+      created?: number; skipped?: number; unmatched?: number;
+      items?: Array<{ externalRef: string; waCycleId: number; result: string }>;
+    }>('/api/crm-educacion/activities/anura/import', {
+      method: 'POST', body: JSON.stringify(body ?? { hours: 24, limit: 40 }),
+    }),
   distributeCrmEducation: (params: { categoria: EducationCategoryScope; channel?: string; q?: string }) =>
     request<{ assigned: number; by_area: Array<{ area: string; assigned: number }> }>(
       '/api/crm-educacion/distribute', { method: 'POST', body: JSON.stringify(params) }),
