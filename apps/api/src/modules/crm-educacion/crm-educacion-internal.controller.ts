@@ -74,6 +74,30 @@ export class CrmEducacionInternalController {
     }
   }
 
+  /** Lectura informativa para WA (facade); no cambia escritor. */
+  @Public()
+  @Get('commercial-authority')
+  commercialAuthority(
+    @Headers('x-crm-educacion-service-token') headerToken?: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.assertServiceToken(headerToken, authorization);
+    const raw = String(this.config.get('COMMERCIAL_AUTHORITY') ?? 'wa').trim().toLowerCase();
+    const authority = raw === 'one' ? 'one' : 'wa';
+    const waChannelsPending = String(this.config.get('COMMERCIAL_AUTHORITY_WA_SOURCES') ?? 'meta,tiktok,wa_inbound')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return {
+      authority,
+      messaging: 'whatsapp',
+      per_opportunity: true,
+      wa_ux: 'stable',
+      wa_channels_pending: waChannelsPending,
+      note: 'Shadow/outbox only; WA keeps commercial writer until F4.',
+    };
+  }
+
   @Public()
   @Get('payments/lookup')
   lookup(
