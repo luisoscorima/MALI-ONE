@@ -11,11 +11,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  IsBoolean, IsEmail, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min,
+  IsBoolean, IsEmail, IsInt, IsNumber, IsObject, IsOptional, IsString, MaxLength, Min,
 } from 'class-validator';
 import { Public } from '../../core/guards/public.decorator';
 import { EducacionSaleService } from './educacion-sale.service';
 import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
+import { EducacionChannelEventService } from './educacion-channel-event.service';
 
 class InternalAssociateBody {
   @IsInt() @Min(1) waCycleId!: number;
@@ -34,6 +35,13 @@ class InternalLinkCycleBody {
   @IsOptional() @IsBoolean() markInbound?: boolean;
 }
 
+class InternalChannelEventBody {
+  @IsString() @MaxLength(120) eventId!: string;
+  @IsString() @MaxLength(80) eventType!: string;
+  @IsOptional() @IsString() @MaxLength(40) occurredAt?: string;
+  @IsOptional() @IsObject() payload?: Record<string, unknown>;
+}
+
 /**
  * Lookup/asociación de pagos + link ciclo↔oportunidad Prospectia para mali-whatsapp.
  * Auth: `x-crm-educacion-service-token` o Bearer = CRM_EDUCACION_SERVICE_TOKEN.
@@ -43,6 +51,7 @@ export class CrmEducacionInternalController {
   constructor(
     private readonly sales: EducacionSaleService,
     private readonly opportunities: EducacionOpportunityService,
+    private readonly channelEvents: EducacionChannelEventService,
     private readonly config: ConfigService,
   ) {}
 
@@ -132,5 +141,36 @@ export class CrmEducacionInternalController {
       email: body.email,
       markInbound: body.markInbound !== false,
     });
+  }
+
+  /**
+   * Outbox shadow WA→ONE. Idempotente por eventId. No escribe etapa comercial.
+   */
+  @Public()
+  @Post('channel-events')
+  ingestChannelEvent(
+    @Body() body: InternalChannelEventBody,
+    @Headers('x-crm-educacion-service-token') headerToken?: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.assertServiceToken(headerToken, authorization);
+    return this.channelEvents.ingest({
+      eventId: body.eventId,
+      eventType: body.eventType,
+      occurredAt: body.occurredAt,
+      payload: body.payload,
+    });
+  }
+
+  @Public()
+  @Get('channel-events/recent')
+  recentChannelEvents(
+    @Query('limit') limitRaw: string | undefined,
+    @Headers('x-crm-educacion-service-token') headerToken?: string,
+    @Headers('authorization') authorization?: string,
+  ) {
+    this.assertServiceToken(headerToken, authorization);
+    const limit = limitRaw ? Number(limitRaw) : 20;
+    return this.channelEvents.recent(Number.isFinite(limit) ? limit : 20);
   }
 }
