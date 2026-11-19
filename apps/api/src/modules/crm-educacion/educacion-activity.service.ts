@@ -99,7 +99,7 @@ export class EducacionActivityService {
       },
       webhook: {
         url: 'POST /api/crm-educacion/webhooks/anura',
-        auth: 'Bearer ANURA_WEBHOOK_SECRET',
+        auth: 'Bearer o X-Hub-Signature HMAC-SHA1 (ANURA_WEBHOOK_SECRET)',
         depends_on_refresh_token: false,
         preferred_trigger: 'END + BOTH',
       },

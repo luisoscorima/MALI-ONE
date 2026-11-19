@@ -15,7 +15,7 @@ Verificado en vivo contra `https://api.anura.com.pe` (2026-11-18), tenant MALI.
 Anura empuja HTTP al CRM. Solo hace falta:
 
 - URL pública HTTPS de ONE
-- `ANURA_WEBHOOK_SECRET` (Bearer en la plantilla del panel)
+- `ANURA_WEBHOOK_SECRET` (misma clave en panel: **Bearer** o **X-Hub-Signature HMAC SHA1**)
 
 Doc Anura: [Webhooks](https://kb.anura.com.ar/es/articles/2579270-webhooks).
 
@@ -95,7 +95,10 @@ El poll/import sigue siendo útil para reprocesar histórico; el día a día es 
 ### Endpoint ONE
 
 `POST https://<host>/api/crm-educacion/webhooks/anura`  
-Header: `Authorization: Bearer <ANURA_WEBHOOK_SECRET>`
+Auth (una de las dos):
+
+- `Authorization: Bearer <ANURA_WEBHOOK_SECRET>`
+- o `X-Hub-Signature: sha1=<hmac>` (HMAC-SHA1 del body con la misma clave)
 
 - Trigger recomendado: **END** + dirección **BOTH**
 - START / TALK: se aceptan (`200`) pero **no** crean fila (aún no hay duración/estado final)
@@ -108,7 +111,8 @@ Header: `Authorization: Bearer <ANURA_WEBHOOK_SECRET>`
    - Protocolo `HTTPS`, Host de ONE, Puerto `443`
    - Ruta: `api/crm-educacion/webhooks/anura` (sin `/` inicial, según doc Anura)
    - Método `POST`, contenido `JSON`
-   - Auth: **Bearer** = valor de `ANURA_WEBHOOK_SECRET`
+   - Auth: **Bearer** o **X-Hub-Signature (HMAC SHA1)** + **Clave** = `ANURA_WEBHOOK_SECRET`
+     (si el panel no deja cambiar de X-Hub a Bearer, dejá X-Hub: ONE acepta ambos)
 3. Cuerpo JSON (usar el predictivo del editor; nombres alineados al CDR):
 
 ```json

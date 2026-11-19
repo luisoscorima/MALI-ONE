@@ -18,7 +18,8 @@ function parseCorsOrigins(): Set<string> {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: firma X-Hub-Signature (HMAC) de webhooks Anura
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('api', {
