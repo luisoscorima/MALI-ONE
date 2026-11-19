@@ -1764,6 +1764,44 @@ function AssociatePaymentPanel({
   </div>;
 }
 
+const ACTIVITY_RESULT_LABELS: Record<string, string> = {
+  reached: 'Contestada',
+  attempted: 'No completada',
+  no_answer: 'No contesta',
+  left_voicemail: 'Buzón',
+  bounced: 'Rebotado',
+  other: 'Otro',
+};
+
+function activityDirectionLabel(direction: string | null | undefined) {
+  if (direction === 'inbound') return 'Entrante';
+  if (direction === 'outbound') return 'Saliente';
+  return null;
+}
+
+/** Quita basura técnica de notas Anura antiguas; deja "ext → teléfono · agente · Ns". */
+function cleanAnuraNotes(notes: string | null | undefined): string | null {
+  if (!notes?.trim()) return null;
+  let text = notes.trim();
+  text = text.replace(/^Anura CDR\s+\d+\s*·\s*/i, '');
+  text = text.replace(/^(IN|OUT)\s*·\s*/i, '');
+  text = text.replace(/^(ANSWER|CANCEL|NOANSWER|BUSY|CONGESTION)\s*·\s*/i, '');
+  text = text.replace(/→00(\d+)/g, '→ +$1');
+  text = text.replace(/→(\d{11,})/g, '→ +$1');
+  text = text.replace(/(\d)→\s*\+/g, '$1 → +');
+  return text.trim() || null;
+}
+
+type AnuraActivityRow = {
+  id: string;
+  result: string;
+  occurredAt: string;
+  notes: string | null;
+  waCycleId: number | null;
+  externalRef: string | null;
+  direction: string;
+};
+
 function ActivityPanel() {
   const toast = useToast();
   const [cycleId, setCycleId] = useState('');
@@ -1774,13 +1812,52 @@ function ActivityPanel() {
     id: string; channel: string; result: string; occurredAt: string; notes: string | null;
     waCycleId?: number | null; externalRef?: string | null; direction?: string | null;
   }>>([]);
-  const [anuraRecent, setAnuraRecent] = useState<Array<{
-    id: string; result: string; occurredAt: string; notes: string | null;
-    waCycleId: number | null; externalRef: string | null; direction: string;
-  }>>([]);
+  const [anuraRecent, setAnuraRecent] = useState<AnuraActivityRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [anuraEnabled, setAnuraEnabled] = useState(false);
   const [anuraNote, setAnuraNote] = useState('');
+
+  const anuraColumns = useMemo<ColumnDef<AnuraActivityRow>[]>(() => [
+    {
+      id: 'when',
+      header: 'Fecha',
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm">{formatDate(row.original.occurredAt)}</span>
+      ),
+    },
+    {
+      id: 'direction',
+      header: 'Dirección',
+      cell: ({ row }) => activityDirectionLabel(row.original.direction) ?? '—',
+    },
+    {
+      id: 'result',
+      header: 'Resultado',
+      cell: ({ row }) => (
+        <Badge variant={row.original.result === 'reached' ? 'default' : 'secondary'}>
+          {ACTIVITY_RESULT_LABELS[row.original.result] ?? row.original.result}
+        </Badge>
+      ),
+    },
+    {
+      id: 'detail',
+      header: 'Detalle',
+      cell: ({ row }) => cleanAnuraNotes(row.original.notes) || '—',
+    },
+    {
+      id: 'cycle',
+      header: 'Ciclo',
+      cell: ({ row }) => (
+        <button
+          type="button"
+          className="font-mono text-sm underline-offset-2 hover:underline"
+          onClick={() => setCycleId(String(row.original.waCycleId ?? ''))}
+        >
+          {row.original.waCycleId ?? '—'}
+        </button>
+      ),
+    },
+  ], []);
 
   async function loadAnuraRecent() {
     try {
@@ -1870,36 +1947,34 @@ function ActivityPanel() {
     }
   }
 
-  return <div className="space-y-4">
-    <div className="max-w-xl space-y-4 rounded-md border p-4">
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={busy || !anuraEnabled}
+  return <div className="space-y-6">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-sm font-semibold">Llamadas Anura</h3>
+        <Button type="button" variant="outline" size="sm" disabled={busy || !anuraEnabled}
           onClick={() => void importAnura()}>
-          Importar Anura 24h
+          Importar 24h
         </Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void loadAnuraRecent()}>
-          Ver recientes Anura
+        <Button type="button" variant="outline" size="sm" disabled={busy}
+          onClick={() => void loadAnuraRecent()}>
+          Actualizar
         </Button>
+        {!anuraEnabled && (
+          <span className="text-xs text-muted-foreground">Falta ANURA_REFRESH_TOKEN</span>
+        )}
       </div>
-      {anuraNote && <p className="text-xs text-muted-foreground">Anura: {anuraNote}</p>}
-      {!anuraEnabled && (
-        <p className="text-xs text-muted-foreground">
-          Falta configurar ANURA_REFRESH_TOKEN (spike) o client_id/secret de Soporte.
-        </p>
-      )}
-      {anuraRecent.length > 0 && (
-        <ul className="space-y-1 text-sm text-muted-foreground">
-          {anuraRecent.map((item) => (
-            <li key={item.id}>
-              {formatDate(item.occurredAt)} · ciclo {item.waCycleId ?? '—'} · {item.direction} · {item.result}
-              {item.externalRef ? ` · CDR ${item.externalRef}` : ''}
-              {item.notes ? ` · ${item.notes}` : ''}
-            </li>
-          ))}
-        </ul>
-      )}
+      {anuraNote && <p className="text-xs text-muted-foreground">{anuraNote}</p>}
+      {anuraRecent.length === 0
+        ? <EmptyState title="Sin llamadas Anura" description="Importa las últimas 24 h o espera nuevos CDRs." />
+        : <DataTable
+            columns={anuraColumns}
+            data={anuraRecent}
+            getRowId={(row) => row.id}
+            tableClassName="min-w-full"
+          />}
     </div>
     <div className="max-w-xl space-y-4 rounded-md border p-4">
+      <h3 className="text-sm font-semibold">Registrar actividad manual</h3>
       <div className="space-y-1">
         <Label>ID ciclo WA</Label>
         <Input value={cycleId} onChange={(e) => setCycleId(e.target.value)} placeholder="Ej. 17089" />
@@ -1942,8 +2017,8 @@ function ActivityPanel() {
       </div>
       {items.length > 0 && <ul className="space-y-1 text-sm text-muted-foreground">
         {items.map((item) => <li key={item.id}>
-          {formatDate(item.occurredAt)} · {item.channel} · {item.result}
-          {item.notes ? ` · ${item.notes}` : ''}
+          {formatDate(item.occurredAt)} · {ACTIVITY_RESULT_LABELS[item.result] ?? item.result}
+          {cleanAnuraNotes(item.notes) ? ` · ${cleanAnuraNotes(item.notes)}` : ''}
         </li>)}
       </ul>}
     </div>

@@ -23,6 +23,28 @@ function mapResult(status: string | undefined): 'reached' | 'no_answer' | 'attem
   return 'other';
 }
 
+function formatPhoneDisplay(raw: string | null | undefined): string | null {
+  let d = digits(raw);
+  if (d.startsWith('00')) d = d.slice(2);
+  if (!d) return null;
+  if (d.startsWith('51') && d.length >= 11) return `+${d}`;
+  if (d.length === 9) return `+51${d}`;
+  return d;
+}
+
+/** Nota corta para UI: "200 → +5193… · Genesis-200 · 44s" */
+export function anuraCdrNote(cdr: AnuraCdr): string {
+  const inbound = String(cdr.direction ?? '').toUpperCase() === 'IN';
+  const ext = inbound ? cdr.called : cdr.calling;
+  const party = formatPhoneDisplay(inbound ? cdr.calling : cdr.called);
+  const agent = String(cdr.account?.name ?? '').trim() || null;
+  const dur = cdr.duration != null ? `${cdr.duration}s` : null;
+  return [ext && party ? `${ext} → ${party}` : (party ?? (ext ? `ext ${ext}` : null)), agent, dur]
+    .filter(Boolean)
+    .join(' · ')
+    .slice(0, 500);
+}
+
 @Injectable()
 export class AnuraIngestService {
   private readonly logger = new Logger(AnuraIngestService.name);
@@ -84,15 +106,7 @@ export class AnuraIngestService {
           continue;
         }
         const occurredAt = new Date(cdr.dialTime ?? Date.now());
-        const account = cdr.account?.name ?? 'Anura';
-        const notes = [
-          `Anura CDR ${externalRef}`,
-          cdr.direction,
-          cdr.status,
-          `${cdr.calling ?? ''}→${cdr.called ?? ''}`,
-          account,
-          cdr.duration != null ? `${cdr.duration}s` : null,
-        ].filter(Boolean).join(' · ').slice(0, 2000);
+        const notes = anuraCdrNote(cdr);
 
         await this.prisma.educacionCrmActivity.create({
           data: {
