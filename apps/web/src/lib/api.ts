@@ -793,19 +793,32 @@ export const api = {
     status: string; expected_fields: string[]; mapping: Record<string, string>; note: string;
     runtime?: { enabled: boolean; running: boolean; apiBase: string };
   }>('/api/crm-educacion/activities/anura-contract'),
-  listAnuraActivitiesRecent: (limit = 20) =>
-    request<Array<{
-      id: string; channel: string; direction: string; result: string; occurredAt: string;
-      notes: string | null; payload?: unknown; waCycleId: number | null;
-      externalRef: string | null; externalSystem: string | null;
-      contactName?: string | null; phone?: string | null; agentName?: string | null;
-      agentRaw?: string | null; extension?: string | null;
-      durationSeconds?: number | null; talkSeconds?: number | null; summary?: string;
-      originLabel?: string | null; originNumber?: string | null;
-      destinationLabel?: string | null; destinationNumber?: string | null;
-      disposition?: string | null;
-      advisorId?: number | null; advisorMatched?: boolean;
-    }>>(`/api/crm-educacion/activities/anura/recent?limit=${limit}`),
+  listAnuraActivitiesRecent: (opts?: { page?: number; pageSize?: number }) => {
+    const page = opts?.page ?? 1;
+    const pageSize = opts?.pageSize ?? 25;
+    const qs = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    return request<{
+      items: Array<{
+        id: string; channel: string; direction: string; result: string; occurredAt: string;
+        notes: string | null; payload?: unknown; waCycleId: number | null;
+        externalRef: string | null; externalSystem: string | null;
+        contactName?: string | null; phone?: string | null; agentName?: string | null;
+        agentRaw?: string | null; extension?: string | null;
+        durationSeconds?: number | null; talkSeconds?: number | null; summary?: string;
+        originLabel?: string | null; originNumber?: string | null;
+        destinationLabel?: string | null; destinationNumber?: string | null;
+        disposition?: string | null;
+        advisorId?: number | null; advisorMatched?: boolean;
+      }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      pages: number;
+    }>(`/api/crm-educacion/activities/anura/recent?${qs}`);
+  },
   importAnuraActivities: (body?: { hours?: number; limit?: number }) =>
     request<{
       started: boolean; reason?: string; hours?: number; cdrs?: number;

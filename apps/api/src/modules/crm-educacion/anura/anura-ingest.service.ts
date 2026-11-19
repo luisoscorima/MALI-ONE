@@ -485,20 +485,26 @@ export class AnuraIngestService {
     };
   }
 
-  async listRecent(limit = 30) {
-    const take = Math.min(100, Math.max(1, limit));
-    const rows = await this.prisma.educacionCrmActivity.findMany({
-      where: { externalSystem: 'anura' },
-      orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
-      take,
-      include: {
-        opportunity: {
-          include: {
-            person: { select: { name: true, lastName: true, phone: true, waContactId: true } },
+  async listRecent(opts?: { page?: number; pageSize?: number; limit?: number }) {
+    const pageSize = Math.min(100, Math.max(1, opts?.pageSize ?? opts?.limit ?? 25));
+    const page = Math.max(1, opts?.page ?? 1);
+    const where = { externalSystem: 'anura' as const };
+    const [total, rows] = await Promise.all([
+      this.prisma.educacionCrmActivity.count({ where }),
+      this.prisma.educacionCrmActivity.findMany({
+        where,
+        orderBy: [{ occurredAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          opportunity: {
+            include: {
+              person: { select: { name: true, lastName: true, phone: true, waContactId: true } },
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
     const cycleIds = [...new Set(rows.map((row) => row.waCycleId).filter((id): id is number => id != null))];
     const contactIds = [...new Set(rows.map((row) => row.waContactId).filter((id): id is number => id != null))];
@@ -596,7 +602,7 @@ export class AnuraIngestService {
       }
     }
 
-    return rows.map((row, index) => {
+    const items = rows.map((row, index) => {
       const fromNote = parsed[index];
       const fromOpp = row.opportunity?.person
         ? {
@@ -672,6 +678,14 @@ export class AnuraIngestService {
         }),
       };
     });
+
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      pages: total > 0 ? Math.ceil(total / pageSize) : 0,
+    };
   }
 
   private async matchWaCycle(phoneDigits: string): Promise<{

@@ -338,9 +338,17 @@ export class CrmEducacionController {
   }
 
   @Get('activities/anura/recent')
-  anuraRecent(@Query('limit') limitRaw?: string) {
-    const limit = limitRaw ? Number(limitRaw) : 30;
-    return this.anuraIngest.listRecent(Number.isFinite(limit) ? limit : 30);
+  anuraRecent(
+    @Query('page') pageRaw?: string,
+    @Query('pageSize') pageSizeRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    const page = pageRaw ? Number(pageRaw) : 1;
+    const pageSize = pageSizeRaw ? Number(pageSizeRaw) : (limitRaw ? Number(limitRaw) : 25);
+    return this.anuraIngest.listRecent({
+      page: Number.isFinite(page) ? page : 1,
+      pageSize: Number.isFinite(pageSize) ? pageSize : 25,
+    });
   }
 
   @Post('activities/anura/import')

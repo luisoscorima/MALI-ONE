@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSearchParams } from 'react-router-dom';
-import { Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
+import { CopyableValue } from '@/components/copyable-value';
 import { useToast } from '@/contexts/toast-context';
 import {
   api, ApiRequestError, type EducationArea, type EducationCatalog, type EducationCategoryScope,
@@ -1868,9 +1869,90 @@ type AnuraActivityRow = {
   originNumber: string | null;
   destinationLabel: string | null;
   destinationNumber: string | null;
-  advisorMatched: boolean;
+  payload: unknown;
   summary: string;
 };
+
+function isPeruMobileDisplay(value: string | null | undefined): boolean {
+  return Boolean(value?.trim().startsWith('+51'));
+}
+
+function AnuraPhoneCell({
+  value,
+  label,
+  className,
+}: {
+  value: string | null | undefined;
+  label: string;
+  className?: string;
+}) {
+  if (isPeruMobileDisplay(value)) {
+    return <CopyableValue value={value} label={label} className={className} />;
+  }
+  return (
+    <span className={`whitespace-nowrap font-mono text-xs tabular-nums ${className ?? ''}`.trim()}>
+      {value?.trim() || '—'}
+    </span>
+  );
+}
+
+function AnuraCallDetail({ row }: { row: AnuraActivityRow }) {
+  const payloadText = row.payload == null
+    ? null
+    : (() => {
+        try {
+          return JSON.stringify(row.payload, null, 2);
+        } catch {
+          return String(row.payload);
+        }
+      })();
+
+  return (
+    <div className="space-y-3 border-t border-border bg-muted/10 px-4 py-3 text-sm">
+      <div>
+        <div className="text-xs font-medium text-muted-foreground">Resumen</div>
+        <p className="mt-0.5">{row.summary || '—'}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Persona CRM</div>
+          <div className="mt-0.5">{row.contactName || '—'}</div>
+          <AnuraPhoneCell value={row.phone} label="Teléfono CRM" className="mt-0.5" />
+        </div>
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Núm origen</div>
+          <AnuraPhoneCell value={row.originNumber} label="Núm origen" className="mt-0.5" />
+        </div>
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Núm destino</div>
+          <AnuraPhoneCell value={row.destinationNumber} label="Núm destino" className="mt-0.5" />
+        </div>
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Ciclo WA</div>
+          <div className="mt-0.5 font-mono text-xs">{row.waCycleId ?? 'Sin ciclo'}</div>
+        </div>
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">CDR / externalRef</div>
+          <div className="mt-0.5 break-all font-mono text-xs">{row.externalRef || '—'}</div>
+        </div>
+        <div>
+          <div className="text-xs font-medium text-muted-foreground">Notas</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{row.notes || '—'}</div>
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-medium text-muted-foreground">Payload Anura</div>
+        {payloadText ? (
+          <pre className="mt-1 max-h-64 overflow-auto rounded-md border border-border bg-background p-3 font-mono text-[11px] leading-relaxed">
+            {payloadText}
+          </pre>
+        ) : (
+          <p className="mt-0.5 text-xs text-muted-foreground">Sin payload guardado (fila antigua o solo nota).</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ActivityPanel() {
   const toast = useToast();
@@ -1883,6 +1965,11 @@ function ActivityPanel() {
     waCycleId?: number | null; externalRef?: string | null; direction?: string | null;
   }>>([]);
   const [anuraRecent, setAnuraRecent] = useState<AnuraActivityRow[]>([]);
+  const [anuraPage, setAnuraPage] = useState(1);
+  const [anuraPages, setAnuraPages] = useState(0);
+  const [anuraTotal, setAnuraTotal] = useState(0);
+  const [anuraExpandedId, setAnuraExpandedId] = useState<string | null>(null);
+  const anuraPageSize = 25;
   const [busy, setBusy] = useState(false);
   const [anuraEnabled, setAnuraEnabled] = useState(false);
   const [anuraNote, setAnuraNote] = useState('');
@@ -1913,9 +2000,11 @@ function ActivityPanel() {
       id: 'originNumber',
       header: 'Núm origen',
       cell: ({ row }) => (
-        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
-          {row.original.originNumber || '—'}
-        </span>
+        <AnuraPhoneCell
+          value={row.original.originNumber}
+          label="Núm origen"
+          className="whitespace-nowrap"
+        />
       ),
     },
     {
@@ -1929,9 +2018,11 @@ function ActivityPanel() {
       id: 'destinationNumber',
       header: 'Núm destino',
       cell: ({ row }) => (
-        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
-          {row.original.destinationNumber || '—'}
-        </span>
+        <AnuraPhoneCell
+          value={row.original.destinationNumber}
+          label="Núm destino"
+          className="whitespace-nowrap"
+        />
       ),
     },
     {
@@ -1952,20 +2043,18 @@ function ActivityPanel() {
       id: 'agent',
       header: 'Asesor',
       cell: ({ row }) => (
-        <div className="text-sm">
-          <div>{row.original.agentName || '—'}</div>
-          {row.original.advisorMatched ? (
-            <div className="text-[10px] text-muted-foreground">CRM</div>
-          ) : null}
-        </div>
+        <span className="text-sm">{row.original.agentName || '—'}</span>
       ),
     },
   ], []);
 
-  async function loadAnuraRecent() {
+  async function loadAnuraRecent(page = anuraPage) {
     try {
-      const data = await api.listAnuraActivitiesRecent(20);
-      setAnuraRecent(data.map((row) => ({
+      const data = await api.listAnuraActivitiesRecent({ page, pageSize: anuraPageSize });
+      setAnuraPage(data.page);
+      setAnuraPages(data.pages);
+      setAnuraTotal(data.total);
+      setAnuraRecent(data.items.map((row) => ({
         id: row.id,
         result: row.result,
         occurredAt: row.occurredAt,
@@ -1981,12 +2070,15 @@ function ActivityPanel() {
         originNumber: row.originNumber ?? null,
         destinationLabel: row.destinationLabel ?? null,
         destinationNumber: row.destinationNumber ?? null,
-        advisorMatched: Boolean(row.advisorMatched),
+        payload: row.payload ?? null,
         summary: row.summary
           || `${row.agentName || 'Un asesor'} llamó · ${ACTIVITY_RESULT_LABELS[row.result] ?? row.result}`,
       })));
     } catch {
       setAnuraRecent([]);
+      setAnuraTotal(0);
+      setAnuraPages(0);
+      setAnuraExpandedId(null);
     }
   }
 
@@ -1997,8 +2089,13 @@ function ActivityPanel() {
         setAnuraEnabled(Boolean(data.runtime?.enabled));
       })
       .catch(() => setAnuraNote(''));
-    void loadAnuraRecent();
   }, []);
+
+  useEffect(() => {
+    setAnuraExpandedId(null);
+    void loadAnuraRecent(anuraPage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar página
+  }, [anuraPage]);
 
   async function load() {
     const waCycleId = Number(cycleId);
@@ -2051,7 +2148,8 @@ function ActivityPanel() {
         return;
       }
       toast.success(`Anura: ${resultImport.created} nuevas · ${resultImport.skipped} omitidas · ${resultImport.unmatched} sin ciclo`);
-      await loadAnuraRecent();
+      if (anuraPage === 1) await loadAnuraRecent(1);
+      else setAnuraPage(1);
       const firstCycle = resultImport.items?.[0]?.waCycleId;
       if (firstCycle) setCycleId(String(firstCycle));
     } catch (error) {
@@ -2070,7 +2168,7 @@ function ActivityPanel() {
           Importar 24h
         </Button>
         <Button type="button" variant="outline" size="sm" disabled={busy}
-          onClick={() => void loadAnuraRecent()}>
+          onClick={() => void loadAnuraRecent(anuraPage)}>
           Actualizar
         </Button>
         {!anuraEnabled && (
@@ -2080,12 +2178,45 @@ function ActivityPanel() {
       {anuraNote && <p className="text-xs text-muted-foreground">{anuraNote}</p>}
       {anuraRecent.length === 0
         ? <EmptyState title="Sin llamadas Anura" description="Importa las últimas 24 h o espera nuevos CDRs." />
-        : <DataTable
-            columns={anuraColumns}
-            data={anuraRecent}
-            getRowId={(row) => row.id}
-            tableClassName="min-w-full"
-          />}
+        : <>
+            <DataTable
+              columns={anuraColumns}
+              data={anuraRecent}
+              getRowId={(row) => row.id}
+              tableClassName="min-w-full"
+              onRowClick={(row) => setAnuraExpandedId((current) =>
+                current === row.id ? null : row.id)}
+              isRowExpanded={(row) => anuraExpandedId === row.id}
+              renderExpandedRow={(row) => <AnuraCallDetail row={row} />}
+              footer={(anuraPages > 1 || anuraTotal > anuraPageSize) ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-sm text-muted-foreground">
+                    Página {anuraPages === 0 ? 0 : anuraPage} de {Math.max(1, anuraPages)} · {anuraTotal} llamadas
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || anuraPage <= 1}
+                      onClick={() => setAnuraPage((current) => Math.max(1, current - 1))}
+                    >
+                      <ChevronLeft className="size-4" /> Anterior
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || anuraPage >= anuraPages}
+                      onClick={() => setAnuraPage((current) => current + 1)}
+                    >
+                      Siguiente <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : undefined}
+            />
+          </>}
     </div>
     <div className="max-w-xl space-y-4 rounded-md border p-4">
       <h3 className="text-sm font-semibold">Registrar actividad manual</h3>
