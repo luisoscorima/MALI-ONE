@@ -31,4 +31,22 @@ Fecha: 2026-11-18. Solo inventario; no implica cutover.
 
 Escrituras comerciales → ONE. WA conserva mensajería + outbox de hechos de canal. Ver [crm-educacion-cutover.md](./crm-educacion-cutover.md).
 
-Piloto actual: solo canal Prospectia con autoridad ONE; el resto sigue en WA hasta F4.
+Piloto actual: Prospectia (+ manual/widget vía `POST /opportunities`) con `commercialAuthority=one`; ciclos WA sin enlace siguen `wa`. Bandeja ONE une ambos.
+
+### Contrato compatibilidad UX WA (facade)
+
+Cuando el dato comercial se mueva a ONE, mali-whatsapp debe seguir ofreciendo al asesor:
+
+- mismas rutas/pantallas de etapa, ficha, chat, asociar código;
+- mismos campos de respuesta hacia la UI del asesor;
+- cambios solo aditivos (`link-cycle`, deep-link, outbox/mirror).
+
+ONE expone `GET /commercial-authority` con `wa_ux: stable`, `per_opportunity: true` y `wa_channels_pending` (Meta/TikTok/WA inbound al final).
+
+### Hooks aditivos WA (sin rediseño inbox)
+
+| Hook | Rol |
+|------|-----|
+| `POST .../internal/opportunities/link-cycle` | Binding ciclo WA → oportunidad ONE |
+| Deep-link ciclo / Prospectia en ficha ONE | Abrir chat sin cambiar UX asesor |
+| `EducacionChannelEvent` outbox | Espejo futuro hechos de canal |

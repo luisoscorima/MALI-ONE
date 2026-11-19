@@ -770,9 +770,79 @@ export const api = {
       }>;
     } | null>(`/api/crm-educacion/sales/by-cycle/${waCycleId}`),
   getCrmEducationCommercialAuthority: () =>
-    request<{ authority: 'wa' | 'one'; messaging: string; note: string }>(
-      '/api/crm-educacion/commercial-authority',
-    ),
+    request<{
+      authority: 'wa' | 'one'; messaging: string; note: string;
+      per_opportunity?: boolean; wa_ux?: string; wa_channels_pending?: string[];
+    }>('/api/crm-educacion/commercial-authority'),
+  getCrmEducationCommercialStages: () =>
+    request<{
+      source: string; mirror_while_wa_writes: boolean;
+      stages: Array<{ slug: string; label: string; terminal: boolean; opens_sale_flow?: boolean }>;
+      note?: string;
+    }>('/api/crm-educacion/commercial-stages'),
+  listCrmEducationBandeja: (params?: {
+    categoria?: string; q?: string; view?: string; page?: number; limit?: number; includeWa?: boolean;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.categoria) qs.set('categoria', params.categoria);
+    if (params?.q) qs.set('q', params.q);
+    if (params?.view) qs.set('view', params.view);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.includeWa === false) qs.set('includeWa', 'false');
+    return request<{
+      items: Array<{
+        id: string; origin: 'one' | 'wa'; commercial_authority: 'one' | 'wa';
+        channel: string; category: string; stage_slug: string;
+        advisor_email: string | null; assigned_user_label: string | null;
+        source_label: string | null; from_meta: boolean;
+        prospectia_inbox: string | null; has_prospectia_chat: boolean | null;
+        linked_wa: boolean; prospectia_status: string | null; interest_course: string | null;
+        wa_cycle_id: number | null; opportunity_id: string | null;
+        first_seen_at: string; last_interaction_at: string | null; closed_at: string | null;
+        payment_link: string | null; last_call_at: string | null; last_call_result: string | null;
+        contacts: { name: string | null; last_name: string | null; phone: string | null; email: string | null };
+        badges: string[];
+      }>;
+      total: number; page: number; limit: number; pages: number; note?: string;
+    }>(`/api/crm-educacion/bandeja?${qs}`);
+  },
+  getCrmEducationBandejaFicha: (id: string) =>
+    request<{
+      found: boolean;
+      origin?: 'one' | 'wa';
+      commercial_authority?: 'one' | 'wa';
+      wa_cycle_id?: number | null;
+      opportunity?: Record<string, unknown> | null;
+      timeline?: Array<{
+        id: string; channel: string; direction: string; result: string;
+        occurred_at: string; notes: string | null; external_system: string | null;
+        external_ref: string | null; payload?: unknown;
+      }>;
+      sale?: unknown;
+      deep_links?: {
+        wa_cycle_id: number | null;
+        wa_chat_hint?: string | null;
+        prospectia: string | null;
+        prospectia_hint?: string | null;
+      };
+      note?: string;
+      venta_ready?: boolean;
+    }>(`/api/crm-educacion/bandeja/${encodeURIComponent(id)}`),
+  patchCrmEducationOpportunity: (id: string, body: {
+    stage_slug?: string; advisor_email?: string | null;
+    interest_course?: string | null; close?: boolean;
+  }) => request(`/api/crm-educacion/opportunities/${encodeURIComponent(id)}`, {
+    method: 'PATCH', body: JSON.stringify(body),
+  }),
+  createCrmEducationOpportunity: (body: {
+    channel: 'manual' | 'widget' | 'anura';
+    category: 'ca' | 'ep' | 'general';
+    name?: string; last_name?: string; phone?: string; email?: string;
+    interest_course?: string; advisor_email?: string; source_label?: string; stage_slug?: string;
+  }) => request('/api/crm-educacion/opportunities', {
+    method: 'POST', body: JSON.stringify(body),
+  }),
   listCrmEducationActivities: (waCycleId?: number, opportunityId?: string) => {
     const qs = new URLSearchParams();
     if (waCycleId) qs.set('waCycleId', String(waCycleId));

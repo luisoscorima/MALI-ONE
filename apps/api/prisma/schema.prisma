@@ -756,17 +756,22 @@ model EducacionPerson {
   id            String   @id @default(cuid())
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  /// Teléfono E.164 (+51…)
+  /// Teléfono principal E.164 (+51…)
   phone         String?
+  /// Teléfonos adicionales E.164 (JSON string[])
+  phones        Json?
   email         String?
   name          String?
   lastName      String?
   waContactId   Int?
+  /// Contact id Prospectia/Chatwoot (si aplica)
+  prospectiaContactId String?
   opportunities EducacionOpportunity[]
 
   @@index([phone])
   @@index([email])
   @@index([waContactId])
+  @@index([prospectiaContactId])
 }
 
 /// Oportunidad comercial nativa ONE. Canal prospectia = maestro ONE (piloto).
@@ -776,15 +781,17 @@ model EducacionOpportunity {
   updatedAt         DateTime @updatedAt
   personId          String
   person            EducacionPerson @relation(fields: [personId], references: [id], onDelete: Cascade)
-  /// prospectia | (futuros canales nativos)
+  /// prospectia | manual | widget | anura | wa_mirror | (futuros)
   channel           String
-  /// ID estable en sistema origen (Prospectia contact id)
+  /// ID estable en sistema origen (Prospectia contact id, manual:cuid, etc.)
   externalId        String
   /// ca | ep | general
   category          String   @default("general")
   stageSlug         String   @default("por_contactar")
+  /// Quién escribe etapa/ciclo: one | wa (un solo escritor; sin dual-write)
+  commercialAuthority String @default("one")
   advisorEmail      String?
-  /// Etiqueta comercial Prospectia (venta_exitosa_arte, mql_ep, no_contesta…)
+  /// Etiqueta comercial Prospectia (venta_exitosa_arte, mql_ep, no_contesta…) — solo lectura UI
   prospectiaStatus  String?
   /// Curso/interés (custom attr conversación o contacto)
   interestCourse    String?
@@ -792,7 +799,7 @@ model EducacionOpportunity {
   leadScore         Int?
   /// Prospectia-first: true si hay conversación Chatwoot (cualquier inbox). Independiente de mali-whatsapp.
   cameWithInbound   Boolean  @default(false)
-  /// Puente opcional a ciclo mali-whatsapp (no define solo contacto)
+  /// Puente opcional a ciclo mali-whatsapp (binding de canal, no segundo ciclo)
   waCycleId         Int?
   waContactId       Int?
   requiresReview    Boolean  @default(false)
@@ -813,6 +820,8 @@ model EducacionOpportunity {
   @@index([channel, createdAt])
   @@index([prospectiaStatus])
   @@index([interestCourse])
+  @@index([commercialAuthority, closedAt])
+  @@index([stageSlug])
 }
 
 /// Cursor / estado del poller Prospectia → ONE.

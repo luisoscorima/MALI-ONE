@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CrmEducacionModule } from '../crm-educacion/crm-educacion.module';
 import { EducacionWidgetsController } from './educacion/educacion-widgets.controller';
 import { EducacionWidgetsService } from './educacion/educacion-widgets.service';
 import { EducacionLeadsService } from './educacion/educacion-leads.service';
@@ -12,6 +13,7 @@ import { PamSchedulerService } from './pam/pam-scheduler.service';
 import { MuseoWidgetsController } from './museo/museo-widgets.controller';
 
 @Module({
+  imports: [CrmEducacionModule],
   controllers: [
     EducacionWidgetsController,
     BibliotecaWidgetsController,

@@ -50,7 +50,10 @@ export type OpportunityListItem = {
   linked_wa: boolean;
   category: string;
   stage_slug: string;
+  /** Un escritor: one | wa */
+  commercial_authority: 'one' | 'wa';
   advisor_email: string | null;
+  /** Solo lectura UI (Chatwoot); no es la etapa comercial */
   prospectia_status: string | null;
   interest_course: string | null;
   lead_score: number | null;
@@ -215,6 +218,122 @@ export class EducacionOpportunityService {
     return this.toListItem(row);
   }
 
+  /**
+   * Cambia etapa/asesor solo si commercialAuthority=one.
+   * prospectiaStatus no se escribe aquí (solo lectura Chatwoot).
+   */
+  async patchCommercial(id: string, input: {
+    stageSlug?: string;
+    advisorEmail?: string | null;
+    interestCourse?: string | null;
+    close?: boolean;
+  }) {
+    const row = await this.prisma.educacionOpportunity.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Oportunidad no encontrada');
+    if (row.commercialAuthority === 'wa') {
+      throw new BadRequestException(
+        'Esta oportunidad escribe etapa en mali-whatsapp (commercialAuthority=wa). Usá la API/UX de WA.',
+      );
+    }
+    const data: Prisma.EducacionOpportunityUpdateInput = {
+      lastInteractionAt: new Date(),
+    };
+    if (input.stageSlug != null) data.stageSlug = String(input.stageSlug).trim() || row.stageSlug;
+    if (input.advisorEmail !== undefined) {
+      data.advisorEmail = input.advisorEmail?.trim() || null;
+    }
+    if (input.interestCourse !== undefined) {
+      data.interestCourse = input.interestCourse?.trim() || null;
+    }
+    if (input.close) {
+      data.closedAt = new Date();
+    }
+    const updated = await this.prisma.educacionOpportunity.update({
+      where: { id },
+      data,
+      include: { person: true },
+    });
+    return this.toListItem(updated);
+  }
+
+  /** Alta nativa ONE (manual/widget). Escritor = one. */
+  async createNative(input: {
+    channel: 'manual' | 'widget' | 'anura';
+    category: 'ca' | 'ep' | 'general';
+    name?: string;
+    lastName?: string;
+    phone?: string;
+    email?: string;
+    interestCourse?: string;
+    advisorEmail?: string;
+    sourceLabel?: string;
+    stageSlug?: string;
+    waCycleId?: number;
+    waContactId?: number;
+  }) {
+    const phone = input.phone?.trim() || null;
+    const email = input.email?.trim().toLowerCase() || null;
+    if (!phone && !email) {
+      throw new BadRequestException('Indica teléfono o email');
+    }
+    const externalId = `${input.channel}:${phone || email}:${Date.now()}`;
+    let person = phone
+      ? await this.prisma.educacionPerson.findFirst({
+          where: { phone: { in: [...new Set([phone, phone.replace(/^\+/, ''), `+${phone.replace(/\D/g, '')}`])] } },
+        })
+      : null;
+    if (!person && email) {
+      person = await this.prisma.educacionPerson.findFirst({ where: { email } });
+    }
+    if (!person) {
+      person = await this.prisma.educacionPerson.create({
+        data: {
+          phone,
+          email,
+          name: input.name?.trim() || null,
+          lastName: input.lastName?.trim() || null,
+          waContactId: input.waContactId ?? null,
+          phones: phone ? ([phone] as Prisma.InputJsonValue) : Prisma.JsonNull,
+        },
+      });
+    } else {
+      const phones = Array.isArray(person.phones)
+        ? person.phones.map((item) => String(item)).filter(Boolean)
+        : [];
+      if (phone && !phones.includes(phone)) phones.push(phone);
+      person = await this.prisma.educacionPerson.update({
+        where: { id: person.id },
+        data: {
+          name: input.name?.trim() || person.name,
+          lastName: input.lastName?.trim() || person.lastName,
+          email: email || person.email,
+          phone: phone || person.phone,
+          waContactId: input.waContactId ?? person.waContactId,
+          phones: phones.length ? (phones as Prisma.InputJsonValue) : Prisma.JsonNull,
+        },
+      });
+    }
+    const created = await this.prisma.educacionOpportunity.create({
+      data: {
+        personId: person.id,
+        channel: input.channel,
+        externalId,
+        category: input.category,
+        stageSlug: input.stageSlug?.trim() || 'por_contactar',
+        commercialAuthority: 'one',
+        advisorEmail: input.advisorEmail?.trim() || null,
+        interestCourse: input.interestCourse?.trim() || null,
+        sourceLabel: input.sourceLabel?.trim() || input.channel,
+        cameWithInbound: false,
+        waCycleId: input.waCycleId ?? null,
+        waContactId: input.waContactId ?? null,
+        lastInteractionAt: new Date(),
+      },
+      include: { person: true },
+    });
+    return this.toListItem(created);
+  }
+
   private buildWhere(params: {
     categoria?: string;
     channel?: string;
@@ -262,6 +381,7 @@ export class EducacionOpportunityService {
     payload?: unknown;
     category: string;
     stageSlug: string;
+    commercialAuthority?: string | null;
     advisorEmail: string | null;
     prospectiaStatus: string | null;
     interestCourse: string | null;
@@ -281,6 +401,7 @@ export class EducacionOpportunityService {
       lastName: string | null;
     };
   }): OpportunityListItem {
+    const authority = row.commercialAuthority === 'wa' ? 'wa' : 'one';
     return {
       id: row.id,
       channel: row.channel,
@@ -292,6 +413,7 @@ export class EducacionOpportunityService {
       linked_wa: row.waCycleId != null,
       category: row.category,
       stage_slug: row.stageSlug,
+      commercial_authority: authority,
       advisor_email: row.advisorEmail,
       prospectia_status: row.prospectiaStatus,
       interest_course: row.interestCourse,

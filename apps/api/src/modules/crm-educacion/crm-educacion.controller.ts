@@ -13,6 +13,7 @@ import { EDUCATION_CATEGORY_SCOPES, EDUCATION_WRITE_AREA } from './education-sco
 import { EducacionOpportunityService } from './prospectia/educacion-opportunity.service';
 import { ProspectiaIngestService } from './prospectia/prospectia-ingest.service';
 import { AnuraIngestService } from './anura/anura-ingest.service';
+import { EducacionBandejaService } from './educacion-bandeja.service';
 
 class ListContactsQuery {
   @IsOptional() @IsIn([...EDUCATION_CATEGORY_SCOPES]) categoria?: string;
@@ -91,6 +92,26 @@ class ProspectiaSubjectBody {
 class ProspectiaCheckBody {
   @IsArray() @ValidateNested({ each: true }) @Type(() => ProspectiaSubjectBody)
   subjects!: ProspectiaSubjectBody[];
+}
+
+class PatchOpportunityBody {
+  @IsOptional() @IsString() @MaxLength(64) stage_slug?: string;
+  @IsOptional() @IsString() @MaxLength(180) advisor_email?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) interest_course?: string | null;
+  @IsOptional() @IsBoolean() close?: boolean;
+}
+
+class CreateOneOpportunityBody {
+  @IsIn(['manual', 'widget', 'anura']) channel!: 'manual' | 'widget' | 'anura';
+  @IsIn(['ca', 'ep', 'general']) category!: 'ca' | 'ep' | 'general';
+  @IsOptional() @IsString() @MaxLength(150) name?: string;
+  @IsOptional() @IsString() @MaxLength(150) last_name?: string;
+  @IsOptional() @IsString() @MaxLength(32) phone?: string;
+  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsString() @MaxLength(200) interest_course?: string;
+  @IsOptional() @IsEmail() advisor_email?: string;
+  @IsOptional() @IsString() @MaxLength(120) source_label?: string;
+  @IsOptional() @IsString() @MaxLength(64) stage_slug?: string;
 }
 
 class ManualLeadBody {
@@ -180,6 +201,7 @@ export class CrmEducacionController {
     private readonly crm: CrmEducacionService,
     private readonly activities: EducacionActivityService,
     private readonly sales: EducacionSaleService,
+    private readonly bandeja: EducacionBandejaService,
     private readonly opportunities: EducacionOpportunityService,
     private readonly prospectiaIngest: ProspectiaIngestService,
     private readonly anuraIngest: AnuraIngestService,
@@ -230,18 +252,72 @@ export class CrmEducacionController {
     return this.crm.managementCatalogs();
   }
 
-  /** F4 scaffolding: quién escribe lo comercial. Default wa hasta cutover. */
+  /** Global default; cada oportunidad puede tener commercial_authority propia. */
   @Get('commercial-authority')
   commercialAuthority() {
     const raw = String(process.env.COMMERCIAL_AUTHORITY ?? 'wa').trim().toLowerCase();
     const authority = raw === 'one' ? 'one' : 'wa';
+    const waChannelsPending = String(process.env.COMMERCIAL_AUTHORITY_WA_SOURCES ?? 'meta,tiktok,wa_inbound')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     return {
       authority,
       messaging: 'whatsapp',
+      per_opportunity: true,
+      wa_ux: 'stable',
+      wa_channels_pending: waChannelsPending,
       note: authority === 'wa'
-        ? 'Motor comercial en mali-whatsapp; Prospectia ingresa nativo en ONE. Mensajería no se tumba en cutover.'
-        : 'Motor comercial en ONE; WA solo canal + hechos.',
+        ? 'Default WA; Prospectia/manual/widget escriben en ONE. Meta/TikTok/WA inbound al final. Asesor WA no debe notar relocate (facade).'
+        : 'Motor comercial en ONE; WA mensajería + facade UX estable.',
     };
+  }
+
+  /**
+   * Catálogo de etapas comerciales destino ONE.
+   * Mientras WA escriba etapas, el CRUD operativo de estados sigue espejado vía catalog-educacion → WA.
+   */
+  @Get('commercial-stages')
+  commercialStages() {
+    return {
+      source: 'one',
+      mirror_while_wa_writes: true,
+      stages: [
+        { slug: 'por_contactar', label: 'Por contactar', terminal: false },
+        { slug: 'contactado', label: 'Contactado', terminal: false },
+        { slug: 'evaluando', label: 'Evaluando', terminal: false },
+        { slug: 'promesa', label: 'Promesa', terminal: false },
+        { slug: 'venta_exitosa', label: 'Venta exitosa', terminal: false, opens_sale_flow: true },
+        { slug: 'no_contesta', label: 'No contesta', terminal: false },
+        { slug: 'no_interesado', label: 'No interesado', terminal: true },
+        { slug: 'perdido', label: 'Perdido', terminal: true },
+      ],
+      note: 'stage_slug = etapa comercial. prospectia_status = solo lectura (≠ etapa). Sync/espejo hacia WA mientras commercialAuthority=wa en canales WA.',
+    };
+  }
+
+  @Get('bandeja')
+  listBandeja(
+    @Query('categoria') categoria?: string,
+    @Query('q') q?: string,
+    @Query('view') view?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('includeWa') includeWa?: string,
+  ) {
+    return this.bandeja.list({
+      categoria,
+      q,
+      view,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      includeWa: includeWa !== 'false',
+    });
+  }
+
+  @Get('bandeja/:id')
+  getBandejaFicha(@Param('id') id: string) {
+    return this.bandeja.getFicha(id);
   }
 
   @Get('opportunities')
@@ -253,6 +329,37 @@ export class CrmEducacionController {
       view: query.view,
       page: query.page ? Number(query.page) : undefined,
       limit: query.limit ? Number(query.limit) : undefined,
+    });
+  }
+
+  @Get('opportunities/:id')
+  getOpportunity(@Param('id') id: string) {
+    return this.opportunities.getById(id);
+  }
+
+  @Patch('opportunities/:id')
+  patchOpportunity(@Param('id') id: string, @Body() body: PatchOpportunityBody) {
+    return this.opportunities.patchCommercial(id, {
+      stageSlug: body.stage_slug,
+      advisorEmail: body.advisor_email,
+      interestCourse: body.interest_course,
+      close: body.close,
+    });
+  }
+
+  @Post('opportunities')
+  createOneOpportunity(@Body() body: CreateOneOpportunityBody) {
+    return this.opportunities.createNative({
+      channel: body.channel,
+      category: body.category,
+      name: body.name,
+      lastName: body.last_name,
+      phone: body.phone,
+      email: body.email,
+      interestCourse: body.interest_course,
+      advisorEmail: body.advisor_email,
+      sourceLabel: body.source_label,
+      stageSlug: body.stage_slug,
     });
   }
 
@@ -301,8 +408,29 @@ export class CrmEducacionController {
   }
 
   @Post('leads/manual')
-  createManualLead(@Body() body: ManualLeadBody, @Req() req: Request) {
-    return this.crm.createManualLead(body, (req.user as User).email);
+  async createManualLead(@Body() body: ManualLeadBody, @Req() req: Request) {
+    const wa = await this.crm.createManualLead(body, (req.user as User).email);
+    // También oportunidad nativa ONE (escritor one) para bandeja unificada.
+    let oneOpportunity: unknown = null;
+    try {
+      oneOpportunity = await this.opportunities.createNative({
+        channel: 'manual',
+        category: body.categoria === 'ca' || body.categoria === 'ep' ? body.categoria : 'general',
+        name: body.name,
+        lastName: body.last_name,
+        phone: body.phone,
+        email: body.email,
+        interestCourse: body.curso,
+        sourceLabel: body.source_key,
+        stageSlug: 'por_contactar',
+        waCycleId: typeof (wa as { cycle_id?: number })?.cycle_id === 'number'
+          ? (wa as { cycle_id: number }).cycle_id
+          : undefined,
+      });
+    } catch {
+      oneOpportunity = null;
+    }
+    return { ...((wa && typeof wa === 'object') ? wa : { wa }), one_opportunity: oneOpportunity };
   }
 
   @Get('activities')

@@ -8,7 +8,7 @@ CRUD de áreas, cursos, programas, sedes, distritos y **estados de lead** usados
 
 ## Cómo funciona
 
-El admin mantiene catálogos en Postgres; opciones se exponen a otros módulos. Estados de lead se sincronizan/espejan con definiciones en mali-whatsapp.
+El admin mantiene catálogos en Postgres; opciones se exponen a otros módulos. **Destino:** catálogo de etapas comerciales en ONE como verdad (`GET /api/crm-educacion/commercial-stages`), con sync/espejo hacia mali-whatsapp mientras WA siga escribiendo etapas (facade UX). Hoy el CRUD operativo de `estados-lead` aún se refleja desde WA; ONE ya publica el listado destino para bandeja/ficha.
 
 ## Código
 

@@ -21,15 +21,16 @@ import {
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
 import { TreasuryStatusBadge } from './treasury-status';
+import { CrmEducacionBandejaPanel } from './crm-educacion-bandeja-panel';
 
 const EDUCATION_AREA: EducationArea = 'educacion';
 const CRM_TABS = [
-  'contacts', 'opportunities', 'historial', 'activities', 'payments', 'campaigns',
+  'bandeja', 'activities', 'payments', 'contacts', 'tools', 'opportunities', 'campaigns',
 ] as const;
 type CrmTab = (typeof CRM_TABS)[number];
 
 function parseCrmTab(raw: string | null): CrmTab {
-  return CRM_TABS.includes(raw as CrmTab) ? (raw as CrmTab) : 'contacts';
+  return CRM_TABS.includes(raw as CrmTab) ? (raw as CrmTab) : 'bandeja';
 }
 
 const CATEGORY_SCOPE_LABELS: Record<EducationCategoryScope, string> = {
@@ -1185,7 +1186,7 @@ export function CrmEducacionPage() {
     </Dialog>
     <PageHeader
       title="CRM Educación"
-      description="Vitrina de fichas y oportunidades de Educación (área única) con filtro por categoría CA/EP/General."
+      description="Bandeja + ficha comercial (ONE). Medios: mali-whatsapp, Prospectia, Anura. El asesor en WA no debe notar si el dato se mueve a ONE."
     />
     <div className="flex flex-wrap items-end gap-3">
       <div className="w-56 space-y-1">
@@ -1208,14 +1209,24 @@ export function CrmEducacionPage() {
       </Button>
     </div>
     <Tabs value={tab} onValueChange={(value) => setTab(value)}>
-      <TabsList>
-        <TabsTrigger value="contacts">Contactos</TabsTrigger>
-        <TabsTrigger value="opportunities">Oportunidades</TabsTrigger>
-        <TabsTrigger value="historial">Historial</TabsTrigger>
-        <TabsTrigger value="activities">Actividades</TabsTrigger>
-        <TabsTrigger value="payments">Pagos</TabsTrigger>
+      <TabsList className="flex h-auto flex-wrap gap-1">
+        <TabsTrigger value="bandeja">Bandeja</TabsTrigger>
+        <TabsTrigger value="activities">Llamadas</TabsTrigger>
+        <TabsTrigger value="payments">Pagos / Caja</TabsTrigger>
+        <TabsTrigger value="contacts">Contactos WA</TabsTrigger>
+        <TabsTrigger value="tools">Herramientas</TabsTrigger>
+        <TabsTrigger value="opportunities">SLA / ciclos WA</TabsTrigger>
         <TabsTrigger value="campaigns">Campañas</TabsTrigger>
       </TabsList>
+      <TabsContent value="bandeja" className="space-y-4">
+        <CrmEducacionBandejaPanel
+          categoria={categoria}
+          onAssociatePayment={(waCycleId) => {
+            setPaymentCyclePrefill(String(waCycleId));
+            setTab('payments');
+          }}
+        />
+      </TabsContent>
       <TabsContent value="contacts" className="space-y-4">
         {contactError && <AlertBanner variant="error">{contactError}</AlertBanner>}
         <div className="flex flex-wrap items-end gap-3">
@@ -1475,27 +1486,55 @@ export function CrmEducacionPage() {
           </div>
         </div>}
       </TabsContent>
-      <TabsContent value="historial" className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Captaciones recientes (orígenes/entradas). Para jefes; el asesor opera etapas en WhatsApp.
-        </p>
-        <HistorialLeadsPanel categoria={categoria} />
-      </TabsContent>
       <TabsContent value="activities" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Historial estilo Anura: dirección, origen/destino, estado y duración.
-          El nombre del lead sale del CRM; el asesor viene de Anura (`Karol-108` → Karol).
+          Lateral Llamadas Anura (también en timeline de Bandeja). Copiar solo `+51…`.
+          Match a Persona/Opportunity ONE (y ciclo WA si binding); unmatched visible, no abre ciclo solo.
         </p>
         <ActivityPanel />
       </TabsContent>
       <TabsContent value="payments" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Transición asesor: asociar código de pago a la oportunidad.
-          Caja: aplicar importe y boleteo. Destino asesor: misma asociación desde mali-whatsapp.
+          Post-venta Caja: validar CRM↔Treasury y boleteo. Flujo Venta desde ficha (`venta_exitosa`).
+          Preferible abrir desde Bandeja con ciclo prefijado.
         </p>
         <AssociatePaymentPanel initialCycleId={paymentCyclePrefill} />
         <CajaPaymentPanel />
         <BillingPanel />
+      </TabsContent>
+      <TabsContent value="tools" className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Ingesta y captaciones. Etapas ONE en Bandeja; etapas WA en mali-whatsapp (UX estable / facade).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={ingestingProspectia || prospectiaIngest.running || !prospectiaIngest.enabled}
+            onClick={() => void ingestProspectia()}
+          >
+            {ingestingProspectia || prospectiaIngest.running ? 'Ingesta Prospectia…' : 'Ingestar Prospectia'}
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setTab('activities')}>
+            Ir a Llamadas Anura
+          </Button>
+          <Button type="button" variant="outline" onClick={() => setTab('bandeja')}>
+            Ir a Bandeja
+          </Button>
+        </div>
+        {prospectiaIngest.lastRunAt && !prospectiaIngest.running && (
+          <p className="text-xs text-muted-foreground">
+            Última ingesta Prospectia: {formatDate(prospectiaIngest.lastRunAt)}
+            {prospectiaIngest.lastRunCreated ? ` (+${prospectiaIngest.lastRunCreated})` : ''}
+          </p>
+        )}
+        <div className="space-y-2 border-t border-border pt-4">
+          <h3 className="text-sm font-medium">Historial de captaciones</h3>
+          <p className="text-xs text-muted-foreground">
+            Orígenes/entradas (lateral de herramientas). Operación comercial: Bandeja.
+          </p>
+          <HistorialLeadsPanel categoria={categoria} />
+        </div>
       </TabsContent>
       <TabsContent value="campaigns">
         <EmptyState title="Campañas próximamente" description="Esta sección estará disponible cuando termine su configuración." />

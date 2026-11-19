@@ -20,6 +20,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function mergePhonesJson(existing: unknown, phone: string | null | undefined): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  const next = String(phone ?? '').trim();
+  const list = Array.isArray(existing)
+    ? existing.map((item) => String(item)).filter(Boolean)
+    : [];
+  if (next && !list.includes(next)) list.push(next);
+  return list.length ? (list as Prisma.InputJsonValue) : Prisma.JsonNull;
+}
+
 @Injectable()
 export class ProspectiaIngestService {
   private readonly logger = new Logger(ProspectiaIngestService.name);
@@ -254,21 +263,34 @@ export class ProspectiaIngestService {
           email: email ?? existing.person.email,
           name: name ?? existing.person.name,
           lastName: lastName ?? existing.person.lastName,
+          prospectiaContactId: externalId,
+          phones: mergePhonesJson(existing.person.phones, phone),
         },
       });
       await this.prisma.educacionOpportunity.update({
         where: { id: existing.id },
-        data: opportunityData,
+        data: {
+          ...opportunityData,
+          // Prospectia ya escribe en ONE; no dual-write con WA.
+          commercialAuthority: 'one',
+        },
       });
       return 'updated';
     }
 
-    const person = await this.findOrCreatePerson({ phone, email, name, lastName });
+    const person = await this.findOrCreatePerson({
+      phone,
+      email,
+      name,
+      lastName,
+      prospectiaContactId: externalId,
+    });
     await this.prisma.educacionOpportunity.create({
       data: {
         personId: person.id,
         channel: CHANNEL,
         externalId,
+        commercialAuthority: 'one',
         ...opportunityData,
       },
     });
@@ -325,7 +347,25 @@ export class ProspectiaIngestService {
     email: string | null;
     name: string | null;
     lastName: string | null;
+    prospectiaContactId?: string | null;
   }) {
+    if (input.prospectiaContactId) {
+      const byPx = await this.prisma.educacionPerson.findFirst({
+        where: { prospectiaContactId: input.prospectiaContactId },
+      });
+      if (byPx) {
+        return this.prisma.educacionPerson.update({
+          where: { id: byPx.id },
+          data: {
+            phone: input.phone ?? byPx.phone,
+            email: input.email ?? byPx.email,
+            name: input.name ?? byPx.name,
+            lastName: input.lastName ?? byPx.lastName,
+            phones: mergePhonesJson(byPx.phones, input.phone),
+          },
+        });
+      }
+    }
     if (input.phone) {
       const byPhone = await this.prisma.educacionPerson.findFirst({
         where: { phone: input.phone },
@@ -337,6 +377,8 @@ export class ProspectiaIngestService {
             email: input.email ?? byPhone.email,
             name: input.name ?? byPhone.name,
             lastName: input.lastName ?? byPhone.lastName,
+            prospectiaContactId: input.prospectiaContactId ?? byPhone.prospectiaContactId,
+            phones: mergePhonesJson(byPhone.phones, input.phone),
           },
         });
       }
@@ -352,6 +394,8 @@ export class ProspectiaIngestService {
             phone: input.phone ?? byEmail.phone,
             name: input.name ?? byEmail.name,
             lastName: input.lastName ?? byEmail.lastName,
+            prospectiaContactId: input.prospectiaContactId ?? byEmail.prospectiaContactId,
+            phones: mergePhonesJson(byEmail.phones, input.phone),
           },
         });
       }
@@ -362,6 +406,8 @@ export class ProspectiaIngestService {
         email: input.email,
         name: input.name,
         lastName: input.lastName,
+        prospectiaContactId: input.prospectiaContactId ?? null,
+        phones: input.phone ? ([input.phone] as Prisma.InputJsonValue) : Prisma.JsonNull,
       },
     });
   }

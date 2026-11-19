@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Orden CRM Educación (cierre plan): widget/manual → oportunidad ONE; Prospectia setea `prospectiaContactId`+`phones`; Anura match Person/Opportunity sin abrir ciclo solo; `GET /commercial-stages` + `wa_channels_pending`; ficha con flujo Venta, SLA strip (proxy WA), deep-links; Historial replegado a Herramientas; laterales Llamadas/Pagos/Contactos.
+- Orden CRM Educación: modelo medios/flujos en docs; `commercialAuthority` + `phones`/`prospectiaContactId` en hub Persona/Oportunidad; API `GET /bandeja` + ficha; UI pestaña **Bandeja** (default) con timeline Anura/etapa ONE; laterales Llamadas/Pagos/Contactos WA/Herramientas. Principio: asesor WA no nota relocate del dato.
 - Associate pagos: `Autorizada` / `authorized` / `processing` cierran ciclo (`settlementKind: authorized` + obs); `Por pagar` / pending / mediation siguen sin cerrar. Caja valida liquidación antes de postventa.
 - Anura → actividades CRM: cliente CDRs + import 24h (match ciclo WA por teléfono); UI recientes + botón import. Spike con `ANURA_REFRESH_TOKEN`.
 - Anura: contrato real documentado (`docs/anura-contract.md`); `EducacionCrmActivity.payload` guarda el CDR completo; UI resume agente/persona/teléfono/segundos (billSeconds). `calledName` ≠ persona.

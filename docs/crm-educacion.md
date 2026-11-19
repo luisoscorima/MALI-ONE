@@ -2,24 +2,76 @@
 
 > Changelog: [crm-educacion-CHANGELOG.md](./crm-educacion-CHANGELOG.md) · Índice: [README.md](./README.md)
 
+## Modelo operable (medios + entidades + flujos)
+
+### Principio UX mali-whatsapp (no negociable)
+
+Si el modelo comercial se mueve de WA → ONE, el **asesor en mali-whatsapp casi no debe notarlo**: mismas pantallas de etapa, ficha, chat y asociar código. El relocate del dato va detrás (facade/API compatible). ONE sí puede refactorizar fuerte (bandeja/ficha para jefe/caja).
+
+### Medios
+
+| Medio | Captación inbound | Comunicación |
+|-------|-------------------|--------------|
+| **mali-whatsapp** | Diversas fuentes (Meta, TikTok, web, QR, links, widget…) | Chat individual y masivo; hoy además escribe ciclos/etapas |
+| **Prospectia** | Meta y algunos orgánicos | Chat individual (no masivo) |
+| **Anura** | Casi nunca | Voz **entrante y saliente** (toques, no dueño del ciclo) |
+
+### Entidades globales vs locales
+
+| Concepto | Dónde vive |
+|----------|------------|
+| Hecho de captación | Sistema que captó |
+| **Persona** | **MALI ONE** (verdad); WA/Prospectia = contactos enlazados |
+| **Oportunidad / ciclo** | **MALI ONE** (destino); hoy WA salvo piloto Prospectia |
+| Binding de canal | `waCycleId`, Prospectia, actividades Anura |
+| Etapa comercial | Un valor, **un escritor** por oportunidad (`commercialAuthority`: `wa` \| `one`) |
+| Estado de conversación | Local (Chatwoot ≠ etapa) |
+| Tags / segmentos | Locales por plataforma |
+
+Regla: **1 oportunidad**, N captaciones, N toques. Sin dual-write del mismo ciclo.
+
+### Flujos
+
+1. **Pre-venta:** inbound → assign/review → 1 ciclo → toques multi-medio → etapa única → cierre (pérdida / sin venta / `venta_exitosa`).
+2. **Venta:** solo desde `venta_exitosa` → datos/cursos → comprobante → match Treasury → flag pago.
+3. **Post-venta:** Caja valida CRM↔Treasury → boleteo → futuro.
+
+### Asimetría de cambio
+
+| Sistema | Cómo |
+|---------|------|
+| **MALI ONE** | Refactor grande (UI/API/Prisma CRM) |
+| **mali-whatsapp** | Solo aditivo + compatibilidad UX |
+
+### Migración autoridad comercial (progresiva)
+
+1. Prospectia (ya ONE) → 2. Manual/widget ONE → 3. Anura solo toques → 4. Meta/TikTok/WA al final → 5. `COMMERCIAL_AUTHORITY=one` global.
+
+Inventario: [crm-educacion-crm-consumers.md](./crm-educacion-crm-consumers.md) · Cutover: [crm-educacion-cutover.md](./crm-educacion-cutover.md).
+
+### IA CRM ONE (destino de pantalla)
+
+1. **Bandeja** comercial unificada  
+2. **Ficha** persona/oportunidad (timeline, etapa, pagos, deep-link chat)  
+3. **Laterales:** Llamadas Anura, Pagos/Caja, herramientas, contactos WA  
+
 ## Destino vs transición (producto)
 
 | | Destino | Transición (ahora) |
 |--|---------|-------------------|
-| **Asesor** | Solo mali-whatsapp (etapa, ficha, chat, asociar código vía API) | WA para etapa/ficha/chat; CRM **solo** alta no captada + asociar código (sin Treasury) |
+| **Asesor** | Solo mali-whatsapp (etapa, ficha, chat, asociar código vía API) — **misma UX** aunque el dato esté en ONE | WA para etapa/ficha/chat; CRM **solo** alta no captada + asociar código (sin Treasury) |
 | **Jefe / Caja** | CRM Educación + Treasury | Igual; CRM se puede refactorizar libre (aún no en uso masivo) |
-| **Motor comercial** | ONE | Todavía mali-whatsapp (ciclos/estados/SLA) |
-| **Estabilidad** | WA mensajería siempre up | Cambios en WA aditivos; riesgo de refactor en ONE |
+| **Motor comercial** | ONE | Todavía mali-whatsapp (ciclos/estados/SLA) salvo Prospectia |
+| **Estabilidad** | WA mensajería siempre up; facade si el dato está en ONE | Cambios en WA aditivos; refactor libre en ONE |
 
 Glosario: **medio de ingreso** (captación) ≠ **medio de comunicación** (actividad) ≠ **venta** ≠ **aplicación de pago** (Caja).  
 `venta_exitosa` = compromiso comercial, no cobro verificado. El ciclo no cierra solo con esa etapa (Option A: pago / sin pago / pérdida).
 
-Plan canónico: `orden_proceso_leads_crm_8aaad038.plan.md` (Cursor plans).  
 Roles: [crm-educacion-roles.md](./crm-educacion-roles.md).
 
 ## Qué es
 
-Panel de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño). En transición, ciclos/estados/SLA viven en **mali-whatsapp**; MALI ONE orquesta UI (jefes), catálogo de apoyo, captura web y (próximo) venta/cobro.
+Panel de **bandeja y ficha comercial** de Educación para jefe/caja (y herramientas). En transición, muchos ciclos/estados/SLA aún viven en **mali-whatsapp**; MALI ONE ya es maestro de Prospectia, Anura, ventas/Treasury y la UI operable.
 
 ## Cómo funciona
 
@@ -39,11 +91,11 @@ Panel de **contactos y oportunidades** de Educación (números WA EP/CA/Diseño)
 
 | Ruta | Uso |
 |------|-----|
-| `/admin/crm-educacion` | Contactos, oportunidades, SLA, ingesta Prospectia |
+| `/admin/crm-educacion` | **Bandeja** (default) + ficha; laterales Llamadas / Pagos·Caja / Contactos WA / Herramientas; SLA·ciclos WA |
 
 ## API
 
-Prefijo `/api/crm-educacion`: contacts, leads, cycles, opportunities, sla, catalogs, management, distribute, review, manual lead, prospectia check/ingest/import.
+Prefijo `/api/crm-educacion`: bandeja, commercial-authority, commercial-stages, contacts, leads, cycles, opportunities, sla, catalogs, management, distribute, review, manual lead, prospectia check/ingest/import, Anura webhook/import.
 
 ## Datos (Prisma)
 

@@ -8,6 +8,7 @@ import type { EducacionLead } from '@prisma/client';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import { RedisService } from '../../../core/redis/redis.service';
 import { WhatsappCrmClientService } from '../../crm/whatsapp-crm-client.service';
+import { EducacionOpportunityService } from '../../crm-educacion/prospectia/educacion-opportunity.service';
 import { CreateEducacionLeadDto } from '../dto/create-educacion-lead.dto';
 import { EducacionLeadsSheetsService } from './educacion-leads-sheets.service';
 
@@ -20,6 +21,7 @@ export class EducacionLeadsService {
     private readonly redis: RedisService,
     private readonly crm: WhatsappCrmClientService,
     private readonly sheets: EducacionLeadsSheetsService,
+    private readonly opportunities: EducacionOpportunityService,
   ) {}
 
   async createLead(dto: CreateEducacionLeadDto, ip: string) {
@@ -70,6 +72,32 @@ export class EducacionLeadsService {
 
     await this.syncWhatsapp(lead);
     void this.syncSheet(lead.id);
+    // Oportunidad nativa ONE (escritor one). WA solo si hay chat/ciclo (link-cycle aditivo).
+    let oneOpportunityId: string | null = null;
+    try {
+      const category = whatsappArea.includes('_ca') ? 'ca'
+        : whatsappArea.includes('_ep') || whatsappArea.includes('educacion') ? 'ep'
+          : 'general';
+      const phone = lead.celular.trim().startsWith('+')
+        ? lead.celular.trim()
+        : `+${lead.celular.trim().replace(/\D/g, '')}`;
+      const one = await this.opportunities.createNative({
+        channel: 'widget',
+        category,
+        name: lead.nombres,
+        lastName: lead.apellidos,
+        phone,
+        email: lead.email ?? undefined,
+        interestCourse: lead.courseTitle ?? lead.courseSlug ?? undefined,
+        sourceLabel: `widget · ${lead.captureSource ?? 'lead-form'}`,
+        stageSlug: 'por_contactar',
+      });
+      oneOpportunityId = one.id;
+    } catch (err) {
+      this.logger.warn(
+        `ONE opportunity widget falló para lead ${lead.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
 
     const updated = await this.prisma.educacionLead.findUniqueOrThrow({
       where: { id: lead.id },
@@ -80,6 +108,7 @@ export class EducacionLeadsService {
       ok: true,
       waStatus: updated.waStatus,
       sheetStatus: updated.sheetStatus,
+      oneOpportunityId,
     };
   }
 

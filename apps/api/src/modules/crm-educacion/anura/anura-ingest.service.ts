@@ -688,30 +688,46 @@ export class AnuraIngestService {
     };
   }
 
+  /**
+   * Match Anura → Person/Opportunity ONE (y ciclo WA si hay binding).
+   * Unmatched se guarda igual; no abre ciclo solo.
+   */
   private async matchWaCycle(phoneDigits: string): Promise<{
-    waCycleId: number;
+    waCycleId: number | null;
     waContactId: number | null;
     opportunityId: string | null;
   } | null> {
     const variants = [
       phoneDigits,
       `+${phoneDigits}`,
-      phoneDigits.startsWith('51') ? phoneDigits.slice(2) : phoneDigits,
+      phoneDigits.startsWith('51') ? phoneDigits.slice(2) : `51${phoneDigits}`,
+      phoneDigits.startsWith('51') ? `+${phoneDigits}` : `+51${phoneDigits}`,
     ];
-    const person = await this.prisma.educacionPerson.findFirst({
-      where: { phone: { in: variants } },
-      include: {
-        opportunities: {
-          where: { closedAt: null },
-          orderBy: [{ createdAt: 'desc' }],
-          take: 1,
-        },
+    const personInclude = {
+      opportunities: {
+        where: { closedAt: null },
+        orderBy: [{ createdAt: 'desc' as const }],
+        take: 1,
       },
+    };
+    let person = await this.prisma.educacionPerson.findFirst({
+      where: { phone: { in: variants } },
+      include: personInclude,
     });
+    if (!person) {
+      person = await this.prisma.educacionPerson.findFirst({
+        where: {
+          OR: variants.map((value) => ({
+            phones: { array_contains: value },
+          })),
+        },
+        include: personInclude,
+      });
+    }
     const opportunity = person?.opportunities[0] ?? null;
-    if (opportunity?.waCycleId) {
+    if (opportunity) {
       return {
-        waCycleId: opportunity.waCycleId,
+        waCycleId: opportunity.waCycleId ?? null,
         waContactId: opportunity.waContactId ?? person?.waContactId ?? null,
         opportunityId: opportunity.id,
       };
@@ -736,7 +752,7 @@ export class AnuraIngestService {
       return {
         waCycleId: cycleId,
         waContactId: hit?.contact_id ?? null,
-        opportunityId: opportunity?.id ?? null,
+        opportunityId: null,
       };
     } catch (err) {
       this.logger.warn(`Anura match WA falló: ${err instanceof Error ? err.message : err}`);
