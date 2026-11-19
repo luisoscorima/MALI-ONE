@@ -2,6 +2,29 @@
 
 Fecha: 2026-11-18. Rollback y operación para mañana.
 
+## Despliegue de consolidación verificado
+
+- ONE API: `f6f81e4`; WA API: `87628b9`.
+- Despliegue por `git pull --ff-only` y `docker compose ... up -d --no-deps --build api`.
+- Frontends sin cambios respecto de lo ya desplegado; bases y volúmenes no recreados.
+- Health ONE 200/healthy; health WA 200 y DB up.
+- Migración aditiva WA `20261120010000_cycle_shadow_outbox_trigger` aplicada;
+  cero migraciones incompletas activas en ambas bases.
+- Usuarios 30, asociaciones de áreas 23, contactos 24.703 y ciclos 19.036,
+  idénticos antes/después del despliegue WA.
+- `APPLY_OPERATIONAL_ROLE_SEED` no habilitado: el arranque preserva permisos.
+- Consulta interna WA→ONE 200: authority=wa, wa_ux=stable;
+  Meta/TikTok/wa_inbound siguen pendientes del corte F4.
+- Miniensayo de lectura: 10/10 etapas y fichas correctas; ver documento de equivalencia.
+- Evento técnico `wa-one-smoke-87628b9` entregado automáticamente en un intento,
+  sin error, recibido en ONE con `processedAt=null`. Replay mantiene una sola fila
+  y el contenido original. No modifica datos comerciales y queda como evidencia.
+- Pruebas locales: 8 ONE y 3 WA pasan; TypeScript de ambas APIs pasa.
+
+Pendiente de validación funcional con datos controlados: creación manual/widget,
+ingestión nueva Anura/Prospectia y aplicación/boleteo de un pago. El smoke de lectura
+no sustituye ese recorrido ni habilita F4. No se fabricaron clientes/pagos en producción.
+
 ## Operación mañana
 
 | Rol | Dónde |

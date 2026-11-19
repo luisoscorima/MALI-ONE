@@ -28,15 +28,33 @@ El ensayo previo encontró 0 oportunidades nativas enlazadas y 0 eventos shadow.
 Por ello esta muestra verifica la proyección WA, no demuestra equivalencia de
 oportunidades nativas enlazadas. Repetir después del despliegue y documentar el resultado.
 
-## Resultados posteriores (pendientes de despliegue)
+## Resultados posteriores al despliegue ONE `f6f81e4`
 
 | # | wa_cycle_id | etapa_WA | fila_ONE | linked | gaps |
 |---|-------------|----------|----------|--------|------|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
-| 5 | | | | | |
+| 1 | 19036 | contactado | wa-cycle-19036: contactado | proyección WA | sin vínculo nativo |
+| 2 | 19032 | contactado | wa-cycle-19032: contactado | proyección WA | sin vínculo nativo |
+| 3 | 19014 | contactado | wa-cycle-19014: contactado | proyección WA | sin vínculo nativo |
+| 4 | 19012 | contactado | wa-cycle-19012: contactado | proyección WA | sin vínculo nativo |
+| 5 | 19009 | contactado | wa-cycle-19009: contactado | proyección WA | sin vínculo nativo |
+| 6 | 17943 | contactado | wa-cycle-17943: contactado | proyección WA | sin vínculo nativo |
+| 7 | 17863 | evaluando | wa-cycle-17863: evaluando | proyección WA | sin vínculo nativo |
+| 8 | 17853 | evaluando | wa-cycle-17853: evaluando | proyección WA | sin vínculo nativo |
+| 9 | 18687 | contactado | wa-cycle-18687: contactado | proyección WA | sin vínculo nativo |
+| 10 | 18685 | contactado | wa-cycle-18685: contactado | proyección WA | sin vínculo nativo |
+
+Filas 1–5 CA; 6–10 EP. Diez etapas coinciden y diez fichas responden.
+La muestra se selecciona de datos vivos, priorizando estados distintos de
+`por_contactar`; los IDs pueden variar entre ejecuciones. No se alteraron etapas.
+API ONE healthy; endpoint interno de autoridad responde 200 y mantiene `wa`,
+`wa_ux=stable`, fuentes pendientes meta/tiktok/wa_inbound. Sin migraciones fallidas
+pendientes; seeds automáticos de widgets desactivados.
+
+Al comprobar: 8.250 oportunidades ONE, 0 enlaces nativos, 1 venta y 604 actividades
+Anura. Estos conteos son una observación puntual, no metas de aceptación.
+No acredita un flujo nuevo de cobro/matrícula ni ingestión de formularios reales:
+se evitó introducir clientes/pagos ficticios en producción. Esas pruebas funcionales
+con datos controlados permanecen separadas del smoke de lectura.
 
 ## Clasificación de gaps
 
