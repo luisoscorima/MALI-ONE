@@ -1482,8 +1482,8 @@ export function CrmEducacionPage() {
       </TabsContent>
       <TabsContent value="activities" className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Llamadas Anura en lenguaje humano: quién llamó, a qué persona/teléfono, si contestó y cuántos segundos.
-          El nombre del lead sale del CRM (Anura no lo trae); el agente sí (`Karol-108` → Karol).
+          Historial estilo Anura: dirección, origen/destino, estado y duración.
+          El nombre del lead sale del CRM; el asesor viene de Anura (`Karol-108` → Karol).
         </p>
         <ActivityPanel />
       </TabsContent>
@@ -1783,12 +1783,74 @@ function AssociatePaymentPanel({
 
 const ACTIVITY_RESULT_LABELS: Record<string, string> = {
   reached: 'Contestada',
-  attempted: 'No completada',
-  no_answer: 'No contesta',
+  attempted: 'Cancelada',
+  no_answer: 'Sin respuesta',
   left_voicemail: 'Buzón',
   bounced: 'Rebotado',
   other: 'Otro',
 };
+
+function formatDurationHms(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds)) return '—';
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function formatAnuraWhen(value: string): string {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
+function anuraDirectionBadge(direction: string) {
+  const inbound = direction === 'inbound';
+  return (
+    <Badge
+      variant="outline"
+      className={inbound
+        ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+        : 'border-sky-500/40 bg-sky-500/15 text-sky-700 dark:text-sky-400'}
+    >
+      {inbound ? 'Entrante' : 'Saliente'}
+    </Badge>
+  );
+}
+
+function anuraStatusBadge(result: string) {
+  const label = ACTIVITY_RESULT_LABELS[result] ?? result;
+  if (result === 'reached') {
+    return (
+      <Badge className="border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+        {label}
+      </Badge>
+    );
+  }
+  if (result === 'attempted' || result === 'bounced') {
+    return <Badge variant="destructive">{label}</Badge>;
+  }
+  if (result === 'no_answer') {
+    return (
+      <Badge className="border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-400">
+        {label}
+      </Badge>
+    );
+  }
+  return <Badge variant="secondary">{label}</Badge>;
+}
 
 type AnuraActivityRow = {
   id: string;
@@ -1802,6 +1864,11 @@ type AnuraActivityRow = {
   phone: string | null;
   agentName: string | null;
   durationSeconds: number | null;
+  originLabel: string | null;
+  originNumber: string | null;
+  destinationLabel: string | null;
+  destinationNumber: string | null;
+  advisorMatched: boolean;
   summary: string;
 };
 
@@ -1823,34 +1890,73 @@ function ActivityPanel() {
   const anuraColumns = useMemo<ColumnDef<AnuraActivityRow>[]>(() => [
     {
       id: 'when',
-      header: 'Fecha y hora',
+      header: 'Fecha',
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-sm">{formatDate(row.original.occurredAt)}</span>
+        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
+          {formatAnuraWhen(row.original.occurredAt)}
+        </span>
       ),
     },
     {
-      id: 'contact',
-      header: 'Persona',
+      id: 'direction',
+      header: 'Dirección',
+      cell: ({ row }) => anuraDirectionBadge(row.original.direction),
+    },
+    {
+      id: 'origin',
+      header: 'Origen',
       cell: ({ row }) => (
-        <div>
-          <div className="font-medium">{row.original.contactName || 'Contacto sin nombre'}</div>
-          <div className="text-xs text-muted-foreground">{row.original.phone || '—'}</div>
-        </div>
+        <span className="font-medium">{row.original.originLabel || '—'}</span>
       ),
     },
     {
-      id: 'summary',
-      header: 'Qué pasó',
+      id: 'originNumber',
+      header: 'Núm origen',
       cell: ({ row }) => (
-        <div className="max-w-xl text-sm">
-          <div>{row.original.summary}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {row.original.direction === 'inbound' ? 'Entrante' : 'Saliente'}
-            {' · '}
-            {ACTIVITY_RESULT_LABELS[row.original.result] ?? row.original.result}
-            {row.original.durationSeconds != null ? ` · ${row.original.durationSeconds} s` : ''}
-            {row.original.agentName ? ` · Agente: ${row.original.agentName}` : ''}
-          </div>
+        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
+          {row.original.originNumber || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'destination',
+      header: 'Destino',
+      cell: ({ row }) => (
+        <span className="font-medium">{row.original.destinationLabel || '—'}</span>
+      ),
+    },
+    {
+      id: 'destinationNumber',
+      header: 'Núm destino',
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
+          {row.original.destinationNumber || '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: ({ row }) => anuraStatusBadge(row.original.result),
+    },
+    {
+      id: 'duration',
+      header: 'Duración',
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap font-mono text-xs tabular-nums">
+          {formatDurationHms(row.original.durationSeconds)}
+        </span>
+      ),
+    },
+    {
+      id: 'agent',
+      header: 'Asesor',
+      cell: ({ row }) => (
+        <div className="text-sm">
+          <div>{row.original.agentName || '—'}</div>
+          {row.original.advisorMatched ? (
+            <div className="text-[10px] text-muted-foreground">CRM</div>
+          ) : null}
         </div>
       ),
     },
@@ -1871,6 +1977,11 @@ function ActivityPanel() {
         phone: row.phone ?? null,
         agentName: row.agentName ?? null,
         durationSeconds: row.durationSeconds ?? null,
+        originLabel: row.originLabel ?? null,
+        originNumber: row.originNumber ?? null,
+        destinationLabel: row.destinationLabel ?? null,
+        destinationNumber: row.destinationNumber ?? null,
+        advisorMatched: Boolean(row.advisorMatched),
         summary: row.summary
           || `${row.agentName || 'Un asesor'} llamó · ${ACTIVITY_RESULT_LABELS[row.result] ?? row.result}`,
       })));

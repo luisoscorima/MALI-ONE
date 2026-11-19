@@ -32,6 +32,31 @@ function formatPhoneDisplay(raw: string | null | undefined): string | null {
   return d;
 }
 
+/** Extensión corta tal cual; número largo como +51… */
+function formatEndpoint(raw: string | null | undefined): string | null {
+  let d = digits(raw);
+  if (d.startsWith('00')) d = d.slice(2);
+  if (!d) return null;
+  if (d.length <= 4) return d;
+  return formatPhoneDisplay(raw);
+}
+
+function endpointsFromPayload(payload: unknown): {
+  originNumber: string | null;
+  destinationNumber: string | null;
+  disposition: string | null;
+} {
+  if (!payload || typeof payload !== 'object') {
+    return { originNumber: null, destinationNumber: null, disposition: null };
+  }
+  const cdr = normalizeWebhookPayload(payload as Record<string, unknown>);
+  return {
+    originNumber: formatEndpoint(cdr.calling),
+    destinationNumber: formatEndpoint(cdr.called),
+    disposition: cdr.status ? String(cdr.status).toUpperCase() : null,
+  };
+}
+
 /**
  * Anura no trae el nombre del lead: `calledName`/`callingName` son etiqueta de ruta
  * ("PERU - RESTO - MOVIL") o del ramal ("Karol-108"). El nombre humano sale de ONE/WA.
@@ -42,6 +67,78 @@ export function agentDisplayName(raw: string | null | undefined): string | null 
   if (!value) return null;
   const stripped = value.replace(/[-_ ]?\d{2,4}$/, '').trim();
   return stripped || value;
+}
+
+/** Rutas Anura / no-persona: no son asesores. */
+export function looksLikeRouteLabel(raw: string | null | undefined): boolean {
+  const value = String(raw ?? '').trim();
+  if (!value) return false;
+  if (/\b(PERU|MOVIL|MÓVIL|FIJO|RESTO|NACIONAL|INTERNACIONAL)\b/i.test(value)) return true;
+  if (/\s-\s/.test(value) && !/^\S+-\d{2,4}$/.test(value)) return true;
+  return false;
+}
+
+function normalizeMatchKey(raw: string | null | undefined): string {
+  return String(raw ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+type CrmAdvisorHit = { id: number; label: string };
+
+/** Match Anura (Karol-108) ↔ catálogo CRM (label del asesor). */
+export function matchCrmAdvisor(
+  candidates: Array<string | null | undefined>,
+  advisors: CrmAdvisorHit[],
+): CrmAdvisorHit | null {
+  const tokens = [...new Set(
+    candidates
+      .flatMap((raw) => {
+        const value = String(raw ?? '').trim();
+        if (!value || looksLikeRouteLabel(value)) return [];
+        const display = agentDisplayName(value);
+        return [value, display].filter(Boolean) as string[];
+      })
+      .map(normalizeMatchKey)
+      .filter((token) => token.length >= 3 && !/^\d+$/.test(token)),
+  )];
+  if (!tokens.length || !advisors.length) return null;
+
+  let best: (CrmAdvisorHit & { score: number }) | null = null;
+  for (const advisor of advisors) {
+    const advKey = normalizeMatchKey(advisor.label);
+    if (!advKey) continue;
+    const advParts = advKey.split(/\s+/).filter(Boolean);
+    const advFirst = advParts[0] ?? '';
+    for (const token of tokens) {
+      const tokFirst = token.split(/\s+/)[0] ?? '';
+      let score = 0;
+      if (advKey === token) score = 100;
+      else if (advFirst && tokFirst && advFirst === tokFirst && advFirst.length >= 3) score = 80;
+      else if (tokFirst.length >= 4 && advKey.includes(tokFirst)) score = 65;
+      else if (advFirst.length >= 4 && token.includes(advFirst)) score = 55;
+      if (score > (best?.score ?? 0)) best = { id: advisor.id, label: advisor.label, score };
+    }
+  }
+  return best && best.score >= 55 ? { id: best.id, label: best.label } : null;
+}
+
+/**
+ * Saliente → origen (account / callingName).
+ * Entrante → destino (account / calledName), a veces.
+ */
+export function agentHintsFromCdr(cdr: AnuraCdr): string[] {
+  const inbound = String(cdr.direction ?? '').toUpperCase() === 'IN';
+  const account = String(cdr.account?.name ?? '').trim();
+  const callingName = String(cdr.callingName ?? '').trim();
+  const calledName = String(cdr.calledName ?? '').trim();
+  const primary = inbound
+    ? [account, calledName, callingName]
+    : [account, callingName, calledName];
+  return primary.filter((value) => value && !looksLikeRouteLabel(value));
 }
 
 export type AnuraCallFields = {
@@ -55,7 +152,8 @@ export type AnuraCallFields = {
 
 export function fieldsFromCdr(cdr: AnuraCdr): AnuraCallFields {
   const inbound = String(cdr.direction ?? '').toUpperCase() === 'IN';
-  const agentRaw = String(cdr.account?.name ?? cdr.callingName ?? cdr.calledName ?? '').trim() || null;
+  const hints = agentHintsFromCdr(cdr);
+  const agentRaw = hints[0] ?? null;
   const talk = cdr.billSeconds != null ? Number(cdr.billSeconds) : null;
   const ring = cdr.duration != null ? Number(cdr.duration) : null;
   return {
@@ -480,6 +578,24 @@ export class AnuraIngestService {
       }
     }
 
+    let crmAdvisors: CrmAdvisorHit[] = [];
+    if (this.wa.configured) {
+      try {
+        const catalogs = await this.wa.fetchEducationManagementCatalogs();
+        crmAdvisors = (catalogs.advisors ?? [])
+          .filter((advisor) => {
+            const areas = advisor.areas ?? [];
+            return areas.includes('educacion')
+              || areas.includes('educacion_ca')
+              || areas.includes('educacion_ep')
+              || areas.length === 0;
+          })
+          .map((advisor) => ({ id: advisor.id, label: advisor.label }));
+      } catch (err) {
+        this.logger.warn(`Anura advisors CRM falló: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
     return rows.map((row, index) => {
       const fromNote = parsed[index];
       const fromOpp = row.opportunity?.person
@@ -498,8 +614,29 @@ export class AnuraIngestService {
       const contactName = fromOpp?.name || fromCycle?.name || fromContact?.name || fromPhone?.name || null;
       const phone = fromOpp?.phone || fromCycle?.phone || fromContact?.phone
         || fromNote.phone || fromPhone?.phone || null;
-      const agentName = fromNote.agentName;
       const durationSeconds = fromNote.durationSeconds;
+      const endpoints = endpointsFromPayload(row.payload);
+      const inbound = row.direction === 'inbound';
+      const cdrHints = row.payload && typeof row.payload === 'object'
+        ? agentHintsFromCdr(normalizeWebhookPayload(row.payload as Record<string, unknown>))
+        : [];
+      const sideHint = inbound
+        ? [endpoints.destinationNumber, fromNote.agentRaw, fromNote.agentName, ...cdrHints]
+        : [endpoints.originNumber, fromNote.agentRaw, fromNote.agentName, ...cdrHints];
+      const matchedAdvisor = matchCrmAdvisor(sideHint, crmAdvisors)
+        ?? matchCrmAdvisor([fromNote.agentRaw, fromNote.agentName, ...cdrHints], crmAdvisors);
+      const agentName = matchedAdvisor?.label || fromNote.agentName;
+      const agentRaw = fromNote.agentRaw || matchedAdvisor?.label || null;
+      const originNumber = endpoints.originNumber
+        || (inbound ? phone : (fromNote.extension || null));
+      const destinationNumber = endpoints.destinationNumber
+        || (inbound ? (fromNote.extension || null) : phone);
+      const originLabel = inbound
+        ? (contactName || originNumber || 'Origen')
+        : (matchedAdvisor?.label || fromNote.agentRaw || agentName || originNumber || 'Asesor');
+      const destinationLabel = inbound
+        ? (matchedAdvisor?.label || fromNote.agentRaw || agentName || destinationNumber || 'Asesor')
+        : (contactName || destinationNumber || 'Destino');
       return {
         id: row.id,
         channel: row.channel,
@@ -514,10 +651,17 @@ export class AnuraIngestService {
         contactName,
         phone,
         agentName,
-        agentRaw: fromNote.agentRaw,
+        agentRaw,
+        advisorId: matchedAdvisor?.id ?? null,
+        advisorMatched: Boolean(matchedAdvisor),
         extension: fromNote.extension,
         durationSeconds,
         talkSeconds: fromNote.talkSeconds,
+        originLabel,
+        originNumber,
+        destinationLabel,
+        destinationNumber,
+        disposition: endpoints.disposition,
         summary: humanAnuraSummary({
           direction: row.direction,
           result: row.result,

@@ -801,6 +801,10 @@ export const api = {
       contactName?: string | null; phone?: string | null; agentName?: string | null;
       agentRaw?: string | null; extension?: string | null;
       durationSeconds?: number | null; talkSeconds?: number | null; summary?: string;
+      originLabel?: string | null; originNumber?: string | null;
+      destinationLabel?: string | null; destinationNumber?: string | null;
+      disposition?: string | null;
+      advisorId?: number | null; advisorMatched?: boolean;
     }>>(`/api/crm-educacion/activities/anura/recent?limit=${limit}`),
   importAnuraActivities: (body?: { hours?: number; limit?: number }) =>
     request<{
