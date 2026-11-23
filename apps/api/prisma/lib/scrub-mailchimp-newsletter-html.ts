@@ -20,7 +20,7 @@ const DEFAULT_UNKNOWN_ARCHIVE = 'https://mali.pe';
 const MAILCHIMP_HREF_RE =
   /https?:\/\/(?:[\w.-]+\.)?(?:mailchi\.mp|list-manage\.com|login\.mailchimp\.com|campaign-archive\.com|eepurl\.com)[^"'\\\s>]*/i;
 
-/** Built-in map of the 7 seeded Mailchimp archives. */
+/** Built-in map of seeded Mailchimp archives. */
 export const SEEDED_MAILCHIMP_ARCHIVE_SLUGS: Record<string, string> = {
   'boletinnoviembre2026-7706881': 'mailchimp-boletin-auditorio-nov-2026',
   'boletinmarzo2026-7706953': 'mailchimp-boletin-mensual-nov-2026',
@@ -31,6 +31,11 @@ export const SEEDED_MAILCHIMP_ARCHIVE_SLUGS: Record<string, string> = {
   'cursosdearte-iniciaenmayo-7706142': 'mailchimp-boletin-cursos-arte',
   'llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706140':
     'mailchimp-boletin-extension-profesional',
+  'asamblea-mali-25ii-7707175': 'mailchimp-invitacion-sandra-gamarra-replica',
+  'asamblea-mali-25i-7707074': 'mailchimp-asamblea-asociados-2026-1',
+  'asamblea-mali-25ii-7706902': 'mailchimp-lanzamiento-casa-del-moral',
+  'invitacin-cctel-de-inauguracin-pacchas-agua-ritual-y-ofrenda-en-los-andes':
+    'mailchimp-invitacion-pacchas',
 };
 
 const SOCIAL_ICON_FILES: Record<string, string> = {

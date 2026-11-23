@@ -72,6 +72,31 @@ const CAMPAIGNS: CampaignSpec[] = [
     sourceUrl:
       'https://mailchi.mp/mali/llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706140',
   },
+  {
+    slug: 'mailchimp-invitacion-sandra-gamarra-replica',
+    title: 'Invitación — Sandra Gamarra Heshiki. Réplica',
+    brand: NewsletterBrand.museo,
+    sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25ii-7707175',
+  },
+  {
+    slug: 'mailchimp-asamblea-asociados-2026-1',
+    title: 'Asamblea General Ordinaria de Asociados MALI 2026-1',
+    brand: NewsletterBrand.museo,
+    sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25i-7707074',
+  },
+  {
+    slug: 'mailchimp-lanzamiento-casa-del-moral',
+    title: 'Invitación — Lanzamiento Casa del Moral BCP - MALI',
+    brand: NewsletterBrand.museo,
+    sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25ii-7706902',
+  },
+  {
+    slug: 'mailchimp-invitacion-pacchas',
+    title: 'Invitación — Cóctel de inauguración: Pacchas',
+    brand: NewsletterBrand.museo,
+    sourceUrl:
+      'https://mailchi.mp/mali/invitacin-cctel-de-inauguracin-pacchas-agua-ritual-y-ofrenda-en-los-andes',
+  },
 ];
 
 const brandLogosDir =
