@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -21,7 +22,10 @@ import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 import {
   CreateMalichimpCampaignDto,
   CreateMalichimpNewsletterDraftDto,
+  ExportMalichimpCampaignsDto,
   MalichimpAudienceDto,
+  MalichimpCampaignSendsQueryDto,
+  UpdateMalichimpContactDto,
 } from './dto/malichimp-campaign.dto';
 import { MalichimpService } from './malichimp.service';
 
@@ -38,6 +42,14 @@ export class MalichimpController {
   @Get('contacts')
   contacts(@Query() query: MalichimpContactsQueryDto) {
     return this.malichimp.listContacts(query);
+  }
+
+  @Patch('contacts/:id')
+  updateContact(
+    @Param('id') id: string,
+    @Body() body: UpdateMalichimpContactDto,
+  ) {
+    return this.malichimp.updateContact(id, body);
   }
 
   @Get('tags')
@@ -61,7 +73,6 @@ export class MalichimpController {
   }
 
   @Post('newsletters/draft')
-  @Roles(UserRole.admin)
   createNewsletterDraft(
     @Req() req: { user: User },
     @Body() body: CreateMalichimpNewsletterDraftDto,
@@ -72,6 +83,25 @@ export class MalichimpController {
   @Get('campaigns')
   campaigns() {
     return this.malichimp.listCampaigns();
+  }
+
+  @Post('campaigns/export')
+  async exportCampaigns(
+    @Body() body: ExportMalichimpCampaignsDto = {},
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.malichimp.exportCampaignsXlsx(
+      body?.campaignIds,
+    );
+    res
+      .status(200)
+      .set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'private, no-store',
+      })
+      .send(buffer);
   }
 
   @Get('campaigns/:id/view')
@@ -100,6 +130,14 @@ export class MalichimpController {
     );
   }
 
+  @Get('campaigns/:id/sends')
+  campaignSends(
+    @Param('id') id: string,
+    @Query() query: MalichimpCampaignSendsQueryDto,
+  ) {
+    return this.malichimp.listCampaignSends(id, query);
+  }
+
   @Get('campaigns/:id')
   campaign(@Param('id') id: string) {
     return this.malichimp.getCampaign(id);
@@ -111,7 +149,6 @@ export class MalichimpController {
   }
 
   @Post('campaigns')
-  @Roles(UserRole.admin)
   createCampaign(
     @Req() req: { user: User },
     @Body() body: CreateMalichimpCampaignDto,
@@ -120,7 +157,6 @@ export class MalichimpController {
   }
 
   @Post('campaigns/:id/duplicate')
-  @Roles(UserRole.admin)
   duplicateCampaign(
     @Req() req: { user: User },
     @Param('id') id: string,
@@ -129,13 +165,11 @@ export class MalichimpController {
   }
 
   @Delete('campaigns/:id')
-  @Roles(UserRole.admin)
   deleteDraftCampaign(@Param('id') id: string) {
     return this.malichimp.deleteDraftCampaign(id);
   }
 
   @Post('campaigns/:id/send')
-  @Roles(UserRole.admin)
   sendDraftCampaign(
     @Param('id') id: string,
     @Body() body: CreateMalichimpCampaignDto,
@@ -159,7 +193,6 @@ export class MalichimpController {
   }
 
   @Post('imports/xlsx/preview')
-  @Roles(UserRole.admin)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { files: 1, fileSize: 10 * 1024 * 1024 },
@@ -181,7 +214,6 @@ export class MalichimpController {
   }
 
   @Post('imports/xlsx/:previewId/apply')
-  @Roles(UserRole.admin)
   applyXlsxImport(
     @Req() req: { user: User },
     @Param('previewId') previewId: string,
@@ -199,7 +231,6 @@ export class MalichimpController {
   }
 
   @Get('imports/jobs/:jobId')
-  @Roles(UserRole.admin)
   importJob(
     @Req() req: { user: User },
     @Param('jobId') jobId: string,

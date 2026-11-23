@@ -7,8 +7,11 @@ import {
   Param,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { AppModule, User, UserRole } from '@prisma/client';
+import type { Request } from 'express';
+import { RequireModule } from '../guards/module.decorator';
 import { Roles } from '../guards/roles.decorator';
 import { EmailDeliveryService } from './email-delivery.service';
 import { SaveEmailSenderDto } from './email-sender.dto';
@@ -41,26 +44,26 @@ export class EmailDeliveryController {
     };
   }
 
-  /** Readable by any authenticated campaign operator; mutations stay admin-only. */
+  /** Readable by any authenticated campaign operator; mutations require newsletters. */
   @Get('senders')
   listSenders() {
     return this.senders.list();
   }
 
   @Post('senders')
-  @Roles(UserRole.admin)
-  createSender(@Body() body: SaveEmailSenderDto) {
-    return this.senders.create(body.email);
+  @RequireModule(AppModule.newsletters)
+  createSender(@Req() req: Request, @Body() body: SaveEmailSenderDto) {
+    return this.senders.create(body.email, (req.user as User).id);
   }
 
   @Patch('senders/:id')
-  @Roles(UserRole.admin)
+  @RequireModule(AppModule.newsletters)
   updateSender(@Param('id') id: string, @Body() body: SaveEmailSenderDto) {
     return this.senders.update(id, body.email);
   }
 
   @Delete('senders/:id')
-  @Roles(UserRole.admin)
+  @RequireModule(AppModule.newsletters)
   removeSender(@Param('id') id: string) {
     return this.senders.remove(id);
   }

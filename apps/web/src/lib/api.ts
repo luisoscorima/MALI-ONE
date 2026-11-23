@@ -463,11 +463,15 @@ export const api = {
       `/api/malichimp/imports/jobs/${encodeURIComponent(jobId)}`,
     ),
 
-  previewMalichimpXlsxImport: (file: File, groupOptionIds: string[]) => {
+  previewMalichimpXlsxImport: (
+    file: File,
+    groupOptionIds: string[],
+    consentConfirmed: boolean,
+  ) => {
     const body = new FormData();
     body.append('file', file);
     body.append('groupOptionIds', JSON.stringify(groupOptionIds));
-    body.append('consentConfirmed', 'true');
+    body.append('consentConfirmed', consentConfirmed ? 'true' : 'false');
     return request<import('@mali-one/shared').MalichimpXlsxImportPreviewDto>(
       '/api/malichimp/imports/xlsx/preview',
       { method: 'POST', body },
@@ -510,6 +514,66 @@ export const api = {
   getMalichimpCampaignStats: (id: string, days = 30) =>
     request<import('@mali-one/shared').MalichimpCampaignStatsDto>(
       `/api/malichimp/campaigns/${encodeURIComponent(id)}/stats?days=${encodeURIComponent(String(days))}`,
+    ),
+
+  listMalichimpCampaignSends: (
+    id: string,
+    params: {
+      event?: import('@mali-one/shared').MalichimpCampaignSendEvent;
+      q?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) => {
+    const query = new URLSearchParams();
+    if (params.event) query.set('event', params.event);
+    if (params.q) query.set('q', params.q);
+    if (params.page) query.set('page', String(params.page));
+    if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    const suffix = query.toString() ? `?${query}` : '';
+    return request<import('@mali-one/shared').MalichimpCampaignSendsPageDto>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}/sends${suffix}`,
+    );
+  },
+
+  exportMalichimpCampaigns: async (campaignIds?: string[]) => {
+    const res = await fetch(`${API_BASE}/api/malichimp/campaigns/export`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaignIds: campaignIds?.length ? campaignIds : undefined }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ message: res.statusText }));
+      const message = error.message;
+      const text = Array.isArray(message)
+        ? message.join(', ')
+        : typeof message === 'string'
+          ? message
+          : res.statusText;
+      throw new Error(text || 'No se pudo exportar');
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? 'malichimp-campanas.xlsx';
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  updateMalichimpContact: (
+    id: string,
+    body: import('@mali-one/shared').UpdateMalichimpContactDto,
+  ) =>
+    request<import('@mali-one/shared').MalichimpContactDto>(
+      `/api/malichimp/contacts/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
     ),
 
   duplicateMalichimpCampaign: (id: string) =>

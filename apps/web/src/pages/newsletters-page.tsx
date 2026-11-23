@@ -27,7 +27,6 @@ import {
 } from '@/components/newsletter-editor';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
-import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
@@ -60,15 +59,11 @@ type EditorMode = 'closed' | 'create' | 'edit';
 export function NewslettersPage() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const editorRef = useRef<NewsletterEditorHandle>(null);
   const openedFromQueryRef = useRef<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const section =
-    searchParams.get('tab') === 'remitentes' && isAdmin
-      ? 'remitentes'
-      : 'boletines';
+    searchParams.get('tab') === 'remitentes' ? 'remitentes' : 'boletines';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,9 +106,7 @@ export function NewslettersPage() {
     try {
       const [nextNewsletters, nextSenders] = await Promise.all([
         api.listNewsletters(),
-        isAdmin
-          ? api.listEmailSenders().catch(() => [] as EmailSenderDto[])
-          : Promise.resolve([] as EmailSenderDto[]),
+        api.listEmailSenders().catch(() => [] as EmailSenderDto[]),
       ]);
       setNewsletters(nextNewsletters);
       setSenders(nextSenders);
@@ -122,7 +115,7 @@ export function NewslettersPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -329,12 +322,10 @@ export function NewslettersPage() {
               <Newspaper className="size-4" aria-hidden />
               Boletines
             </TabsTrigger>
-            {isAdmin ? (
-              <TabsTrigger value="remitentes">
-                <Mail className="size-4" aria-hidden />
-                Remitentes
-              </TabsTrigger>
-            ) : null}
+            <TabsTrigger value="remitentes">
+              <Mail className="size-4" aria-hidden />
+              Remitentes
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="remitentes" className="mt-6">

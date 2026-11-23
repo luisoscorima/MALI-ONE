@@ -131,6 +131,7 @@ export interface EmailSenderDto {
   email: string;
   createdAt: string;
   updatedAt: string;
+  createdBy?: { name: string; email: string } | null;
 }
 
 export interface MalichimpImportReportDto {
@@ -256,6 +257,12 @@ export interface CreateMalichimpNewsletterDraftDto {
   subject?: string;
 }
 
+export interface MalichimpCampaignCreatorDto {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface MalichimpCampaignDto {
   id: string;
   name: string;
@@ -272,9 +279,11 @@ export interface MalichimpCampaignDto {
   complaints: number;
   opened: number;
   clicked: number;
+  replied: number;
   scheduledAt: string | null;
   createdAt: string;
   completedAt: string | null;
+  createdBy: MalichimpCampaignCreatorDto | null;
 }
 
 export interface MalichimpCampaignDetailDto {
@@ -294,6 +303,7 @@ export interface MalichimpCampaignDetailDto {
   totalRecipients: number;
   scheduledAt: string | null;
   createdAt: string;
+  createdBy: MalichimpCampaignCreatorDto | null;
 }
 
 /** Lifetime totals + daily open/click series for a MALICHIMP campaign. */
@@ -310,12 +320,69 @@ export interface MalichimpCampaignStatsDto {
   complaints: number;
   opened: number;
   clicked: number;
+  replied: number;
   /** Unique opens / delivered (0–1). */
   openRate: number;
   /** Unique clicks / delivered (0–1). */
   clickRate: number;
+  /** Unique replies / delivered (0–1). */
+  replyRate: number;
   opensByDay: Array<{ date: string; count: number }>;
   clicksByDay: Array<{ date: string; count: number }>;
+}
+
+export type MalichimpCampaignSendEvent =
+  | 'all'
+  | 'sent'
+  | 'delivered'
+  | 'opened'
+  | 'clicked'
+  | 'bounced'
+  | 'complained'
+  | 'suppressed'
+  | 'failed'
+  | 'pending'
+  | 'replied';
+
+export interface MalichimpCampaignSendDto {
+  id: string;
+  email: string;
+  name: string | null;
+  status: string;
+  sourceContactId: string | null;
+  sentAt: string | null;
+  deliveredAt: string | null;
+  openedAt: string | null;
+  clickedAt: string | null;
+  bouncedAt: string | null;
+  complainedAt: string | null;
+  repliedAt: string | null;
+  error: string | null;
+}
+
+export interface MalichimpCampaignSendsPageDto {
+  items: MalichimpCampaignSendDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+  event: MalichimpCampaignSendEvent;
+}
+
+export interface UpdateMalichimpContactDto {
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  institutionName?: string | null;
+  jobTitle?: string | null;
+  city?: string | null;
+  country?: string | null;
+  classification?: string | null;
+  groupOptionIds?: string[];
+}
+
+export interface ExportMalichimpCampaignsDto {
+  campaignIds?: string[];
 }
 
 export interface InternalAudienceMemberDto {

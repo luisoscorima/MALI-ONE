@@ -13,7 +13,7 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 3. MALICHIMP, Campañas internas (Usuarios Workspace) u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
 4. Tracking, bajas y transporte se añaden fuera de Boletines en `core/email-delivery` y en el módulo dueño de la audiencia.
 5. Personalización de nombre: en el HTML o asunto puedes usar `{{first_name}}` (también vale `<<First Name>>` o `*|FNAME|*`). Al enviar, el motor SES lo reemplaza con el primer nombre del destinatario; si no hay nombre, usa `estimado(a)`. En el editor hay una nota, un botón **Insertar {{first_name}}** y el atajo `{{fn}}` en la barra de GrapesJS; el asunto también tiene un acceso rápido.
-6. La pestaña **Remitentes** (solo admin) administra el catálogo compartido `EmailSender` (`@mali.pe`) usado por MALICHIMP y Campañas internas.
+6. La pestaña **Remitentes** (módulo `newsletters`) administra el catálogo compartido `EmailSender` (`@mali.pe`) usado por MALICHIMP y Campañas internas.
 
 ## Código
 
@@ -23,7 +23,7 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 ## UI
 
 | `/admin/newsletters` | Boletines + Remitentes |
-| `/admin/newsletters?tab=remitentes` | Catálogo `EmailSender` (admin) |
+| `/admin/newsletters?tab=remitentes` | Catálogo `EmailSender` (módulo newsletters) |
 | `/n/:slug` | Vista pública |
 
 ## API
@@ -53,10 +53,11 @@ Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
 
 ## Remitentes
 
-Pestaña en Boletines (admin):
+Pestaña en Boletines (quien tiene módulo `newsletters`):
 
 - Solo acepta direcciones `@mali.pe`.
-- Listado disponible para operadores autenticados al armar campañas; CRUD solo admin.
+- Listado disponible para operadores autenticados al armar campañas; CRUD con módulo `newsletters`.
+- El listado muestra quién creó cada remitente (registros antiguos pueden quedar sin autor).
 - No se puede eliminar el último remitente.
 - Crear o editar no verifica identidades en AWS SES: el dominio/dirección deben estar autorizados en SES.
 - Borrar un remitente no altera campañas ya creadas.

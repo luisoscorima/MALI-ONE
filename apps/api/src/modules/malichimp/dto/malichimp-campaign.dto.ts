@@ -6,6 +6,7 @@ import {
   IsArray,
   IsDateString,
   IsEmail,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -129,4 +130,105 @@ export class CreateMalichimpNewsletterDraftDto {
   @MaxLength(200)
   @Matches(/^[^\r\n]+$/)
   subject?: string;
+}
+
+export class ExportMalichimpCampaignsDto {
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  campaignIds?: string[];
+}
+
+export const MALICHIMP_CAMPAIGN_SEND_EVENTS = [
+  'all',
+  'sent',
+  'delivered',
+  'opened',
+  'clicked',
+  'bounced',
+  'complained',
+  'suppressed',
+  'failed',
+  'pending',
+  'replied',
+] as const;
+
+export type MalichimpCampaignSendEvent =
+  (typeof MALICHIMP_CAMPAIGN_SEND_EVENTS)[number];
+
+export class MalichimpCampaignSendsQueryDto {
+  @IsOptional()
+  @IsIn(MALICHIMP_CAMPAIGN_SEND_EVENTS)
+  event?: MalichimpCampaignSendEvent;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize?: number;
+}
+
+export class UpdateMalichimpContactDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  firstName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  lastName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  institutionName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  jobTitle?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  country?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  classification?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  groupOptionIds?: string[];
 }

@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   Copy,
   Eye,
+  Download,
   ExternalLink,
   Loader2,
   Pencil,
@@ -100,7 +101,6 @@ type Props = {
   groups: MalichimpGroupDto[];
   delivery: MalichimpStatsDto['delivery'] | null;
   senders: EmailSenderDto[];
-  isAdmin: boolean;
 };
 
 type FlatOption = {
@@ -385,7 +385,7 @@ function NewsletterSearchSelect({
   );
 }
 
-export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props) {
+export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
   const senderEmails = senders.map((sender) => sender.email);
@@ -394,6 +394,8 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
     ? delivery.defaultFromEmail
     : senderEmails[0] ?? '';
   const [campaigns, setCampaigns] = useState<MalichimpCampaignDto[]>([]);
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -936,13 +938,44 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
             Cada envío congela el boletín y su audiencia.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => void load()} aria-label="Actualizar campañas">
             <RefreshCw className="size-4" aria-hidden /> Actualizar
           </Button>
           <Button
+            variant="outline"
+            disabled={exporting || !campaigns.length}
+            onClick={() => {
+              void (async () => {
+                setExporting(true);
+                try {
+                  const ids = [...selectedCampaignIds];
+                  await api.exportMalichimpCampaigns(ids.length ? ids : undefined);
+                  toast.success(
+                    ids.length
+                      ? `Exportadas ${ids.length} campaña${ids.length === 1 ? '' : 's'}`
+                      : 'Exportadas todas las campañas',
+                  );
+                } catch (reason) {
+                  toast.error(reason instanceof Error ? reason.message : 'No se pudo exportar');
+                } finally {
+                  setExporting(false);
+                }
+              })();
+            }}
+          >
+            {exporting ? (
+              <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <Download className="size-4" aria-hidden />
+            )}
+            {selectedCampaignIds.size
+              ? `Exportar ${selectedCampaignIds.size}`
+              : 'Exportar Excel'}
+          </Button>
+          <Button
             onClick={openCampaign}
-            disabled={!isAdmin || !delivery?.configured || !hasGroupOptions || !senders.length}
+            disabled={!delivery?.configured || !hasGroupOptions || !senders.length}
           >
             <Plus className="size-4" aria-hidden /> Nueva campaña
           </Button>
@@ -961,9 +994,9 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
         </AlertBanner>
       ) : null}
 
-      {isAdmin && !senders.length ? (
+      {!senders.length ? (
         <AlertBanner variant="info">
-          Agrega al menos un remitente @mali.pe en la pestaña Remitentes antes de crear campañas.
+          Agrega al menos un remitente @mali.pe en Boletines → Remitentes antes de crear campañas.
         </AlertBanner>
       ) : null}
 
@@ -971,6 +1004,25 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
         <Table className="min-w-[840px]">
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Seleccionar todas las campañas"
+                  checked={
+                    campaigns.length > 0 && selectedCampaignIds.size === campaigns.length
+                      ? true
+                      : selectedCampaignIds.size > 0
+                        ? 'indeterminate'
+                        : false
+                  }
+                  onCheckedChange={(checked) => {
+                    setSelectedCampaignIds(
+                      checked === true
+                        ? new Set(campaigns.map((campaign) => campaign.id))
+                        : new Set(),
+                    );
+                  }}
+                />
+              </TableHead>
               <TableHead className="w-[7.5rem]">Vista</TableHead>
                 <TableHead>Campaña</TableHead>
                 <TableHead>Estado</TableHead>
@@ -983,6 +1035,20 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
             <TableBody>
               {campaigns.map((campaign) => (
                 <TableRow key={campaign.id}>
+                  <TableCell className="align-middle">
+                    <Checkbox
+                      aria-label={`Seleccionar ${campaign.name}`}
+                      checked={selectedCampaignIds.has(campaign.id)}
+                      onCheckedChange={(checked) => {
+                        setSelectedCampaignIds((current) => {
+                          const next = new Set(current);
+                          if (checked === true) next.add(campaign.id);
+                          else next.delete(campaign.id);
+                          return next;
+                        });
+                      }}
+                    />
+                  </TableCell>
                   <TableCell className="align-middle">
                     <button
                       type="button"
@@ -1013,6 +1079,11 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                     <p className="text-xs text-muted-foreground">
                       {campaign.newsletterTitle} · {df.format(new Date(campaign.createdAt))}
                     </p>
+                    {campaign.createdBy ? (
+                      <p className="text-xs text-muted-foreground">
+                        Creada por {campaign.createdBy.name || campaign.createdBy.email}
+                      </p>
+                    ) : null}
                     {campaign.scheduledAt ? (
                       <p className="text-xs text-muted-foreground">
                         Programada: {df.format(new Date(campaign.scheduledAt))}
@@ -1047,7 +1118,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       >
                         <BarChart3 className="size-4" />
                       </IconActionButton>
-                      {campaign.status === 'draft' && isAdmin ? (
+                      {campaign.status === 'draft' ? (
                         <IconActionButton
                           label="Continuar"
                           onClick={() => void continueDraft(campaign.id)}
@@ -1066,20 +1137,18 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
                       >
                         <ExternalLink className="size-4" aria-hidden />
                       </IconActionButton>
-                      {isAdmin ? (
-                        <IconActionButton
-                          label="Duplicar"
-                          onClick={() => void duplicateCampaign(campaign.id)}
-                          disabled={duplicatingId === campaign.id}
-                        >
-                          {duplicatingId === campaign.id ? (
-                            <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                          ) : (
-                            <Copy className="size-4" aria-hidden />
-                          )}
-                        </IconActionButton>
-                      ) : null}
-                      {campaign.status === 'draft' && isAdmin ? (
+                      <IconActionButton
+                        label="Duplicar"
+                        onClick={() => void duplicateCampaign(campaign.id)}
+                        disabled={duplicatingId === campaign.id}
+                      >
+                        {duplicatingId === campaign.id ? (
+                          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                        ) : (
+                          <Copy className="size-4" aria-hidden />
+                        )}
+                      </IconActionButton>
+                      {campaign.status === 'draft' ? (
                         <IconActionButton
                           label="Eliminar"
                           onClick={() => void deleteDraftCampaign(campaign)}
@@ -1098,7 +1167,7 @@ export function MalichimpCampaigns({ groups, delivery, senders, isAdmin }: Props
               ))}
               {!campaigns.length ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     <BarChart3 className="mx-auto mb-2 size-6" aria-hidden />
                     Aún no hay campañas MALICHIMP.
                   </TableCell>

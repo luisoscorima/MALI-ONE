@@ -588,6 +588,7 @@ export class InternalCommunicationsService {
       complaints: bigint;
       opened: bigint;
       clicked: bigint;
+      replied: bigint;
     }>>(Prisma.sql`
       SELECT
         COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
@@ -595,7 +596,8 @@ export class InternalCommunicationsService {
         COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
         COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
         COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
-        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked"
+        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
+        COUNT(send."id") FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied"
       FROM "EmailSend" send
       WHERE send."campaignId" = ${campaign.id}
     `);
@@ -635,6 +637,7 @@ export class InternalCommunicationsService {
     const delivered = Number(totals?.delivered ?? 0);
     const opened = Number(totals?.opened ?? 0);
     const clicked = Number(totals?.clicked ?? 0);
+    const replied = Number(totals?.replied ?? 0);
 
     return {
       campaignId: campaign.id,
@@ -649,8 +652,10 @@ export class InternalCommunicationsService {
       complaints: Number(totals?.complaints ?? 0),
       opened,
       clicked,
+      replied,
       openRate: delivered > 0 ? opened / delivered : 0,
       clickRate: delivered > 0 ? clicked / delivered : 0,
+      replyRate: delivered > 0 ? replied / delivered : 0,
       opensByDay,
       clicksByDay,
     };

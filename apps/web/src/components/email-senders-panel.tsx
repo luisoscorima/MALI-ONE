@@ -120,6 +120,7 @@ export function EmailSendersPanel({ senders, onChange }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Correo</TableHead>
+              <TableHead>Creado por</TableHead>
               <TableHead>Agregado</TableHead>
               <TableHead className="w-28 text-right">Acciones</TableHead>
             </TableRow>
@@ -132,6 +133,12 @@ export function EmailSendersPanel({ senders, onChange }: Props) {
                     <Mail className="size-4 text-muted-foreground" aria-hidden />
                     {sender.email}
                   </div>
+                </TableCell>
+                <TableCell
+                  className="text-muted-foreground"
+                  title={sender.createdBy?.email}
+                >
+                  {sender.createdBy?.name ?? sender.createdBy?.email ?? '—'}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {df.format(new Date(sender.createdAt))}
@@ -164,7 +171,7 @@ export function EmailSendersPanel({ senders, onChange }: Props) {
             ))}
             {!senders.length ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
                   No hay remitentes. Agrega un correo @mali.pe para habilitar campañas.
                 </TableCell>
               </TableRow>

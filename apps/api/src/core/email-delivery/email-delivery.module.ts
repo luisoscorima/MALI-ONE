@@ -7,6 +7,7 @@ import { EmailCampaignDispatcherService } from './email-campaign-dispatcher.serv
 import { EmailTrackingController } from './email-tracking.controller';
 import { EmailTrackingService } from './email-tracking.service';
 import { EmailSenderService } from './email-sender.service';
+import { GmailReplySyncService } from './gmail-reply-sync.service';
 
 @Global()
 @Module({
@@ -18,12 +19,14 @@ import { EmailSenderService } from './email-sender.service';
     EmailCampaignDispatcherService,
     SesEventProcessorService,
     SesEventConsumerService,
+    GmailReplySyncService,
   ],
   exports: [
     EmailDeliveryService,
     EmailSenderService,
     EmailTrackingService,
     SesEventProcessorService,
+    GmailReplySyncService,
   ],
 })
 export class EmailDeliveryModule {}

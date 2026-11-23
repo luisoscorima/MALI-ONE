@@ -52,8 +52,15 @@ import {
   CreateMalichimpCampaignDto,
   CreateMalichimpNewsletterDraftDto,
   MalichimpAudienceDto,
+  MalichimpCampaignSendsQueryDto,
+  UpdateMalichimpContactDto,
+  type MalichimpCampaignSendEvent,
 } from './dto/malichimp-campaign.dto';
 import { NewslettersService } from '../newsletters/newsletters.service';
+import {
+  buildTreasuryXlsx,
+  limaStamp,
+} from '../treasury/treasury-xlsx';
 
 type AudienceRecipient = {
   id: string;
@@ -252,28 +259,147 @@ export class MalichimpService implements OnModuleInit {
     ]);
 
     return {
-      items: items.map(({ tags, groupOptions, ...contact }) => ({
-        ...contact,
-        tags: tags.map((entry) => entry.tag),
-        groupOptions: groupOptions
-          .map((entry) => entry.option)
-          .sort((left, right) =>
-            left.group.sortOrder - right.group.sortOrder ||
-            left.name.localeCompare(right.name, 'es-PE'))
-          .map(({ group, ...option }) => ({
-            ...option,
-            group: {
-              id: group.id,
-              name: group.name,
-              normalizedName: group.normalizedName,
-            },
-          })),
-      })),
+      items: items.map((item) => this.mapContact(item)),
       total,
       page: query.page,
       pageSize: query.pageSize,
       pages: Math.max(1, Math.ceil(total / query.pageSize)),
     };
+  }
+
+  private mapContact(item: {
+    tags: Array<{ tag: { id: string; name: string; normalizedName: string } }>;
+    groupOptions: Array<{
+      option: {
+        id: string;
+        name: string;
+        normalizedName: string;
+        group: {
+          id: string;
+          name: string;
+          normalizedName: string;
+          sortOrder: number;
+        };
+      };
+    }>;
+    [key: string]: unknown;
+  }) {
+    const { tags, groupOptions, ...contact } = item;
+    return {
+      ...contact,
+      tags: tags.map((entry) => entry.tag),
+      groupOptions: groupOptions
+        .map((entry) => entry.option)
+        .sort((left, right) =>
+          left.group.sortOrder - right.group.sortOrder ||
+          left.name.localeCompare(right.name, 'es-PE'))
+        .map(({ group, ...option }) => ({
+          ...option,
+          group: {
+            id: group.id,
+            name: group.name,
+            normalizedName: group.normalizedName,
+          },
+        })),
+    };
+  }
+
+  async updateContact(id: string, dto: UpdateMalichimpContactDto) {
+    const contact = await this.prisma.malichimpContact.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!contact) throw new NotFoundException('Contacto no encontrado');
+
+    const clean = (value: string | null | undefined, max: number) => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed.slice(0, max) : null;
+    };
+
+    if (dto.groupOptionIds) {
+      const options = await this.prisma.malichimpGroupOption.findMany({
+        where: { id: { in: dto.groupOptionIds } },
+        select: { id: true },
+      });
+      if (options.length !== dto.groupOptionIds.length) {
+        throw new BadRequestException('Una o más opciones de grupo no existen');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.malichimpContact.update({
+        where: { id },
+        data: {
+          ...(dto.firstName !== undefined
+            ? { firstName: clean(dto.firstName, 120) }
+            : {}),
+          ...(dto.lastName !== undefined
+            ? { lastName: clean(dto.lastName, 120) }
+            : {}),
+          ...(dto.phone !== undefined ? { phone: clean(dto.phone, 40) } : {}),
+          ...(dto.institutionName !== undefined
+            ? { institutionName: clean(dto.institutionName, 200) }
+            : {}),
+          ...(dto.jobTitle !== undefined
+            ? { jobTitle: clean(dto.jobTitle, 160) }
+            : {}),
+          ...(dto.city !== undefined ? { city: clean(dto.city, 120) } : {}),
+          ...(dto.country !== undefined
+            ? { country: clean(dto.country, 120) }
+            : {}),
+          ...(dto.classification !== undefined
+            ? { classification: clean(dto.classification, 120) }
+            : {}),
+        },
+      });
+
+      if (dto.groupOptionIds) {
+        await tx.malichimpContactGroupOption.deleteMany({
+          where: { contactId: id },
+        });
+        if (dto.groupOptionIds.length) {
+          await tx.malichimpContactGroupOption.createMany({
+            data: dto.groupOptionIds.map((optionId) => ({
+              contactId: id,
+              optionId,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+    });
+
+    const updated = await this.prisma.malichimpContact.findUniqueOrThrow({
+      where: { id },
+      include: {
+        tags: {
+          select: { tag: { select: { id: true, name: true, normalizedName: true } } },
+          orderBy: { tag: { name: 'asc' } },
+        },
+        groupOptions: {
+          select: {
+            option: {
+              select: {
+                id: true,
+                name: true,
+                normalizedName: true,
+                group: {
+                  select: {
+                    id: true,
+                    name: true,
+                    normalizedName: true,
+                    sortOrder: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return this.mapContact(updated);
   }
 
   async listTags() {
@@ -474,9 +600,13 @@ export class MalichimpService implements OnModuleInit {
       complaints: bigint;
       opened: bigint;
       clicked: bigint;
+      replied: bigint;
       scheduledAt: Date | null;
       createdAt: Date;
       completedAt: Date | null;
+      createdById: string | null;
+      createdByName: string | null;
+      createdByEmail: string | null;
     }>>(Prisma.sql`
       SELECT
         campaign."id",
@@ -494,25 +624,49 @@ export class MalichimpService implements OnModuleInit {
         COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
         COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
         COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
+        COUNT(send."id") FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied",
         campaign."scheduledAt",
         campaign."createdAt",
-        campaign."completedAt"
+        campaign."completedAt",
+        campaign."createdById",
+        creator."name" AS "createdByName",
+        creator."email" AS "createdByEmail"
       FROM "EmailCampaign" campaign
       JOIN "Newsletter" newsletter ON newsletter."id" = campaign."newsletterId"
+      LEFT JOIN "User" creator ON creator."id" = campaign."createdById"
       LEFT JOIN "EmailSend" send ON send."campaignId" = campaign."id"
       WHERE campaign."audienceArea" = 'malichimp'
-      GROUP BY campaign."id", newsletter."title"
+      GROUP BY campaign."id", newsletter."title", creator."name", creator."email"
       ORDER BY campaign."createdAt" DESC
-      LIMIT 50
+      LIMIT 200
     `);
     return rows.map((row) => ({
-      ...row,
+      id: row.id,
+      name: row.name,
+      newsletterId: row.newsletterId,
+      newsletterTitle: row.newsletterTitle,
+      subject: row.subject,
+      status: row.status,
+      totalRecipients: row.totalRecipients,
+      sent: row.sent,
+      failed: row.failed,
       delivered: Number(row.delivered),
       suppressed: Number(row.suppressed),
       bounced: Number(row.bounced),
       complaints: Number(row.complaints),
       opened: Number(row.opened),
       clicked: Number(row.clicked),
+      replied: Number(row.replied),
+      scheduledAt: row.scheduledAt,
+      createdAt: row.createdAt,
+      completedAt: row.completedAt,
+      createdBy: row.createdById
+        ? {
+            id: row.createdById,
+            name: row.createdByName ?? '',
+            email: row.createdByEmail ?? '',
+          }
+        : null,
     }));
   }
 
@@ -531,6 +685,9 @@ export class MalichimpService implements OnModuleInit {
             createdAt: true,
             updatedAt: true,
           },
+        },
+        createdBy: {
+          select: { id: true, name: true, email: true },
         },
       },
     });
@@ -554,6 +711,13 @@ export class MalichimpService implements OnModuleInit {
       totalRecipients: campaign.totalRecipients,
       scheduledAt: campaign.scheduledAt,
       createdAt: campaign.createdAt,
+      createdBy: campaign.createdBy
+        ? {
+            id: campaign.createdBy.id,
+            name: campaign.createdBy.name,
+            email: campaign.createdBy.email,
+          }
+        : null,
     };
   }
 
@@ -583,6 +747,7 @@ export class MalichimpService implements OnModuleInit {
       complaints: bigint;
       opened: bigint;
       clicked: bigint;
+      replied: bigint;
     }>>(Prisma.sql`
       SELECT
         COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
@@ -590,7 +755,8 @@ export class MalichimpService implements OnModuleInit {
         COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
         COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
         COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
-        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked"
+        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
+        COUNT(send."id") FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied"
       FROM "EmailSend" send
       WHERE send."campaignId" = ${campaign.id}
     `);
@@ -630,6 +796,7 @@ export class MalichimpService implements OnModuleInit {
     const delivered = Number(totals?.delivered ?? 0);
     const opened = Number(totals?.opened ?? 0);
     const clicked = Number(totals?.clicked ?? 0);
+    const replied = Number(totals?.replied ?? 0);
 
     return {
       campaignId: campaign.id,
@@ -644,10 +811,171 @@ export class MalichimpService implements OnModuleInit {
       complaints: Number(totals?.complaints ?? 0),
       opened,
       clicked,
+      replied,
       openRate: delivered > 0 ? opened / delivered : 0,
       clickRate: delivered > 0 ? clicked / delivered : 0,
+      replyRate: delivered > 0 ? replied / delivered : 0,
       opensByDay,
       clicksByDay,
+    };
+  }
+
+  async listCampaignSends(id: string, query: MalichimpCampaignSendsQueryDto) {
+    const campaign = await this.prisma.emailCampaign.findFirst({
+      where: { id, audienceArea: 'malichimp' },
+      select: { id: true },
+    });
+    if (!campaign) throw new NotFoundException('Campaña no encontrada');
+
+    const event = (query.event ?? 'all') as MalichimpCampaignSendEvent;
+    const page = Math.max(1, query.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 50));
+    const q = query.q?.trim();
+
+    const where: Prisma.EmailSendWhereInput = {
+      campaignId: campaign.id,
+      ...(q
+        ? {
+            OR: [
+              { email: { contains: q, mode: 'insensitive' } },
+              { name: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+      ...(event === 'sent'
+        ? { status: 'sent' as const }
+        : event === 'delivered'
+          ? { deliveredAt: { not: null } }
+          : event === 'opened'
+            ? { openedAt: { not: null } }
+            : event === 'clicked'
+              ? { clickedAt: { not: null } }
+              : event === 'bounced'
+                ? { bouncedAt: { not: null } }
+                : event === 'complained'
+                  ? { complainedAt: { not: null } }
+                  : event === 'suppressed'
+                    ? { status: 'suppressed' as const }
+                    : event === 'failed'
+                      ? { status: 'failed' as const }
+                      : event === 'pending'
+                        ? { status: 'pending' as const }
+                        : event === 'replied'
+                          ? { repliedAt: { not: null } }
+                          : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.emailSend.findMany({
+        where,
+        orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          status: true,
+          sourceContactId: true,
+          sentAt: true,
+          deliveredAt: true,
+          openedAt: true,
+          clickedAt: true,
+          bouncedAt: true,
+          complainedAt: true,
+          repliedAt: true,
+          error: true,
+        },
+      }),
+      this.prisma.emailSend.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        ...item,
+        sentAt: item.sentAt?.toISOString() ?? null,
+        deliveredAt: item.deliveredAt?.toISOString() ?? null,
+        openedAt: item.openedAt?.toISOString() ?? null,
+        clickedAt: item.clickedAt?.toISOString() ?? null,
+        bouncedAt: item.bouncedAt?.toISOString() ?? null,
+        complainedAt: item.complainedAt?.toISOString() ?? null,
+        repliedAt: item.repliedAt?.toISOString() ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+      pages: Math.max(1, Math.ceil(total / pageSize)),
+      event,
+    };
+  }
+
+  async exportCampaignsXlsx(campaignIds?: string[]) {
+    const ids = (campaignIds ?? []).map((id) => id.trim()).filter(Boolean);
+    const campaigns = await this.listCampaigns();
+    const rows = ids.length
+      ? campaigns.filter((campaign) => ids.includes(campaign.id))
+      : campaigns;
+    if (ids.length && !rows.length) {
+      throw new BadRequestException('No se encontraron campañas para exportar');
+    }
+
+    const pct = (num: number, den: number) =>
+      den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
+
+    const buffer = await buildTreasuryXlsx(
+      'Campañas',
+      [
+        { key: 'name', header: 'Campaña', width: 32 },
+        { key: 'subject', header: 'Asunto', width: 36 },
+        { key: 'status', header: 'Estado', width: 14 },
+        { key: 'createdBy', header: 'Creada por', width: 24 },
+        { key: 'createdAt', header: 'Creada', width: 20 },
+        { key: 'scheduledAt', header: 'Programada', width: 20 },
+        { key: 'completedAt', header: 'Completada', width: 20 },
+        { key: 'totalRecipients', header: 'Destinatarios', width: 14 },
+        { key: 'sent', header: 'Enviados', width: 12 },
+        { key: 'delivered', header: 'Entregados', width: 12 },
+        { key: 'opened', header: 'Abiertos', width: 12 },
+        { key: 'clicked', header: 'Clics', width: 12 },
+        { key: 'replied', header: 'Respondieron', width: 14 },
+        { key: 'bounced', header: 'Rebotes', width: 12 },
+        { key: 'complaints', header: 'Quejas', width: 12 },
+        { key: 'suppressed', header: 'Omitidos', width: 12 },
+        { key: 'failed', header: 'Fallidos', width: 12 },
+        { key: 'deliveryRate', header: '% entrega', width: 12 },
+        { key: 'openRate', header: '% apertura', width: 12 },
+        { key: 'clickRate', header: '% clic', width: 12 },
+        { key: 'replyRate', header: '% reply', width: 12 },
+      ],
+      rows.map((campaign) => ({
+        name: campaign.name,
+        subject: campaign.subject,
+        status: campaign.status,
+        createdBy: campaign.createdBy?.name || campaign.createdBy?.email || '',
+        createdAt: limaStamp(campaign.createdAt),
+        scheduledAt: limaStamp(campaign.scheduledAt),
+        completedAt: limaStamp(campaign.completedAt),
+        totalRecipients: campaign.totalRecipients,
+        sent: campaign.sent,
+        delivered: campaign.delivered,
+        opened: campaign.opened,
+        clicked: campaign.clicked,
+        replied: campaign.replied,
+        bounced: campaign.bounced,
+        complaints: campaign.complaints,
+        suppressed: campaign.suppressed,
+        failed: campaign.failed,
+        deliveryRate: pct(campaign.delivered, campaign.sent),
+        openRate: pct(campaign.opened, campaign.delivered),
+        clickRate: pct(campaign.clicked, campaign.delivered),
+        replyRate: pct(campaign.replied, campaign.delivered),
+      })),
+    );
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    return {
+      buffer,
+      filename: `malichimp-campanas_${stamp}.xlsx`,
     };
   }
 

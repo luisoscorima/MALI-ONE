@@ -78,11 +78,6 @@ function formatDateTime(value: string | null): string {
   return Number.isNaN(date.getTime()) ? '—' : dateTimeFormat.format(date);
 }
 
-function attributeLabel(value: string): string {
-  const words = value.replaceAll('_', ' ').trim();
-  return words ? words[0].toLocaleUpperCase('es-PE') + words.slice(1) : value;
-}
-
 const statusMeta: Record<
   MalichimpContactStatus,
   { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
@@ -153,6 +148,19 @@ export function MalichimpPage() {
     useState<MalichimpXlsxImportPreviewDto | null>(null);
   const [xlsxResult, setXlsxResult] =
     useState<MalichimpXlsxImportResultDto | null>(null);
+  const [xlsxConsent, setXlsxConsent] = useState(false);
+  const [contactDraft, setContactDraft] = useState<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    institutionName: string;
+    jobTitle: string;
+    city: string;
+    country: string;
+    classification: string;
+    groupOptionIds: string[];
+  } | null>(null);
+  const [contactSaving, setContactSaving] = useState(false);
 
   useEffect(() => {
     const jobId = window.sessionStorage.getItem(importJobStorageKey);
@@ -238,13 +246,29 @@ export function MalichimpPage() {
     return () => window.clearTimeout(timer);
   }, [importJob, toast]);
 
+  function openContact(contact: MalichimpContactDto) {
+    setSelectedContact(contact);
+    setContactDraft({
+      firstName: contact.firstName ?? '',
+      lastName: contact.lastName ?? '',
+      phone: contact.phone ?? '',
+      institutionName: contact.institutionName ?? '',
+      jobTitle: contact.jobTitle ?? '',
+      city: contact.city ?? '',
+      country: contact.country ?? '',
+      classification: contact.classification ?? '',
+      groupOptionIds: contact.groupOptions.map((option) => option.id),
+    });
+  }
+
   function openImport() {
     if (importJob && ['queued', 'running'].includes(importJob.status)) {
-      setImportMode('zip');
+      setImportMode(isAdmin ? 'zip' : 'xlsx');
       setImportOpen(true);
       return;
     }
     setImportMode('xlsx');
+    setXlsxConsent(false);
     setZipFile(null);
     setImportPreview(null);
     setImportJob(null);
@@ -257,6 +281,7 @@ export function MalichimpPage() {
   }
 
   function selectImportMode(value: string) {
+    if (value === 'zip' && !isAdmin) return;
     setImportMode(value as 'xlsx' | 'zip');
     setImportError('');
   }
@@ -340,13 +365,14 @@ export function MalichimpPage() {
   }
 
   async function previewXlsxImport() {
-    if (!xlsxFile || !xlsxGroupOptionIds.length) return;
+    if (!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsent) return;
     setImportBusy(true);
     setImportError('');
     try {
       setXlsxPreview(await api.previewMalichimpXlsxImport(
         xlsxFile,
         xlsxGroupOptionIds,
+        true,
       ));
     } catch (reason) {
       setImportError(reason instanceof Error ? reason.message : 'No se pudo validar el XLSX');
@@ -379,12 +405,12 @@ export function MalichimpPage() {
       <PageHeader
         title="MALICHIMP"
         description="Audiencia de correo organizada por grupos de Mailchimp."
-        actions={user?.role === 'admin' ? (
+        actions={(
           <Button type="button" onClick={openImport}>
             <Upload className="mr-1 size-4" aria-hidden />
             Importar contactos
           </Button>
-        ) : undefined}
+        )}
       />
 
       {error ? <AlertBanner>{error}</AlertBanner> : null}
@@ -495,11 +521,11 @@ export function MalichimpPage() {
                     tabIndex={0}
                     className="cursor-pointer"
                     aria-label={`Ver detalle de ${name || contact.email}`}
-                    onClick={() => setSelectedContact(contact)}
+                    onClick={() => openContact(contact)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
-                        setSelectedContact(contact);
+                        openContact(contact);
                       }
                     }}
                   >
@@ -558,7 +584,6 @@ export function MalichimpPage() {
             groups={groups}
             delivery={stats?.delivery ?? null}
             senders={senders}
-            isAdmin={isAdmin}
           />
         </TabsContent>
       </Tabs>
@@ -566,93 +591,209 @@ export function MalichimpPage() {
       <Dialog
         open={Boolean(selectedContact)}
         onOpenChange={(open) => {
-          if (!open) setSelectedContact(null);
+          if (!open) {
+            setSelectedContact(null);
+            setContactDraft(null);
+          }
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          {selectedContact ? (
+          {selectedContact && contactDraft ? (
             <>
               <DialogHeader>
                 <div className="flex flex-wrap items-center gap-2 pr-8">
                   <DialogTitle>
-                    {[selectedContact.firstName, selectedContact.lastName].filter(Boolean).join(' ') || 'Detalle del contacto'}
+                    {[contactDraft.firstName, contactDraft.lastName].filter(Boolean).join(' ') || 'Editar contacto'}
                   </DialogTitle>
                   <Badge variant={statusMeta[selectedContact.status].variant}>
                     {statusMeta[selectedContact.status].label}
                   </Badge>
                 </div>
-                <DialogDescription>{selectedContact.email}</DialogDescription>
+                <DialogDescription>
+                  {selectedContact.email} · el correo y el estado no se editan aquí
+                </DialogDescription>
               </DialogHeader>
 
               <section aria-labelledby="contact-profile-title" className="space-y-3">
                 <h3 id="contact-profile-title" className="text-sm font-semibold">Datos del contacto</h3>
-                <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
-                  <ContactField label="Teléfono" value={selectedContact.phone} />
-                  <ContactField label="Institución" value={selectedContact.institutionName} />
-                  <ContactField label="Cargo" value={selectedContact.jobTitle} />
-                  <ContactField label="Clasificación" value={selectedContact.classification} />
-                  <ContactField label="Ciudad" value={selectedContact.city} />
-                  <ContactField label="País" value={selectedContact.country} />
-                  <ContactField label="Origen" value={selectedContact.source} />
-                  <ContactField label="Correo" value={selectedContact.email} />
-                </dl>
-              </section>
-
-              <section aria-labelledby="contact-segmentation-title" className="space-y-3">
-                <h3 id="contact-segmentation-title" className="text-sm font-semibold">Segmentación</h3>
-                <div className="space-y-4 rounded-lg border p-4">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Grupos</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {selectedContact.groupOptions.map((option) => (
-                        <Badge key={option.id} variant="outline">
-                          {option.group.name}: {option.name}
-                        </Badge>
-                      ))}
-                      {!selectedContact.groupOptions.length ? (
-                        <span className="text-sm text-muted-foreground">Sin grupos</span>
-                      ) : null}
-                    </div>
+                <div className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-first-name">Nombre</Label>
+                    <Input
+                      id="contact-first-name"
+                      value={contactDraft.firstName}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, firstName: e.target.value }))}
+                    />
                   </div>
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etiquetas</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {selectedContact.tags.map((tag) => (
-                        <Badge key={tag.id} variant="secondary">{tag.name}</Badge>
-                      ))}
-                      {!selectedContact.tags.length ? (
-                        <span className="text-sm text-muted-foreground">Sin etiquetas</span>
-                      ) : null}
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-last-name">Apellido</Label>
+                    <Input
+                      id="contact-last-name"
+                      value={contactDraft.lastName}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, lastName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-phone">Teléfono</Label>
+                    <Input
+                      id="contact-phone"
+                      value={contactDraft.phone}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-institution">Institución</Label>
+                    <Input
+                      id="contact-institution"
+                      value={contactDraft.institutionName}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, institutionName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-job">Cargo</Label>
+                    <Input
+                      id="contact-job"
+                      value={contactDraft.jobTitle}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, jobTitle: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-classification">Clasificación</Label>
+                    <Input
+                      id="contact-classification"
+                      value={contactDraft.classification}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, classification: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-city">Ciudad</Label>
+                    <Input
+                      id="contact-city"
+                      value={contactDraft.city}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, city: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contact-country">País</Label>
+                    <Input
+                      id="contact-country"
+                      value={contactDraft.country}
+                      onChange={(e) => setContactDraft((d) => d && ({ ...d, country: e.target.value }))}
+                    />
                   </div>
                 </div>
               </section>
 
-              {selectedContact.attributes && Object.keys(selectedContact.attributes).length ? (
-                <section aria-labelledby="contact-attributes-title" className="space-y-3">
-                  <h3 id="contact-attributes-title" className="text-sm font-semibold">Otros datos importados</h3>
-                  <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
-                    {Object.entries(selectedContact.attributes).map(([key, value]) => (
-                      <ContactField key={key} label={attributeLabel(key)} value={String(value)} />
-                    ))}
-                  </dl>
-                </section>
-              ) : null}
+              <section aria-labelledby="contact-segmentation-title" className="space-y-3">
+                <h3 id="contact-segmentation-title" className="text-sm font-semibold">Grupos</h3>
+                <div className="max-h-56 space-y-3 overflow-y-auto rounded-lg border p-4">
+                  {groups.filter((g) => g.options.length).map((group) => (
+                    <fieldset key={group.id} className="space-y-2">
+                      <legend className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {group.name}
+                      </legend>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {group.options.map((option) => {
+                          const inputId = `edit-group-${option.id}`;
+                          return (
+                            <label key={option.id} htmlFor={inputId} className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-sm">
+                              <Checkbox
+                                id={inputId}
+                                checked={contactDraft.groupOptionIds.includes(option.id)}
+                                onCheckedChange={(checked) => {
+                                  setContactDraft((draft) => {
+                                    if (!draft) return draft;
+                                    const next = checked === true
+                                      ? [...new Set([...draft.groupOptionIds, option.id])]
+                                      : draft.groupOptionIds.filter((id) => id !== option.id);
+                                    return { ...draft, groupOptionIds: next };
+                                  });
+                                }}
+                              />
+                              <span>{option.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+                {selectedContact.tags.length ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etiquetas (solo lectura)</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {selectedContact.tags.map((tag) => (
+                        <Badge key={tag.id} variant="secondary">{tag.name}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
 
               <section aria-labelledby="contact-dates-title" className="space-y-3">
-                <h3 id="contact-dates-title" className="text-sm font-semibold">Fechas y consentimiento</h3>
+                <h3 id="contact-dates-title" className="text-sm font-semibold">Fechas</h3>
                 <dl className="grid gap-x-6 gap-y-4 rounded-lg border p-4 sm:grid-cols-2">
                   <ContactField label="Alta" value={formatDateTime(selectedContact.optInAt)} />
-                  <ContactField label="Confirmación" value={formatDateTime(selectedContact.confirmedAt)} />
-                  <ContactField label="Cambio de estado" value={formatDateTime(selectedContact.statusChangedAt)} />
-                  <ContactField label="Creado en MALI ONE" value={formatDateTime(selectedContact.createdAt)} />
                   <ContactField label="Última actualización" value={formatDateTime(selectedContact.updatedAt)} />
                 </dl>
               </section>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setSelectedContact(null)}>
-                  Cerrar
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedContact(null);
+                    setContactDraft(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  disabled={contactSaving}
+                  onClick={() => {
+                    void (async () => {
+                      if (!selectedContact || !contactDraft) return;
+                      setContactSaving(true);
+                      try {
+                        const updated = await api.updateMalichimpContact(selectedContact.id, {
+                          firstName: contactDraft.firstName || null,
+                          lastName: contactDraft.lastName || null,
+                          phone: contactDraft.phone || null,
+                          institutionName: contactDraft.institutionName || null,
+                          jobTitle: contactDraft.jobTitle || null,
+                          city: contactDraft.city || null,
+                          country: contactDraft.country || null,
+                          classification: contactDraft.classification || null,
+                          groupOptionIds: contactDraft.groupOptionIds,
+                        });
+                        setSelectedContact(updated);
+                        setContactDraft({
+                          firstName: updated.firstName ?? '',
+                          lastName: updated.lastName ?? '',
+                          phone: updated.phone ?? '',
+                          institutionName: updated.institutionName ?? '',
+                          jobTitle: updated.jobTitle ?? '',
+                          city: updated.city ?? '',
+                          country: updated.country ?? '',
+                          classification: updated.classification ?? '',
+                          groupOptionIds: updated.groupOptions.map((o) => o.id),
+                        });
+                        setContacts((current) =>
+                          current.map((row) => (row.id === updated.id ? updated : row)),
+                        );
+                        toast.success('Contacto actualizado');
+                      } catch (reason) {
+                        toast.error(reason instanceof Error ? reason.message : 'No se pudo guardar');
+                      } finally {
+                        setContactSaving(false);
+                      }
+                    })();
+                  }}
+                >
+                  {contactSaving ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
+                  Guardar
                 </Button>
               </DialogFooter>
             </>
@@ -680,9 +821,11 @@ export function MalichimpPage() {
                 <TabsTrigger value="xlsx">
                   <FileSpreadsheet aria-hidden="true" /> XLSX de contactos
                 </TabsTrigger>
-                <TabsTrigger value="zip">
-                  <FileArchive aria-hidden="true" /> ZIP de Mailchimp
-                </TabsTrigger>
+                {isAdmin ? (
+                  <TabsTrigger value="zip">
+                    <FileArchive aria-hidden="true" /> ZIP de Mailchimp
+                  </TabsTrigger>
+                ) : null}
               </TabsList>
 
               <TabsContent value="xlsx" className="space-y-4">
@@ -753,9 +896,17 @@ export function MalichimpPage() {
                       </p>
                     </div>
 
-                    <p className="text-xs text-muted-foreground">
-                      Las bajas, correos limpiados y supresiones nunca serán reactivados.
-                    </p>
+                    <label htmlFor="xlsx-consent" className="flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm">
+                      <Checkbox
+                        id="xlsx-consent"
+                        checked={xlsxConsent}
+                        onCheckedChange={(checked) => setXlsxConsent(checked === true)}
+                      />
+                      <span>
+                        Confirmo que estos contactos autorizaron recibir correos de MALI y que no
+                        reactivaré bajas ni correos limpiados/suprimidos.
+                      </span>
+                    </label>
                   </>
                 ) : null}
 
@@ -846,7 +997,7 @@ export function MalichimpPage() {
                     <Button
                       type="button"
                       onClick={() => void previewXlsxImport()}
-                      disabled={!xlsxFile || !xlsxGroupOptionIds.length || importBusy}
+                      disabled={!xlsxFile || !xlsxGroupOptionIds.length || !xlsxConsent || importBusy}
                     >
                       {importBusy ? <Loader2 className="mr-1 size-4 animate-spin motion-reduce:animate-none" /> : null}
                       {importBusy ? 'Validando…' : 'Validar XLSX'}
@@ -869,6 +1020,7 @@ export function MalichimpPage() {
                 </DialogFooter>
               </TabsContent>
 
+              {isAdmin ? (
               <TabsContent value="zip" className="space-y-4">
                 {!importPreview ? (
                   <div className="space-y-4">
@@ -942,6 +1094,7 @@ export function MalichimpPage() {
                   )}
                 </DialogFooter>
               </TabsContent>
+              ) : null}
             </Tabs>
           ) : (
             <div className="space-y-4" aria-live="polite">

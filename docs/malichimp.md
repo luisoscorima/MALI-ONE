@@ -48,13 +48,14 @@ El mismo dispatcher ya atiende Campañas internas (Usuarios Workspace) y queda d
 
 ### XLSX de contactos (UI, lotes nuevos)
 
-Un administrador abre `/admin/malichimp` → **Importar contactos** → pestaña **XLSX de contactos**:
+Cualquier usuario con módulo `malichimp` abre `/admin/malichimp` → **Importar contactos** → pestaña **XLSX de contactos**:
 
 1. Descarga la plantilla en `/plantillas/plantilla-contactos-malichimp.xlsx` (fila 1: encabezados; fila 2: ejemplo a reemplazar) o sube un XLSX con una columna de correo (acepta alias como `Correo`, `Email`, `Email address`).
 2. Límite: 10 MB y 10 000 contactos por lote.
 3. Selecciona una o más opciones de grupo que se agregarán a cada contacto importable sin quitar membresías previas.
-4. La API muestra preview (nuevos, existentes, bloqueados, muestra) sin escribir PostgreSQL.
-5. Al confirmar, crea o completa perfiles en una sola transacción, añade membresías y registra `MalichimpImportJob` + `MalichimpImportRun` (incluye huella del archivo, admin y marca de consentimiento).
+4. Confirma el consentimiento explícito en la UI.
+5. La API muestra preview (nuevos, existentes, bloqueados, muestra) sin escribir PostgreSQL.
+6. Al confirmar, crea o completa perfiles en una sola transacción, añade membresías y registra `MalichimpImportJob` + `MalichimpImportRun` (incluye huella del archivo, usuario y marca de consentimiento).
 
 Comportamiento:
 
@@ -102,29 +103,36 @@ El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [n
 - UI: `/admin/malichimp` (Audiencia por defecto; `?tab=campaigns` abre Campañas)
 - `GET /api/malichimp/stats`
 - `GET /api/malichimp/contacts` — opcional `tagId`, `groupOptionId`, `q`
+- `PATCH /api/malichimp/contacts/{id}` — perfil + grupos; no cambia email ni status
 - `GET /api/malichimp/tags`
 - `GET /api/malichimp/groups`
 - `GET /api/malichimp/newsletters`
-- `GET /api/malichimp/newsletters/{id}` — administrador, para refrescar borradores creados desde la campaña
-- `POST /api/malichimp/newsletters/draft` — administrador, crea borrador en Boletines desde Nueva campaña
-- `GET /api/malichimp/campaigns`
-- `GET /api/malichimp/campaigns/{id}` — detalle y preview
-- `GET /api/malichimp/campaigns/{id}/stats?days=30` — totales y aperturas/clics por día
+- `GET /api/malichimp/newsletters/{id}` — refrescar borradores creados desde la campaña
+- `POST /api/malichimp/newsletters/draft` — crea borrador en Boletines desde Nueva campaña
+- `GET /api/malichimp/campaigns` — incluye `createdBy` y contadores (incl. `replied`)
+- `POST /api/malichimp/campaigns/export` — Excel de todas o `campaignIds` seleccionadas
+- `GET /api/malichimp/campaigns/{id}` — detalle y preview; incluye `createdBy`
+- `GET /api/malichimp/campaigns/{id}/stats?days=30` — totales, `replied` y series diarias
+- `GET /api/malichimp/campaigns/{id}/sends?event=&q=&page=` — destinatarios por evento
 - `GET /api/malichimp/campaigns/{id}/view` — HTML en navegador, autenticado y sin scripts
 - `POST /api/malichimp/campaigns/preview`
-- `POST /api/malichimp/campaigns` — administrador; admite `draftNewsletterId` si el contenido es un borrador creado aquí
-- `POST /api/malichimp/campaigns/{id}/duplicate` — administrador
-- `DELETE /api/malichimp/campaigns/{id}` — administrador; solo borradores (libera boletín huérfano en draft)
-- `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador duplicado, administrador
+- `POST /api/malichimp/campaigns` — admite `draftNewsletterId`; guarda `createdById`
+- `POST /api/malichimp/campaigns/{id}/duplicate`
+- `DELETE /api/malichimp/campaigns/{id}` — solo borradores
+- `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador
 - `GET /api/email-delivery/senders` — autenticado (selector de campañas)
 - `POST|PATCH|DELETE /api/email-delivery/senders…` — administrador (UI en Boletines)
-- `POST /api/malichimp/imports/xlsx/preview` — administrador, multipart `file` + `groupOptionIds` + `consentConfirmed`
-- `POST /api/malichimp/imports/xlsx/{previewId}/apply` — administrador
-- `POST /api/malichimp/imports/preview` — administrador, multipart `file` (ZIP)
-- `POST /api/malichimp/imports/{previewId}/apply` — administrador
-- `GET /api/malichimp/imports/jobs/{jobId}` — administrador
+- `POST /api/malichimp/imports/xlsx/preview` — multipart `file` + `groupOptionIds` + `consentConfirmed`
+- `POST /api/malichimp/imports/xlsx/{previewId}/apply`
+- `POST /api/malichimp/imports/preview` — **solo admin**, multipart `file` (ZIP)
+- `POST /api/malichimp/imports/{previewId}/apply` — **solo admin** (ZIP)
+- `GET /api/malichimp/imports/jobs/{jobId}`
 
-Permiso de lectura: `malichimp`. Importaciones, campañas y remitentes requieren además rol `admin`.
+Permiso: módulo `malichimp`. Solo el import ZIP de Mailchimp exige además rol `admin`. Remitentes se administran en Boletines (admin).
+
+### Contador “respondieron”
+
+Al enviar, el dispatcher pone `Reply-To` plus-address (`usuario+mc.{sendId}@mali.pe`). Con `GOOGLE_GMAIL_REPLY_SYNC=true` y la misma service account de Workspace (scope `gmail.readonly` + domain-wide delegation), un cron marca `EmailSend.repliedAt` sin guardar cuerpos. Las stats muestran “X personas respondieron”.
 
 ## Notas operativas y riesgos
 

@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { applyEmailMergeTags, firstNameFromDisplayName } from './email-merge-tags';
 import { EmailDeliveryService } from './email-delivery.service';
 import { EmailTrackingService } from './email-tracking.service';
+import { replyToWithSendToken } from './malichimp-reply-to';
 
 const BATCH_SIZE = 25;
 const MAX_ATTEMPTS = 3;
@@ -121,7 +122,9 @@ export class EmailCampaignDispatcherService {
             ),
             fromName: campaign.fromName ?? undefined,
             fromEmail: campaign.fromEmail ?? undefined,
-            replyTo: campaign.replyToEmail ?? undefined,
+            replyTo: campaign.replyToEmail
+              ? replyToWithSendToken(campaign.replyToEmail, send.id)
+              : undefined,
             tags: {
               source: campaign.audienceArea,
               campaign: campaign.id,

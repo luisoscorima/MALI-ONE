@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Pestaña **Remitentes** accesible a quien tiene módulo `newsletters` (ya no solo admin); el listado muestra quién creó cada remitente.
 - Logo header Cursos de Arte actualizado a púrpura `#63277f` (alineado al footer / bloque Color Cursos); query `?v=` en logos de marca para evitar caché del PNG.
 - Acción **Duplicar** en la lista (reemplaza Copiar URL): crea borrador con el mismo diseño, asunto y marca; slug nuevo. La URL pública sigue disponible con Abrir.
 - Al eliminar un borrador de campaña (MALICHIMP / Campañas internas), si el boletín ligado está en draft y sin otras campañas, también se elimina y deja de bloquear Boletines.

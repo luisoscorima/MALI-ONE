@@ -6,19 +6,27 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+const createdBySelect = { select: { name: true, email: true } } as const;
+
 @Injectable()
 export class EmailSenderService {
   constructor(private readonly prisma: PrismaService) {}
 
   list() {
-    return this.prisma.emailSender.findMany({ orderBy: { email: 'asc' } });
+    return this.prisma.emailSender.findMany({
+      orderBy: { email: 'asc' },
+      include: { createdBy: createdBySelect },
+    });
   }
 
-  async create(rawEmail: string) {
+  async create(rawEmail: string, userId?: string) {
     const email = this.normalize(rawEmail);
     const existing = await this.prisma.emailSender.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Ese remitente ya está registrado');
-    return this.prisma.emailSender.create({ data: { email } });
+    return this.prisma.emailSender.create({
+      data: { email, createdById: userId },
+      include: { createdBy: createdBySelect },
+    });
   }
 
   async update(id: string, rawEmail: string) {
@@ -30,7 +38,11 @@ export class EmailSenderService {
       select: { id: true },
     });
     if (duplicate) throw new ConflictException('Ese remitente ya está registrado');
-    return this.prisma.emailSender.update({ where: { id }, data: { email } });
+    return this.prisma.emailSender.update({
+      where: { id },
+      data: { email },
+      include: { createdBy: createdBySelect },
+    });
   }
 
   async remove(id: string) {
