@@ -65,6 +65,7 @@ export class EmailCampaignDispatcherService {
         where: {
           campaignId: campaign.id,
           status: EmailSendStatus.pending,
+          isTest: false,
           AND: [
             { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] },
             { OR: [{ claimedAt: null }, { claimedAt: { lt: staleClaim } }] },
@@ -180,7 +181,11 @@ export class EmailCampaignDispatcherService {
       }
 
       const remaining = await this.prisma.emailSend.count({
-        where: { campaignId: campaign.id, status: EmailSendStatus.pending },
+        where: {
+          campaignId: campaign.id,
+          status: EmailSendStatus.pending,
+          isTest: false,
+        },
       });
       if (!remaining) {
         await this.prisma.emailCampaign.updateMany({

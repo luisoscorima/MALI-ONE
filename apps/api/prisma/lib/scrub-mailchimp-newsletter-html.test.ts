@@ -7,7 +7,7 @@ import {
 
 const opts = {
   appUrl: 'https://dev.mali.pe',
-  slug: 'mailchimp-boletin-mensual-nov-2026',
+  slug: 'boletin-mensual-nov-2026',
 };
 
 test('normalizes view-in-browser for all templates and rewrites known archives', () => {
@@ -19,11 +19,11 @@ test('normalizes view-in-browser for all templates and rewrites known archives',
   assert.match(html, /Ver este correo en el navegador/);
   assert.match(
     html,
-    /https:\/\/dev\.mali\.pe\/n\/mailchimp-boletin-mensual-nov-2026/,
+    /https:\/\/dev\.mali\.pe\/n\/boletin-mensual-nov-2026/,
   );
   assert.match(
     html,
-    /https:\/\/dev\.mali\.pe\/n\/mailchimp-boletin-auditorio-nov-2026/,
+    /https:\/\/dev\.mali\.pe\/n\/boletin-auditorio-nov-2026/,
   );
   assert.equal(htmlStillPointsToMailchimp(html).length, 0);
 });
@@ -34,7 +34,7 @@ test('injects view-in-browser when missing', () => {
   assert.match(html, /Ver este correo en el navegador/);
   assert.match(
     html,
-    /href="https:\/\/dev\.mali\.pe\/n\/mailchimp-boletin-mensual-nov-2026"/,
+    /href="https:\/\/dev\.mali\.pe\/n\/boletin-mensual-nov-2026"/,
   );
 });
 

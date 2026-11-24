@@ -112,9 +112,11 @@ El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [n
 - `GET /api/malichimp/campaigns` — incluye `createdBy` y contadores (incl. `replied`)
 - `POST /api/malichimp/campaigns/export` — Excel de todas o `campaignIds` seleccionadas
 - `GET /api/malichimp/campaigns/{id}` — detalle y preview; incluye `createdBy`
-- `GET /api/malichimp/campaigns/{id}/stats?days=30` — totales, `replied` y series diarias
-- `GET /api/malichimp/campaigns/{id}/sends?event=&q=&page=` — destinatarios por evento
+- `GET /api/malichimp/campaigns/{id}/stats?days=30&scope=production|test|all` — totales, `replied` y series diarias (default producción; excluye `isTest`)
+- `GET /api/malichimp/campaigns/{id}/sends?event=&scope=&q=&page=` — destinatarios por evento y alcance
 - `GET /api/malichimp/campaigns/{id}/view` — HTML en navegador, autenticado y sin scripts
+- `GET /api/malichimp/test-recipients?q=` — usuarios `@mali.pe` activos (Directory) para pruebas
+- `POST /api/malichimp/campaigns/test-send` — envío de prueba síncrono (`EmailSend.isTest`); crea/actualiza borrador; sin unsubscribe; no incrementa `sentCount`
 - `POST /api/malichimp/campaigns/preview`
 - `POST /api/malichimp/campaigns` — admite `draftNewsletterId`; guarda `createdById`
 - `POST /api/malichimp/campaigns/{id}/duplicate`
@@ -133,6 +135,16 @@ Permiso: módulo `malichimp`. Solo el import ZIP de Mailchimp exige además rol 
 ### Contador “respondieron”
 
 Al enviar, el dispatcher pone `Reply-To` plus-address (`usuario+mc.{sendId}@mali.pe`). Con `GOOGLE_GMAIL_REPLY_SYNC=true` y la misma service account de Workspace (scope `gmail.readonly` + domain-wide delegation), un cron marca `EmailSend.repliedAt` sin guardar cuerpos. Las stats muestran “X personas respondieron”.
+
+### Envío de prueba
+
+En el wizard (paso Envío) → **Enviar prueba**:
+
+1. Destinatarios solo `@mali.pe` (siempre el usuario en sesión + hasta 4 más del Directory).
+2. Se crea o reutiliza un borrador de campaña; cada prueba es un `EmailSend` con `isTest: true`.
+3. El envío es síncrono (no usa el dispatcher). Incluye tracking de apertura/clic y Reply-To con token; **no** inserta enlace de baja.
+4. El asunto lleva prefijo `[PRUEBA]`. No altera `sentCount` / KPIs de producción.
+5. En estadísticas: filtro Producción | Pruebas | Todo (default Producción).
 
 ## Notas operativas y riesgos
 

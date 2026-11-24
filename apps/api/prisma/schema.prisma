@@ -1218,6 +1218,7 @@ model EmailSend {
   openedAt        DateTime?
   clickedAt       DateTime?
   repliedAt       DateTime?
+  isTest          Boolean         @default(false)
   createdAt       DateTime        @default(now())
   events          EmailEvent[]
 
@@ -1226,6 +1227,7 @@ model EmailSend {
   @@index([status, nextAttemptAt])
   @@index([sesMessageId])
   @@index([repliedAt])
+  @@index([campaignId, isTest])
 }
 
 model EmailEvent {

@@ -13,6 +13,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  FlaskConical,
   Search,
   Send,
   Trash2,
@@ -25,10 +26,12 @@ import type {
   MalichimpCampaignDto,
   MalichimpGroupDto,
   MalichimpStatsDto,
+  MalichimpTestRecipientDto,
   NewsletterDto,
 } from '@mali-one/shared';
 import { AlertBanner, Spinner, TableShellSkeleton } from '@/components/feedback';
 import { IconActionButton } from '@/components/icon-action-button';
+import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
@@ -386,8 +389,10 @@ function NewsletterSearchSelect({
 }
 
 export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
+  const { user } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
+  const sessionEmail = user?.email?.trim().toLowerCase() ?? '';
   const senderEmails = senders.map((sender) => sender.email);
   const defaultSenderEmail = delivery?.defaultFromEmail
     && senderEmails.includes(delivery.defaultFromEmail)
@@ -396,6 +401,12 @@ export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
   const [campaigns, setCampaigns] = useState<MalichimpCampaignDto[]>([]);
   const [selectedCampaignIds, setSelectedCampaignIds] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
+  const [testBusy, setTestBusy] = useState(false);
+  const [testQuery, setTestQuery] = useState('');
+  const [testRecipients, setTestRecipients] = useState<MalichimpTestRecipientDto[]>([]);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testSelected, setTestSelected] = useState<string[]>([]);
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -923,6 +934,83 @@ export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo crear la campaña');
     } finally {
       setBusy(false);
+    }
+  }
+
+  const testReady = senderReady && contentReady && Boolean(delivery?.configured)
+    && maliPeEmailPattern.test(sessionEmail);
+
+  function openTestDialog() {
+    if (!testReady) return;
+    setTestQuery('');
+    setTestSelected(sessionEmail ? [sessionEmail] : []);
+    setTestOpen(true);
+  }
+
+  useEffect(() => {
+    if (!testOpen) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setTestLoading(true);
+      void api.listMalichimpTestRecipients(testQuery.trim() || undefined)
+        .then((items) => {
+          if (!cancelled) setTestRecipients(items);
+        })
+        .catch((reason) => {
+          if (!cancelled) {
+            toast.error(reason instanceof Error ? reason.message : 'No se pudo cargar el directorio');
+            setTestRecipients([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setTestLoading(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [testOpen, testQuery, toast]);
+
+  async function submitTestSend() {
+    if (!testReady || !selectedNewsletter) return;
+    const emails = [...new Set([sessionEmail, ...testSelected].filter(Boolean))];
+    if (!emails.length) {
+      toast.error('Incluye al menos tu correo @mali.pe');
+      return;
+    }
+    if (emails.length > 5) {
+      toast.error('Máximo 5 destinatarios de prueba');
+      return;
+    }
+    setTestBusy(true);
+    try {
+      const result = await api.sendMalichimpTestCampaign({
+        ...(draftCampaignId ? { campaignId: draftCampaignId } : {}),
+        name: effectiveName,
+        newsletterId,
+        ...(draftNewsletterId && draftNewsletterId === newsletterId
+          ? { draftNewsletterId }
+          : {}),
+        subject: subject.trim(),
+        fromName: fromName.trim(),
+        fromEmail,
+        replyTo: replyTo.trim(),
+        emails,
+      });
+      setDraftCampaignId(result.campaignId);
+      const sent = result.sends.filter((row) => row.status === 'sent').length;
+      const failed = result.sends.filter((row) => row.status === 'failed').length;
+      toast.success(
+        failed
+          ? `Prueba: ${nf.format(sent)} enviada(s), ${nf.format(failed)} fallida(s)`
+          : `Prueba enviada a ${nf.format(sent)} destinatario(s)`,
+      );
+      setTestOpen(false);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo enviar la prueba');
+    } finally {
+      setTestBusy(false);
     }
   }
 
@@ -1602,22 +1690,33 @@ export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
                 Atrás
               </Button>
               {formStep === 'send' ? (
-                <Button
-                  type="button"
-                  onClick={() => void submitCampaign()}
-                  disabled={busy || !campaignReady}
-                >
-                  {busy ? (
-                    <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                  ) : (
-                    <Send className="size-4" aria-hidden />
-                  )}
-                  {busy
-                    ? 'Preparando…'
-                    : scheduleMode === 'scheduled'
-                      ? 'Programar'
-                      : 'Enviar'}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openTestDialog}
+                    disabled={busy || testBusy || !testReady}
+                  >
+                    <FlaskConical className="size-4" aria-hidden />
+                    Enviar prueba
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void submitCampaign()}
+                    disabled={busy || !campaignReady}
+                  >
+                    {busy ? (
+                      <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                    ) : (
+                      <Send className="size-4" aria-hidden />
+                    )}
+                    {busy
+                      ? 'Preparando…'
+                      : scheduleMode === 'scheduled'
+                        ? 'Programar'
+                        : 'Enviar'}
+                  </Button>
+                </div>
               ) : (
                 <Button type="button" onClick={goNext} disabled={busy || !stepReady[formStep]}>
                   Siguiente
@@ -1625,6 +1724,94 @@ export function MalichimpCampaigns({ groups, delivery, senders }: Props) {
                 </Button>
               )}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={testOpen}
+        onOpenChange={(value) => {
+          if (!testBusy) setTestOpen(value);
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar prueba</DialogTitle>
+            <DialogDescription>
+              Se envía a correos @mali.pe con tracking real (sin baja). Tu usuario queda siempre incluido.
+              Máximo 5 destinatarios.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <p className="font-medium">{user?.name || 'Tu usuario'}</p>
+              <p className="text-xs text-muted-foreground">{sessionEmail || 'Sin correo de sesión'}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="malichimp-test-q">Buscar en Directory</Label>
+              <Input
+                id="malichimp-test-q"
+                value={testQuery}
+                onChange={(event) => setTestQuery(event.target.value)}
+                placeholder="nombre o correo"
+              />
+            </div>
+            <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
+              {testLoading ? (
+                <p className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
+                  <Spinner className="size-4" /> Cargando…
+                </p>
+              ) : testRecipients.length ? (
+                testRecipients.map((recipient) => {
+                  const checked = testSelected.includes(recipient.email)
+                    || recipient.email === sessionEmail;
+                  const locked = recipient.email === sessionEmail;
+                  return (
+                    <label
+                      key={recipient.email}
+                      className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={locked || testBusy}
+                        onCheckedChange={(value) => {
+                          if (locked) return;
+                          setTestSelected((current) => {
+                            const next = new Set(current);
+                            if (value === true) next.add(recipient.email);
+                            else next.delete(recipient.email);
+                            if (sessionEmail) next.add(sessionEmail);
+                            return [...next].slice(0, 5);
+                          });
+                        }}
+                      />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{recipient.name}</span>
+                        <span className="block text-xs text-muted-foreground">{recipient.email}</span>
+                      </span>
+                    </label>
+                  );
+                })
+              ) : (
+                <p className="p-2 text-sm text-muted-foreground">Sin resultados</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground tabular-nums">
+              {[...new Set([sessionEmail, ...testSelected].filter(Boolean))].length} / 5 seleccionados
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setTestOpen(false)} disabled={testBusy}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => void submitTestSend()} disabled={testBusy || !testReady}>
+              {testBusy ? (
+                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <FlaskConical className="size-4" aria-hidden />
+              )}
+              Enviar prueba
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

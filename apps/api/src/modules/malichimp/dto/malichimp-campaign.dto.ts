@@ -159,10 +159,17 @@ export const MALICHIMP_CAMPAIGN_SEND_EVENTS = [
 export type MalichimpCampaignSendEvent =
   (typeof MALICHIMP_CAMPAIGN_SEND_EVENTS)[number];
 
+export const MALICHIMP_SEND_SCOPES = ['production', 'test', 'all'] as const;
+export type MalichimpSendScope = (typeof MALICHIMP_SEND_SCOPES)[number];
+
 export class MalichimpCampaignSendsQueryDto {
   @IsOptional()
   @IsIn(MALICHIMP_CAMPAIGN_SEND_EVENTS)
   event?: MalichimpCampaignSendEvent;
+
+  @IsOptional()
+  @IsIn(MALICHIMP_SEND_SCOPES)
+  scope?: MalichimpSendScope;
 
   @IsOptional()
   @IsString()
@@ -181,6 +188,74 @@ export class MalichimpCampaignSendsQueryDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+}
+
+export class MalichimpCampaignStatsQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days?: number;
+
+  @IsOptional()
+  @IsIn(MALICHIMP_SEND_SCOPES)
+  scope?: MalichimpSendScope;
+}
+
+export class SendMalichimpTestDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  campaignId?: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(160)
+  name!: string;
+
+  @IsString()
+  @MinLength(1)
+  newsletterId!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  draftNewsletterId?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(300)
+  @Matches(/^[^\r\n]+$/)
+  subject!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  @Matches(/^[^\r\n]+$/)
+  fromName!: string;
+
+  @IsEmail()
+  @MaxLength(320)
+  @Matches(/^[^@\s]+@mali\.pe$/i, {
+    message: 'El remitente debe ser un correo @mali.pe',
+  })
+  fromEmail!: string;
+
+  @IsEmail()
+  @MaxLength(320)
+  @Matches(/^[^@\s]+@mali\.pe$/i, {
+    message: 'La respuesta debe ser un correo @mali.pe',
+  })
+  replyTo!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5)
+  @ArrayUnique()
+  @IsEmail({}, { each: true })
+  @MaxLength(320, { each: true })
+  emails!: string[];
 }
 
 export class UpdateMalichimpContactDto {

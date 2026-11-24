@@ -8,11 +8,13 @@ import {
 } from '@nestjs/common';
 import {
   EmailCampaignStatus,
+  EmailSendStatus,
   MalichimpContactStatus,
   MalichimpSuppressionReason,
   NewsletterStatus,
   Prisma,
   type MalichimpImportJob,
+  type User,
 } from '@prisma/client';
 import { mkdir, readdir, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -53,14 +55,23 @@ import {
   CreateMalichimpNewsletterDraftDto,
   MalichimpAudienceDto,
   MalichimpCampaignSendsQueryDto,
+  SendMalichimpTestDto,
   UpdateMalichimpContactDto,
   type MalichimpCampaignSendEvent,
+  type MalichimpSendScope,
 } from './dto/malichimp-campaign.dto';
 import { NewslettersService } from '../newsletters/newsletters.service';
 import {
   buildTreasuryXlsx,
   limaStamp,
 } from '../treasury/treasury-xlsx';
+import { GoogleAdminService } from '../google-admin/google-admin.service';
+import { EmailTrackingService } from '../../core/email-delivery/email-tracking.service';
+import {
+  applyEmailMergeTags,
+  firstNameFromDisplayName,
+} from '../../core/email-delivery/email-merge-tags';
+import { replyToWithSendToken } from '../../core/email-delivery/malichimp-reply-to';
 
 type AudienceRecipient = {
   id: string;
@@ -118,6 +129,8 @@ export class MalichimpService implements OnModuleInit {
     private readonly emailDelivery: EmailDeliveryService,
     private readonly emailSenders: EmailSenderService,
     private readonly newsletters: NewslettersService,
+    private readonly googleAdmin: GoogleAdminService,
+    private readonly emailTracking: EmailTrackingService,
   ) {}
 
   async onModuleInit() {
@@ -634,7 +647,7 @@ export class MalichimpService implements OnModuleInit {
       FROM "EmailCampaign" campaign
       JOIN "Newsletter" newsletter ON newsletter."id" = campaign."newsletterId"
       LEFT JOIN "User" creator ON creator."id" = campaign."createdById"
-      LEFT JOIN "EmailSend" send ON send."campaignId" = campaign."id"
+      LEFT JOIN "EmailSend" send ON send."campaignId" = campaign."id" AND send."isTest" = false
       WHERE campaign."audienceArea" = 'malichimp'
       GROUP BY campaign."id", newsletter."title", creator."name", creator."email"
       ORDER BY campaign."createdAt" DESC
@@ -721,7 +734,17 @@ export class MalichimpService implements OnModuleInit {
     };
   }
 
-  async getCampaignStats(id: string, days = 30) {
+  private sendScopeSql(scope: MalichimpSendScope = 'production') {
+    if (scope === 'all') return Prisma.sql``;
+    if (scope === 'test') return Prisma.sql`AND send."isTest" = true`;
+    return Prisma.sql`AND send."isTest" = false`;
+  }
+
+  async getCampaignStats(
+    id: string,
+    days = 30,
+    scope: MalichimpSendScope = 'production',
+  ) {
     const campaign = await this.prisma.emailCampaign.findFirst({
       where: { id, audienceArea: 'malichimp' },
       select: {
@@ -739,8 +762,11 @@ export class MalichimpService implements OnModuleInit {
     const since = new Date();
     since.setUTCDate(since.getUTCDate() - (safeDays - 1));
     since.setUTCHours(0, 0, 0, 0);
+    const scopeSql = this.sendScopeSql(scope);
 
     const [totals] = await this.prisma.$queryRaw<Array<{
+      sent: bigint;
+      failed: bigint;
       suppressed: bigint;
       delivered: bigint;
       bounced: bigint;
@@ -750,6 +776,8 @@ export class MalichimpService implements OnModuleInit {
       replied: bigint;
     }>>(Prisma.sql`
       SELECT
+        COUNT(send."id") FILTER (WHERE send."status" = 'sent'::"EmailSendStatus") AS "sent",
+        COUNT(send."id") FILTER (WHERE send."status" = 'failed'::"EmailSendStatus") AS "failed",
         COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
         COUNT(send."id") FILTER (WHERE send."deliveredAt" IS NOT NULL) AS "delivered",
         COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
@@ -759,6 +787,7 @@ export class MalichimpService implements OnModuleInit {
         COUNT(send."id") FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied"
       FROM "EmailSend" send
       WHERE send."campaignId" = ${campaign.id}
+      ${scopeSql}
     `);
 
     const openRows = await this.prisma.$queryRaw<Array<{ day: string; count: bigint }>>(Prisma.sql`
@@ -767,6 +796,7 @@ export class MalichimpService implements OnModuleInit {
       FROM "EmailSend" send
       WHERE send."campaignId" = ${campaign.id}
         AND send."openedAt" >= ${since}
+        ${scopeSql}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -777,6 +807,7 @@ export class MalichimpService implements OnModuleInit {
       FROM "EmailSend" send
       WHERE send."campaignId" = ${campaign.id}
         AND send."clickedAt" >= ${since}
+        ${scopeSql}
       GROUP BY 1
       ORDER BY 1
     `);
@@ -798,13 +829,22 @@ export class MalichimpService implements OnModuleInit {
     const clicked = Number(totals?.clicked ?? 0);
     const replied = Number(totals?.replied ?? 0);
 
+    const sent =
+      scope === 'production'
+        ? campaign.sentCount
+        : Number(totals?.sent ?? 0);
+    const failed =
+      scope === 'production'
+        ? campaign.errorCount
+        : Number(totals?.failed ?? 0);
+
     return {
       campaignId: campaign.id,
       name: campaign.name,
       status: campaign.status,
       totalRecipients: campaign.totalRecipients,
-      sent: campaign.sentCount,
-      failed: campaign.errorCount,
+      sent,
+      failed,
       suppressed: Number(totals?.suppressed ?? 0),
       delivered,
       bounced: Number(totals?.bounced ?? 0),
@@ -817,6 +857,7 @@ export class MalichimpService implements OnModuleInit {
       replyRate: delivered > 0 ? replied / delivered : 0,
       opensByDay,
       clicksByDay,
+      scope,
     };
   }
 
@@ -828,12 +869,18 @@ export class MalichimpService implements OnModuleInit {
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
 
     const event = (query.event ?? 'all') as MalichimpCampaignSendEvent;
+    const scope = (query.scope ?? 'production') as MalichimpSendScope;
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.pageSize ?? 50));
     const q = query.q?.trim();
 
     const where: Prisma.EmailSendWhereInput = {
       campaignId: campaign.id,
+      ...(scope === 'production'
+        ? { isTest: false }
+        : scope === 'test'
+          ? { isTest: true }
+          : {}),
       ...(q
         ? {
             OR: [
@@ -877,6 +924,7 @@ export class MalichimpService implements OnModuleInit {
           name: true,
           status: true,
           sourceContactId: true,
+          isTest: true,
           sentAt: true,
           deliveredAt: true,
           openedAt: true,
@@ -906,7 +954,203 @@ export class MalichimpService implements OnModuleInit {
       pageSize,
       pages: Math.max(1, Math.ceil(total / pageSize)),
       event,
+      scope,
     };
+  }
+
+  async listTestRecipients(q?: string) {
+    const query = q?.trim().toLowerCase() ?? '';
+    const users = await this.googleAdmin.listRecentlyActiveInternalUsers(90);
+    const filtered = query
+      ? users.filter(
+          (user) =>
+            user.email.includes(query) ||
+            user.name.toLowerCase().includes(query),
+        )
+      : users;
+    return filtered.slice(0, 50).map((user) => ({
+      email: user.email,
+      name: user.name,
+    }));
+  }
+
+  async sendTestCampaign(user: User, dto: SendMalichimpTestDto) {
+    if (!this.emailDelivery.status.configured) {
+      throw new BadRequestException('El motor SES todavía no está configurado');
+    }
+
+    const sessionEmail = user.email.trim().toLowerCase();
+    if (!MALI_PE_EMAIL.test(sessionEmail)) {
+      throw new BadRequestException('Tu usuario debe ser @mali.pe para enviar pruebas');
+    }
+
+    const emails = [
+      ...new Set(
+        [sessionEmail, ...dto.emails.map((email) => email.trim().toLowerCase())]
+          .filter(Boolean),
+      ),
+    ];
+    if (emails.length > 5) {
+      throw new BadRequestException('Máximo 5 destinatarios de prueba');
+    }
+    for (const email of emails) {
+      if (!MALI_PE_EMAIL.test(email)) {
+        throw new BadRequestException(`Solo se permiten correos @mali.pe (${email})`);
+      }
+    }
+
+    const fromEmail = dto.fromEmail.trim().toLowerCase();
+    const replyTo = dto.replyTo.trim().toLowerCase();
+    if (!MALI_PE_EMAIL.test(replyTo)) {
+      throw new BadRequestException('La respuesta debe ser un correo @mali.pe');
+    }
+    await this.emailSenders.assertEnabled(fromEmail);
+
+    const draftNewsletterId = dto.draftNewsletterId?.trim() || undefined;
+    const canUseAttachedDraft = Boolean(
+      draftNewsletterId && draftNewsletterId === dto.newsletterId,
+    );
+    if (dto.draftNewsletterId?.trim() && dto.draftNewsletterId.trim() !== dto.newsletterId) {
+      throw new BadRequestException('El boletín borrador no coincide con el contenido seleccionado');
+    }
+    const newsletter = await this.prisma.newsletter.findFirst({
+      where: {
+        id: dto.newsletterId,
+        ...(canUseAttachedDraft ? {} : { status: NewsletterStatus.published }),
+      },
+      select: { id: true, htmlBody: true, title: true },
+    });
+    if (!newsletter) {
+      throw new BadRequestException(
+        canUseAttachedDraft
+          ? 'El boletín borrador ya no está disponible'
+          : 'Selecciona un boletín publicado',
+      );
+    }
+
+    const subject = dto.subject.trim();
+    const fromName = dto.fromName.trim();
+    const name = dto.name.trim();
+    let campaignId = dto.campaignId?.trim() || '';
+
+    if (campaignId) {
+      const existing = await this.prisma.emailCampaign.findFirst({
+        where: { id: campaignId, audienceArea: 'malichimp' },
+        select: { id: true, status: true },
+      });
+      if (!existing) throw new NotFoundException('Campaña no encontrada');
+      if (existing.status !== EmailCampaignStatus.draft) {
+        throw new ConflictException('Solo se pueden enviar pruebas desde un borrador');
+      }
+      await this.prisma.emailCampaign.update({
+        where: { id: campaignId },
+        data: {
+          newsletterId: newsletter.id,
+          name,
+          replyToEmail: replyTo,
+          subjectSnapshot: subject,
+          htmlSnapshot: newsletter.htmlBody,
+          fromName,
+          fromEmail,
+          unsubscribePath: 'mail/unsubscribe',
+          managedByDispatcher: false,
+        },
+      });
+    } else {
+      const created = await this.prisma.emailCampaign.create({
+        data: {
+          newsletterId: newsletter.id,
+          name,
+          replyToEmail: replyTo,
+          subjectSnapshot: subject,
+          htmlSnapshot: newsletter.htmlBody,
+          fromName,
+          fromEmail,
+          unsubscribePath: 'mail/unsubscribe',
+          managedByDispatcher: false,
+          status: EmailCampaignStatus.draft,
+          audienceArea: 'malichimp',
+          audienceSegments: [],
+          audienceExcludeSegments: [],
+          totalRecipients: 0,
+          createdById: user.id,
+        },
+      });
+      campaignId = created.id;
+    }
+
+    const directoryUsers = await this.googleAdmin
+      .listRecentlyActiveInternalUsers(90)
+      .catch(() => [] as Array<{ email: string; name: string }>);
+    const nameByEmail = new Map(
+      directoryUsers.map((entry) => [entry.email, entry.name] as const),
+    );
+
+    const sends: Array<{
+      id: string;
+      email: string;
+      status: string;
+      error: string | null;
+    }> = [];
+
+    for (const email of emails) {
+      const displayName =
+        nameByEmail.get(email) ||
+        (email === sessionEmail ? user.name : email.split('@')[0]);
+      const send = await this.prisma.emailSend.create({
+        data: {
+          campaignId,
+          email,
+          name: displayName,
+          isTest: true,
+          status: EmailSendStatus.pending,
+        },
+      });
+
+      try {
+        const firstName = firstNameFromDisplayName(displayName);
+        const personalizedSubject = applyEmailMergeTags(subject, { firstName });
+        const personalizedHtml = applyEmailMergeTags(newsletter.htmlBody, {
+          firstName,
+        });
+        const result = await this.emailDelivery.sendHtml({
+          to: email,
+          subject: `[PRUEBA] ${personalizedSubject}`,
+          html: this.emailTracking.inject(personalizedHtml, send.openToken),
+          fromName,
+          fromEmail,
+          replyTo: replyToWithSendToken(replyTo, send.id),
+          tags: {
+            source: 'malichimp',
+            campaign: campaignId,
+            send: send.id,
+            test: '1',
+          },
+        });
+        await this.prisma.emailSend.update({
+          where: { id: send.id },
+          data: {
+            status: EmailSendStatus.sent,
+            sesMessageId: result.messageId,
+            sentAt: new Date(),
+            error: null,
+          },
+        });
+        sends.push({ id: send.id, email, status: 'sent', error: null });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Error de envío';
+        await this.prisma.emailSend.update({
+          where: { id: send.id },
+          data: {
+            status: EmailSendStatus.failed,
+            error: message.slice(0, 1000),
+          },
+        });
+        sends.push({ id: send.id, email, status: 'failed', error: message });
+      }
+    }
+
+    return { campaignId, sends };
   }
 
   async exportCampaignsXlsx(campaignIds?: string[]) {
@@ -1172,6 +1416,7 @@ export class MalichimpService implements OnModuleInit {
             email: recipient.email,
             sourceContactId: recipient.id,
             name: [recipient.firstName, recipient.lastName].filter(Boolean).join(' ') || null,
+            isTest: false,
           })),
         });
       }
@@ -1228,6 +1473,7 @@ export class MalichimpService implements OnModuleInit {
             email: recipient.email,
             sourceContactId: recipient.id,
             name: [recipient.firstName, recipient.lastName].filter(Boolean).join(' ') || null,
+            isTest: false,
           })),
         });
       }

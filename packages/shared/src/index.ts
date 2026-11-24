@@ -329,6 +329,7 @@ export interface MalichimpCampaignStatsDto {
   replyRate: number;
   opensByDay: Array<{ date: string; count: number }>;
   clicksByDay: Array<{ date: string; count: number }>;
+  scope?: MalichimpSendScope;
 }
 
 export type MalichimpCampaignSendEvent =
@@ -344,12 +345,15 @@ export type MalichimpCampaignSendEvent =
   | 'pending'
   | 'replied';
 
+export type MalichimpSendScope = 'production' | 'test' | 'all';
+
 export interface MalichimpCampaignSendDto {
   id: string;
   email: string;
   name: string | null;
   status: string;
   sourceContactId: string | null;
+  isTest?: boolean;
   sentAt: string | null;
   deliveredAt: string | null;
   openedAt: string | null;
@@ -367,6 +371,34 @@ export interface MalichimpCampaignSendsPageDto {
   pageSize: number;
   pages: number;
   event: MalichimpCampaignSendEvent;
+  scope?: MalichimpSendScope;
+}
+
+export interface MalichimpTestRecipientDto {
+  email: string;
+  name: string;
+}
+
+export interface SendMalichimpTestDto {
+  campaignId?: string;
+  name: string;
+  newsletterId: string;
+  draftNewsletterId?: string;
+  subject: string;
+  fromName: string;
+  fromEmail: string;
+  replyTo: string;
+  emails: string[];
+}
+
+export interface SendMalichimpTestResultDto {
+  campaignId: string;
+  sends: Array<{
+    id: string;
+    email: string;
+    status: string;
+    error: string | null;
+  }>;
 }
 
 export interface UpdateMalichimpContactDto {

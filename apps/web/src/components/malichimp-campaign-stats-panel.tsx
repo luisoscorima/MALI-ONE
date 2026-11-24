@@ -3,6 +3,7 @@ import type {
   MalichimpCampaignSendEvent,
   MalichimpCampaignSendsPageDto,
   MalichimpCampaignStatsDto,
+  MalichimpSendScope,
 } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
 import { Button, Card, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
@@ -47,6 +48,7 @@ interface MalichimpCampaignStatsPanelProps {
   loadStats?: (
     campaignId: string,
     days: number,
+    scope?: MalichimpSendScope,
   ) => Promise<MalichimpCampaignStatsDto>;
 }
 
@@ -56,6 +58,7 @@ export function MalichimpCampaignStatsPanel({
   loadStats = api.getMalichimpCampaignStats,
 }: MalichimpCampaignStatsPanelProps) {
   const [days, setDays] = useState(30);
+  const [scope, setScope] = useState<MalichimpSendScope>('production');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<MalichimpCampaignStatsDto | null>(null);
   const [error, setError] = useState('');
@@ -66,6 +69,7 @@ export function MalichimpCampaignStatsPanel({
   const [sends, setSends] = useState<MalichimpCampaignSendsPageDto | null>(null);
   const [sendsLoading, setSendsLoading] = useState(false);
   const [sendsError, setSendsError] = useState('');
+  const supportsScope = loadStats === api.getMalichimpCampaignStats;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(sendsQuery.trim()), 300);
@@ -74,13 +78,12 @@ export function MalichimpCampaignStatsPanel({
 
   useEffect(() => {
     setSendsPage(1);
-  }, [event, debouncedQuery, campaignId]);
+  }, [event, debouncedQuery, campaignId, scope]);
 
   useEffect(() => {
     let cancelled = false;
-    const useSharedCache = loadStats === api.getMalichimpCampaignStats;
-    if (useSharedCache) {
-      const cached = getCachedMalichimpCampaignStats(campaignId, days);
+    if (supportsScope) {
+      const cached = getCachedMalichimpCampaignStats(campaignId, days, scope);
       if (cached) {
         setStats(cached);
         setLoading(false);
@@ -91,11 +94,11 @@ export function MalichimpCampaignStatsPanel({
 
     setLoading(true);
     setError('');
-    void loadStats(campaignId, days)
+    void loadStats(campaignId, days, supportsScope ? scope : undefined)
       .then((data) => {
         if (!cancelled) {
-          if (useSharedCache) {
-            setCachedMalichimpCampaignStats(campaignId, days, data);
+          if (supportsScope) {
+            setCachedMalichimpCampaignStats(campaignId, days, data, scope);
           }
           setStats(data);
         }
@@ -115,16 +118,17 @@ export function MalichimpCampaignStatsPanel({
     return () => {
       cancelled = true;
     };
-  }, [campaignId, days, loadStats]);
+  }, [campaignId, days, loadStats, scope, supportsScope]);
 
   useEffect(() => {
-    if (loadStats !== api.getMalichimpCampaignStats) return;
+    if (!supportsScope) return;
     let cancelled = false;
     setSendsLoading(true);
     setSendsError('');
     void api
       .listMalichimpCampaignSends(campaignId, {
         event,
+        scope,
         q: debouncedQuery || undefined,
         page: sendsPage,
         pageSize: 25,
@@ -144,7 +148,7 @@ export function MalichimpCampaignStatsPanel({
     return () => {
       cancelled = true;
     };
-  }, [campaignId, debouncedQuery, event, loadStats, sendsPage]);
+  }, [campaignId, debouncedQuery, event, scope, sendsPage, supportsScope]);
 
   if (loading) {
     return (
@@ -178,7 +182,28 @@ export function MalichimpCampaignStatsPanel({
           <p className="text-sm text-muted">Campaña</p>
           <p className="font-medium text-balance">{campaignName || stats.name}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {supportsScope ? (
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  ['production', 'Producción'],
+                  ['test', 'Pruebas'],
+                  ['all', 'Todo'],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  size="sm"
+                  variant={scope === value ? 'default' : 'outline'}
+                  onClick={() => setScope(value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <span className="text-sm text-muted">Período:</span>
           {[7, 30, 90].map((d) => (
             <Button
@@ -281,13 +306,13 @@ export function MalichimpCampaignStatsPanel({
         )}
       </Card>
 
-      {loadStats === api.getMalichimpCampaignStats ? (
+      {supportsScope ? (
         <Card className="space-y-3 p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h4 className="text-sm font-medium">Destinatarios</h4>
               <p className="text-xs text-muted-foreground">
-                Lista filtrada por el evento seleccionado
+                Lista filtrada por el evento y el alcance seleccionado
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -321,6 +346,7 @@ export function MalichimpCampaignStatsPanel({
               <TableHeader>
                 <TableRow>
                   <TableHead>Destinatario</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Entrega</TableHead>
                   <TableHead>Apertura</TableHead>
@@ -331,7 +357,7 @@ export function MalichimpCampaignStatsPanel({
               <TableBody>
                 {sendsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-20 text-center text-muted-foreground">
                       <span className="inline-flex items-center gap-2">
                         <Spinner className="size-4" /> Cargando…
                       </span>
@@ -343,6 +369,13 @@ export function MalichimpCampaignStatsPanel({
                       <TableCell className="min-w-48">
                         <p className="font-medium">{row.name || 'Sin nombre'}</p>
                         <p className="text-xs text-muted-foreground">{row.email}</p>
+                      </TableCell>
+                      <TableCell>
+                        {row.isTest ? (
+                          <span className="text-xs font-medium text-amber-700">Prueba</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Prod</span>
+                        )}
                       </TableCell>
                       <TableCell className="tabular-nums">{row.status}</TableCell>
                       <TableCell className="tabular-nums text-xs">
@@ -361,7 +394,7 @@ export function MalichimpCampaignStatsPanel({
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-20 text-center text-muted-foreground">
                       Sin destinatarios en este filtro
                     </TableCell>
                   </TableRow>

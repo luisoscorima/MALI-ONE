@@ -21,7 +21,21 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
   const delivery = new EmailDeliveryService(config);
   const emailSenders = new EmailSenderService(prisma);
   const newsletters = new NewslettersService(prisma, config);
-  const service = new MalichimpService(prisma, delivery, emailSenders, newsletters);
+  const googleAdmin = {
+    listRecentlyActiveInternalUsers: async () => [],
+  } as never;
+  const emailTracking = {
+    inject: (html: string) => html,
+    publicUrl: (path: string) => path,
+  } as never;
+  const service = new MalichimpService(
+    prisma,
+    delivery,
+    emailSenders,
+    newsletters,
+    googleAdmin,
+    emailTracking,
+  );
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const emails = [
     `eligible-${suffix}@example.com`,

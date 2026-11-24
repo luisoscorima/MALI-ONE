@@ -29,69 +29,69 @@ type CampaignSpec = {
 
 const CAMPAIGNS: CampaignSpec[] = [
   {
-    slug: 'mailchimp-boletin-auditorio-nov-2026',
+    slug: 'boletin-auditorio-nov-2026',
     title: 'Boletín Auditorio — Noviembre 2026',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/boletinnoviembre2026-7706881',
   },
   {
-    slug: 'mailchimp-boletin-mensual-nov-2026',
+    slug: 'boletin-mensual-nov-2026',
     title: 'Boletín mensual MALI — Noviembre 2026',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/boletinmarzo2026-7706953',
   },
   {
-    slug: 'mailchimp-boletin-amigos-mali',
+    slug: 'boletin-amigos-mali',
     title: 'Boletín Amigos MALI',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/boletinmarzo2026-7706798',
   },
   {
-    slug: 'mailchimp-alumnos-noche-mali',
+    slug: 'alumnos-noche-mali',
     title: 'Alumnos MALI — Noche MALI',
     brand: NewsletterBrand.cursos_arte,
     sourceUrl: 'https://mailchi.mp/mali/cursosdearte-iniciaenmayo-7706891',
   },
   {
-    slug: 'mailchimp-cursos-ep-ca-cine',
+    slug: 'cursos-ep-ca-cine',
     title: 'Cursos EP/CA — Marco legal del cine',
     brand: NewsletterBrand.extension_profesional,
     sourceUrl:
       'https://mailchi.mp/mali/llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706753',
   },
   {
-    slug: 'mailchimp-boletin-cursos-arte',
+    slug: 'boletin-cursos-arte',
     title: 'Boletín Cursos de Arte',
     brand: NewsletterBrand.cursos_arte,
     sourceUrl: 'https://mailchi.mp/mali/cursosdearte-iniciaenmayo-7706142',
   },
   {
-    slug: 'mailchimp-boletin-extension-profesional',
+    slug: 'boletin-extension-profesional',
     title: 'Boletín Extensión Profesional',
     brand: NewsletterBrand.extension_profesional,
     sourceUrl:
       'https://mailchi.mp/mali/llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706140',
   },
   {
-    slug: 'mailchimp-invitacion-sandra-gamarra-replica',
+    slug: 'invitacion-sandra-gamarra-replica',
     title: 'Invitación — Sandra Gamarra Heshiki. Réplica',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25ii-7707175',
   },
   {
-    slug: 'mailchimp-asamblea-asociados-2026-1',
+    slug: 'asamblea-asociados-2026-1',
     title: 'Asamblea General Ordinaria de Asociados MALI 2026-1',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25i-7707074',
   },
   {
-    slug: 'mailchimp-lanzamiento-casa-del-moral',
+    slug: 'lanzamiento-casa-del-moral',
     title: 'Invitación — Lanzamiento Casa del Moral BCP - MALI',
     brand: NewsletterBrand.museo,
     sourceUrl: 'https://mailchi.mp/mali/asamblea-mali-25ii-7706902',
   },
   {
-    slug: 'mailchimp-invitacion-pacchas',
+    slug: 'invitacion-pacchas',
     title: 'Invitación — Cóctel de inauguración: Pacchas',
     brand: NewsletterBrand.museo,
     sourceUrl:

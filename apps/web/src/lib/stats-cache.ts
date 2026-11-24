@@ -41,14 +41,16 @@ export function setCachedLinkStats(
 export function getCachedMalichimpCampaignStats(
   campaignId: string,
   days: number,
+  scope = 'production',
 ): MalichimpCampaignStatsDto | null {
-  return readCache(campaignCache, `${campaignId}:${days}`);
+  return readCache(campaignCache, `${campaignId}:${days}:${scope}`);
 }
 
 export function setCachedMalichimpCampaignStats(
   campaignId: string,
   days: number,
   data: MalichimpCampaignStatsDto,
+  scope = 'production',
 ): void {
-  campaignCache.set(`${campaignId}:${days}`, { data, at: Date.now() });
+  campaignCache.set(`${campaignId}:${days}:${scope}`, { data, at: Date.now() });
 }

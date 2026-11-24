@@ -20,22 +20,21 @@ const DEFAULT_UNKNOWN_ARCHIVE = 'https://mali.pe';
 const MAILCHIMP_HREF_RE =
   /https?:\/\/(?:[\w.-]+\.)?(?:mailchi\.mp|list-manage\.com|login\.mailchimp\.com|campaign-archive\.com|eepurl\.com)[^"'\\\s>]*/i;
 
-/** Built-in map of seeded Mailchimp archives. */
+/** Built-in map of seeded Mailchimp archives → MALI ONE newsletter slugs. */
 export const SEEDED_MAILCHIMP_ARCHIVE_SLUGS: Record<string, string> = {
-  'boletinnoviembre2026-7706881': 'mailchimp-boletin-auditorio-nov-2026',
-  'boletinmarzo2026-7706953': 'mailchimp-boletin-mensual-nov-2026',
-  'boletinmarzo2026-7706798': 'mailchimp-boletin-amigos-mali',
-  'cursosdearte-iniciaenmayo-7706891': 'mailchimp-alumnos-noche-mali',
-  'llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706753':
-    'mailchimp-cursos-ep-ca-cine',
-  'cursosdearte-iniciaenmayo-7706142': 'mailchimp-boletin-cursos-arte',
+  'boletinnoviembre2026-7706881': 'boletin-auditorio-nov-2026',
+  'boletinmarzo2026-7706953': 'boletin-mensual-nov-2026',
+  'boletinmarzo2026-7706798': 'boletin-amigos-mali',
+  'cursosdearte-iniciaenmayo-7706891': 'alumnos-noche-mali',
+  'llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706753': 'cursos-ep-ca-cine',
+  'cursosdearte-iniciaenmayo-7706142': 'boletin-cursos-arte',
   'llena-tu-hogar-de-arte-con-los-cursos-del-mali-7706140':
-    'mailchimp-boletin-extension-profesional',
-  'asamblea-mali-25ii-7707175': 'mailchimp-invitacion-sandra-gamarra-replica',
-  'asamblea-mali-25i-7707074': 'mailchimp-asamblea-asociados-2026-1',
-  'asamblea-mali-25ii-7706902': 'mailchimp-lanzamiento-casa-del-moral',
+    'boletin-extension-profesional',
+  'asamblea-mali-25ii-7707175': 'invitacion-sandra-gamarra-replica',
+  'asamblea-mali-25i-7707074': 'asamblea-asociados-2026-1',
+  'asamblea-mali-25ii-7706902': 'lanzamiento-casa-del-moral',
   'invitacin-cctel-de-inauguracin-pacchas-agua-ritual-y-ofrenda-en-los-andes':
-    'mailchimp-invitacion-pacchas',
+    'invitacion-pacchas',
 };
 
 const SOCIAL_ICON_FILES: Record<string, string> = {
@@ -111,7 +110,7 @@ function resolveMailchimpHref(
 }
 
 function rewriteSocialIconCdn(html: string, appUrl: string): string {
-  return html.replace(
+  let out = html.replace(
     /https:\/\/cdn-images\.mailchimp\.com\/icons\/social-block-v2\/([a-z0-9-]+\.png)/gi,
     (_full, file: string) => {
       const mapped = SOCIAL_ICON_FILES[file.toLowerCase()];
@@ -120,6 +119,40 @@ function rewriteSocialIconCdn(html: string, appUrl: string): string {
         : socialIconUrl(appUrl, 'facebook.png');
     },
   );
+  // Already-rehosted S3 copies still carry Mailchimp CDN filenames.
+  out = out.replace(
+    /https:\/\/mali-one-files\.s3\.[a-z0-9-]+\.amazonaws\.com\/newsletters\/[^"'\\\s>]+?((?:outline-)?light-[a-z0-9-]+-96\.png)/gi,
+    (_full, file: string) => {
+      const mapped = SOCIAL_ICON_FILES[file.toLowerCase()];
+      return mapped
+        ? socialIconUrl(appUrl, mapped)
+        : socialIconUrl(appUrl, 'facebook.png');
+    },
+  );
+  return out;
+}
+
+/** Convert leftover Mailchimp / archive personalization to SES merge tags. */
+function normalizeMergeTags(html: string): string {
+  let out = html;
+  out = out.replace(/\*\|FNAME\|\*/gi, '{{first_name}}');
+  // Variants seen in archives: |FNAME| / *|FNAME|* / bare FNAME with pipes.
+  out = out.replace(/\|\s*FNAME\s*\|/gi, '{{first_name}}');
+  out = out.replace(/<<\s*(?:Test\s+)?First Name\s*>>/gi, '{{first_name}}');
+  out = out.replace(
+    /&lt;&lt;\s*(?:Test\s+)?First Name\s*&gt;&gt;/gi,
+    '{{first_name}}',
+  );
+  // Mixed escaping from Mailchimp archives: &lt;&lt;First Name>>
+  out = out.replace(
+    /&lt;&lt;\s*(?:Test\s+)?First Name\s*>>/gi,
+    '{{first_name}}',
+  );
+  out = out.replace(
+    /<<\s*(?:Test\s+)?First Name\s*&gt;&gt;/gi,
+    '{{first_name}}',
+  );
+  return out;
 }
 
 /** Spaces + HTML nbsp variants used in Mailchimp footers. */
@@ -243,6 +276,7 @@ export function scrubMailchimpNewsletterHtml(
   out = rewriteSocialIconCdn(out, opts.appUrl);
   out = stripMailchimpComplianceCopy(out);
   out = normalizeCopyright(out);
+  out = normalizeMergeTags(out);
 
   // Merge-field leftovers from archive HTML.
   out = out.replace(/\?e=\[UNIQID\]/gi, '');
@@ -255,7 +289,7 @@ export function scrubMailchimpNewsletterHtml(
 export function htmlStillPointsToMailchimp(html: string): string[] {
   const found = new Set<string>();
   const re =
-    /https?:\/\/(?:[\w.-]+\.)?(?:mailchi\.mp|list-manage\.com|login\.mailchimp\.com|campaign-archive\.com|eepurl\.com|cdn-images\.mailchimp\.com)[^\s"'<>]*/gi;
+    /https?:\/\/(?:[\w.-]+\.)?(?:mailchi\.mp|list-manage\.com|login\.mailchimp\.com|campaign-archive\.com|eepurl\.com|cdn-images\.mailchimp\.com|mcusercontent\.com)[^\s"'<>]*/gi;
   for (const match of html.matchAll(re)) {
     found.add(match[0].replace(/&amp;/g, '&'));
   }

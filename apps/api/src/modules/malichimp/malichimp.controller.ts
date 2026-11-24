@@ -25,6 +25,8 @@ import {
   ExportMalichimpCampaignsDto,
   MalichimpAudienceDto,
   MalichimpCampaignSendsQueryDto,
+  MalichimpCampaignStatsQueryDto,
+  SendMalichimpTestDto,
   UpdateMalichimpContactDto,
 } from './dto/malichimp-campaign.dto';
 import { MalichimpService } from './malichimp.service';
@@ -60,6 +62,11 @@ export class MalichimpController {
   @Get('groups')
   groups() {
     return this.malichimp.listGroups();
+  }
+
+  @Get('test-recipients')
+  testRecipients(@Query('q') q?: string) {
+    return this.malichimp.listTestRecipients(q);
   }
 
   @Get('newsletters')
@@ -104,6 +111,14 @@ export class MalichimpController {
       .send(buffer);
   }
 
+  @Post('campaigns/test-send')
+  sendTestCampaign(
+    @Req() req: { user: User },
+    @Body() body: SendMalichimpTestDto,
+  ) {
+    return this.malichimp.sendTestCampaign(req.user, body);
+  }
+
   @Get('campaigns/:id/view')
   async viewCampaign(@Param('id') id: string, @Res() res: Response) {
     const campaign = await this.malichimp.getCampaignBrowserView(id);
@@ -122,11 +137,15 @@ export class MalichimpController {
   }
 
   @Get('campaigns/:id/stats')
-  campaignStats(@Param('id') id: string, @Query('days') days?: string) {
-    const parsedDays = days ? Number(days) : 30;
+  campaignStats(
+    @Param('id') id: string,
+    @Query() query: MalichimpCampaignStatsQueryDto,
+  ) {
+    const parsedDays = query.days ? Number(query.days) : 30;
     return this.malichimp.getCampaignStats(
       id,
       Number.isFinite(parsedDays) ? parsedDays : 30,
+      query.scope ?? 'production',
     );
   }
 

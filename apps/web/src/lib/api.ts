@@ -511,15 +511,25 @@ export const api = {
       `/api/malichimp/campaigns/${encodeURIComponent(id)}`,
     ),
 
-  getMalichimpCampaignStats: (id: string, days = 30) =>
-    request<import('@mali-one/shared').MalichimpCampaignStatsDto>(
-      `/api/malichimp/campaigns/${encodeURIComponent(id)}/stats?days=${encodeURIComponent(String(days))}`,
-    ),
+  getMalichimpCampaignStats: (
+    id: string,
+    days = 30,
+    scope: import('@mali-one/shared').MalichimpSendScope = 'production',
+  ) => {
+    const query = new URLSearchParams({
+      days: String(days),
+      scope,
+    });
+    return request<import('@mali-one/shared').MalichimpCampaignStatsDto>(
+      `/api/malichimp/campaigns/${encodeURIComponent(id)}/stats?${query}`,
+    );
+  },
 
   listMalichimpCampaignSends: (
     id: string,
     params: {
       event?: import('@mali-one/shared').MalichimpCampaignSendEvent;
+      scope?: import('@mali-one/shared').MalichimpSendScope;
       q?: string;
       page?: number;
       pageSize?: number;
@@ -527,6 +537,7 @@ export const api = {
   ) => {
     const query = new URLSearchParams();
     if (params.event) query.set('event', params.event);
+    if (params.scope) query.set('scope', params.scope);
     if (params.q) query.set('q', params.q);
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
@@ -535,6 +546,21 @@ export const api = {
       `/api/malichimp/campaigns/${encodeURIComponent(id)}/sends${suffix}`,
     );
   },
+
+  listMalichimpTestRecipients: (q?: string) => {
+    const query = q?.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
+    return request<import('@mali-one/shared').MalichimpTestRecipientDto[]>(
+      `/api/malichimp/test-recipients${query}`,
+    );
+  },
+
+  sendMalichimpTestCampaign: (
+    body: import('@mali-one/shared').SendMalichimpTestDto,
+  ) =>
+    request<import('@mali-one/shared').SendMalichimpTestResultDto>(
+      '/api/malichimp/campaigns/test-send',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   exportMalichimpCampaigns: async (campaignIds?: string[]) => {
     const res = await fetch(`${API_BASE}/api/malichimp/campaigns/export`, {
