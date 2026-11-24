@@ -6,12 +6,26 @@ import type {
   MalichimpSendScope,
 } from '@mali-one/shared';
 import { Spinner } from '@/components/feedback';
-import { Button, Card, Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableShell,
+} from '@/components/ui';
 import { api } from '@/lib/api';
 import {
   getCachedMalichimpCampaignStats,
   setCachedMalichimpCampaignStats,
 } from '@/lib/stats-cache';
+import { cn } from '@/lib/utils';
 
 const MalichimpCampaignStatsChart = lazy(() =>
   import('@/components/malichimp-campaign-stats-chart').then((m) => ({
@@ -34,13 +48,23 @@ const EVENT_OPTIONS: Array<{ value: MalichimpCampaignSendEvent; label: string }>
   { value: 'sent', label: 'Enviados' },
   { value: 'delivered', label: 'Recibieron' },
   { value: 'opened', label: 'Abrieron' },
-  { value: 'clicked', label: 'Clicaron' },
+  { value: 'clicked', label: 'Hicieron clic' },
   { value: 'replied', label: 'Respondieron' },
   { value: 'bounced', label: 'Rebotes' },
   { value: 'suppressed', label: 'Omitidos' },
   { value: 'failed', label: 'Fallidos' },
   { value: 'complained', label: 'Quejas' },
 ];
+
+const SEND_STATUS_META: Record<
+  string,
+  { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
+> = {
+  pending: { label: 'Pendiente', variant: 'outline' },
+  sent: { label: 'Enviado', variant: 'secondary' },
+  failed: { label: 'Fallido', variant: 'destructive' },
+  suppressed: { label: 'Omitido', variant: 'outline' },
+};
 
 interface MalichimpCampaignStatsPanelProps {
   campaignId: string;
@@ -184,36 +208,28 @@ export function MalichimpCampaignStatsPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {supportsScope ? (
-            <div className="flex items-center gap-1">
-              {(
-                [
-                  ['production', 'Producción'],
-                  ['test', 'Pruebas'],
-                  ['all', 'Todo'],
-                ] as const
-              ).map(([value, label]) => (
-                <Button
-                  key={value}
-                  type="button"
-                  size="sm"
-                  variant={scope === value ? 'default' : 'outline'}
-                  onClick={() => setScope(value)}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
+              <Checkbox
+                checked={scope === 'all'}
+                onCheckedChange={(checked) =>
+                  setScope(checked === true ? 'all' : 'production')
+                }
+                aria-label="Incluir estadísticas de prueba"
+              />
+              Incluir pruebas
+            </label>
           ) : null}
-          <span className="text-sm text-muted">Período:</span>
+          <span className="text-sm text-muted">Gráfico: últimos</span>
           {[7, 30, 90].map((d) => (
             <Button
               key={d}
               type="button"
               size="sm"
               variant={days === d ? 'default' : 'outline'}
+              aria-pressed={days === d}
               onClick={() => setDays(d)}
             >
-              {d}d
+              {d} días
             </Button>
           ))}
         </div>
@@ -291,7 +307,7 @@ export function MalichimpCampaignStatsPanel({
         <h4 className="mb-4 text-sm font-medium">Aperturas y clics por día</h4>
         {chartData.every((row) => row.opens === 0 && row.clicks === 0) ? (
           <p className="py-10 text-center text-sm text-muted">
-            Sin aperturas ni clics en este período
+            Sin aperturas ni clics en este gráfico
           </p>
         ) : (
           <Suspense
@@ -351,7 +367,7 @@ export function MalichimpCampaignStatsPanel({
                   <TableHead>Entrega</TableHead>
                   <TableHead>Apertura</TableHead>
                   <TableHead>Clic</TableHead>
-                  <TableHead>Reply</TableHead>
+                  <TableHead>Respuesta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -374,10 +390,14 @@ export function MalichimpCampaignStatsPanel({
                         {row.isTest ? (
                           <span className="text-xs font-medium text-amber-700">Prueba</span>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Prod</span>
+                          <span className="text-xs text-muted-foreground">Envío real</span>
                         )}
                       </TableCell>
-                      <TableCell className="tabular-nums">{row.status}</TableCell>
+                      <TableCell>
+                        <Badge variant={SEND_STATUS_META[row.status]?.variant ?? 'outline'}>
+                          {SEND_STATUS_META[row.status]?.label ?? row.status}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="tabular-nums text-xs">
                         {row.deliveredAt ? df.format(new Date(row.deliveredAt)) : '—'}
                       </TableCell>
@@ -452,28 +472,31 @@ function Kpi({
   active?: boolean;
   onClick?: () => void;
 }) {
-  return (
-    <Card
-      className={`p-3 ${onClick ? 'cursor-pointer transition-colors hover:bg-muted/40' : ''} ${active ? 'ring-2 ring-primary/40' : ''}`}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? (event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
-      }
-    >
+  const body = (
+    <>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
       <p className="text-xs text-muted">
         {label}
         {hint ? ` · ${hint}` : ''}
       </p>
-    </Card>
+    </>
+  );
+
+  if (!onClick) {
+    return <Card className="p-3">{body}</Card>;
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={Boolean(active)}
+      onClick={onClick}
+      className={cn(
+        'rounded-xl bg-card p-3 text-left text-sm text-card-foreground ring-1 ring-foreground/10 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        active ? 'ring-2 ring-primary/40' : '',
+      )}
+    >
+      {body}
+    </button>
   );
 }

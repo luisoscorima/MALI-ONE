@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- “Ver este correo en el navegador” apunta a `/mail/view/{openToken}` (snapshot congelado + personalización; sin contar apertura). `/n/:slug` queda solo como boletín público vigente.
+- “Ver este correo…” ya no vive en el HTML del boletín: se quita en scrub/imports y se inyecta al enviar (mismo estilo que “Cancelar suscripción”).
 - Pestaña **Remitentes** accesible a quien tiene módulo `newsletters` (ya no solo admin); el listado muestra quién creó cada remitente.
 - Logo header Cursos de Arte actualizado a púrpura `#63277f` (alineado al footer / bloque Color Cursos); query `?v=` en logos de marca para evitar caché del PNG.
 - Acción **Duplicar** en la lista (reemplaza Copiar URL): crea borrador con el mismo diseño, asunto y marca; slug nuevo. La URL pública sigue disponible con Abrir.
@@ -11,7 +13,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 - Pestaña **Remitentes** en Boletines (catálogo `EmailSender`); sale de MALICHIMP.
 - UI del editor: nota + botón **Insertar {{first_name}}** (y atajo `{{fn}}` en GrapesJS / asunto) para la variable de nombre.
 - Placeholders de nombre en boletines/campañas: `{{first_name}}` (y compatibles `<<First Name>>` / `*|FNAME|*`) se resuelven al enviar; fallback `estimado(a)`.
-- Scrub de plantillas Mailchimp: “Ver este correo en el navegador” en todas (`/n/{slug}`); se eliminan preferencias/baja y badge “Powered by Mailchimp” (la baja la inyecta MALICHIMP al enviar); íconos sociales pasan a `/newsletter-brands/social/…`. Script: `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links`.
+- Scrub de plantillas Mailchimp: se eliminan preferencias/baja, badge “Powered by Mailchimp” y “ver en navegador” del HTML guardado (chrome de envío al despachar); íconos sociales pasan a `/newsletter-brands/social/…`. Script: `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links`.
 - Bloques MALI alineados a sembradas: cabecera con logo, tipografía/CTA rosa en columnas, Color Museo/Cursos/Extensión, CTA Entradas + Outline, Redes sociales, pie con nav/redes/copyright.
 - Copyright unificado en español con año actual (`newsletterCopyrightLine`) en footers de marca (museo/cursos/EP) y en el scrub de sembrados.
 - Footer de marca usa íconos PNG (no letras) servidos desde el origen web.

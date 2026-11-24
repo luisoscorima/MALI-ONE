@@ -4,12 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EmailCampaignStatus, NewsletterStatus, Prisma } from '@prisma/client';
+import {
+  EmailCampaignStatus,
+  NewsletterKind,
+  NewsletterScope,
+  NewsletterStatus,
+  Prisma,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { GoogleAdminService } from '../google-admin/google-admin.service';
 import { NewslettersService } from '../newsletters/newsletters.service';
+import { publishedLibraryWhere } from '../newsletters/newsletter-working-copy';
 import {
   CreateInternalCampaignDto,
   CreateInternalNewsletterDraftDto,
@@ -177,6 +184,8 @@ export class InternalCommunicationsService {
           htmlBody: NEW_NEWSLETTER_PLACEHOLDER_HTML,
           designJson: null,
           status: NewsletterStatus.draft,
+          scope: NewsletterScope.shared,
+          kind: NewsletterKind.library,
           createdById: userId,
         },
         select: {
@@ -235,17 +244,24 @@ export class InternalCommunicationsService {
       throw new BadRequestException('El boletín borrador no coincide con el contenido seleccionado');
     }
     const newsletter = await this.prisma.newsletter.findFirst({
-      where: {
-        id: dto.newsletterId,
-        ...(canUseAttachedDraft ? {} : { status: NewsletterStatus.published }),
+      where: canUseAttachedDraft
+        ? { id: dto.newsletterId }
+        : { id: dto.newsletterId, ...publishedLibraryWhere() },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        htmlBody: true,
+        designJson: true,
+        brand: true,
+        status: true,
       },
-      select: { id: true, htmlBody: true, status: true },
     });
     if (!newsletter) {
       throw new BadRequestException(
         canUseAttachedDraft
           ? 'El boletín borrador ya no está disponible'
-          : 'Selecciona un boletín publicado',
+          : 'Selecciona un boletín publicado de la biblioteca',
       );
     }
 
@@ -270,13 +286,27 @@ export class InternalCommunicationsService {
   async createCampaign(userId: string, dto: CreateInternalCampaignDto) {
     const prepared = await this.prepareCampaignInput(dto);
     const campaign = await this.prisma.$transaction(async (tx) => {
+      const working = await this.newslettersService.createWorkingCopy(tx, {
+        userId,
+        scope: NewsletterScope.internal_communications,
+        sourceNewsletterId: prepared.newsletter.id,
+        title: prepared.newsletter.title,
+        subject: prepared.subject,
+        htmlBody: prepared.newsletter.htmlBody,
+        designJson: prepared.newsletter.designJson,
+        brand: prepared.newsletter.brand,
+        slugBase: prepared.newsletter.slug,
+      });
       const created = await tx.emailCampaign.create({
         data: {
           newsletterId: prepared.newsletter.id,
+          workingNewsletterId: working.id,
           name: dto.name.trim(),
           replyToEmail: prepared.replyTo,
-          subjectSnapshot: prepared.subject,
-          htmlSnapshot: prepared.newsletter.htmlBody,
+          subjectSnapshot: working.subject.slice(0, 300),
+          htmlSnapshot: working.htmlBody,
+          designJsonSnapshot: working.designJson,
+          brandSnapshot: working.brand,
           fromName: prepared.fromName,
           fromEmail: prepared.fromEmail,
           managedByDispatcher: true,
@@ -314,22 +344,34 @@ export class InternalCommunicationsService {
   async sendDraftCampaign(id: string, dto: CreateInternalCampaignDto) {
     const draft = await this.prisma.emailCampaign.findFirst({
       where: { id, audienceArea: AUDIENCE_AREA },
-      select: { id: true, status: true, newsletterId: true },
+      select: {
+        id: true,
+        status: true,
+        newsletterId: true,
+        workingNewsletterId: true,
+      },
     });
     if (!draft) throw new NotFoundException('Campaña no encontrada');
     if (draft.status !== EmailCampaignStatus.draft) {
       throw new ConflictException('Esta campaña ya no es un borrador');
     }
-    const prepared = await this.prepareCampaignInput(dto, draft.newsletterId);
+    if (!draft.workingNewsletterId) {
+      throw new BadRequestException('La campaña no tiene contenido de trabajo');
+    }
+    const prepared = await this.prepareCampaignInput(dto, draft.workingNewsletterId);
+    const working = await this.prisma.newsletter.findUniqueOrThrow({
+      where: { id: draft.workingNewsletterId },
+    });
     const campaign = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.emailCampaign.updateMany({
         where: { id, status: EmailCampaignStatus.draft },
         data: {
-          newsletterId: prepared.newsletter.id,
           name: dto.name.trim(),
           replyToEmail: prepared.replyTo,
           subjectSnapshot: prepared.subject,
-          htmlSnapshot: prepared.newsletter.htmlBody,
+          htmlSnapshot: working.htmlBody,
+          designJsonSnapshot: working.designJson,
+          brandSnapshot: working.brand,
           fromName: prepared.fromName,
           fromEmail: prepared.fromEmail,
           managedByDispatcher: true,
@@ -371,19 +413,35 @@ export class InternalCommunicationsService {
       include: {
         newsletter: {
           select: {
+            id: true,
             slug: true,
             title: true,
             htmlBody: true,
             designJson: true,
+            brand: true,
           },
         },
+        workingNewsletter: true,
       },
     });
     if (!source) throw new NotFoundException('Campaña no encontrada');
 
-    const sourceHtml = source.status === EmailCampaignStatus.draft
-      ? source.newsletter.htmlBody
-      : source.htmlSnapshot;
+    const fromWorking =
+      source.status === EmailCampaignStatus.draft && source.workingNewsletter
+        ? {
+            html: source.workingNewsletter.htmlBody,
+            designJson: source.workingNewsletter.designJson,
+            brand: source.workingNewsletter.brand,
+            title: source.workingNewsletter.title,
+            subject: source.workingNewsletter.subject,
+          }
+        : {
+            html: source.htmlSnapshot,
+            designJson: source.designJsonSnapshot,
+            brand: source.brandSnapshot ?? source.newsletter.brand,
+            title: source.newsletter.title,
+            subject: source.subjectSnapshot,
+          };
     const includePaths = source.audienceSegments;
     const excludePaths = source.audienceExcludeSegments;
     const recipients = includePaths.length
@@ -391,26 +449,27 @@ export class InternalCommunicationsService {
       : [];
 
     const draftId = await this.prisma.$transaction(async (tx) => {
-      const newsletter = await tx.newsletter.create({
-        data: {
-          slug: duplicateNewsletterSlug(source.newsletter.slug),
-          title: duplicateLabel(source.newsletter.title, 200),
-          subject: source.subjectSnapshot.slice(0, 200),
-          htmlBody: sourceHtml,
-          designJson: source.newsletter.htmlBody === sourceHtml
-            ? source.newsletter.designJson
-            : null,
-          status: NewsletterStatus.draft,
-          createdById: userId,
-        },
+      const working = await this.newslettersService.createWorkingCopy(tx, {
+        userId,
+        scope: NewsletterScope.internal_communications,
+        sourceNewsletterId: source.newsletterId,
+        title: duplicateLabel(fromWorking.title, 200),
+        subject: fromWorking.subject.slice(0, 200),
+        htmlBody: fromWorking.html,
+        designJson: fromWorking.designJson,
+        brand: fromWorking.brand,
+        slugBase: source.newsletter.slug,
       });
       const draft = await tx.emailCampaign.create({
         data: {
-          newsletterId: newsletter.id,
+          newsletterId: source.newsletterId,
+          workingNewsletterId: working.id,
           name: duplicateLabel(source.name, 160),
           replyToEmail: source.replyToEmail,
-          subjectSnapshot: source.subjectSnapshot,
-          htmlSnapshot: sourceHtml,
+          subjectSnapshot: fromWorking.subject.slice(0, 300),
+          htmlSnapshot: fromWorking.html,
+          designJsonSnapshot: fromWorking.designJson,
+          brandSnapshot: fromWorking.brand,
           fromName: source.fromName,
           fromEmail: source.fromEmail,
           managedByDispatcher: false,
@@ -434,8 +493,8 @@ export class InternalCommunicationsService {
       select: {
         id: true,
         status: true,
-        newsletterId: true,
-        newsletter: { select: { id: true, status: true } },
+        workingNewsletterId: true,
+        workingNewsletter: { select: { id: true, kind: true } },
       },
     });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
@@ -446,13 +505,13 @@ export class InternalCommunicationsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      const workingId = campaign.workingNewsletterId;
       await tx.emailCampaign.delete({ where: { id: campaign.id } });
-      if (campaign.newsletter.status !== NewsletterStatus.draft) return;
-      const remaining = await tx.emailCampaign.count({
-        where: { newsletterId: campaign.newsletterId },
-      });
-      if (remaining === 0) {
-        await tx.newsletter.delete({ where: { id: campaign.newsletterId } });
+      if (
+        workingId &&
+        campaign.workingNewsletter?.kind === 'campaign_working_copy'
+      ) {
+        await tx.newsletter.delete({ where: { id: workingId } }).catch(() => undefined);
       }
     });
 
@@ -537,19 +596,45 @@ export class InternalCommunicationsService {
             updatedAt: true,
           },
         },
+        workingNewsletter: {
+          select: {
+            id: true,
+            title: true,
+            subject: true,
+            htmlBody: true,
+            status: true,
+            updatedAt: true,
+          },
+        },
       },
     });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
+    const working = campaign.workingNewsletter;
+    const content =
+      campaign.status === EmailCampaignStatus.draft && working
+        ? {
+            id: working.id,
+            slug: campaign.newsletter.slug,
+            title: working.title,
+            subject: working.subject,
+            htmlBody: working.htmlBody,
+            status: working.status,
+            createdAt: campaign.newsletter.createdAt,
+            updatedAt: working.updatedAt,
+          }
+        : campaign.newsletter;
     return {
       id: campaign.id,
       name: campaign.name,
       newsletterId: campaign.newsletterId,
-      newsletterTitle: campaign.newsletter.title,
-      newsletter: campaign.newsletter,
+      workingNewsletterId: campaign.workingNewsletterId,
+      newsletterTitle: content.title,
+      newsletter: content,
       subject: campaign.subjectSnapshot,
-      previewHtml: campaign.status === EmailCampaignStatus.draft
-        ? campaign.newsletter.htmlBody
-        : campaign.htmlSnapshot,
+      previewHtml:
+        campaign.status === EmailCampaignStatus.draft && working
+          ? working.htmlBody
+          : campaign.htmlSnapshot,
       status: campaign.status,
       fromName: campaign.fromName ?? DEFAULT_FROM_NAME,
       fromEmail: campaign.fromEmail ?? '',

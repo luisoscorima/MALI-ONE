@@ -32,15 +32,16 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 1. En **Nueva campaña** el flujo es un panel numerado compacto (estilo del envío histórico de CRM PAM): incluir opciones → excluir (opcional) → vista previa → boletín/asunto → enviar o programar.
 2. Debe seleccionar una o más opciones de grupo para **incluir** (desplegable multi-select). **Excluir** es un segundo desplegable opcional; la exclusión siempre prevalece. Cada correo se deduplica. No existe un envío accidental a “todos”.
 3. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar.
-4. El camino feliz usa un **boletín publicado**. Si no hay publicados, se puede crear un borrador en Boletines. El asunto se propone desde el boletín; el nombre interno del envío es opcional (fallback al título o `Envío {fecha}`).
-5. El remitente se prellena desde el catálogo administrado en **Boletines → Remitentes**; el reply-to vive en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
-6. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita antes de crear. Una fecha programada vencida se rechaza.
-7. Al confirmar se congelan asunto, HTML, remitente, inclusiones, exclusiones y destinatarios. Editar después el boletín o los grupos no altera la campaña.
-8. Desde la tabla se puede previsualizar el snapshot y abrirlo en el navegador. En borradores (duplicados), la vista muestra la versión actual del boletín asociado hasta confirmar.
-9. **Duplicar** crea una nueva campaña en borrador y una copia editable del boletín. Copia remitente, asunto e inclusiones/exclusiones; limpia programación, destinatarios materializados y métricas.
-10. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
-11. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
-12. El footer enlaza a `/mail/unsubscribe/{token}`. El GET pide confirmación y el POST aplica la baja solo en MALICHIMP.
+4. El camino feliz parte de un **boletín publicado de la biblioteca** (`shared`/`library`). Al crear o duplicar se genera un **fork exclusivo** (`workingNewsletterId`) en la misma transacción. El asunto se propone desde la base; el nombre interno del envío es opcional (fallback al título o `Envío {fecha}`).
+5. El contenido de la campaña se edita en **MALICHIMP → Contenido** (`?tab=content&edit={workingCopyId}`), no en Boletines. Boletines sigue siendo la biblioteca compartida y los remitentes.
+6. El remitente se prellena desde el catálogo administrado en **Boletines → Remitentes**; el reply-to vive en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
+7. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita. Prueba y envío envían `contentRevision`; si el fork cambió → `409`.
+8. Al confirmar se congelan asunto, HTML, diseño, marca, criterios de audiencia (grupos + contactos manuales) y destinatarios desde el fork. Editar después la biblioteca o los grupos no altera la campaña.
+9. Desde la tabla se puede previsualizar el snapshot. En borradores, la vista usa el working copy hasta confirmar.
+10. **Duplicar** crea campaña + fork desde snapshots históricos. Copia remitente, asunto, grupos e inclusiones/exclusiones manuales de contactos; limpia programación, destinatarios materializados y métricas.
+11. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
+12. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
+13. Chrome de envío (estilo de plataforma): arriba, “Ver este correo en el navegador” → `{APP_URL}/mail/view/{openToken}` (snapshot + personalización; sin contar apertura); abajo, “Cancelar suscripción” → `/mail/unsubscribe/{token}`. `/n/{slug}` es solo el boletín público vigente de biblioteca.
 
 El mismo dispatcher ya atiende Campañas internas (Usuarios Workspace) y queda disponible para otros módulos. Los consumidores crean campañas con snapshots; nunca entregan al motor una consulta a sus tablas de contactos.
 
@@ -100,28 +101,31 @@ El catálogo `EmailSender` se administra en **Boletines → Remitentes** (ver [n
 
 ## API y UI
 
-- UI: `/admin/malichimp` (Audiencia por defecto; `?tab=campaigns` abre Campañas)
+- UI: `/admin/malichimp`
+  - Audiencia por defecto
+  - `?tab=campaigns` · `?tab=campaigns&new=1` abre el asistente · `?tab=campaigns&campaign={id}` abre borrador/preview
+  - `?tab=content` · `?tab=content&edit={workingCopyId}` editor del fork (API malichimp/content)
 - `GET /api/malichimp/stats`
 - `GET /api/malichimp/contacts` — opcional `tagId`, `groupOptionId`, `q`
 - `PATCH /api/malichimp/contacts/{id}` — perfil + grupos; no cambia email ni status
 - `GET /api/malichimp/tags`
 - `GET /api/malichimp/groups`
-- `GET /api/malichimp/newsletters`
-- `GET /api/malichimp/newsletters/{id}` — refrescar borradores creados desde la campaña
-- `POST /api/malichimp/newsletters/draft` — crea borrador en Boletines desde Nueva campaña
+- `GET /api/malichimp/newsletters/library` — bases publicadas (`shared`/`library`)
+- `GET /api/malichimp/content` — working copies de campañas MALICHIMP
+- `GET|PATCH /api/malichimp/content/{id}` — editar fork (solo campaña en borrador)
 - `GET /api/malichimp/campaigns` — incluye `createdBy` y contadores (incl. `replied`)
 - `POST /api/malichimp/campaigns/export` — Excel de todas o `campaignIds` seleccionadas
-- `GET /api/malichimp/campaigns/{id}` — detalle y preview; incluye `createdBy`
-- `GET /api/malichimp/campaigns/{id}/stats?days=30&scope=production|test|all` — totales, `replied` y series diarias (default producción; excluye `isTest`)
+- `GET /api/malichimp/campaigns/{id}` — detalle y preview; incluye `workingNewsletterId`, `contentRevision`, criterios manuales
+- `GET /api/malichimp/campaigns/{id}/stats?days=30&scope=production|test|all` — totales, `replied` y series diarias (default producción; `totalRecipients` sigue el alcance). Export Excel de campañas no aplica el tope de 200 de la lista UI.
 - `GET /api/malichimp/campaigns/{id}/sends?event=&scope=&q=&page=` — destinatarios por evento y alcance
 - `GET /api/malichimp/campaigns/{id}/view` — HTML en navegador, autenticado y sin scripts
 - `GET /api/malichimp/test-recipients?q=` — usuarios `@mali.pe` activos (Directory) para pruebas
-- `POST /api/malichimp/campaigns/test-send` — envío de prueba síncrono (`EmailSend.isTest`); crea/actualiza borrador; sin unsubscribe; no incrementa `sentCount`
+- `POST /api/malichimp/campaigns/test-send` — envío de prueba síncrono (`EmailSend.isTest`); crea/actualiza borrador; exige `contentRevision` si ya hay fork; sin unsubscribe; no incrementa `sentCount`
 - `POST /api/malichimp/campaigns/preview`
-- `POST /api/malichimp/campaigns` — admite `draftNewsletterId`; guarda `createdById`
+- `POST /api/malichimp/campaigns` — crea campaña + fork desde biblioteca publicada; `contentRevision` opcional en el primer envío directo
 - `POST /api/malichimp/campaigns/{id}/duplicate`
-- `DELETE /api/malichimp/campaigns/{id}` — solo borradores
-- `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador
+- `DELETE /api/malichimp/campaigns/{id}` — solo borradores (elimina el fork asociado)
+- `POST /api/malichimp/campaigns/{id}/send` — confirma un borrador (snapshot desde fork; `contentRevision` obligatorio)
 - `GET /api/email-delivery/senders` — autenticado (selector de campañas)
 - `POST|PATCH|DELETE /api/email-delivery/senders…` — administrador (UI en Boletines)
 - `POST /api/malichimp/imports/xlsx/preview` — multipart `file` + `groupOptionIds` + `consentConfirmed`
@@ -134,17 +138,17 @@ Permiso: módulo `malichimp`. Solo el import ZIP de Mailchimp exige además rol 
 
 ### Contador “respondieron”
 
-Al enviar, el dispatcher pone `Reply-To` plus-address (`usuario+mc.{sendId}@mali.pe`). Con `GOOGLE_GMAIL_REPLY_SYNC=true` y la misma service account de Workspace (scope `gmail.readonly` + domain-wide delegation), un cron marca `EmailSend.repliedAt` sin guardar cuerpos. Las stats muestran “X personas respondieron”.
+Al enviar, el dispatcher pone `Reply-To` plus-address (`usuario+mc.{sendId}@mali.pe`). Con `GOOGLE_GMAIL_REPLY_SYNC=true` y la misma service account de Workspace (scope `gmail.readonly` + domain-wide delegation), un cron marca `EmailSend.repliedAt` sin guardar cuerpos. Revisa buzones con envíos recientes (prueba o real), aunque la campaña siga en borrador. Las stats muestran “X personas respondieron”.
 
 ### Envío de prueba
 
 En el wizard (paso Envío) → **Enviar prueba**:
 
-1. Destinatarios solo `@mali.pe` (siempre el usuario en sesión + hasta 4 más del Directory).
+1. Destinatarios solo `@mali.pe` (siempre el usuario en sesión + hasta 4 más del directorio interno).
 2. Se crea o reutiliza un borrador de campaña; cada prueba es un `EmailSend` con `isTest: true`.
-3. El envío es síncrono (no usa el dispatcher). Incluye tracking de apertura/clic y Reply-To con token; **no** inserta enlace de baja.
+3. El envío es síncrono (no usa el dispatcher). Incluye tracking de apertura/clic, “ver en navegador” (`/mail/view/{openToken}`) y Reply-To con token; **no** inserta enlace de baja.
 4. El asunto lleva prefijo `[PRUEBA]`. No altera `sentCount` / KPIs de producción.
-5. En estadísticas: filtro Producción | Pruebas | Todo (default Producción).
+5. En estadísticas: por defecto solo envíos reales; checkbox **Incluir pruebas** suma las de prueba (denominador coherente con el alcance).
 
 ## Notas operativas y riesgos
 

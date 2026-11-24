@@ -486,20 +486,45 @@ export const api = {
 
   listMalichimpNewsletters: () =>
     request<import('@mali-one/shared').NewsletterDto[]>(
-      '/api/malichimp/newsletters',
+      '/api/malichimp/newsletters/library',
     ),
 
-  getMalichimpNewsletter: (id: string) =>
+  listMalichimpContent: () =>
+    request<
+      Array<{
+        id: string;
+        title: string;
+        subject: string;
+        updatedAt: string;
+        contentRevision: string;
+        campaign: { id: string; name: string; status: string } | null;
+        campaignStatusLabel: string;
+        editable: boolean;
+      }>
+    >('/api/malichimp/content'),
+
+  getMalichimpContent: (id: string) =>
+    request<
+      import('@mali-one/shared').NewsletterDto & {
+        contentRevisionToken: string;
+        editable: boolean;
+        workingForCampaign?: { id: string; name: string; status: string } | null;
+      }
+    >(`/api/malichimp/content/${encodeURIComponent(id)}`),
+
+  updateMalichimpContent: (
+    id: string,
+    body: {
+      title?: string;
+      subject?: string;
+      htmlBody?: string;
+      designJson?: string | null;
+    },
+  ) =>
     request<import('@mali-one/shared').NewsletterDto>(
-      `/api/malichimp/newsletters/${encodeURIComponent(id)}`,
+      `/api/malichimp/content/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
     ),
-
-  createMalichimpNewsletterDraft: (
-    body: import('@mali-one/shared').CreateMalichimpNewsletterDraftDto,
-  ) => request<import('@mali-one/shared').NewsletterDto>(
-    '/api/malichimp/newsletters/draft',
-    { method: 'POST', body: JSON.stringify(body) },
-  ),
 
   listMalichimpCampaigns: () =>
     request<import('@mali-one/shared').MalichimpCampaignDto[]>(

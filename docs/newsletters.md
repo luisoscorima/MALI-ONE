@@ -11,7 +11,7 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 1. Crear/editar newsletter (draft/published).
 2. La URL pública sirve el HTML publicado.
 3. MALICHIMP, Campañas internas (Usuarios Workspace) u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
-4. Tracking, bajas y transporte se añaden fuera de Boletines en `core/email-delivery` y en el módulo dueño de la audiencia.
+4. Tracking, bajas, “Ver este correo en el navegador” y transporte se añaden fuera de Boletines en `core/email-delivery` (al enviar). El HTML guardado del boletín no incluye ese link ni el de cancelar suscripción; el estilo es único para todos los envíos.
 5. Personalización de nombre: en el HTML o asunto puedes usar `{{first_name}}` (también vale `<<First Name>>` o `*|FNAME|*`). Al enviar, el motor SES lo reemplaza con el primer nombre del destinatario; si no hay nombre, usa `estimado(a)`. En el editor hay una nota, un botón **Insertar {{first_name}}** y el atajo `{{fn}}` en la barra de GrapesJS; el asunto también tiene un acceso rápido.
 6. La pestaña **Remitentes** (módulo `newsletters`) administra el catálogo compartido `EmailSender` (`@mali.pe`) usado por MALICHIMP y Campañas internas.
 
@@ -24,21 +24,23 @@ Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El edi
 
 | `/admin/newsletters` | Boletines + Remitentes |
 | `/admin/newsletters?tab=remitentes` | Catálogo `EmailSender` (módulo newsletters) |
-| `/n/:slug` | Vista pública |
+| `/n/:slug` | Vista pública (`shared` + `library` + `published`) |
+| `/mail/view/:token` | Correo histórico congelado (por destinatario) |
+| MALICHIMP → Contenido | Working copies de campañas (no biblioteca) |
 
 ## API
 
 Admin: `/api/newsletters` CRUD + `POST /api/newsletters/:id/duplicate`.
-Público: `GET /n/:slug`.
+Público: `GET /n/:slug` (versión actual del boletín).
 
-Las rutas `/mail/o|c/:token` pertenecen al motor compartido, no a este módulo.
+Las rutas `/mail/o|c|view/:token` pertenecen al motor compartido, no a este módulo. `GET /mail/view/:token` sirve el `htmlSnapshot` de la campaña con personalización del destinatario; no registra apertura.
 
 ## Datos (Prisma)
 
 - `Newsletter` (incluye `brand` opcional: `museo`, `cursos_arte`, `extension_profesional`)
 - Una campaña referencia el boletín para auditoría, pero envía `subjectSnapshot` y `htmlSnapshot`. Un boletín usado por campañas no puede eliminarse.
 - Import Mailchimp: `pnpm --filter @mali-one/api prisma:seed:mailchimp-newsletters`
-- Arreglar plantillas Mailchimp ya sembradas (enlaces, ver en navegador, íconos sociales): `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links` (usa `--dry-run` para inspeccionar)
+- Arreglar plantillas Mailchimp ya sembradas (enlaces Mailchimp, quitar “ver en navegador” del HTML, íconos sociales): `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links` (usa `--dry-run` para inspeccionar). El link “Ver este correo…” se inyecta al enviar y apunta a `/mail/view/{openToken}` (snapshot), no a `/n/:slug`.
 - Assets del import van a `s3://mali-one-files/newsletters/…`. El rol EC2 puede
   subirlos; la URL anónima S3 solo funciona si hay bucket policy pública (ver
   [aws-runtime-role.md](./aws-runtime-role.md)). Mientras tanto el HTML puede

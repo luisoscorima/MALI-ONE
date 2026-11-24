@@ -243,18 +243,13 @@ export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto 
 export interface CreateMalichimpCampaignDto extends MalichimpAudienceFilterDto {
   name: string;
   newsletterId: string;
-  /** Draft newsletter created from MALICHIMP “Crear nuevo”; must match newsletterId. */
-  draftNewsletterId?: string;
+  /** Token from campaign detail / content review; mismatch → 409. */
+  contentRevision?: string;
   subject: string;
   fromName: string;
   fromEmail: string;
   replyTo: string;
   scheduledAt?: string;
-}
-
-export interface CreateMalichimpNewsletterDraftDto {
-  title: string;
-  subject?: string;
 }
 
 export interface MalichimpCampaignCreatorDto {
@@ -290,8 +285,11 @@ export interface MalichimpCampaignDetailDto {
   id: string;
   name: string;
   newsletterId: string;
+  /** Exclusive working copy for draft edit/preview/snapshot. */
+  workingNewsletterId?: string | null;
   newsletterTitle: string;
   newsletter: NewsletterDto;
+  contentRevision?: string | null;
   subject: string;
   previewHtml: string;
   status: EmailCampaignStatus;
@@ -300,6 +298,8 @@ export interface MalichimpCampaignDetailDto {
   replyTo: string;
   groupOptionIds: string[];
   excludeGroupOptionIds: string[];
+  includeContactIds?: string[];
+  excludeContactIds?: string[];
   totalRecipients: number;
   scheduledAt: string | null;
   createdAt: string;
@@ -383,7 +383,8 @@ export interface SendMalichimpTestDto {
   campaignId?: string;
   name: string;
   newsletterId: string;
-  draftNewsletterId?: string;
+  /** Token from campaign detail / content review; mismatch → 409. */
+  contentRevision?: string;
   subject: string;
   fromName: string;
   fromEmail: string;

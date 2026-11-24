@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   htmlStillPointsToMailchimp,
   scrubMailchimpNewsletterHtml,
+  stripViewInBrowserFromHtml,
 } from './scrub-mailchimp-newsletter-html';
 
 const opts = {
@@ -10,17 +11,15 @@ const opts = {
   slug: 'boletin-mensual-nov-2026',
 };
 
-test('normalizes view-in-browser for all templates and rewrites known archives', () => {
+test('strips view-in-browser and rewrites known archive CTAs', () => {
   const html = scrubMailchimpNewsletterHtml(
     `<p><a href="https://mailchi.mp/mali/boletinmarzo2026-7706953?e=[UNIQID]">View this email in your browser</a></p>
      <p><a href="https://mailchi.mp/mali/boletinnoviembre2026-7706881?e=[UNIQID]">PROGRAMACIÓN COMPLETA AQUÍ</a></p>`,
     opts,
   );
-  assert.match(html, /Ver este correo en el navegador/);
-  assert.match(
-    html,
-    /https:\/\/dev\.mali\.pe\/n\/boletin-mensual-nov-2026/,
-  );
+  assert.doesNotMatch(html, /Ver este correo en el navegador/i);
+  assert.doesNotMatch(html, /View this email in your browser/i);
+  assert.doesNotMatch(html, /data-mali-view-in-browser/i);
   assert.match(
     html,
     /https:\/\/dev\.mali\.pe\/n\/boletin-auditorio-nov-2026/,
@@ -28,14 +27,11 @@ test('normalizes view-in-browser for all templates and rewrites known archives',
   assert.equal(htmlStillPointsToMailchimp(html).length, 0);
 });
 
-test('injects view-in-browser when missing', () => {
+test('does not add view-in-browser to stored HTML', () => {
   const html = scrubMailchimpNewsletterHtml('<p>Solo contenido</p>', opts);
-  assert.match(html, /data-mali-view-in-browser/);
-  assert.match(html, /Ver este correo en el navegador/);
-  assert.match(
-    html,
-    /href="https:\/\/dev\.mali\.pe\/n\/boletin-mensual-nov-2026"/,
-  );
+  assert.doesNotMatch(html, /data-mali-view-in-browser/);
+  assert.doesNotMatch(html, /Ver este correo en el navegador/);
+  assert.match(html, /Solo contenido/);
 });
 
 test('removes list-manage preference/unsubscribe copy and referral badge', () => {
@@ -128,4 +124,24 @@ test('rewrites Mailchimp social icon CDN to local newsletter-brands paths', () =
     /https:\/\/dev\.mali\.pe\/newsletter-brands\/social\/tiktok\.png/,
   );
   assert.equal(htmlStillPointsToMailchimp(html).length, 0);
+});
+
+test('strips short View email in browser and drops orphan or', () => {
+  const html = scrubMailchimpNewsletterHtml(
+    `<p class="last-child"><a href="https://mailchi.mp/mali/x"><span style="font-size: 11px">View email in browser</span></a><span style="font-size: 11px"> or </span></p>`,
+    { appUrl: 'https://dev.mali.pe', slug: 'invitacion-pacchas' },
+  );
+  assert.doesNotMatch(html, /Ver este correo en el navegador/i);
+  assert.doesNotMatch(html, /View email in browser/i);
+  assert.doesNotMatch(html, />\s*or\s*</i);
+  assert.doesNotMatch(html, /<span[^>]*>\s*or\s*<\/span>/i);
+});
+
+test('stripViewInBrowserFromHtml removes injected preheader', () => {
+  const html = stripViewInBrowserFromHtml(
+    `<div data-mali-view-in-browser style="x"><a href="https://dev.mali.pe/n/x">Ver este correo en el navegador</a></div><p>Hola</p>`,
+  );
+  assert.doesNotMatch(html, /data-mali-view-in-browser/);
+  assert.doesNotMatch(html, /Ver este correo/);
+  assert.match(html, /Hola/);
 });

@@ -78,23 +78,11 @@ type NewsletterEditorProps = {
   initialDesignJson?: string | null;
   initialHtml?: string | null;
   brand?: NewsletterBrand | null;
-  /** Used for “Ver este correo…” when brand chrome is inserted. */
-  slug?: string;
   className?: string;
 };
 
-function brandAssetsFor(
-  brand: NewsletterBrand,
-  slug?: string,
-): { logoUrl: string; viewInBrowserUrl: string } {
-  const logoUrl = NEWSLETTER_BRAND_LOGO_URLS[brand];
-  const trimmed = slug?.trim();
-  return {
-    logoUrl,
-    viewInBrowserUrl: trimmed
-      ? `${BRAND_LOGO_ORIGIN}/n/${trimmed}`
-      : 'https://mali.pe',
-  };
+function brandAssetsFor(brand: NewsletterBrand): { logoUrl: string } {
+  return { logoUrl: NEWSLETTER_BRAND_LOGO_URLS[brand] };
 }
 
 /** Accents from Mailchimp MALI templates / brand chrome. */
@@ -234,11 +222,6 @@ const BLOCK_HERO = `
 const BLOCK_HEADER = `
 <table style="width:100%;margin:0;padding:0;border-collapse:collapse;font-family:${FONT}" width="100%" cellspacing="0" cellpadding="0">
   <tbody>
-    <tr>
-      <td style="padding:10px 16px;text-align:center;font-size:11px;color:#888888;background:#ffffff">
-        <a href="https://mali.pe" style="color:#888888;text-decoration:underline">Ver este correo en el navegador</a>
-      </td>
-    </tr>
     <tr>
       <td style="padding:18px 16px 10px;text-align:left;background:#ffffff">
         <img src="${NEWSLETTER_BRAND_LOGO_URLS.museo}" alt="MALI" width="120" style="display:block;width:120px;max-width:100%;height:auto;border:0" />
@@ -385,7 +368,6 @@ const MALI_STARTER_HTML = `
 function registerMaliBlocks(
   editor: Editor,
   brand?: NewsletterBrand | null,
-  slug?: string,
 ) {
   const bm = editor.BlockManager;
   const cat = 'MALI';
@@ -470,7 +452,7 @@ function registerMaliBlocks(
   ];
 
   if (brand) {
-    const assets = brandAssetsFor(brand, slug);
+    const assets = brandAssetsFor(brand);
     items.unshift(
       {
         id: `mali-brand-header-${brand}`,
@@ -500,7 +482,6 @@ function loadInitialContent(
   designJson?: string | null,
   html?: string | null,
   brand?: NewsletterBrand | null,
-  slug?: string,
 ) {
   if (designJson?.trim()) {
     try {
@@ -519,7 +500,7 @@ function loadInitialContent(
       wrapNewsletterWithBrandChrome(
         `<table style="width:100%;margin:0;padding:0;border-collapse:collapse" width="100%" cellspacing="0" cellpadding="0"><tbody><tr><td style="padding:24px 16px;font-family:${FONT};color:${MALI_BLACK};font-size:14px;line-height:1.55"><p style="margin:0">Escribe aquí el contenido del boletín.</p></td></tr></tbody></table>`,
         brand,
-        brandAssetsFor(brand, slug),
+        brandAssetsFor(brand),
       ),
     );
     return;
@@ -531,7 +512,7 @@ export const NewsletterEditor = forwardRef<
   NewsletterEditorHandle,
   NewsletterEditorProps
 >(function NewsletterEditor(
-  { initialDesignJson, initialHtml, brand = null, slug, className },
+  { initialDesignJson, initialHtml, brand = null, className },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -707,8 +688,8 @@ export const NewsletterEditor = forwardRef<
       }
     }
 
-    registerMaliBlocks(editor, brand, slug);
-    loadInitialContent(editor, initialDesignJson, initialHtml, brand, slug);
+    registerMaliBlocks(editor, brand);
+    loadInitialContent(editor, initialDesignJson, initialHtml, brand);
     editorRef.current = editor;
 
     return () => {

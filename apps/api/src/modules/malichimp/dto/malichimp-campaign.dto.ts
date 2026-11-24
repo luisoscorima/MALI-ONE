@@ -80,12 +80,6 @@ export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
   @MinLength(1)
   newsletterId!: string;
 
-  /** Allows confirming a campaign with a draft newsletter created from MALICHIMP. */
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  draftNewsletterId?: string;
-
   @IsString()
   @MinLength(1)
   @MaxLength(300)
@@ -115,14 +109,21 @@ export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
   @IsOptional()
   @IsDateString()
   scheduledAt?: string;
+
+  /** Token returned when reviewing working-copy content; mismatch → 409. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  contentRevision?: string;
 }
 
-export class CreateMalichimpNewsletterDraftDto {
+export class UpdateMalichimpWorkingCopyDto {
+  @IsOptional()
   @IsString()
-  @MinLength(3)
+  @MinLength(1)
   @MaxLength(200)
   @Matches(/^[^\r\n]+$/)
-  title!: string;
+  title?: string;
 
   @IsOptional()
   @IsString()
@@ -130,6 +131,15 @@ export class CreateMalichimpNewsletterDraftDto {
   @MaxLength(200)
   @Matches(/^[^\r\n]+$/)
   subject?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  htmlBody?: string;
+
+  @IsOptional()
+  @IsString()
+  designJson?: string | null;
 }
 
 export class ExportMalichimpCampaignsDto {
@@ -220,8 +230,8 @@ export class SendMalichimpTestDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  draftNewsletterId?: string;
+  @MaxLength(64)
+  contentRevision?: string;
 
   @IsString()
   @MinLength(1)

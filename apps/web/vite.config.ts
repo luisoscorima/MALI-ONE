@@ -28,6 +28,14 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/n': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/mail': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
       '/socket.io': {
         target: 'http://localhost:3000',
         changeOrigin: true,

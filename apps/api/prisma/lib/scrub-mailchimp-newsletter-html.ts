@@ -3,6 +3,9 @@
  * so seeded newsletters no longer send readers back to Mailchimp.
  */
 import { newsletterCopyrightLine } from '@mali-one/shared';
+import { stripViewInBrowserFromHtml } from '../../src/core/email-delivery/strip-view-in-browser';
+
+export { stripViewInBrowserFromHtml };
 
 export type ScrubMailchimpOptions = {
   /** Public app origin without trailing slash (e.g. https://dev.mali.pe). */
@@ -188,6 +191,15 @@ function stripMailchimpComplianceCopy(html: string): string {
   // Leftovers like "Puedes&nbsp;&nbsp;o&nbsp;." / "You can or ." after anchors were dropped.
   out = out.replace(new RegExp(`You can${WS}or(?:${WS})?\\.?`, 'gi'), '');
   out = out.replace(new RegExp(`Puedes${WS}o(?:${WS})?\\.?`, 'gi'), '');
+  // Orphan " or " / " o " spans left after preference / share links were removed.
+  out = out.replace(
+    /<span\b[^>]*>\s*(?:&nbsp;|\s)*(?:or|o)(?:\s|&nbsp;)*<\/span>/gi,
+    '',
+  );
+  out = out.replace(
+    new RegExp(`(?:^|>)${WS}(?:or|o)${WS}(?=<|$)`, 'gi'),
+    (m) => (m.startsWith('>') ? '>' : ''),
+  );
   out = out.replace(/why did I get this\?/gi, '');
   out = out.replace(/Email Marketing Powered by Mailchimp/gi, '');
   out = out.replace(
@@ -196,7 +208,7 @@ function stripMailchimpComplianceCopy(html: string): string {
   );
   // Empty paragraphs left behind in the footer cell.
   out = out.replace(
-    /<p\b[^>]*>\s*(?:&nbsp;|\s)*<\/p>/gi,
+    /<p\b[^>]*>\s*(?:&nbsp;|\s|<br\s*\/?>)*<\/p>/gi,
     '',
   );
   return out;
@@ -217,30 +229,10 @@ function normalizeCopyright(html: string): string {
   return out;
 }
 
-function normalizeViewInBrowser(html: string, opts: ScrubMailchimpOptions): string {
-  const url = publicNewsletterUrl(opts.appUrl, opts.slug);
-  let out = html.replace(
-    />\s*View this email in your browser\s*</gi,
-    '>Ver este correo en el navegador<',
-  );
-
-  // Point any remaining "ver en navegador" anchors at this newsletter.
-  out = out.replace(
-    /(<a\b[^>]*href=(["']))([^"']+)(\2[^>]*>)\s*Ver este correo en el navegador\s*(<\/a>)/gi,
-    `$1${url}$4Ver este correo en el navegador$5`,
-  );
-
-  if (!/Ver este correo en el navegador/i.test(out)) {
-    const preheader = `<div data-mali-view-in-browser style="text-align:center;padding:12px 16px;font:12px/1.4 Arial,Helvetica,sans-serif;color:#656565"><a href="${url}" target="_blank" rel="noreferrer" style="color:#656565;text-decoration:underline">Ver este correo en el navegador</a></div>`;
-    out = `${preheader}${out}`;
-  }
-  return out;
-}
-
 /**
  * Rewrite or remove anchors whose href still points at Mailchimp infrastructure.
- * Also normalizes view-in-browser, strips Mailchimp compliance copy, and rehosts
- * social icons onto the app origin.
+ * Strips view-in-browser (injected at send), Mailchimp compliance copy, and
+ * rehosts social icons onto the app origin.
  */
 export function scrubMailchimpNewsletterHtml(
   html: string,
@@ -282,7 +274,7 @@ export function scrubMailchimpNewsletterHtml(
   out = out.replace(/\?e=\[UNIQID\]/gi, '');
   out = out.replace(/\[UNIQID\]/gi, '');
 
-  out = normalizeViewInBrowser(out, opts);
+  out = stripViewInBrowserFromHtml(out);
   return out;
 }
 

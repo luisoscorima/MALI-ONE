@@ -31,6 +31,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
 import { MalichimpCampaigns } from '@/components/malichimp-campaigns';
+import { MalichimpContentEditor } from '@/components/malichimp-content-editor';
+import { MalichimpContentPanel } from '@/components/malichimp-content-panel';
 import {
   Badge,
   Button,
@@ -116,7 +118,9 @@ export function MalichimpPage() {
   const isAdmin = user?.role === 'admin';
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
-  const section = searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'audience';
+  const tabParam = searchParams.get('tab');
+  const section =
+    tabParam === 'campaigns' || tabParam === 'content' ? tabParam : 'audience';
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [tags, setTags] = useState<MalichimpTagDto[]>([]);
@@ -438,8 +442,11 @@ export function MalichimpPage() {
         value={section}
         onValueChange={(value) => {
           const next = new URLSearchParams(searchParams);
-          if (value === 'campaigns') next.set('tab', 'campaigns');
-          else next.delete('tab');
+          if (value === 'audience') next.delete('tab');
+          else next.set('tab', value);
+          next.delete('edit');
+          next.delete('new');
+          next.delete('campaign');
           setSearchParams(next, { replace: true });
         }}
         className="gap-4"
@@ -447,6 +454,7 @@ export function MalichimpPage() {
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
+          <TabsTrigger value="content">Contenido</TabsTrigger>
         </TabsList>
 
         <TabsContent value="audience">
@@ -584,7 +592,47 @@ export function MalichimpPage() {
             groups={groups}
             delivery={stats?.delivery ?? null}
             senders={senders}
+            openNew={searchParams.get('new') === '1'}
+            openCampaignId={searchParams.get('campaign')}
+            onDeepLinkConsumed={(keys) => {
+              const next = new URLSearchParams(searchParams);
+              for (const key of keys) next.delete(key);
+              setSearchParams(next, { replace: true });
+            }}
           />
+        </TabsContent>
+
+        <TabsContent value="content">
+          {searchParams.get('edit') ? (
+            <MalichimpContentEditor
+              contentId={searchParams.get('edit')!}
+              onClose={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('edit');
+                next.set('tab', 'content');
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          ) : (
+            <MalichimpContentPanel
+              onNewCampaign={() => {
+                const next = new URLSearchParams(searchParams);
+                next.set('tab', 'campaigns');
+                next.set('new', '1');
+                next.delete('campaign');
+                next.delete('edit');
+                setSearchParams(next, { replace: true });
+              }}
+              onOpenCampaign={(campaignId) => {
+                const next = new URLSearchParams(searchParams);
+                next.set('tab', 'campaigns');
+                next.set('campaign', campaignId);
+                next.delete('new');
+                next.delete('edit');
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -916,7 +964,11 @@ export function MalichimpPage() {
                       <StatCard label="Importables" value={xlsxPreview.report.importableContacts} hint={`${nf.format(xlsxPreview.report.validRows)} correos válidos`} />
                       <StatCard label="Nuevos" value={xlsxPreview.report.newContacts} hint="Se crearán" />
                       <StatCard label="Existentes" value={xlsxPreview.report.existingContacts} hint="Se completarán" />
-                      <StatCard label="Bloqueados" value={xlsxPreview.report.blockedContacts} hint="Bajas, cleaned, nonsubscribed o suprimidos" />
+                      <StatCard
+                        label="Bloqueados"
+                        value={xlsxPreview.report.blockedContacts}
+                        hint="Bajas, limpiados, sin suscripción o suprimidos"
+                      />
                     </div>
                     {xlsxPreview.report.invalidRows || xlsxPreview.report.duplicateRows ? (
                       <AlertBanner variant="info">

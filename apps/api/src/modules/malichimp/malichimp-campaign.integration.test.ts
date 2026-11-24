@@ -5,6 +5,7 @@ import { NewsletterStatus } from '@prisma/client';
 import { EmailDeliveryService } from '../../core/email-delivery/email-delivery.service';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
+import { contentRevisionOf } from '../newsletters/newsletter-working-copy';
 import { NewslettersService } from '../newsletters/newsletters.service';
 import { MalichimpService } from './malichimp.service';
 
@@ -153,6 +154,15 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
       excludeGroupOptionIds: [exclusionOption.id],
     });
     campaignId = created.id;
+
+    // Persist manual contact criteria (as the UI would on confirm) before duplicating.
+    await prisma.emailCampaign.update({
+      where: { id: created.id },
+      data: {
+        audienceExcludeContactIds: [contacts[0].id],
+        audienceIncludeContactIds: [],
+      },
+    });
     await prisma.newsletter.update({
       where: { id: newsletter.id },
       data: { subject: 'Asunto editado', htmlBody: '<p>Editado</p>' },
@@ -188,33 +198,40 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     assert.equal(duplicated.scheduledAt, null);
     assert.deepEqual(duplicated.groupOptionIds, [option.id, secondOption.id]);
     assert.deepEqual(duplicated.excludeGroupOptionIds, [exclusionOption.id]);
+    assert.deepEqual(duplicated.excludeContactIds, [contacts[0].id]);
+    assert.deepEqual(duplicated.includeContactIds ?? [], []);
 
     const duplicatedBeforeSend = await prisma.emailCampaign.findUniqueOrThrow({
       where: { id: duplicated.id },
-      include: { sends: true, newsletter: true },
+      include: { sends: true, workingNewsletter: true },
     });
     assert.equal(duplicatedBeforeSend.managedByDispatcher, false);
     assert.equal(duplicatedBeforeSend.sends.length, 0);
     assert.equal(duplicatedBeforeSend.sentCount, 0);
     assert.equal(duplicatedBeforeSend.openCount, 0);
-    assert.equal(duplicatedBeforeSend.newsletter.htmlBody, '<p>Contenido original</p>');
+    assert.ok(duplicatedBeforeSend.workingNewsletterId);
+    assert.equal(duplicatedBeforeSend.workingNewsletter?.htmlBody, '<p>Contenido original</p>');
 
     await prisma.newsletter.update({
-      where: { id: duplicated.newsletterId },
+      where: { id: duplicatedBeforeSend.workingNewsletterId! },
       data: { htmlBody: '<p>Copia editada</p>' },
     });
     const draftView = await service.getCampaignBrowserView(duplicated.id);
     assert.equal(draftView.html, '<p>Copia editada</p>');
 
+    const workingFresh = await prisma.newsletter.findUniqueOrThrow({
+      where: { id: duplicatedBeforeSend.workingNewsletterId! },
+    });
     const sentDuplicate = await service.sendDraftCampaign(duplicated.id, {
       name: duplicated.name,
-      newsletterId: duplicated.newsletterId,
+      newsletterId: duplicated.workingNewsletterId || duplicated.newsletterId,
       subject: duplicated.subject,
       fromName: duplicated.fromName,
       fromEmail: duplicated.fromEmail,
       replyTo: duplicated.replyTo,
       groupOptionIds: duplicated.groupOptionIds,
       excludeGroupOptionIds: duplicated.excludeGroupOptionIds,
+      contentRevision: contentRevisionOf(workingFresh),
     });
     assert.equal(sentDuplicate.status, 'queued');
     assert.equal(sentDuplicate.totalRecipients, 1);
@@ -226,10 +243,26 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     assert.equal(duplicatedAfterSend.htmlSnapshot, '<p>Copia editada</p>');
     assert.equal(duplicatedAfterSend.sends.length, 1);
   } finally {
+    const workingIds: string[] = [];
     if (duplicatedCampaignId) {
+      const dup = await prisma.emailCampaign.findUnique({
+        where: { id: duplicatedCampaignId },
+        select: { workingNewsletterId: true },
+      });
+      if (dup?.workingNewsletterId) workingIds.push(dup.workingNewsletterId);
       await prisma.emailCampaign.deleteMany({ where: { id: duplicatedCampaignId } });
     }
-    if (campaignId) await prisma.emailCampaign.deleteMany({ where: { id: campaignId } });
+    if (campaignId) {
+      const camp = await prisma.emailCampaign.findUnique({
+        where: { id: campaignId },
+        select: { workingNewsletterId: true },
+      });
+      if (camp?.workingNewsletterId) workingIds.push(camp.workingNewsletterId);
+      await prisma.emailCampaign.deleteMany({ where: { id: campaignId } });
+    }
+    if (workingIds.length) {
+      await prisma.newsletter.deleteMany({ where: { id: { in: workingIds } } });
+    }
     if (senderId) await prisma.emailSender.deleteMany({ where: { id: senderId } });
     await prisma.malichimpSuppression.deleteMany({ where: { email: { in: emails } } });
     await prisma.emailGlobalSuppression.deleteMany({ where: { email: { in: emails } } });

@@ -1,32 +1,33 @@
-import { randomUUID } from 'crypto';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  EmailCampaignStatus,
   NewsletterBrand,
+  NewsletterKind,
+  NewsletterScope,
   NewsletterStatus,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import {
   CreateNewsletterDto,
   UpdateNewsletterDto,
 } from './dto/newsletter.dto';
-
-function duplicateLabel(value: string, maxLength: number): string {
-  const suffix = ' — copia';
-  return `${value.slice(0, maxLength - suffix.length).trimEnd()}${suffix}`;
-}
-
-function duplicateNewsletterSlug(value: string): string {
-  const suffix = `copia-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  const base = value
-    .slice(0, 80 - suffix.length - 1)
-    .replace(/-+$/g, '');
-  return `${base}-${suffix}`;
-}
+import {
+  WorkingCopyScope,
+  buildWorkingCopyCreateData,
+  contentRevisionOf,
+  duplicateLabel,
+  duplicateNewsletterSlug as makeLibraryCopySlug,
+  libraryListWhere,
+  publishedLibraryWhere,
+  workingCopyListWhere,
+} from './newsletter-working-copy';
 
 @Injectable()
 export class NewslettersService {
@@ -41,8 +42,10 @@ export class NewslettersService {
       .replace(/\/$/, '');
   }
 
+  /** Admin Boletines list: shared library only. */
   list() {
     return this.prisma.newsletter.findMany({
+      where: libraryListWhere(),
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: { select: { campaigns: true } },
@@ -51,10 +54,10 @@ export class NewslettersService {
     });
   }
 
-  /** Published content available to any authorized campaign module. */
+  /** Published library bases for campaign wizards (read-only). */
   listPublished() {
     return this.prisma.newsletter.findMany({
-      where: { status: NewsletterStatus.published },
+      where: publishedLibraryWhere(),
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
@@ -62,16 +65,37 @@ export class NewslettersService {
         title: true,
         subject: true,
         htmlBody: true,
+        designJson: true,
+        brand: true,
         status: true,
+        contentRevision: true,
         createdAt: true,
         updatedAt: true,
       },
     });
   }
 
+  listWorkingCopies(scope: WorkingCopyScope) {
+    return this.prisma.newsletter.findMany({
+      where: workingCopyListWhere(scope),
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        workingForCampaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            updatedAt: true,
+          },
+        },
+        createdBy: { select: { email: true, name: true } },
+      },
+    });
+  }
+
   async get(id: string) {
-    const row = await this.prisma.newsletter.findUnique({
-      where: { id },
+    const row = await this.prisma.newsletter.findFirst({
+      where: { id, ...libraryListWhere() },
       include: {
         createdBy: { select: { email: true, name: true } },
       },
@@ -88,10 +112,35 @@ export class NewslettersService {
 
   async getPublishedBySlug(slug: string) {
     const row = await this.prisma.newsletter.findFirst({
-      where: { slug, status: NewsletterStatus.published },
+      where: {
+        slug,
+        ...publishedLibraryWhere(),
+      },
     });
     if (!row) throw new NotFoundException('Boletín no publicado');
     return row;
+  }
+
+  async getWorkingCopy(id: string, scope: WorkingCopyScope) {
+    const row = await this.prisma.newsletter.findFirst({
+      where: { id, ...workingCopyListWhere(scope) },
+      include: {
+        workingForCampaign: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+    if (!row) throw new NotFoundException('Contenido no encontrado');
+    return {
+      ...row,
+      contentRevisionToken: contentRevisionOf(row),
+      editable: row.workingForCampaign?.status === EmailCampaignStatus.draft,
+    };
   }
 
   async create(userId: string, dto: CreateNewsletterDto) {
@@ -110,6 +159,9 @@ export class NewslettersService {
                 ? null
                 : (dto.brand as NewsletterBrand),
           status: (dto.status as NewsletterStatus) ?? NewsletterStatus.draft,
+          scope: NewsletterScope.shared,
+          kind: NewsletterKind.library,
+          contentRevision: 1,
           createdById: userId,
         },
       });
@@ -146,31 +198,175 @@ export class NewslettersService {
         ...(dto.status !== undefined
           ? { status: dto.status as NewsletterStatus }
           : {}),
+        contentRevision: { increment: 1 },
       },
     });
   }
 
+  async updateWorkingCopy(
+    id: string,
+    scope: WorkingCopyScope,
+    dto: UpdateNewsletterDto,
+  ) {
+    const current = await this.getWorkingCopy(id, scope);
+    if (!current.editable) {
+      throw new ConflictException(
+        'Solo se puede editar el contenido mientras la campaña esté en preparación',
+      );
+    }
+    return this.prisma.newsletter.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
+        ...(dto.subject !== undefined ? { subject: dto.subject.trim() } : {}),
+        ...(dto.htmlBody !== undefined ? { htmlBody: dto.htmlBody } : {}),
+        ...(dto.designJson !== undefined
+          ? { designJson: dto.designJson }
+          : {}),
+        ...(dto.brand !== undefined
+          ? {
+              brand:
+                dto.brand === null ? null : (dto.brand as NewsletterBrand),
+            }
+          : {}),
+        contentRevision: { increment: 1 },
+      },
+    });
+  }
+
+  async createWorkingCopy(
+    tx: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      scope: WorkingCopyScope;
+      sourceNewsletterId: string | null;
+      title: string;
+      subject: string;
+      htmlBody: string;
+      designJson?: string | null;
+      brand?: NewsletterBrand | null;
+      slugBase: string;
+    },
+  ) {
+    return tx.newsletter.create({
+      data: buildWorkingCopyCreateData(input),
+    });
+  }
+
+  /**
+   * Snapshot payload from the exclusive working copy (never from library base).
+   */
+  async snapshotFromWorkingCopy(workingNewsletterId: string) {
+    const row = await this.prisma.newsletter.findUnique({
+      where: { id: workingNewsletterId },
+    });
+    if (!row || row.kind !== NewsletterKind.campaign_working_copy) {
+      throw new BadRequestException(
+        'La campaña no tiene un contenido de trabajo válido',
+      );
+    }
+    return {
+      subjectSnapshot: row.subject.slice(0, 300),
+      htmlSnapshot: row.htmlBody,
+      designJsonSnapshot: row.designJson,
+      brandSnapshot: row.brand,
+      contentRevision: row.contentRevision,
+      contentRevisionToken: contentRevisionOf(row),
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  assertContentRevision(
+    row: {
+      contentRevision: number;
+      updatedAt: Date;
+      htmlBody: string;
+      designJson: string | null;
+    },
+    expected: string | undefined,
+    options?: { required?: boolean },
+  ) {
+    if (!expected) {
+      if (options?.required) {
+        throw new ConflictException(
+          'El contenido cambió después de tu revisión. Revísalo nuevamente antes de enviar.',
+        );
+      }
+      return;
+    }
+    const current = contentRevisionOf(row);
+    if (current !== expected) {
+      throw new ConflictException(
+        'El contenido cambió después de tu revisión. Revísalo nuevamente antes de enviar.',
+      );
+    }
+  }
+
+  /**
+   * Atomically verify the review token and bump contentRevision.
+   * If another writer changed the row, updateMany matches 0 → 409.
+   */
+  async claimWorkingCopyRevision(
+    tx: Prisma.TransactionClient,
+    workingId: string,
+    expectedToken: string | undefined,
+    options?: { required?: boolean; subject?: string },
+  ) {
+    const working = await tx.newsletter.findUnique({ where: { id: workingId } });
+    if (!working || working.kind !== NewsletterKind.campaign_working_copy) {
+      throw new BadRequestException(
+        'La campaña no tiene un contenido de trabajo válido',
+      );
+    }
+    this.assertContentRevision(working, expectedToken, {
+      required: options?.required,
+    });
+    const bumped = await tx.newsletter.updateMany({
+      where: {
+        id: workingId,
+        contentRevision: working.contentRevision,
+      },
+      data: {
+        ...(options?.subject !== undefined
+          ? { subject: options.subject.slice(0, 200) }
+          : {}),
+        contentRevision: { increment: 1 },
+      },
+    });
+    if (!bumped.count) {
+      throw new ConflictException(
+        'El contenido cambió después de tu revisión. Revísalo nuevamente antes de enviar.',
+      );
+    }
+    return tx.newsletter.findUniqueOrThrow({ where: { id: workingId } });
+  }
+
   async duplicate(userId: string, id: string) {
-    const source = await this.prisma.newsletter.findUnique({ where: { id } });
+    const source = await this.prisma.newsletter.findFirst({
+      where: { id, ...libraryListWhere() },
+    });
     if (!source) throw new NotFoundException('Boletín no encontrado');
 
     return this.prisma.newsletter.create({
       data: {
-        slug: duplicateNewsletterSlug(source.slug),
+        slug: makeLibraryCopySlug(source.slug, 'copia'),
         title: duplicateLabel(source.title, 200),
         subject: source.subject.slice(0, 200),
         htmlBody: source.htmlBody,
         designJson: source.designJson,
         brand: source.brand,
         status: NewsletterStatus.draft,
+        scope: NewsletterScope.shared,
+        kind: NewsletterKind.library,
+        contentRevision: 1,
         createdById: userId,
       },
     });
   }
 
   async remove(id: string) {
-    const newsletter = await this.prisma.newsletter.findUnique({
-      where: { id },
+    const newsletter = await this.prisma.newsletter.findFirst({
+      where: { id, ...libraryListWhere() },
       include: { _count: { select: { campaigns: true } } },
     });
     if (!newsletter) throw new NotFoundException('Boletín no encontrado');

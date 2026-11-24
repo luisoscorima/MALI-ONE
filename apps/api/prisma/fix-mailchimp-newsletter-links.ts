@@ -1,8 +1,6 @@
 /**
- * Scrubs leftover Mailchimp links/assets from seeded newsletters:
- * - rewrites mailchi.mp / list-manage / social CDN
- * - rehosts mcusercontent / cdn-images.mailchimp images → S3
- * - normalizes First Name → {{first_name}}
+ * Scrubs leftover Mailchimp links/assets and strips view-in-browser from
+ * stored newsletter HTML (platform injects it at send time).
  *
  *   pnpm --filter @mali-one/api exec tsx prisma/fix-mailchimp-newsletter-links.ts
  *   pnpm --filter @mali-one/api exec tsx prisma/fix-mailchimp-newsletter-links.ts --dry-run
@@ -13,6 +11,7 @@ import { PrismaClient } from '@prisma/client';
 import {
   htmlStillPointsToMailchimp,
   scrubMailchimpNewsletterHtml,
+  stripViewInBrowserFromHtml,
   SEEDED_MAILCHIMP_ARCHIVE_SLUGS,
 } from './lib/scrub-mailchimp-newsletter-html';
 
@@ -20,12 +19,7 @@ const prisma = new PrismaClient();
 const dryRun = process.argv.includes('--dry-run');
 const appUrl = (process.env.APP_URL ?? 'https://dev.mali.pe').trim();
 
-const SLUGS = [
-  ...new Set([
-    ...Object.values(SEEDED_MAILCHIMP_ARCHIVE_SLUGS),
-    // Keep legacy rows even if the map drifts.
-  ]),
-];
+const SEEDED_SLUGS = new Set(Object.values(SEEDED_MAILCHIMP_ARCHIVE_SLUGS));
 
 const ASSET_RE =
   /https:\/\/(?:mcusercontent\.com|cdn-images\.mailchimp\.com)\/[^"'\\\s>]+\.(?:png|jpe?g|gif|webp)/gi;
@@ -82,9 +76,6 @@ async function main() {
   });
 
   const rows = await prisma.newsletter.findMany({
-    where: {
-      OR: [{ slug: { in: SLUGS } }, { slug: { startsWith: 'mailchimp-' } }],
-    },
     select: { id: true, slug: true, title: true, htmlBody: true },
   });
 
@@ -95,7 +86,6 @@ async function main() {
         appUrl,
         bucket,
         found: rows.length,
-        expectedMap: SLUGS.length,
       },
       null,
       2,
@@ -137,23 +127,24 @@ async function main() {
       htmlBody = htmlBody.split(from.replace(/&/g, '&amp;')).join(to);
     }
 
-    const before = htmlStillPointsToMailchimp(row.htmlBody);
-    const next = scrubMailchimpNewsletterHtml(htmlBody, {
-      appUrl,
-      slug: row.slug,
-    });
-    const after = htmlStillPointsToMailchimp(next);
+    const beforeMc = htmlStillPointsToMailchimp(row.htmlBody);
+    const next = SEEDED_SLUGS.has(row.slug)
+      ? scrubMailchimpNewsletterHtml(htmlBody, { appUrl, slug: row.slug })
+      : stripViewInBrowserFromHtml(htmlBody);
+    const afterMc = htmlStillPointsToMailchimp(next);
+    const hasView = /Ver este correo en el navegador|View(?:\s+this)?\s+email\s+in|data-mali-view-in-browser/i.test(
+      next,
+    );
     const dirty = next !== row.htmlBody;
 
     console.log(
       JSON.stringify({
         slug: row.slug,
         assetsRehosted: assetUrls.length,
-        before: before.length,
-        after: after.length,
+        beforeMc: beforeMc.length,
+        afterMc: afterMc.length,
+        viewInBrowserLeft: hasView,
         changed: dirty,
-        leftover: after.slice(0, 5),
-        firstNameLeft: /First Name|\*\|FNAME\|\*/i.test(next),
       }),
     );
 
@@ -167,10 +158,6 @@ async function main() {
     });
   }
 
-  const missing = SLUGS.filter((slug) => !rows.some((r) => r.slug === slug));
-  if (missing.length) {
-    console.warn('missing slugs:', missing);
-  }
   console.log(dryRun ? `would update ${changed}` : `updated ${changed}`);
 }
 

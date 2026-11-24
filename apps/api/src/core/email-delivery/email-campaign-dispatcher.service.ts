@@ -108,6 +108,9 @@ export class EmailCampaignDispatcherService {
           const unsubscribeUrl = campaign.unsubscribePath
             ? this.tracking.publicUrl(`${campaign.unsubscribePath}/${send.openToken}`)
             : undefined;
+          const viewInBrowserUrl = this.tracking.publicUrl(
+            `mail/view/${send.openToken}`,
+          );
           const firstName = firstNameFromDisplayName(send.name);
           const subject = applyEmailMergeTags(campaign.subjectSnapshot, { firstName });
           const personalizedHtml = applyEmailMergeTags(campaign.htmlSnapshot, {
@@ -120,6 +123,7 @@ export class EmailCampaignDispatcherService {
               personalizedHtml,
               send.openToken,
               unsubscribeUrl,
+              viewInBrowserUrl,
             ),
             fromName: campaign.fromName ?? undefined,
             fromEmail: campaign.fromEmail ?? undefined,

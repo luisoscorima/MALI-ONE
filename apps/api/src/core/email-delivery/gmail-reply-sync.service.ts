@@ -9,6 +9,9 @@ import {
   extractSendIdFromReplyAddress,
 } from './malichimp-reply-to';
 
+/** Align with Gmail search `newer_than:14d` below. */
+export const REPLY_SYNC_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
+
 /**
  * Marks EmailSend.repliedAt when a reply lands in a @mali.pe Workspace mailbox.
  * Does not store message bodies. Requires domain-wide Gmail readonly delegation.
@@ -59,12 +62,22 @@ export class GmailReplySyncService {
     }
   }
 
+  /**
+   * Watch any @mali.pe Reply-To that actually got a send recently (production or test),
+   * including draft campaigns — status alone would miss test replies.
+   */
   private async listReplyMailboxes(): Promise<string[]> {
+    const since = new Date(Date.now() - REPLY_SYNC_LOOKBACK_MS);
     const rows = await this.prisma.emailCampaign.findMany({
       where: {
         audienceArea: 'malichimp',
         replyToEmail: { not: null },
-        status: { in: ['queued', 'sending', 'completed', 'scheduled'] },
+        sends: {
+          some: {
+            status: 'sent',
+            sentAt: { gte: since },
+          },
+        },
       },
       select: { replyToEmail: true },
       distinct: ['replyToEmail'],

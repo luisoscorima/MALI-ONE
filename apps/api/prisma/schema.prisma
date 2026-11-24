@@ -1021,6 +1021,19 @@ enum NewsletterStatus {
   published
 }
 
+/// Which product surface owns / may list this newsletter row.
+enum NewsletterScope {
+  shared
+  malichimp
+  internal_communications
+}
+
+/// Library piece vs exclusive campaign working copy.
+enum NewsletterKind {
+  library
+  campaign_working_copy
+}
+
 /// Optional visual brand for header/footer chrome in Boletines.
 enum NewsletterBrand {
   museo
@@ -1103,15 +1116,28 @@ model Newsletter {
   /// Optional brand selects the matching header + footer chrome.
   brand       NewsletterBrand?
   status      NewsletterStatus @default(draft)
+  scope       NewsletterScope  @default(shared)
+  kind        NewsletterKind   @default(library)
+  /// Library piece this working copy was forked from (optional).
+  sourceNewsletterId String?
+  sourceNewsletter   Newsletter?  @relation("NewsletterSource", fields: [sourceNewsletterId], references: [id], onDelete: SetNull)
+  derivedNewsletters Newsletter[] @relation("NewsletterSource")
+  /// Bumps on each content edit; used for optimistic send/test checks.
+  contentRevision Int          @default(1)
   createdById String
   createdBy   User             @relation(fields: [createdById], references: [id])
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  campaigns   EmailCampaign[]
+  /// Campaigns that treat this row as library base (audit / provenance).
+  campaigns   EmailCampaign[]  @relation("CampaignLibraryNewsletter")
+  /// At most one campaign may own this row as exclusive working copy.
+  workingForCampaign EmailCampaign? @relation("CampaignWorkingNewsletter")
 
   @@index([createdById])
   @@index([status])
   @@index([brand])
+  @@index([scope, kind])
+  @@index([sourceNewsletterId])
 }
 
 model LandingPage {
@@ -1141,13 +1167,19 @@ model LandingPage {
 
 model EmailCampaign {
   id                      String              @id @default(cuid())
+  /// Library base (provenance). Never edited from audience modules as send source.
   newsletterId            String
-  newsletter              Newsletter          @relation(fields: [newsletterId], references: [id], onDelete: Restrict)
+  newsletter              Newsletter          @relation("CampaignLibraryNewsletter", fields: [newsletterId], references: [id], onDelete: Restrict)
+  /// Exclusive working copy for draft edit/preview/test/snapshot. Unique across campaigns.
+  workingNewsletterId     String?             @unique
+  workingNewsletter       Newsletter?         @relation("CampaignWorkingNewsletter", fields: [workingNewsletterId], references: [id], onDelete: Restrict)
   name                    String
   replyToEmail            String?
-  /// Immutable content captured when the campaign is created.
+  /// Immutable content captured when the campaign is sent/queued.
   subjectSnapshot         String              @db.VarChar(300)
   htmlSnapshot            String              @db.Text
+  designJsonSnapshot      String?             @db.Text
+  brandSnapshot           NewsletterBrand?
   fromName                String?             @db.VarChar(160)
   fromEmail               String?             @db.VarChar(320)
   /// Optional public route owned by the audience module, without coupling the dispatcher to it.
@@ -1160,6 +1192,8 @@ model EmailCampaign {
   audienceSegment         String?
   audienceSegments        String[]            @default([])
   audienceExcludeSegments String[]            @default([])
+  audienceIncludeContactIds String[]          @default([])
+  audienceExcludeContactIds String[]          @default([])
   audienceAttrKey         String?
   audienceAttrValue       String?
   totalRecipients         Int                 @default(0)

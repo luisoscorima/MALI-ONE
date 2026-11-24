@@ -21,13 +21,13 @@ import { Roles } from '../../core/guards/roles.decorator';
 import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 import {
   CreateMalichimpCampaignDto,
-  CreateMalichimpNewsletterDraftDto,
   ExportMalichimpCampaignsDto,
   MalichimpAudienceDto,
   MalichimpCampaignSendsQueryDto,
   MalichimpCampaignStatsQueryDto,
   SendMalichimpTestDto,
   UpdateMalichimpContactDto,
+  UpdateMalichimpWorkingCopyDto,
 } from './dto/malichimp-campaign.dto';
 import { MalichimpService } from './malichimp.service';
 
@@ -69,22 +69,33 @@ export class MalichimpController {
     return this.malichimp.listTestRecipients(q);
   }
 
+  @Get('newsletters/library')
+  libraryNewsletters() {
+    return this.malichimp.listPublishedNewsletters();
+  }
+
+  /** @deprecated prefer newsletters/library — kept for short transition */
   @Get('newsletters')
   newsletters() {
     return this.malichimp.listPublishedNewsletters();
   }
 
-  @Get('newsletters/:id')
-  newsletter(@Param('id') id: string) {
-    return this.malichimp.getCampaignNewsletter(id);
+  @Get('content')
+  listContent() {
+    return this.malichimp.listWorkingContent();
   }
 
-  @Post('newsletters/draft')
-  createNewsletterDraft(
-    @Req() req: { user: User },
-    @Body() body: CreateMalichimpNewsletterDraftDto,
+  @Get('content/:id')
+  getContent(@Param('id') id: string) {
+    return this.malichimp.getWorkingContent(id);
+  }
+
+  @Patch('content/:id')
+  updateContent(
+    @Param('id') id: string,
+    @Body() body: UpdateMalichimpWorkingCopyDto,
   ) {
-    return this.malichimp.createNewsletterDraft(req.user.id, body);
+    return this.malichimp.updateWorkingContent(id, body);
   }
 
   @Get('campaigns')

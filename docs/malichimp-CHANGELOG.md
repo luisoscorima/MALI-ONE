@@ -2,22 +2,20 @@
 
 ## [Unreleased]
 
-### Changed
-
-- Las pestañas Audiencia / Campañas quedan en la URL (`?tab=campaigns`), igual que Boletines y Usuarios Workspace.
-
 ### Added
 
-- Eliminar campañas en **borrador** (`DELETE /api/malichimp/campaigns/:id`); si el boletín ligado está en borrador y sin otras campañas, también se elimina.
+- Working copies exclusivas por campaña (`workingNewsletterId`) + pestaña **Contenido** con editor propio (`?tab=content&edit=`); biblioteca en Boletines.
+- Deep links: `?tab=campaigns&new=1`, `?tab=campaigns&campaign={id}`.
+- Vista congelada del correo enviado: `GET /mail/view/:token` (snapshot + personalización; sin contar apertura).
+- Eliminar campañas en **borrador** (`DELETE /api/malichimp/campaigns/:id`); elimina el fork de trabajo asociado.
 - Personalización por destinatario en el dispatcher SES: `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` se sustituyen con el primer nombre del contacto; sin nombre usa `estimado(a)`.
 - Importación administrativa por XLSX con plantilla, preview, consentimiento, grupos del lote y apply transaccional.
 - Persistencia en disco de previews ZIP/XLSX (TTL 30 min) recuperable tras reinicio en el mismo host.
 - Auditoría XLSX vía `MalichimpImportJob` + `MalichimpImportRun` (huella, admin, consentimiento y conteos).
 - Catálogo compartido `EmailSender` (`@mali.pe`) con CRUD en `/api/email-delivery/senders` (UI ahora en Boletines).
 - Campañas con exclusión de opciones de grupo, asunto/remitente/nombre editables y rechazo de programación vencida.
-- Duplicación de campañas como borrador, con copia editable del boletín, configuración heredada y audiencia recalculada.
+- Duplicación de campañas como borrador, con fork desde snapshots, criterios de audiencia (grupos + contactos manuales) y métricas limpias.
 - Vista previa del HTML congelado y apertura autenticada en navegador desde la tabla de campañas.
-- En Nueva campaña: **Usar existente** o **Crear nuevo** (borrador en Boletines, sin editor embebido).
 - Filtro opcional `tagId` en el listado de contactos.
 - Grupos de Mailchimp normalizados como categorías, opciones y pertenencias por contacto.
 - Selector de múltiples opciones de grupo con conteos y preview de destinatarios.
@@ -30,8 +28,22 @@
 - Importación administrativa por ZIP con preview, confirmación, progreso y limpieza temporal.
 - Motor SES transversal en `core/email-delivery`.
 
+### Fixed
+
+- Editor de Contenido MALICHIMP usa `/api/malichimp/content` (usuarios sin módulo Boletines pueden editar el fork).
+- Hidratar borrador/duplicado restaura inclusiones y exclusiones manuales de contactos.
+- `contentRevision` se valida y aplica en la misma transacción que el snapshot (prueba y envío).
+- `composeHtml`/`inject` siempre reemplazan chrome histórico de “ver en navegador” (p. ej. `/n/:slug`) por `/mail/view/{token}`.
+- Sync de respuestas Gmail: revisa buzones con envíos recientes (prueba o real), aunque la campaña siga en borrador.
+
 ### Changed
 
+- “Ver este correo en el navegador” apunta a `/mail/view/{openToken}` (HTML congelado de la campaña), no a `/n/:slug`.
+- Estados de Contenido: `queued`/`sending` → En curso; `failed` → Error; `completed` → Enviado.
+- Copy UI en español (Clicaron/Reply/Prod/Directory, texto de prueba, estados de envío con badge) y KPIs de stats con `aria-pressed`.
+- Estadísticas de campaña: checkbox **Incluir pruebas** (off por defecto) en lugar de Producción/Pruebas/Todo; `totalRecipients` sigue el alcance (evita `enviados / 0` en pruebas).
+- Export Excel de campañas ya no hereda el tope de 200 de la lista UI (`listCampaigns({ limit: null })`).
+- Las pestañas Audiencia / Campañas quedan en la URL (`?tab=campaigns`), igual que Boletines y Usuarios Workspace.
 - La pestaña **Remitentes** sale de MALICHIMP y vive en Boletines; el catálogo `EmailSender` sigue siendo compartido.
 - Nueva campaña usa un panel numerado compacto (estilo CRM PAM): incluir/excluir con desplegables, preview tabular, boletín publicado, radios Ahora/Programar y confirmación antes de enviar.
 - El diálogo de importación ofrece XLSX (lotes nuevos) y ZIP (sincronización Mailchimp).
