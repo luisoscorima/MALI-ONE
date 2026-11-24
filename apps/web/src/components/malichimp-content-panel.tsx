@@ -144,7 +144,7 @@ export function MalichimpContentPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Contenido</TableHead>
+              <TableHead className="w-56 max-w-56">Contenido</TableHead>
               <TableHead>Marca</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Campañas</TableHead>
@@ -164,9 +164,15 @@ export function MalichimpContentPanel({
             ) : rows.length ? (
               rows.map((row) => (
                 <TableRow key={row.id}>
-                  <TableCell>
-                    <p className="font-medium">{row.title}</p>
-                    <p className="text-xs text-muted-foreground">{row.subject}</p>
+                  <TableCell className="w-56 max-w-56">
+                    <div className="w-56 max-w-56">
+                      <p className="truncate font-medium" title={row.title}>
+                        {row.title}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground" title={row.subject}>
+                        {row.subject}
+                      </p>
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {row.brand ? NEWSLETTER_BRAND_LABELS[row.brand] : '—'}

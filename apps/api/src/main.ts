@@ -1,7 +1,11 @@
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+
+/** HTML + designJson de boletines supera el default Express (~100kb) → 413. */
+const JSON_BODY_LIMIT = '25mb';
 
 function parseCorsOrigins(): Set<string> {
   const origins = new Set<string>();
@@ -19,7 +23,13 @@ function parseCorsOrigins(): Set<string> {
 
 async function bootstrap() {
   // rawBody: firma X-Hub-Signature (HMAC) de webhooks Anura
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // bodyParser: false → registramos parsers con límite propio (evita el 100kb por defecto)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+    bodyParser: false,
+  });
+  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
+  app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('api', {
