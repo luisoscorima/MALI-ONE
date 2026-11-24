@@ -20,6 +20,7 @@ import {
   NEWSLETTER_BRAND_LABELS,
 } from '@mali-one/shared';
 import { EmailSendersPanel } from '@/components/email-senders-panel';
+import { NewsletterCampaignsRegistry } from '@/components/newsletter-campaigns-registry';
 import {
   NEWSLETTER_FIRST_NAME_MERGE_TAG,
   NewsletterEditor,
@@ -32,6 +33,7 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import { slugify } from '@/lib/coordinates';
 import {
+  Badge,
   Button,
   Input,
   Label,
@@ -62,8 +64,15 @@ export function NewslettersPage() {
   const editorRef = useRef<NewsletterEditorHandle>(null);
   const openedFromQueryRef = useRef<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
   const section =
-    searchParams.get('tab') === 'remitentes' ? 'remitentes' : 'boletines';
+    tabParam === 'remitentes' || tabParam === 'campanas' ? tabParam : 'boletines';
+
+  const SCOPE_LABEL: Record<string, string> = {
+    shared: 'Org / Boletines',
+    malichimp: 'MALICHIMP',
+    internal_communications: 'Campañas internas',
+  };
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -276,13 +285,13 @@ export function NewslettersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Boletines"
-        description="Diseña y publica contenido reutilizable. El catálogo de remitentes @mali.pe vive aquí; las audiencias se administran en cada módulo de envío."
+        title="Campañas y Boletines"
+        description="Hub global: biblioteca org, registro de campañas y remitentes por módulo. Las campañas se operan en MALICHIMP o Usuarios Workspace."
         actions={
           mode === 'closed' && section === 'boletines' ? (
             <Button type="button" onClick={openCreate}>
               <Plus className="mr-1 size-4" />
-              Nuevo boletín
+              Nuevo boletín org
             </Button>
           ) : mode !== 'closed' ? (
             <div className="flex flex-wrap gap-2">
@@ -312,8 +321,8 @@ export function NewslettersPage() {
           value={section}
           onValueChange={(value) => {
             const next = new URLSearchParams(searchParams);
-            if (value === 'remitentes') next.set('tab', 'remitentes');
-            else next.delete('tab');
+            if (value === 'boletines') next.delete('tab');
+            else next.set('tab', value);
             setSearchParams(next, { replace: true });
           }}
         >
@@ -322,14 +331,22 @@ export function NewslettersPage() {
               <Newspaper className="size-4" aria-hidden />
               Boletines
             </TabsTrigger>
+            <TabsTrigger value="campanas">
+              <Mail className="size-4" aria-hidden />
+              Campañas
+            </TabsTrigger>
             <TabsTrigger value="remitentes">
               <Mail className="size-4" aria-hidden />
               Remitentes
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="campanas" className="mt-6">
+            <NewsletterCampaignsRegistry />
+          </TabsContent>
+
           <TabsContent value="remitentes" className="mt-6">
-            <EmailSendersPanel senders={senders} onChange={setSenders} />
+            <EmailSendersPanel hubMode senders={senders} onChange={setSenders} />
           </TabsContent>
 
           <TabsContent value="boletines" className="mt-6 space-y-6">
@@ -345,9 +362,10 @@ export function NewslettersPage() {
                 <Table>
                   <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[320px] max-w-[320px]">Título</TableHead>
-                    <TableHead className="w-[200px] max-w-[200px]">Slug</TableHead>
-                    <TableHead className="w-[140px]">Marca</TableHead>
+                    <TableHead className="w-[280px] max-w-[280px]">Título</TableHead>
+                    <TableHead className="w-[120px]">Módulo</TableHead>
+                    <TableHead className="w-[180px] max-w-[180px]">Slug</TableHead>
+                    <TableHead className="w-[120px]">Marca</TableHead>
                     <TableHead className="w-[150px]">Estado</TableHead>
                     <TableHead className="w-[1%] whitespace-nowrap text-right">
                       Acciones
@@ -355,9 +373,11 @@ export function NewslettersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {newsletters.map((n) => (
+                  {newsletters.map((n) => {
+                    const isShared = (n.scope ?? 'shared') === 'shared';
+                    return (
                     <TableRow key={n.id}>
-                      <TableCell className="max-w-[320px]">
+                      <TableCell className="max-w-[280px]">
                         <div className="truncate font-medium" title={n.title}>
                           {n.title}
                         </div>
@@ -368,8 +388,13 @@ export function NewslettersPage() {
                           {n.subject}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {SCOPE_LABEL[n.scope ?? 'shared'] ?? n.scope}
+                        </Badge>
+                      </TableCell>
                       <TableCell
-                        className="max-w-[200px] truncate font-mono text-sm"
+                        className="max-w-[180px] truncate font-mono text-sm"
                         title={n.slug}
                       >
                         {n.slug}
@@ -378,6 +403,7 @@ export function NewslettersPage() {
                         {n.brand ? NEWSLETTER_BRAND_LABELS[n.brand] : '—'}
                       </TableCell>
                       <TableCell>
+                        {isShared ? (
                         <div className="flex items-center gap-2">
                           <Switch
                             size="sm"
@@ -396,8 +422,13 @@ export function NewslettersPage() {
                             {n.status === 'published' ? 'Publicado' : 'Borrador'}
                           </span>
                         </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Biblioteca módulo</span>
+                        )}
                       </TableCell>
                       <TableCell className="space-x-1 text-right">
+                        {isShared ? (
+                        <>
                         <Button
                           size="sm"
                           variant="ghost"
@@ -439,9 +470,26 @@ export function NewslettersPage() {
                         >
                           <Trash2 className="size-4" />
                         </Button>
+                        </>
+                        ) : n.scope === 'malichimp' ? (
+                          <Button size="sm" variant="ghost" asChild>
+                            <a href={`/admin/malichimp?tab=content&edit=${encodeURIComponent(n.id)}`}>
+                              Abrir en MALICHIMP
+                            </a>
+                          </Button>
+                        ) : n.scope === 'internal_communications' ? (
+                          <Button size="sm" variant="ghost" asChild>
+                            <a href={`/admin/users?tab=contenido&edit=${encodeURIComponent(n.id)}`}>
+                              Abrir en Contenido
+                            </a>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Solo lectura</span>
+                        )}
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                  })}
                   </TableBody>
                 </Table>
               </TableShell>

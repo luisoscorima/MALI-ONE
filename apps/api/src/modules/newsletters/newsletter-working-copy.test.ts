@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NewsletterKind, NewsletterScope, NewsletterStatus } from '@prisma/client';
 import {
+  buildModuleLibraryCreateData,
   contentRevisionOf,
   libraryListWhere,
+  moduleLibraryListWhere,
   publishedLibraryWhere,
   scopeForAudienceArea,
   workingCopyListWhere,
@@ -18,6 +20,10 @@ test('library and public listings never include working copies', () => {
     scope: NewsletterScope.shared,
     kind: NewsletterKind.library,
     status: NewsletterStatus.published,
+  });
+  assert.deepEqual(moduleLibraryListWhere(NewsletterScope.malichimp), {
+    scope: NewsletterScope.malichimp,
+    kind: NewsletterKind.library,
   });
   assert.deepEqual(workingCopyListWhere(NewsletterScope.malichimp), {
     scope: NewsletterScope.malichimp,
@@ -46,4 +52,20 @@ test('scopeForAudienceArea maps IC and MALICHIMP areas', () => {
     NewsletterScope.internal_communications,
   );
   assert.equal(scopeForAudienceArea('other'), null);
+});
+
+test('buildModuleLibraryCreateData stores brand and malichimp library shape', () => {
+  const data = buildModuleLibraryCreateData({
+    userId: 'user-1',
+    scope: NewsletterScope.malichimp,
+    title: 'Pieza',
+    subject: 'Asunto',
+    htmlBody: '<p>Hola</p>',
+    brand: 'museo',
+  });
+  assert.equal(data.scope, NewsletterScope.malichimp);
+  assert.equal(data.kind, NewsletterKind.library);
+  assert.equal(data.brand, 'museo');
+  assert.equal(data.status, NewsletterStatus.draft);
+  assert.match(String(data.slug), /lib-/);
 });

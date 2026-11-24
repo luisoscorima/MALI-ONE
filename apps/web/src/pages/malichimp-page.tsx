@@ -8,11 +8,13 @@ import {
   FileArchive,
   FileSpreadsheet,
   Loader2,
+  Mail,
   Search,
   Send,
   Upload,
   Users,
 } from 'lucide-react';
+import { EmailSendersPanel } from '@/components/email-senders-panel';
 import type {
   EmailSenderDto,
   MalichimpContactDto,
@@ -120,7 +122,11 @@ export function MalichimpPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const section =
-    tabParam === 'campaigns' || tabParam === 'content' ? tabParam : 'audience';
+    tabParam === 'campaigns' ||
+    tabParam === 'content' ||
+    tabParam === 'remitentes'
+      ? tabParam
+      : 'audience';
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [tags, setTags] = useState<MalichimpTagDto[]>([]);
@@ -209,7 +215,7 @@ export function MalichimpPage() {
       api.getMalichimpStats(),
       api.listMalichimpGroups(),
       api.listMalichimpTags(),
-      api.listEmailSenders().catch(() => [] as EmailSenderDto[]),
+      api.listEmailSenders('malichimp').catch(() => [] as EmailSenderDto[]),
       loadContacts(),
     ])
       .then(([nextStats, nextGroups, nextTags, nextSenders]) => {
@@ -444,9 +450,12 @@ export function MalichimpPage() {
           const next = new URLSearchParams(searchParams);
           if (value === 'audience') next.delete('tab');
           else next.set('tab', value);
-          next.delete('edit');
-          next.delete('new');
-          next.delete('campaign');
+          // Deep-link params are tab-specific.
+          if (value !== 'content') next.delete('edit');
+          if (value !== 'campaigns') next.delete('campaign');
+          if (value !== 'content' && value !== 'campaigns') next.delete('new');
+          if (value === 'content') next.delete('campaign');
+          if (value === 'campaigns') next.delete('edit');
           setSearchParams(next, { replace: true });
         }}
         className="gap-4"
@@ -455,6 +464,7 @@ export function MalichimpPage() {
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
           <TabsTrigger value="content">Contenido</TabsTrigger>
+          <TabsTrigger value="remitentes"><Mail aria-hidden="true" /> Remitentes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="audience">
@@ -592,8 +602,8 @@ export function MalichimpPage() {
             groups={groups}
             delivery={stats?.delivery ?? null}
             senders={senders}
-            openNew={searchParams.get('new') === '1'}
-            openCampaignId={searchParams.get('campaign')}
+            openNew={section === 'campaigns' && searchParams.get('new') === '1'}
+            openCampaignId={section === 'campaigns' ? searchParams.get('campaign') : null}
             onDeepLinkConsumed={(keys) => {
               const next = new URLSearchParams(searchParams);
               for (const key of keys) next.delete(key);
@@ -603,36 +613,63 @@ export function MalichimpPage() {
         </TabsContent>
 
         <TabsContent value="content">
-          {searchParams.get('edit') ? (
+          {searchParams.get('new') === '1' ? (
             <MalichimpContentEditor
+              mode="create"
+              onClose={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('new');
+                next.delete('edit');
+                next.set('tab', 'content');
+                setSearchParams(next, { replace: true });
+              }}
+              onCreated={(id) => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('new');
+                next.set('tab', 'content');
+                next.set('edit', id);
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          ) : searchParams.get('edit') ? (
+            <MalichimpContentEditor
+              mode="edit"
               contentId={searchParams.get('edit')!}
               onClose={() => {
                 const next = new URLSearchParams(searchParams);
                 next.delete('edit');
+                next.delete('new');
                 next.set('tab', 'content');
                 setSearchParams(next, { replace: true });
               }}
             />
           ) : (
             <MalichimpContentPanel
-              onNewCampaign={() => {
+              onNewContent={() => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'campaigns');
+                next.set('tab', 'content');
                 next.set('new', '1');
-                next.delete('campaign');
                 next.delete('edit');
+                next.delete('campaign');
                 setSearchParams(next, { replace: true });
               }}
-              onOpenCampaign={(campaignId) => {
+              onEditContent={(contentId) => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'campaigns');
-                next.set('campaign', campaignId);
+                next.set('tab', 'content');
+                next.set('edit', contentId);
                 next.delete('new');
-                next.delete('edit');
                 setSearchParams(next, { replace: true });
               }}
             />
           )}
+        </TabsContent>
+
+        <TabsContent value="remitentes">
+          <EmailSendersPanel
+            scope="malichimp"
+            senders={senders}
+            onChange={setSenders}
+          />
         </TabsContent>
       </Tabs>
 

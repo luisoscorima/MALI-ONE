@@ -1215,18 +1215,23 @@ model EmailCampaign {
   @@index([createdById])
   @@index([status])
   @@index([scheduledAt])
+  @@index([audienceArea])
 }
 
-/// Sender addresses offered to business modules. SES identity verification remains in AWS.
+/// Sender addresses offered per catalog scope. SES identity verification remains in AWS.
 model EmailSender {
-  id          String   @id @default(cuid())
-  email       String   @unique @db.VarChar(320)
+  id          String          @id @default(cuid())
+  email       String          @db.VarChar(320)
+  /// shared = org/hub; malichimp / internal_communications = module catalogs.
+  scope       NewsletterScope @default(shared)
   createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
+  @@unique([scope, email])
   @@index([createdById])
+  @@index([scope])
 }
 
 model EmailSend {

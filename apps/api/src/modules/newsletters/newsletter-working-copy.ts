@@ -52,12 +52,48 @@ export function publishedLibraryWhere(): Prisma.NewsletterWhereInput {
   };
 }
 
+/** Module-scoped library (e.g. MALICHIMP Contenido), not shared Boletines. */
+export function moduleLibraryListWhere(
+  scope: WorkingCopyScope,
+): Prisma.NewsletterWhereInput {
+  return {
+    scope,
+    kind: Kind.library,
+  };
+}
+
 export function workingCopyListWhere(
   scope: WorkingCopyScope,
 ): Prisma.NewsletterWhereInput {
   return {
     scope,
     kind: Kind.campaign_working_copy,
+  };
+}
+
+export function buildModuleLibraryCreateData(input: {
+  userId: string;
+  scope: WorkingCopyScope;
+  title: string;
+  subject: string;
+  htmlBody: string;
+  designJson?: string | null;
+  brand?: NewsletterBrand | null;
+  slugBase?: string;
+}): Prisma.NewsletterCreateInput {
+  const slugBase = input.slugBase?.trim() || input.title || 'contenido';
+  return {
+    slug: duplicateNewsletterSlug(slugBase, 'lib'),
+    title: input.title.slice(0, 200),
+    subject: input.subject.slice(0, 200),
+    htmlBody: input.htmlBody,
+    designJson: input.designJson ?? null,
+    brand: input.brand ?? null,
+    status: NewsletterStatus.draft,
+    scope: input.scope,
+    kind: Kind.library as NewsletterKind,
+    contentRevision: 1,
+    createdBy: { connect: { id: input.userId } },
   };
 }
 

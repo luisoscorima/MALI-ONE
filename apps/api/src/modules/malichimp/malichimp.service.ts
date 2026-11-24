@@ -11,6 +11,8 @@ import {
   EmailSendStatus,
   MalichimpContactStatus,
   MalichimpSuppressionReason,
+  NewsletterKind,
+  NewsletterScope,
   Prisma,
   type MalichimpImportJob,
   type User,
@@ -52,6 +54,7 @@ import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 import {
   CreateMalichimpCampaignDto,
   MalichimpAudienceDto,
+  CreateMalichimpContentDto,
   MalichimpCampaignSendsQueryDto,
   SendMalichimpTestDto,
   UpdateMalichimpContactDto,
@@ -62,9 +65,8 @@ import {
 import { NewslettersService } from '../newsletters/newsletters.service';
 import {
   contentRevisionOf,
-  publishedLibraryWhere,
+  moduleLibraryListWhere,
 } from '../newsletters/newsletter-working-copy';
-import { NewsletterScope } from '@prisma/client';
 import {
   buildTreasuryXlsx,
   limaStamp,
@@ -457,48 +459,85 @@ export class MalichimpService implements OnModuleInit {
     }));
   }
 
+  /** Campaign wizard bases: shared published + MALICHIMP library. */
   listPublishedNewsletters() {
-    return this.newsletters.listPublished();
+    return this.newsletters.listCampaignContentBases(NewsletterScope.malichimp);
   }
 
-  listWorkingContent() {
-    return this.newsletters.listWorkingCopies(NewsletterScope.malichimp).then((rows) =>
+  /** Contenido tab: module library only (not working copies). */
+  listLibraryContent() {
+    return this.newsletters.listModuleLibrary(NewsletterScope.malichimp).then((rows) =>
       rows.map((row) => ({
         id: row.id,
         title: row.title,
         subject: row.subject,
+        brand: row.brand,
         updatedAt: row.updatedAt,
         contentRevision: contentRevisionOf(row),
-        campaign: row.workingForCampaign
-          ? {
-              id: row.workingForCampaign.id,
-              name: row.workingForCampaign.name,
-              status: row.workingForCampaign.status,
-            }
-          : null,
-        campaignStatusLabel: !row.workingForCampaign
-          ? 'En preparación'
-          : row.workingForCampaign.status === EmailCampaignStatus.draft
-            ? 'En preparación'
-            : row.workingForCampaign.status === EmailCampaignStatus.scheduled
-              ? 'Programado'
-              : row.workingForCampaign.status === EmailCampaignStatus.queued
-                || row.workingForCampaign.status === EmailCampaignStatus.sending
-                ? 'En curso'
-                : row.workingForCampaign.status === EmailCampaignStatus.failed
-                  ? 'Error'
-                  : 'Enviado',
-        editable: row.workingForCampaign?.status === EmailCampaignStatus.draft,
+        usedInCampaigns: row._count.campaigns,
+        editable: true,
       })),
     );
   }
 
-  getWorkingContent(id: string) {
+  async getContent(id: string) {
+    const library = await this.prisma.newsletter.findFirst({
+      where: { id, ...moduleLibraryListWhere(NewsletterScope.malichimp) },
+    });
+    if (library) {
+      return {
+        ...library,
+        contentRevisionToken: contentRevisionOf(library),
+        editable: true,
+        kind: library.kind,
+      };
+    }
     return this.newsletters.getWorkingCopy(id, NewsletterScope.malichimp);
   }
 
-  updateWorkingContent(id: string, dto: UpdateMalichimpWorkingCopyDto) {
-    return this.newsletters.updateWorkingCopy(id, NewsletterScope.malichimp, dto);
+  createLibraryContent(userId: string, dto: CreateMalichimpContentDto) {
+    return this.newsletters.createModuleLibrary(userId, NewsletterScope.malichimp, {
+      title: dto.title,
+      subject: dto.subject,
+      htmlBody: dto.htmlBody,
+      designJson: dto.designJson,
+      brand: dto.brand,
+    });
+  }
+
+  async updateContent(id: string, dto: UpdateMalichimpWorkingCopyDto) {
+    const library = await this.prisma.newsletter.findFirst({
+      where: { id, ...moduleLibraryListWhere(NewsletterScope.malichimp) },
+      select: { id: true },
+    });
+    const row = library
+      ? await this.newsletters.updateModuleLibrary(id, NewsletterScope.malichimp, dto)
+      : await this.newsletters.updateWorkingCopy(id, NewsletterScope.malichimp, dto);
+    return {
+      ...row,
+      contentRevisionToken: contentRevisionOf(row),
+      editable: true,
+    };
+  }
+
+  duplicateLibraryContent(userId: string, id: string) {
+    return this.newsletters.duplicateModuleLibrary(
+      userId,
+      id,
+      NewsletterScope.malichimp,
+    );
+  }
+
+  deleteLibraryContent(id: string) {
+    return this.newsletters.removeModuleLibrary(id, NewsletterScope.malichimp);
+  }
+
+  async getContentBrowserView(id: string) {
+    const row = await this.getContent(id);
+    return {
+      title: row.title,
+      html: row.htmlBody,
+    };
   }
 
   async previewAudience(dto: MalichimpAudienceDto) {
@@ -1019,7 +1058,7 @@ export class MalichimpService implements OnModuleInit {
     if (!MALI_PE_EMAIL.test(replyTo)) {
       throw new BadRequestException('La respuesta debe ser un correo @mali.pe');
     }
-    await this.emailSenders.assertEnabled(fromEmail);
+    await this.emailSenders.assertEnabled(fromEmail, NewsletterScope.malichimp);
 
     const subject = dto.subject.trim();
     const fromName = dto.fromName.trim();
@@ -1068,7 +1107,7 @@ export class MalichimpService implements OnModuleInit {
         return working.htmlBody;
       });
     } else {
-      const library = await this.requirePublishedLibraryBase(dto.newsletterId);
+      const library = await this.requireCampaignContentBase(dto.newsletterId);
       campaignId = await this.prisma.$transaction(async (tx) => {
         const working = await this.newsletters.createWorkingCopy(tx, {
           userId: user.id,
@@ -1408,7 +1447,7 @@ export class MalichimpService implements OnModuleInit {
     if (!MALI_PE_EMAIL.test(replyTo)) {
       throw new BadRequestException('La respuesta debe ser un correo @mali.pe');
     }
-    await this.emailSenders.assertEnabled(fromEmail);
+    await this.emailSenders.assertEnabled(fromEmail, NewsletterScope.malichimp);
     const recipients = await this.resolveAudience(
       filters.groupOptionIds,
       filters.excludeGroupOptionIds,
@@ -1425,9 +1464,13 @@ export class MalichimpService implements OnModuleInit {
     return { filters, fromEmail, replyTo, recipients, scheduledAt };
   }
 
-  private async requirePublishedLibraryBase(newsletterId: string) {
+  /** Accepts only MALICHIMP module library as campaign base. */
+  private async requireCampaignContentBase(newsletterId: string) {
     const newsletter = await this.prisma.newsletter.findFirst({
-      where: { id: newsletterId, ...publishedLibraryWhere() },
+      where: {
+        id: newsletterId,
+        ...moduleLibraryListWhere(NewsletterScope.malichimp),
+      },
       select: {
         id: true,
         slug: true,
@@ -1437,11 +1480,12 @@ export class MalichimpService implements OnModuleInit {
         designJson: true,
         brand: true,
         status: true,
+        scope: true,
       },
     });
     if (!newsletter) {
       throw new BadRequestException(
-        'Selecciona un boletín publicado de la biblioteca en Boletines',
+        'Selecciona un contenido de la biblioteca MALICHIMP',
       );
     }
     return newsletter;
@@ -1449,7 +1493,7 @@ export class MalichimpService implements OnModuleInit {
 
   async createCampaign(userId: string, dto: CreateMalichimpCampaignDto) {
     const prepared = await this.prepareAudienceAndSender(dto);
-    const library = await this.requirePublishedLibraryBase(dto.newsletterId);
+    const library = await this.requireCampaignContentBase(dto.newsletterId);
     const campaign = await this.prisma.$transaction(async (tx) => {
       const working = await this.newsletters.createWorkingCopy(tx, {
         userId,

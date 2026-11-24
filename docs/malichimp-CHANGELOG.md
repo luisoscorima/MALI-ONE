@@ -2,10 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Campañas solo usan biblioteca MALICHIMP (ya no `shared` published).
+- Remitentes con `scope=malichimp`: pestaña Remitentes + `assertEnabled` acotado; CRUD también en hub.
+
 ### Added
 
-- Working copies exclusivas por campaña (`workingNewsletterId`) + pestaña **Contenido** con editor propio (`?tab=content&edit=`); biblioteca en Boletines.
-- Deep links: `?tab=campaigns&new=1`, `?tab=campaigns&campaign={id}`.
+- Pestaña **Contenido** = biblioteca acotada MALICHIMP (`malichimp`/`library`) con Nuevo contenido, duplicar y eliminar; sin permiso de Boletines.
+- Working copies exclusivas por campaña (`workingNewsletterId`) al crear/duplicar/enviar; editor compartido (`?tab=content&edit=`).
+- Deep links: `?tab=campaigns&new=1`, `?tab=campaigns&campaign={id}`, `?tab=content&new=1`.
 - Vista congelada del correo enviado: `GET /mail/view/:token` (snapshot + personalización; sin contar apertura).
 - Eliminar campañas en **borrador** (`DELETE /api/malichimp/campaigns/:id`); elimina el fork de trabajo asociado.
 - Personalización por destinatario en el dispatcher SES: `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` se sustituyen con el primer nombre del contacto; sin nombre usa `estimado(a)`.

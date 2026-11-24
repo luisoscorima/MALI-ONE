@@ -66,7 +66,11 @@ test('IC create/duplicate keeps exclusive working copy after Newsletter fork mod
     });
     userId = user.id;
 
-    const sender = await emailSenders.create(senderEmail);
+    const sender = await emailSenders.create(
+      senderEmail,
+      NewsletterScope.internal_communications,
+      user.id,
+    );
     senderId = sender.id;
 
     const newsletter = await prisma.newsletter.create({
@@ -75,8 +79,8 @@ test('IC create/duplicate keeps exclusive working copy after Newsletter fork mod
         title: 'Boletín IC base',
         subject: 'Asunto IC',
         htmlBody: '<p>Contenido IC</p>',
-        status: NewsletterStatus.published,
-        scope: NewsletterScope.shared,
+        status: NewsletterStatus.draft,
+        scope: NewsletterScope.internal_communications,
         kind: NewsletterKind.library,
         createdById: user.id,
       },

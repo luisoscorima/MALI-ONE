@@ -27,6 +27,12 @@ export class NewslettersAdminController {
     return this.newsletters.list();
   }
 
+  /** Cross-module campaign registry (read-only). Must be registered before `:id`. */
+  @Get('campaigns')
+  listCampaigns() {
+    return this.newsletters.listCampaignRegistry();
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.newsletters.get(id);

@@ -25,6 +25,7 @@
     "test:malichimp-import": "node --import tsx --test src/modules/malichimp/lib/malichimp-import.test.ts src/modules/malichimp/lib/malichimp-xlsx-import.test.ts src/modules/malichimp/lib/malichimp-preview-store.test.ts",
     "test:malichimp-import:integration": "node --import tsx --test src/modules/malichimp/lib/malichimp-import-runner.integration.test.ts",
     "test:malichimp-campaigns:integration": "node --import tsx --test src/modules/malichimp/malichimp-campaign.integration.test.ts",
+    "test:malichimp-content:integration": "node --import tsx --test src/modules/malichimp/malichimp-content.integration.test.ts",
     "test:newsletter-working-copies": "node --import tsx --test src/modules/newsletters/newsletter-working-copy.test.ts",
     "test:internal-comms:integration": "node --import tsx --test src/modules/internal-communications/internal-communications.integration.test.ts",
     "test:ses-events": "node --import tsx --test src/core/email-delivery/ses-event.test.ts src/core/email-delivery/email-tracking.test.ts src/core/email-delivery/email-merge-tags.test.ts",

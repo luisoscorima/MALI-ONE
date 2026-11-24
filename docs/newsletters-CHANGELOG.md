@@ -4,6 +4,9 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Hub **Campañas y Boletines**: listado multi-scope de libraries, pestaña registro de campañas (readonly), remitentes con `scope` y badge de módulo.
+- `EmailSender.scope` + unique `(scope, email)`; catálogos malichimp / internal_communications / shared.
+- Campañas de módulo ya no usan `shared` published como base; solo su biblioteca.
 - “Ver este correo en el navegador” apunta a `/mail/view/{openToken}` (snapshot congelado + personalización; sin contar apertura). `/n/:slug` queda solo como boletín público vigente.
 - “Ver este correo…” ya no vive en el HTML del boletín: se quita en scrub/imports y se inyecta al enviar (mismo estilo que “Cancelar suscripción”).
 - Pestaña **Remitentes** accesible a quien tiene módulo `newsletters` (ya no solo admin); el listado muestra quién creó cada remitente.

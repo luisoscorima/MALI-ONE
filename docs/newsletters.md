@@ -1,79 +1,59 @@
-# Boletines (newsletters)
+# Campañas y Boletines (newsletters)
 
 > Changelog: [newsletters-CHANGELOG.md](./newsletters-CHANGELOG.md) · Índice: [README.md](./README.md)
 
 ## Qué es
 
-Editor visual por bloques de boletines HTML con URL pública `/n/{slug}`. El editor no decide audiencia ni transporta correo.
+Hub global de correo: biblioteca org (`shared`), visibilidad de plantillas de módulo, registro de campañas (solo lectura) y catálogo de remitentes por scope. El editor org publica HTML en `/n/{slug}`. Las campañas se **operan** en cada módulo de audiencia (MALICHIMP, Usuarios Workspace).
+
+## Glosario
+
+| Concepto UI | `audienceArea` | `NewsletterScope` / sender scope | `AppModule` |
+|-------------|---------------|----------------------------------|-------------|
+| MALICHIMP | `malichimp` | `malichimp` | `malichimp` |
+| Campañas internas | `internal_workspace` | `internal_communications` | `workspace_users` |
+| Hub Campañas y Boletines | — | `shared` (CRUD) + ve todos | `newsletters` |
+| Legacy | `pam` | — | `mailing` (enum muerto) |
 
 ## Cómo funciona
 
-1. Crear/editar newsletter (draft/published).
-2. La URL pública sirve el HTML publicado.
-3. MALICHIMP, Campañas internas (Usuarios Workspace) u otro módulo autorizado seleccionan un boletín y guardan un snapshot inmutable al crear su campaña.
-4. Tracking, bajas, “Ver este correo en el navegador” y transporte se añaden fuera de Boletines en `core/email-delivery` (al enviar). El HTML guardado del boletín no incluye ese link ni el de cancelar suscripción; el estilo es único para todos los envíos.
-5. Personalización de nombre: en el HTML o asunto puedes usar `{{first_name}}` (también vale `<<First Name>>` o `*|FNAME|*`). Al enviar, el motor SES lo reemplaza con el primer nombre del destinatario; si no hay nombre, usa `estimado(a)`. En el editor hay una nota, un botón **Insertar {{first_name}}** y el atajo `{{fn}}` en la barra de GrapesJS; el asunto también tiene un acceso rápido.
-6. La pestaña **Remitentes** (módulo `newsletters`) administra el catálogo compartido `EmailSender` (`@mali.pe`) usado por MALICHIMP y Campañas internas.
-
-## Código
-
-- `apps/api/src/modules/newsletters/` — admin + public controllers
-- Web: `newsletters-page.tsx`
+1. **Hub → Boletines:** lista `kind=library` de todos los scopes. Crear/editar/publicar/duplicar/eliminar solo aplica a `shared`. Piezas de módulo se abren con deep link al módulo dueño.
+2. **Hub → Campañas:** registro readonly de `EmailCampaign` + enlace al asistente del módulo.
+3. **Hub → Remitentes:** CRUD de todos los scopes (badge de módulo).
+4. Cada módulo tiene su biblioteca (`scope` + `kind=library`) y elige **solo** esa biblioteca al crear campañas. Fork exclusivo `campaign_working_copy`.
+5. `/n/{slug}` solo sirve `shared` + `library` + `published`.
+6. Personalización `{{first_name}}` y tracking viven en `core/email-delivery` al enviar.
 
 ## UI
 
-| `/admin/newsletters` | Boletines + Remitentes |
-| `/admin/newsletters?tab=remitentes` | Catálogo `EmailSender` (módulo newsletters) |
-| `/n/:slug` | Vista pública (`shared` + `library` + `published`) |
-| `/mail/view/:token` | Correo histórico congelado (por destinatario) |
-| MALICHIMP → Contenido | Working copies de campañas (no biblioteca) |
+| Ruta | Uso |
+|------|-----|
+| `/admin/newsletters` | Hub: Boletines (multi-scope) |
+| `/admin/newsletters?tab=campanas` | Registro de campañas |
+| `/admin/newsletters?tab=remitentes` | Remitentes globales |
+| `/n/:slug` | Público shared published |
+| MALICHIMP → Contenido / Remitentes | Biblioteca y CRUD remitentes `malichimp` |
+| Usuarios → Contenido | Biblioteca `internal_communications` |
 
 ## API
 
-Admin: `/api/newsletters` CRUD + `POST /api/newsletters/:id/duplicate`.
-Público: `GET /n/:slug` (versión actual del boletín).
-
-Las rutas `/mail/o|c|view/:token` pertenecen al motor compartido, no a este módulo. `GET /mail/view/:token` sirve el `htmlSnapshot` de la campaña con personalización del destinatario; no registra apertura.
-
-## Datos (Prisma)
-
-- `Newsletter` (incluye `brand` opcional: `museo`, `cursos_arte`, `extension_profesional`)
-- Una campaña referencia el boletín para auditoría, pero envía `subjectSnapshot` y `htmlSnapshot`. Un boletín usado por campañas no puede eliminarse.
-- Import Mailchimp: `pnpm --filter @mali-one/api prisma:seed:mailchimp-newsletters`
-- Arreglar plantillas Mailchimp ya sembradas (enlaces Mailchimp, quitar “ver en navegador” del HTML, íconos sociales): `pnpm --filter @mali-one/api prisma:fix:mailchimp-newsletter-links` (usa `--dry-run` para inspeccionar). El link “Ver este correo…” se inyecta al enviar y apunta a `/mail/view/{openToken}` (snapshot), no a `/n/:slug`.
-- Assets del import van a `s3://mali-one-files/newsletters/…`. El rol EC2 puede
-  subirlos; la URL anónima S3 solo funciona si hay bucket policy pública (ver
-  [aws-runtime-role.md](./aws-runtime-role.md)). Mientras tanto el HTML puede
-  conservar `mcusercontent.com` y los logos de marca se sirven en
-  `/newsletter-brands/`.
-
-## Conexiones externas
-
-| **MALICHIMP** | Audiencia y campañas de correo masivo |
-| **Usuarios Workspace → Campañas internas** | Audiencia activa por OU de Google Workspace |
-| Públicos | HTML del boletín |
+- Admin: `/api/newsletters` CRUD shared; `GET /api/newsletters/campaigns` registro.
+- Remitentes hub: `/api/email-delivery/senders` (`scope` opcional en query/body).
+- Remitentes MALICHIMP: `/api/malichimp/senders`.
+- Público: `GET /n/:slug`.
 
 ## Remitentes
 
-Pestaña en Boletines (quien tiene módulo `newsletters`):
-
-- Solo acepta direcciones `@mali.pe`.
-- Listado disponible para operadores autenticados al armar campañas; CRUD con módulo `newsletters`.
-- El listado muestra quién creó cada remitente (registros antiguos pueden quedar sin autor).
-- No se puede eliminar el último remitente.
-- Crear o editar no verifica identidades en AWS SES: el dominio/dirección deben estar autorizados en SES.
-- Borrar un remitente no altera campañas ya creadas.
-
-## Variables de entorno
-
-El editor no envía correo. El transporte SES vive en `core/email-delivery` (ver [malichimp.md](./malichimp.md)). El SMTP de PAM (`PAM_SMTP_*`) es otro canal, solo para welcome transaccional.
+- Particionados por `EmailSender.scope` (`@@unique([scope, email])`).
+- Mínimo 1 remitente **por scope**.
+- `assertEnabled(email, scope)` estricto al módulo.
+- MALICHIMP tiene pestaña Remitentes (autonomía sin `newsletters`). IC consume el selector; CRUD IC vía hub.
 
 ## Permisos
 
-Módulo: `newsletters`
+Módulo: `newsletters` (hub). Operación de campañas: `malichimp` / `workspace_users`.
 
 ## Relacionados
 
 - [malichimp.md](./malichimp.md)
-- [google-admin.md](./google-admin.md) — Campañas internas
-- [crm-pam.md](./crm-pam.md) — SMTP PAM, no SES
+- [google-admin.md](./google-admin.md)

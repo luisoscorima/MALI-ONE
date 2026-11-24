@@ -126,9 +126,15 @@ export interface MalichimpStatsDto {
   } | null;
 }
 
+export type EmailSenderScope =
+  | 'shared'
+  | 'malichimp'
+  | 'internal_communications';
+
 export interface EmailSenderDto {
   id: string;
   email: string;
+  scope: EmailSenderScope;
   createdAt: string;
   updatedAt: string;
   createdBy?: { name: string; email: string } | null;
@@ -1501,6 +1507,8 @@ export interface NewsletterDto {
   /** Optional brand selects header + footer chrome. */
   brand?: NewsletterBrand | null;
   status: NewsletterStatus;
+  /** Present on campaign content pickers (shared vs malichimp library). */
+  scope?: 'shared' | 'malichimp' | 'internal_communications';
   createdAt: string;
   updatedAt: string;
   publicUrl?: string;

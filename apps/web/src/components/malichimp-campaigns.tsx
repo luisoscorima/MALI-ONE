@@ -372,11 +372,10 @@ function NewsletterSearchSelect({
                   }}
                 >
                   <span className="block w-full truncate font-medium">{newsletter.title}</span>
-                  {newsletter.subject ? (
-                    <span className="block w-full truncate text-xs text-muted-foreground">
-                      {newsletter.subject}
-                    </span>
-                  ) : null}
+                  <span className="block w-full truncate text-xs text-muted-foreground">
+                    {newsletter.scope === 'malichimp' ? 'MALICHIMP' : 'Boletines'}
+                    {newsletter.subject ? ` · ${newsletter.subject}` : ''}
+                  </span>
                 </button>
               );
             }) : (
@@ -1114,7 +1113,8 @@ export function MalichimpCampaigns({
 
       {!newsletters.length ? (
         <AlertBanner variant="info">
-          No hay boletines publicados. En Nueva campaña puedes crear un borrador en Boletines.
+          No hay contenido disponible. Crea una pieza en la pestaña Contenido o publica un
+          boletín en Boletines.
         </AlertBanner>
       ) : null}
 
@@ -1568,7 +1568,7 @@ export function MalichimpCampaigns({
                   <div className="space-y-3">
                     <NewsletterSearchSelect
                       id="malichimp-newsletter"
-                      label="Boletín publicado (biblioteca)"
+                      label="Contenido (MALICHIMP o Boletines publicados)"
                       newsletters={selectableNewsletters}
                       value={newsletterId}
                       onChange={selectNewsletter}
@@ -1576,8 +1576,8 @@ export function MalichimpCampaigns({
                     />
                     {!selectableNewsletters.length ? (
                       <p className="text-sm text-muted-foreground">
-                        No hay contenido disponible para iniciar una campaña. Crea una pieza en
-                        Boletines o solicita a una persona con acceso que la prepare.
+                        No hay contenido disponible. Crea una pieza en la pestaña Contenido o
+                        publica un boletín en Boletines.
                       </p>
                     ) : null}
                   </div>

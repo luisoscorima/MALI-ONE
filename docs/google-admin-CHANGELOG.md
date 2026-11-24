@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Biblioteca propia `internal_communications` (pestaña Contenido); campañas ya no usan `shared` published.
+- Remitentes de campaña filtrados a `scope=internal_communications`.
 - Eliminar campañas internas en **borrador**; si el boletín ligado está en borrador y sin otras campañas, también se elimina.
 - Paridad con MALICHIMP: miniatura en fila, duplicar, programar envío, crear borrador de boletín, continuar borradores.
 - Campañas internas (antes Comunicación interna) viven en `/admin/users?tab=campanas`; permiso absorbido en `workspace_users`.

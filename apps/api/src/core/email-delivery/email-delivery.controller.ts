@@ -7,14 +7,18 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
-import { AppModule, User, UserRole } from '@prisma/client';
+import { AppModule, NewsletterScope, User, UserRole } from '@prisma/client';
 import type { Request } from 'express';
 import { RequireModule } from '../guards/module.decorator';
 import { Roles } from '../guards/roles.decorator';
 import { EmailDeliveryService } from './email-delivery.service';
-import { SaveEmailSenderDto } from './email-sender.dto';
+import {
+  ListEmailSendersQueryDto,
+  SaveEmailSenderDto,
+} from './email-sender.dto';
 import { EmailSenderService } from './email-sender.service';
 import { SesEventConsumerService } from './ses-event-consumer.service';
 
@@ -44,16 +48,20 @@ export class EmailDeliveryController {
     };
   }
 
-  /** Readable by any authenticated campaign operator; mutations require newsletters. */
+  /**
+   * Hub (newsletters) lists all scopes when `scope` omitted.
+   * Campaign operators pass `scope` for their module catalog.
+   */
   @Get('senders')
-  listSenders() {
-    return this.senders.list();
+  listSenders(@Query() query: ListEmailSendersQueryDto) {
+    return this.senders.list(query.scope);
   }
 
   @Post('senders')
   @RequireModule(AppModule.newsletters)
   createSender(@Req() req: Request, @Body() body: SaveEmailSenderDto) {
-    return this.senders.create(body.email, (req.user as User).id);
+    const scope = body.scope ?? NewsletterScope.shared;
+    return this.senders.create(body.email, scope, (req.user as User).id);
   }
 
   @Patch('senders/:id')

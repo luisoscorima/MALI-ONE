@@ -393,13 +393,20 @@ export const api = {
   getMalichimpStats: () =>
     request<import('@mali-one/shared').MalichimpStatsDto>('/api/malichimp/stats'),
 
-  listEmailSenders: () =>
-    request<import('@mali-one/shared').EmailSenderDto[]>('/api/email-delivery/senders'),
+  listEmailSenders: (scope?: import('@mali-one/shared').EmailSenderScope) => {
+    const query = scope ? `?scope=${encodeURIComponent(scope)}` : '';
+    return request<import('@mali-one/shared').EmailSenderDto[]>(
+      `/api/email-delivery/senders${query}`,
+    );
+  },
 
-  createEmailSender: (email: string) =>
+  createEmailSender: (
+    email: string,
+    scope: import('@mali-one/shared').EmailSenderScope = 'shared',
+  ) =>
     request<import('@mali-one/shared').EmailSenderDto>('/api/email-delivery/senders', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, scope }),
     }),
 
   updateEmailSender: (id: string, email: string) =>
@@ -410,6 +417,53 @@ export const api = {
 
   deleteEmailSender: (id: string) =>
     request<{ ok: true }>(`/api/email-delivery/senders/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    }),
+
+  listNewsletterCampaignRegistry: () =>
+    request<
+      Array<{
+        id: string;
+        name: string;
+        status: string;
+        audienceArea: string;
+        fromEmail: string | null;
+        subjectSnapshot: string;
+        totalRecipients: number;
+        sentCount: number;
+        openCount: number;
+        clickCount: number;
+        errorCount: number;
+        scheduledAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+        newsletter: {
+          id: string;
+          title: string;
+          scope: string;
+          slug: string;
+        };
+        createdBy: { name: string; email: string } | null;
+      }>
+    >('/api/newsletters/campaigns'),
+
+  listMalichimpSenders: () =>
+    request<import('@mali-one/shared').EmailSenderDto[]>('/api/malichimp/senders'),
+
+  createMalichimpSender: (email: string) =>
+    request<import('@mali-one/shared').EmailSenderDto>('/api/malichimp/senders', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  updateMalichimpSender: (id: string, email: string) =>
+    request<import('@mali-one/shared').EmailSenderDto>(
+      `/api/malichimp/senders/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify({ email }) },
+    ),
+
+  deleteMalichimpSender: (id: string) =>
+    request<{ ok: true }>(`/api/malichimp/senders/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }),
 
@@ -495,10 +549,10 @@ export const api = {
         id: string;
         title: string;
         subject: string;
+        brand: import('@mali-one/shared').NewsletterBrand | null;
         updatedAt: string;
         contentRevision: string;
-        campaign: { id: string; name: string; status: string } | null;
-        campaignStatusLabel: string;
+        usedInCampaigns: number;
         editable: boolean;
       }>
     >('/api/malichimp/content'),
@@ -512,6 +566,18 @@ export const api = {
       }
     >(`/api/malichimp/content/${encodeURIComponent(id)}`),
 
+  createMalichimpContent: (body: {
+    title: string;
+    subject: string;
+    htmlBody: string;
+    designJson?: string | null;
+    brand?: import('@mali-one/shared').NewsletterBrand | null;
+  }) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      '/api/malichimp/content',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   updateMalichimpContent: (
     id: string,
     body: {
@@ -519,11 +585,30 @@ export const api = {
       subject?: string;
       htmlBody?: string;
       designJson?: string | null;
+      brand?: import('@mali-one/shared').NewsletterBrand | null;
+      contentRevision: string;
     },
   ) =>
+    request<
+      import('@mali-one/shared').NewsletterDto & {
+        contentRevisionToken: string;
+        editable: boolean;
+      }
+    >(`/api/malichimp/content/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  duplicateMalichimpContent: (id: string) =>
     request<import('@mali-one/shared').NewsletterDto>(
+      `/api/malichimp/content/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  deleteMalichimpContent: (id: string) =>
+    request<{ ok: boolean }>(
       `/api/malichimp/content/${encodeURIComponent(id)}`,
-      { method: 'PATCH', body: JSON.stringify(body) },
+      { method: 'DELETE' },
     ),
 
   listMalichimpCampaigns: () =>
@@ -2042,6 +2127,74 @@ export const api = {
     request<import('@mali-one/shared').NewsletterDto>(
       '/api/internal-communications/newsletters/draft',
       { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  listInternalContent: () =>
+    request<
+      Array<{
+        id: string;
+        title: string;
+        subject: string;
+        brand: import('@mali-one/shared').NewsletterBrand | null;
+        status: import('@mali-one/shared').NewsletterStatus;
+        updatedAt: string;
+        contentRevision: string;
+        usedInCampaigns: number;
+        editable: boolean;
+      }>
+    >('/api/internal-communications/content'),
+
+  getInternalContent: (id: string) =>
+    request<
+      import('@mali-one/shared').NewsletterDto & {
+        contentRevisionToken: string;
+        editable: boolean;
+      }
+    >(`/api/internal-communications/content/${encodeURIComponent(id)}`),
+
+  createInternalContent: (body: {
+    title: string;
+    subject: string;
+    htmlBody: string;
+    designJson?: string | null;
+    brand?: import('@mali-one/shared').NewsletterBrand | null;
+  }) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      '/api/internal-communications/content',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  updateInternalContent: (
+    id: string,
+    body: {
+      title?: string;
+      subject?: string;
+      htmlBody?: string;
+      designJson?: string | null;
+      brand?: import('@mali-one/shared').NewsletterBrand | null;
+      contentRevision: string;
+    },
+  ) =>
+    request<
+      import('@mali-one/shared').NewsletterDto & {
+        contentRevisionToken: string;
+        editable: boolean;
+      }
+    >(`/api/internal-communications/content/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  duplicateInternalContent: (id: string) =>
+    request<import('@mali-one/shared').NewsletterDto>(
+      `/api/internal-communications/content/${encodeURIComponent(id)}/duplicate`,
+      { method: 'POST', body: '{}' },
+    ),
+
+  deleteInternalContent: (id: string) =>
+    request<{ ok: boolean }>(
+      `/api/internal-communications/content/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
     ),
 
   listInternalCampaigns: () =>

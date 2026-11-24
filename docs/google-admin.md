@@ -10,7 +10,7 @@ CRUD de cuentas `@mali.pe` vía Google Admin SDK (Directory API) con Domain-Wide
 
 1. API autentica con SA JSON e impersona `GOOGLE_ADMIN_IMPERSONATE`.
 2. Operadores con `workspace_users` listan, crean, editan, resetean password y cierran sesiones.
-3. En la pestaña **Campañas internas** el flujo es el mismo patrón que MALICHIMP: OU (include/exclude), actividad (1–90 días), remitente, boletín (publicado o borrador nuevo), asunto, y enviar ahora o programar. También hay miniatura en fila, duplicar y continuar borradores.
+3. En **Campañas internas** el flujo es el mismo patrón que MALICHIMP: OU (include/exclude), actividad (1–90 días), remitente del catálogo `internal_communications`, plantilla de la biblioteca del módulo (`?tab=contenido`), asunto, y enviar ahora o programar. También hay miniatura en fila, duplicar y continuar borradores.
 
 ## Código
 
@@ -22,6 +22,7 @@ CRUD de cuentas `@mali.pe` vía Google Admin SDK (Directory API) con Domain-Wide
 
 | `/admin/users` | Directorio Workspace |
 | `/admin/users?tab=campanas` | Campañas internas |
+| `/admin/users?tab=contenido` | Biblioteca de plantillas del módulo |
 | `/admin/comunicacion-interna` | Redirect legacy → `?tab=campanas` |
 
 ## API

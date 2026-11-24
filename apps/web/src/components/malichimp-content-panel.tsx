@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ExternalLink, Loader2, Pencil, RefreshCw } from 'lucide-react';
+import { Copy, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import type { NewsletterBrand } from '@mali-one/shared';
+import { NEWSLETTER_BRAND_LABELS } from '@mali-one/shared';
 import { AlertBanner } from '@/components/feedback';
+import { useToast } from '@/contexts/toast-context';
+import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
 import {
   Badge,
@@ -12,6 +16,10 @@ import {
   TableHeader,
   TableRow,
   TableShell,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui';
 
 const df = new Intl.DateTimeFormat('es-PE', {
@@ -23,23 +31,26 @@ type ContentRow = {
   id: string;
   title: string;
   subject: string;
+  brand: NewsletterBrand | null;
   updatedAt: string;
   contentRevision: string;
-  campaign: { id: string; name: string; status: string } | null;
-  campaignStatusLabel: string;
+  usedInCampaigns: number;
   editable: boolean;
 };
 
 export function MalichimpContentPanel({
-  onOpenCampaign,
-  onNewCampaign,
+  onNewContent,
+  onEditContent,
 }: {
-  onOpenCampaign?: (campaignId: string) => void;
-  onNewCampaign?: () => void;
+  onNewContent?: () => void;
+  onEditContent?: (contentId: string) => void;
 }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<ContentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,14 +69,55 @@ export function MalichimpContentPanel({
     void load();
   }, [load]);
 
+  async function duplicateRow(row: ContentRow) {
+    setBusyId(row.id);
+    try {
+      const created = await api.duplicateMalichimpContent(row.id);
+      toast.success('Contenido duplicado');
+      await load();
+      onEditContent?.(created.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo duplicar');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteRow(row: ContentRow) {
+    const ok = await confirm({
+      title: `¿Eliminar “${row.title}”?`,
+      description: row.usedInCampaigns
+        ? 'Este contenido ya se usó en campañas y no se puede eliminar.'
+        : 'Se eliminará de la biblioteca MALICHIMP.',
+      confirmLabel: 'Eliminar',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    if (row.usedInCampaigns) {
+      toast.error('Este contenido ya fue usado en una campaña');
+      return;
+    }
+    setBusyId(row.id);
+    try {
+      await api.deleteMalichimpContent(row.id);
+      toast.success('Contenido eliminado');
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-medium">Contenido de campañas</h2>
+          <h2 className="text-base font-medium">Contenido</h2>
           <p className="text-sm text-muted-foreground">
-            Edita el contenido utilizado en campañas MALICHIMP. La biblioteca compartida y los
-            remitentes se administran en Boletines.
+            Biblioteca de correos de MALICHIMP. Crea y edita piezas aquí; al armar una campaña se
+            copia una versión editable. Los remitentes del módulo están en la pestaña Remitentes;
+            el hub Campañas y Boletines ve el inventario global.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -77,9 +129,10 @@ export function MalichimpContentPanel({
             )}
             Actualizar
           </Button>
-          {onNewCampaign ? (
-            <Button type="button" size="sm" onClick={onNewCampaign}>
-              Nueva campaña
+          {onNewContent ? (
+            <Button type="button" size="sm" onClick={onNewContent}>
+              <Plus className="size-4" aria-hidden />
+              Nuevo contenido
             </Button>
           ) : null}
         </div>
@@ -92,8 +145,9 @@ export function MalichimpContentPanel({
           <TableHeader>
             <TableRow>
               <TableHead>Contenido</TableHead>
-              <TableHead>Campaña</TableHead>
+              <TableHead>Marca</TableHead>
               <TableHead>Estado</TableHead>
+              <TableHead>Campañas</TableHead>
               <TableHead>Última modificación</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -101,7 +155,7 @@ export function MalichimpContentPanel({
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   <span className="inline-flex items-center gap-2">
                     <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> Cargando…
                   </span>
@@ -114,58 +168,91 @@ export function MalichimpContentPanel({
                     <p className="font-medium">{row.title}</p>
                     <p className="text-xs text-muted-foreground">{row.subject}</p>
                   </TableCell>
-                  <TableCell>{row.campaign?.name ?? '—'}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {row.brand ? NEWSLETTER_BRAND_LABELS[row.brand] : '—'}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{row.campaignStatusLabel}</Badge>
+                    <Badge variant="secondary">Disponible</Badge>
+                  </TableCell>
+                  <TableCell className="tabular-nums text-xs">
+                    {row.usedInCampaigns || '—'}
                   </TableCell>
                   <TableCell className="tabular-nums text-xs">
                     {df.format(new Date(row.updatedAt))}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex flex-wrap justify-end gap-2">
-                      {row.editable ? (
-                        <Button type="button" size="sm" variant="outline" asChild>
-                          <a
-                            href={`/admin/malichimp?tab=content&edit=${encodeURIComponent(row.id)}`}
-                          >
-                            <Pencil className="size-4" aria-hidden />
-                            Editar contenido
-                          </a>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busyId === row.id}
+                        onClick={() => onEditContent?.(row.id)}
+                      >
+                        <Pencil className="size-4" aria-hidden />
+                        Editar
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" asChild>
+                        <a
+                          href={`/api/malichimp/content/${encodeURIComponent(row.id)}/view`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Vista previa
+                        </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={busyId === row.id}
+                        onClick={() => void duplicateRow(row)}
+                      >
+                        <Copy className="size-4" aria-hidden />
+                        Duplicar
+                      </Button>
+                      {row.usedInCampaigns > 0 ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled
+                                  aria-disabled
+                                >
+                                  <Trash2 className="size-4" aria-hidden />
+                                  Eliminar
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              No se puede eliminar porque forma parte del historial de una campaña.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={busyId === row.id}
+                          onClick={() => void deleteRow(row)}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                          Eliminar
                         </Button>
-                      ) : null}
-                      {row.campaign ? (
-                        <>
-                          {onOpenCampaign ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => onOpenCampaign(row.campaign!.id)}
-                            >
-                              <ExternalLink className="size-4" aria-hidden />
-                              Abrir campaña
-                            </Button>
-                          ) : null}
-                          <Button type="button" size="sm" variant="ghost" asChild>
-                            <a
-                              href={`/api/malichimp/campaigns/${encodeURIComponent(row.campaign.id)}/view`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Vista previa
-                            </a>
-                          </Button>
-                        </>
-                      ) : null}
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  No hay contenido de campañas. Crea una campaña a partir de un boletín publicado
-                  en Boletines, o duplica una campaña existente.
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  No hay contenido todavía. Crea tu primer contenido para usarlo en campañas.
                 </TableCell>
               </TableRow>
             )}

@@ -8,22 +8,28 @@ import {
   EmailCampaignStatus,
   NewsletterKind,
   NewsletterScope,
-  NewsletterStatus,
   Prisma,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { GoogleAdminService } from '../google-admin/google-admin.service';
+import { UpdateNewsletterDto } from '../newsletters/dto/newsletter.dto';
 import { NewslettersService } from '../newsletters/newsletters.service';
-import { publishedLibraryWhere } from '../newsletters/newsletter-working-copy';
+import {
+  contentRevisionOf,
+  moduleLibraryListWhere,
+} from '../newsletters/newsletter-working-copy';
 import {
   CreateInternalCampaignDto,
   CreateInternalNewsletterDraftDto,
   PreviewInternalAudienceDto,
 } from './dto/create-internal-campaign.dto';
+import { CreateInternalCommunicationsContentDto } from './dto/internal-communications-content.dto';
 
 const AUDIENCE_AREA = 'internal_workspace';
+const IC_SCOPE = NewsletterScope.internal_communications;
+const IC_LIBRARY_WHERE = moduleLibraryListWhere(IC_SCOPE);
 const DEFAULT_REPLY_TO = 'tecnologia@mali.pe';
 const DEFAULT_FROM_NAME = 'MALI - Campañas internas';
 const MALI_PE_EMAIL = /^[^@\s]+@mali\.pe$/i;
@@ -77,18 +83,6 @@ function duplicateNewsletterSlug(value: string): string {
   const base = value
     .slice(0, 80 - suffix.length - 1)
     .replace(/-+$/g, '');
-  return `${base}-${suffix}`;
-}
-
-function newsletterSlugFromTitle(title: string): string {
-  const suffix = `${Date.now().toString(36)}-${randomUUID().slice(0, 6)}`;
-  const base = title
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 80 - suffix.length - 1) || 'boletin';
   return `${base}-${suffix}`;
 }
 
@@ -151,57 +145,100 @@ export class InternalCommunicationsService {
   }
 
   newsletters() {
-    return this.newslettersService.listPublished();
+    return this.newslettersService.listCampaignContentBases(IC_SCOPE);
+  }
+
+  listLibraryContent() {
+    return this.newslettersService.listModuleLibrary(IC_SCOPE).then((rows) =>
+      rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        subject: row.subject,
+        brand: row.brand,
+        status: row.status,
+        updatedAt: row.updatedAt,
+        contentRevision: contentRevisionOf(row),
+        usedInCampaigns: row._count.campaigns,
+        editable: true,
+      })),
+    );
+  }
+
+  async getContent(id: string) {
+    return this.newslettersService.getModuleLibrary(id, IC_SCOPE);
+  }
+
+  createLibraryContent(userId: string, dto: CreateInternalCommunicationsContentDto) {
+    return this.newslettersService.createModuleLibrary(userId, IC_SCOPE, {
+      title: dto.title,
+      subject: dto.subject,
+      htmlBody: dto.htmlBody,
+      designJson: dto.designJson,
+      brand: dto.brand,
+    });
+  }
+
+  async updateContent(id: string, dto: UpdateNewsletterDto & { contentRevision?: string }) {
+    const row = await this.newslettersService.updateModuleLibrary(id, IC_SCOPE, dto);
+    return {
+      ...row,
+      contentRevisionToken: contentRevisionOf(row),
+      editable: true,
+    };
+  }
+
+  duplicateLibraryContent(userId: string, id: string) {
+    return this.newslettersService.duplicateModuleLibrary(userId, id, IC_SCOPE);
+  }
+
+  deleteLibraryContent(id: string) {
+    return this.newslettersService.removeModuleLibrary(id, IC_SCOPE);
+  }
+
+  async getContentBrowserView(id: string) {
+    const row = await this.getContent(id);
+    return {
+      title: row.title,
+      html: row.htmlBody,
+    };
   }
 
   async getCampaignNewsletter(id: string) {
-    const newsletter = await this.prisma.newsletter.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        subject: true,
-        htmlBody: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-    if (!newsletter) throw new NotFoundException('Boletín no encontrado');
-    return newsletter;
+    const newsletter = await this.getContent(id);
+    return {
+      id: newsletter.id,
+      slug: newsletter.slug,
+      title: newsletter.title,
+      subject: newsletter.subject,
+      htmlBody: newsletter.htmlBody,
+      status: newsletter.status,
+      createdAt: newsletter.createdAt,
+      updatedAt: newsletter.updatedAt,
+    };
   }
 
   async createNewsletterDraft(userId: string, dto: CreateInternalNewsletterDraftDto) {
     const title = dto.title.trim();
     const subject = (dto.subject?.trim() || title).slice(0, 200);
     try {
-      return await this.prisma.newsletter.create({
-        data: {
-          slug: newsletterSlugFromTitle(title),
-          title,
-          subject,
-          htmlBody: NEW_NEWSLETTER_PLACEHOLDER_HTML,
-          designJson: null,
-          status: NewsletterStatus.draft,
-          scope: NewsletterScope.shared,
-          kind: NewsletterKind.library,
-          createdById: userId,
-        },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          subject: true,
-          htmlBody: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+      const created = await this.newslettersService.createModuleLibrary(userId, IC_SCOPE, {
+        title,
+        subject,
+        htmlBody: NEW_NEWSLETTER_PLACEHOLDER_HTML,
       });
+      return {
+        id: created.id,
+        slug: created.slug,
+        title: created.title,
+        subject: created.subject,
+        htmlBody: created.htmlBody,
+        status: created.status,
+        createdAt: created.createdAt,
+        updatedAt: created.updatedAt,
+      };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('No se pudo crear el boletín; vuelve a intentarlo');
+        throw new ConflictException('No se pudo crear el contenido; vuelve a intentarlo');
       }
       throw error;
     }
@@ -225,7 +262,7 @@ export class InternalCommunicationsService {
     if (!MALI_PE_EMAIL.test(fromEmail)) {
       throw new BadRequestException('El remitente debe ser un correo @mali.pe');
     }
-    await this.emailSenders.assertEnabled(fromEmail);
+    await this.emailSenders.assertEnabled(fromEmail, IC_SCOPE);
 
     const activeDays = Math.min(90, Math.max(1, dto.activeDays ?? 30));
     const active = await this.loadActiveMembers(activeDays);
@@ -244,9 +281,7 @@ export class InternalCommunicationsService {
       throw new BadRequestException('El boletín borrador no coincide con el contenido seleccionado');
     }
     const newsletter = await this.prisma.newsletter.findFirst({
-      where: canUseAttachedDraft
-        ? { id: dto.newsletterId }
-        : { id: dto.newsletterId, ...publishedLibraryWhere() },
+      where: { id: dto.newsletterId, ...IC_LIBRARY_WHERE },
       select: {
         id: true,
         slug: true,
@@ -260,8 +295,8 @@ export class InternalCommunicationsService {
     if (!newsletter) {
       throw new BadRequestException(
         canUseAttachedDraft
-          ? 'El boletín borrador ya no está disponible'
-          : 'Selecciona un boletín publicado de la biblioteca',
+          ? 'El contenido borrador ya no está disponible'
+          : 'Selecciona un contenido de la biblioteca de comunicaciones internas',
       );
     }
 

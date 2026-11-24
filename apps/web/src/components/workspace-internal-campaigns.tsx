@@ -388,7 +388,7 @@ export function WorkspaceInternalCampaigns() {
           api.getInternalAudience(30),
           api.listInternalNewsletters(),
           api.listInternalCampaigns(),
-          api.listEmailSenders().catch(() => [] as EmailSenderDto[]),
+          api.listEmailSenders('internal_communications').catch(() => [] as EmailSenderDto[]),
         ]);
       setAudience(nextAudience);
       setNewsletters(nextNewsletters);
@@ -418,10 +418,7 @@ export function WorkspaceInternalCampaigns() {
   }, []);
 
   const orgUnits = audience?.orgUnits ?? [];
-  const selectableNewsletters = useMemo(
-    () => newsletters.filter((item) => item.status === 'published'),
-    [newsletters],
-  );
+  const selectableNewsletters = useMemo(() => newsletters, [newsletters]);
   const selectedNewsletter =
     (attachedNewsletter && attachedNewsletter.id === newsletterId
       ? attachedNewsletter
@@ -464,7 +461,7 @@ export function WorkspaceInternalCampaigns() {
           ? undefined
           : 'No hay destinatarios con estos filtros',
     from: !senders.length
-      ? 'Agrega remitentes en Boletines → Remitentes'
+      ? 'Agrega remitentes del catálogo de comunicaciones internas (Boletines → Remitentes, scope IC)'
       : !maliPeEmailPattern.test(fromEmail)
         ? 'Elige un remitente @mali.pe'
         : !maliPeEmailPattern.test(replyTo.trim())
@@ -540,7 +537,7 @@ export function WorkspaceInternalCampaigns() {
       setNewsletterId(created.id);
       setSubject((current) => current.trim() || created.subject);
       setName((current) => current.trim() || created.title);
-      toast.success('Borrador creado en Boletines');
+      toast.success('Borrador creado en la biblioteca de contenido');
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo crear el boletín');
     } finally {
@@ -792,13 +789,14 @@ export function WorkspaceInternalCampaigns() {
 
       {!newsletters.length ? (
         <AlertBanner variant="info">
-          No hay boletines publicados. Publícalos en Boletines antes de enviar.
+          No hay contenido en la biblioteca de comunicaciones internas. Créalo en la pestaña Contenido.
         </AlertBanner>
       ) : null}
 
       {!senders.length ? (
         <AlertBanner variant="info">
-          Agrega al menos un remitente @mali.pe en Boletines → Remitentes.
+          Agrega al menos un remitente @mali.pe en el catálogo de comunicaciones internas (Boletines →
+          Remitentes).
         </AlertBanner>
       ) : null}
 
@@ -1181,16 +1179,17 @@ export function WorkspaceInternalCampaigns() {
                 <div className="space-y-1">
                   <h3 className="text-base font-medium">Contenido</h3>
                   <p className="text-sm text-muted-foreground">
-                    Elige un boletín publicado o crea un borrador nuevo en Boletines.
+                    Elige contenido de la biblioteca de comunicaciones internas o crea un borrador
+                    nuevo.
                   </p>
                 </div>
                 {draftNewsletterId && selectedNewsletter?.id === draftNewsletterId ? (
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                    <Badge variant="secondary">Borrador en Boletines</Badge>
+                    <Badge variant="secondary">Borrador en biblioteca</Badge>
                     <span className="font-medium">{selectedNewsletter.title}</span>
                     <Button type="button" size="sm" variant="outline" asChild>
                       <a
-                        href={`/admin/newsletters?edit=${encodeURIComponent(selectedNewsletter.id)}`}
+                        href={`/admin/users?tab=contenido&edit=${encodeURIComponent(selectedNewsletter.id)}`}
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -1217,7 +1216,7 @@ export function WorkspaceInternalCampaigns() {
                   <div className="space-y-3">
                     <NewsletterSearchSelect
                       id="internal-newsletter"
-                      label="Boletín publicado"
+                      label="Contenido de biblioteca"
                       newsletters={selectableNewsletters}
                       value={newsletterId}
                       onChange={selectNewsletter}
@@ -1235,7 +1234,7 @@ export function WorkspaceInternalCampaigns() {
                       ) : (
                         <Plus className="size-4" aria-hidden />
                       )}
-                      {creatingNewsletter ? 'Creando…' : 'Crear boletín nuevo'}
+                      {creatingNewsletter ? 'Creando…' : 'Crear contenido nuevo'}
                     </Button>
                   </div>
                 )}

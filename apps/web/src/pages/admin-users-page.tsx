@@ -8,6 +8,7 @@ import {
   LogOut,
   Pencil,
   RefreshCw,
+  FileText,
   Send,
   Users,
   X,
@@ -15,6 +16,8 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import type { GoogleWorkspaceUser } from '@mali-one/shared';
 import { GoogleAdminIcon, IconActionButton } from '@/components/icon-action-button';
+import { WorkspaceIcContentEditor } from '@/components/workspace-ic-content-editor';
+import { WorkspaceIcContentPanel } from '@/components/workspace-ic-content-panel';
 import { WorkspaceInternalCampaigns } from '@/components/workspace-internal-campaigns';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format-bytes';
@@ -77,8 +80,13 @@ export function AdminUsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
   const tab =
-    searchParams.get('tab') === 'campanas' ? 'campanas' : 'directorio';
+    tabParam === 'campanas'
+      ? 'campanas'
+      : tabParam === 'contenido'
+        ? 'contenido'
+        : 'directorio';
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -474,7 +482,12 @@ export function AdminUsersPage() {
         onValueChange={(value) => {
           const next = new URLSearchParams(searchParams);
           if (value === 'campanas') next.set('tab', 'campanas');
+          else if (value === 'contenido') next.set('tab', 'contenido');
           else next.delete('tab');
+          if (value !== 'contenido') {
+            next.delete('edit');
+            next.delete('new');
+          }
           setSearchParams(next, { replace: true });
         }}
       >
@@ -483,11 +496,66 @@ export function AdminUsersPage() {
             <Users className="size-4" aria-hidden />
             Directorio
           </TabsTrigger>
+          <TabsTrigger value="contenido">
+            <FileText className="size-4" aria-hidden />
+            Contenido
+          </TabsTrigger>
           <TabsTrigger value="campanas">
             <Send className="size-4" aria-hidden />
             Campañas internas
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="contenido" className="mt-6">
+          {searchParams.get('new') === '1' ? (
+            <WorkspaceIcContentEditor
+              mode="create"
+              onClose={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('new');
+                next.delete('edit');
+                next.set('tab', 'contenido');
+                setSearchParams(next, { replace: true });
+              }}
+              onCreated={(id) => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('new');
+                next.set('tab', 'contenido');
+                next.set('edit', id);
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          ) : searchParams.get('edit') ? (
+            <WorkspaceIcContentEditor
+              mode="edit"
+              contentId={searchParams.get('edit')!}
+              onClose={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('edit');
+                next.delete('new');
+                next.set('tab', 'contenido');
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          ) : (
+            <WorkspaceIcContentPanel
+              onNewContent={() => {
+                const next = new URLSearchParams(searchParams);
+                next.set('tab', 'contenido');
+                next.set('new', '1');
+                next.delete('edit');
+                setSearchParams(next, { replace: true });
+              }}
+              onEditContent={(contentId) => {
+                const next = new URLSearchParams(searchParams);
+                next.set('tab', 'contenido');
+                next.set('edit', contentId);
+                next.delete('new');
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          )}
+        </TabsContent>
 
         <TabsContent value="campanas" className="mt-6">
           <WorkspaceInternalCampaigns />

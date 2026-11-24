@@ -15,6 +15,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class MalichimpAudienceDto {
@@ -117,6 +118,39 @@ export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
   contentRevision?: string;
 }
 
+const MALICHIMP_CONTENT_BRANDS = [
+  'museo',
+  'cursos_arte',
+  'extension_profesional',
+] as const;
+
+export class CreateMalichimpContentDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  @Matches(/^[^\r\n]+$/)
+  title!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  @Matches(/^[^\r\n]+$/)
+  subject!: string;
+
+  @IsString()
+  @MinLength(1)
+  htmlBody!: string;
+
+  @IsOptional()
+  @IsString()
+  designJson?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn([...MALICHIMP_CONTENT_BRANDS])
+  brand?: (typeof MALICHIMP_CONTENT_BRANDS)[number] | null;
+}
+
 export class UpdateMalichimpWorkingCopyDto {
   @IsOptional()
   @IsString()
@@ -140,6 +174,17 @@ export class UpdateMalichimpWorkingCopyDto {
   @IsOptional()
   @IsString()
   designJson?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsIn([...MALICHIMP_CONTENT_BRANDS])
+  brand?: (typeof MALICHIMP_CONTENT_BRANDS)[number] | null;
+
+  /** Token from GET content; mismatch → 409. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  contentRevision?: string;
 }
 
 export class ExportMalichimpCampaignsDto {

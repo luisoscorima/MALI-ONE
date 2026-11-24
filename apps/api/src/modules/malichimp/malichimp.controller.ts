@@ -14,13 +14,16 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { AppModule, User, UserRole } from '@prisma/client';
+import { AppModule, NewsletterScope, User, UserRole } from '@prisma/client';
 import type { Response } from 'express';
 import { RequireModule } from '../../core/guards/module.decorator';
 import { Roles } from '../../core/guards/roles.decorator';
+import { SaveEmailSenderDto } from '../../core/email-delivery/email-sender.dto';
+import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { MalichimpContactsQueryDto } from './dto/malichimp-query.dto';
 import {
   CreateMalichimpCampaignDto,
+  CreateMalichimpContentDto,
   ExportMalichimpCampaignsDto,
   MalichimpAudienceDto,
   MalichimpCampaignSendsQueryDto,
@@ -34,7 +37,34 @@ import { MalichimpService } from './malichimp.service';
 @Controller('malichimp')
 @RequireModule(AppModule.malichimp)
 export class MalichimpController {
-  constructor(private readonly malichimp: MalichimpService) {}
+  constructor(
+    private readonly malichimp: MalichimpService,
+    private readonly emailSenders: EmailSenderService,
+  ) {}
+
+  @Get('senders')
+  listSenders() {
+    return this.emailSenders.list(NewsletterScope.malichimp);
+  }
+
+  @Post('senders')
+  createSender(@Req() req: { user: User }, @Body() body: SaveEmailSenderDto) {
+    return this.emailSenders.create(
+      body.email,
+      NewsletterScope.malichimp,
+      req.user.id,
+    );
+  }
+
+  @Patch('senders/:id')
+  updateSender(@Param('id') id: string, @Body() body: SaveEmailSenderDto) {
+    return this.emailSenders.update(id, body.email, NewsletterScope.malichimp);
+  }
+
+  @Delete('senders/:id')
+  removeSender(@Param('id') id: string) {
+    return this.emailSenders.remove(id, NewsletterScope.malichimp);
+  }
 
   @Get('stats')
   stats() {
@@ -82,12 +112,34 @@ export class MalichimpController {
 
   @Get('content')
   listContent() {
-    return this.malichimp.listWorkingContent();
+    return this.malichimp.listLibraryContent();
+  }
+
+  @Post('content')
+  createContent(@Req() req: { user: User }, @Body() body: CreateMalichimpContentDto) {
+    return this.malichimp.createLibraryContent(req.user.id, body);
+  }
+
+  @Get('content/:id/view')
+  async viewContent(@Param('id') id: string, @Res() res: Response) {
+    const content = await this.malichimp.getContentBrowserView(id);
+    res
+      .status(200)
+      .set({
+        'Cache-Control': 'private, no-store',
+        'Content-Security-Policy': "default-src 'none'; img-src 'self' https: data:; style-src 'unsafe-inline' https:; font-src https: data:; script-src 'none'; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        'Referrer-Policy': 'no-referrer',
+        'X-Content-Type-Options': 'nosniff',
+      })
+      .type('html')
+      .send(
+        `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtml(content.title)}</title></head><body>${content.html}</body></html>`,
+      );
   }
 
   @Get('content/:id')
   getContent(@Param('id') id: string) {
-    return this.malichimp.getWorkingContent(id);
+    return this.malichimp.getContent(id);
   }
 
   @Patch('content/:id')
@@ -95,7 +147,17 @@ export class MalichimpController {
     @Param('id') id: string,
     @Body() body: UpdateMalichimpWorkingCopyDto,
   ) {
-    return this.malichimp.updateWorkingContent(id, body);
+    return this.malichimp.updateContent(id, body);
+  }
+
+  @Post('content/:id/duplicate')
+  duplicateContent(@Req() req: { user: User }, @Param('id') id: string) {
+    return this.malichimp.duplicateLibraryContent(req.user.id, id);
+  }
+
+  @Delete('content/:id')
+  deleteContent(@Param('id') id: string) {
+    return this.malichimp.deleteLibraryContent(id);
   }
 
   @Get('campaigns')

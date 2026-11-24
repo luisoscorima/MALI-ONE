@@ -110,7 +110,7 @@ export const appNavSections: AppNavSection[] = [
     items: [
       {
         to: '/admin/newsletters',
-        label: 'Boletines',
+        label: 'Campañas y Boletines',
         icon: Newspaper,
         module: 'newsletters',
       },

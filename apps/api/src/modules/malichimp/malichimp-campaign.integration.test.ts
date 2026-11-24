@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ConfigService } from '@nestjs/config';
-import { NewsletterStatus } from '@prisma/client';
+import { NewsletterKind, NewsletterScope, NewsletterStatus } from '@prisma/client';
 import { EmailDeliveryService } from '../../core/email-delivery/email-delivery.service';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
@@ -63,7 +63,11 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
       },
     });
     userId = user.id;
-    const sender = await emailSenders.create(senderEmail);
+    const sender = await emailSenders.create(
+      senderEmail,
+      NewsletterScope.malichimp,
+      user.id,
+    );
     senderId = sender.id;
     const newsletter = await prisma.newsletter.create({
       data: {
@@ -71,7 +75,9 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
         title: 'Contenido original',
         subject: 'Asunto original',
         htmlBody: '<p>Contenido original</p>',
-        status: NewsletterStatus.published,
+        status: NewsletterStatus.draft,
+        scope: NewsletterScope.malichimp,
+        kind: NewsletterKind.library,
         createdById: user.id,
       },
     });
