@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Migración de piezas sembradas: boletines operativos MALI → `scope=malichimp`; `boletin-prueba-ti` → `internal_communications` (dejan de ser solo “Org / Boletines”).
 - Hub **Campañas y Boletines**: listado multi-scope de libraries, pestaña registro de campañas (readonly), remitentes con `scope` y badge de módulo.
 - `EmailSender.scope` + unique `(scope, email)`; catálogos malichimp / internal_communications / shared.
 - Campañas de módulo ya no usan `shared` published como base; solo su biblioteca.

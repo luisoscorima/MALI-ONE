@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Migración: boletines operativos (Asamblea, invitaciones, boletines mensuales/auditorio/EP/CA, etc.) pasan a biblioteca MALICHIMP.
 - Campañas solo usan biblioteca MALICHIMP (ya no `shared` published).
 - Remitentes con `scope=malichimp`: pestaña Remitentes + `assertEnabled` acotado; CRUD también en hub.
 

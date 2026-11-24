@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Migración: `boletin-prueba-ti` → biblioteca `internal_communications`.
 - Biblioteca propia `internal_communications` (pestaña Contenido); campañas ya no usan `shared` published.
 - Remitentes de campaña filtrados a `scope=internal_communications`.
 - Eliminar campañas internas en **borrador**; si el boletín ligado está en borrador y sin otras campañas, también se elimina.
