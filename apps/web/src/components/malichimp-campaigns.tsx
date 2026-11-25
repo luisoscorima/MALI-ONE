@@ -628,6 +628,10 @@ export function MalichimpCampaigns({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [campaignPreview, setCampaignPreview] = useState<MalichimpCampaignDetailDto | null>(null);
+  const [campaignSummary, setCampaignSummary] = useState<MalichimpCampaignDetailDto | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const summaryRequest = useRef(0);
   const [statsCampaign, setStatsCampaign] = useState<MalichimpCampaignDto | null>(null);
   const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
   const [refreshingContent, setRefreshingContent] = useState(false);
@@ -1379,6 +1383,30 @@ export function MalichimpCampaigns({
     }
   }
 
+  function closeCampaignSummary() {
+    summaryRequest.current += 1;
+    setCampaignSummary(null);
+    setSummaryError('');
+    setSummaryLoading(false);
+  }
+
+  async function openCampaignSummary(campaignId: string) {
+    const request = ++summaryRequest.current;
+    setCampaignSummary(null);
+    setSummaryError('');
+    setSummaryLoading(true);
+    try {
+      const detail = await api.getMalichimpCampaign(campaignId);
+      if (summaryRequest.current !== request) return;
+      setCampaignSummary(detail);
+    } catch (reason) {
+      if (summaryRequest.current !== request) return;
+      setSummaryError(reason instanceof Error ? reason.message : 'No se pudo cargar el resumen');
+    } finally {
+      if (summaryRequest.current === request) setSummaryLoading(false);
+    }
+  }
+
   async function openCampaignPreview(campaignId: string) {
     setPreviewCampaignId(campaignId);
     try {
@@ -1903,9 +1931,17 @@ function audienceSelectionPayload() {
                     </button>
                   </TableCell>
                   <TableCell className="min-w-64">
-                    <p className="font-medium">{campaign.name}</p>
+                    <button
+                      type="button"
+                      className="text-left font-medium text-primary underline-offset-2 hover:underline focus-visible:underline"
+                      onClick={() => void openCampaignSummary(campaign.id)}
+                    >
+                      {campaign.name}
+                    </button>
                     <p className="text-xs text-muted-foreground">
-                      {campaign.newsletterTitle} · {df.format(new Date(campaign.createdAt))}
+                      {campaign.name.trim() === campaign.newsletterTitle.trim()
+                        ? df.format(new Date(campaign.createdAt))
+                        : `${campaign.newsletterTitle} · ${df.format(new Date(campaign.createdAt))}`}
                     </p>
                     {campaign.createdBy ? (
                       <p className="text-xs text-muted-foreground">
@@ -2492,7 +2528,7 @@ function audienceSelectionPayload() {
                         rel="noreferrer"
                       >
                         <Pencil className="size-4" aria-hidden />
-                        Editar contenido
+                        Editar boletín
                       </a>
                     </Button>
                     <Button
@@ -2531,7 +2567,7 @@ function audienceSelectionPayload() {
                     />
                     {!selectableNewsletters.length ? (
                       <p className="text-sm text-muted-foreground">
-                        No hay contenido disponible. Crea una pieza en la pestaña Contenido de MALICHIMP.
+                        No hay boletines disponibles. Crea uno en la pestaña Boletines de MALICHIMP.
                       </p>
                     ) : null}
                   </div>
@@ -2838,6 +2874,111 @@ function audienceSelectionPayload() {
               Enviar prueba
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={summaryLoading || Boolean(campaignSummary) || Boolean(summaryError)}
+        onOpenChange={(value) => { if (!value) closeCampaignSummary(); }}
+      >
+        <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-5 sm:px-6">
+            <DialogTitle>{campaignSummary?.name ?? 'Resumen del envío'}</DialogTitle>
+            <DialogDescription>
+              {campaignSummary?.status === 'draft'
+                ? 'Versión editable de este borrador.'
+                : campaignSummary
+                  ? 'Remitente, audiencia y contenido congelado de este envío.'
+                  : 'Cargando el resumen de este envío.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-auto space-y-5 overflow-y-auto px-5 py-4 sm:px-6">
+            {summaryLoading ? (
+              <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner className="size-4" /> Cargando resumen…
+              </p>
+            ) : null}
+            {summaryError ? (
+              <AlertBanner variant="error">
+                <p>{summaryError}</p>
+                <Button type="button" variant="outline" className="mt-2" onClick={closeCampaignSummary}>
+                  Cerrar
+                </Button>
+              </AlertBanner>
+            ) : null}
+            {campaignSummary ? (
+              <>
+                <section className="space-y-1">
+                  <h3 className="text-sm font-medium">De</h3>
+                  <p className="text-sm">
+                    {campaignSummary.fromName.trim() || '—'}{' '}
+                    &lt;{campaignSummary.fromEmail.trim() || '—'}&gt;
+                  </p>
+                </section>
+                <section className="space-y-1">
+                  <h3 className="text-sm font-medium">Para</h3>
+                  <p className="text-sm">{campaignSummary.audienceLabel || 'Sin audiencia registrada'}</p>
+                  {/^\d+ destinatarios?$/.test(campaignSummary.audienceLabel) ? null : (
+                    <p className="text-sm text-muted-foreground">
+                      {nf.format(campaignSummary.totalRecipients)}{' '}
+                      {campaignSummary.totalRecipients === 1 ? 'destinatario' : 'destinatarios'}
+                    </p>
+                  )}
+                  {campaignSummary.recipientSample.length ? (
+                    <ul className="space-y-0.5 text-xs text-muted-foreground">
+                      {campaignSummary.recipientSample.map((recipient) => (
+                        <li className="break-all" key={recipient.email}>
+                          {recipient.name ? `${recipient.name} · ${recipient.email}` : recipient.email}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-medium">Contenido</h3>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Asunto:</span>{' '}
+                    {campaignSummary.subject.trim() || '—'}
+                  </p>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Boletín:</span>{' '}
+                    {campaignSummary.libraryTitle || campaignSummary.newsletterTitle}
+                  </p>
+                  <div className="relative h-72 overflow-hidden rounded-md border bg-white">
+                    {campaignSummary.previewHtml ? (
+                      <iframe
+                        title={`Vista previa de ${campaignSummary.name}`}
+                        srcDoc={campaignSummary.previewHtml}
+                        sandbox=""
+                        referrerPolicy="no-referrer"
+                        tabIndex={-1}
+                        className="pointer-events-none absolute left-0 top-0 origin-top-left border-0"
+                        style={{ width: 640, height: 900, transform: 'scale(0.45)' }}
+                      />
+                    ) : (
+                      <p className="flex h-full items-center justify-center px-3 text-center text-xs text-muted-foreground">
+                        Sin contenido para previsualizar
+                      </p>
+                    )}
+                  </div>
+                </section>
+              </>
+            ) : null}
+          </div>
+          {campaignSummary ? (
+            <DialogFooter className="shrink-0 border-t bg-background px-5 py-4 sm:px-6">
+              <Button type="button" variant="outline" asChild>
+                <a
+                  href={`/api/malichimp/campaigns/${encodeURIComponent(campaignSummary.id)}/view`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="size-4" aria-hidden />
+                  Ver en navegador
+                </a>
+              </Button>
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </Dialog>
 

@@ -75,7 +75,7 @@ export function WorkspaceIcContentEditor({
       setInitialHtml(row.htmlBody);
       setEditorKey((k) => k + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo abrir el contenido');
+      setError(e instanceof Error ? e.message : 'No se pudo abrir el boletín');
     } finally {
       setLoading(false);
     }
@@ -129,11 +129,11 @@ export function WorkspaceIcContentEditor({
           designJson: exported.designJson,
           brand,
         });
-        toast.success('Contenido creado');
+        toast.success('Boletín creado');
         onCreated?.(created.id);
       } else if (contentId) {
         if (!contentRevision) {
-          toast.error('Recarga el contenido antes de guardar');
+          toast.error('Recarga el boletín antes de guardar');
           return;
         }
         const updated = await api.updateInternalContent(contentId, {
@@ -145,7 +145,7 @@ export function WorkspaceIcContentEditor({
           contentRevision,
         });
         setContentRevision(updated.contentRevisionToken ?? null);
-        toast.success('Contenido actualizado');
+        toast.success('Boletín actualizado');
         onClose();
       }
     } catch (e) {
@@ -164,7 +164,7 @@ export function WorkspaceIcContentEditor({
     return (
       <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-        Cargando contenido…
+        Cargando boletín…
       </div>
     );
   }
@@ -190,10 +190,10 @@ export function WorkspaceIcContentEditor({
             Volver al listado
           </Button>
           <h2 className="mt-2 text-base font-medium">
-            {mode === 'create' ? 'Nuevo contenido' : 'Editar contenido'}
+            {mode === 'create' ? 'Nuevo boletín' : 'Editar boletín'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Biblioteca de campañas internas (comunicaciones internas).
+            Biblioteca de boletines de campañas internas.
           </p>
         </div>
         <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
@@ -208,7 +208,7 @@ export function WorkspaceIcContentEditor({
         <AlertBanner variant="error">
           <div className="space-y-2">
             <p>
-              Otra persona modificó este contenido. Recarga la versión del servidor o conserva tu
+              Otra persona modificó este boletín. Recarga la versión del servidor o conserva tu
               trabajo para copiarlo.
             </p>
             <div className="flex flex-wrap gap-2">

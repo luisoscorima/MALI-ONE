@@ -514,7 +514,7 @@ export function NewslettersPage() {
                         ) : n.scope === 'internal_communications' ? (
                           <Button size="sm" variant="ghost" asChild>
                             <a href={`/admin/users?tab=contenido&edit=${encodeURIComponent(n.id)}`}>
-                              Abrir en Contenido
+                              Abrir en Usuarios Workspace
                             </a>
                           </Button>
                         ) : (

@@ -59,7 +59,7 @@ export function WorkspaceIcContentPanel({
     try {
       setRows(await api.listInternalContent());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo cargar el contenido');
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los boletines');
       setRows([]);
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export function WorkspaceIcContentPanel({
     setBusyId(row.id);
     try {
       const created = await api.duplicateInternalContent(row.id);
-      toast.success('Contenido duplicado');
+      toast.success('Boletín duplicado');
       await load();
       onEditContent?.(created.id);
     } catch (e) {
@@ -88,20 +88,20 @@ export function WorkspaceIcContentPanel({
     const ok = await confirm({
       title: `¿Eliminar “${row.title}”?`,
       description: row.usedInCampaigns
-        ? 'Este contenido ya se usó en campañas y no se puede eliminar.'
+        ? 'Este boletín ya se usó en campañas y no se puede eliminar.'
         : 'Se eliminará de la biblioteca de campañas internas.',
       confirmLabel: 'Eliminar',
       variant: 'destructive',
     });
     if (!ok) return;
     if (row.usedInCampaigns) {
-      toast.error('Este contenido ya fue usado en una campaña');
+      toast.error('Este boletín ya fue usado en una campaña');
       return;
     }
     setBusyId(row.id);
     try {
       await api.deleteInternalContent(row.id);
-      toast.success('Contenido eliminado');
+      toast.success('Boletín eliminado');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
@@ -114,7 +114,7 @@ export function WorkspaceIcContentPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-medium">Contenido</h2>
+          <h2 className="text-base font-medium">Boletines</h2>
           <p className="text-sm text-muted-foreground">
             Biblioteca exclusiva de comunicaciones internas. Al crear una campaña se genera una copia
             de trabajo a partir de estas piezas.
@@ -132,7 +132,7 @@ export function WorkspaceIcContentPanel({
           {onNewContent ? (
             <Button type="button" size="sm" onClick={onNewContent}>
               <Plus className="size-4" aria-hidden />
-              Nuevo contenido
+              Nuevo boletín
             </Button>
           ) : null}
         </div>
@@ -144,7 +144,7 @@ export function WorkspaceIcContentPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Contenido</TableHead>
+              <TableHead>Boletín</TableHead>
               <TableHead>Marca</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Campañas</TableHead>
@@ -254,7 +254,7 @@ export function WorkspaceIcContentPanel({
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No hay contenido todavía. Crea tu primer contenido para usarlo en campañas.
+                  No hay boletines todavía. Crea el primero para usarlo en campañas.
                 </TableCell>
               </TableRow>
             )}

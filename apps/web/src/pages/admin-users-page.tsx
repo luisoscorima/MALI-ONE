@@ -8,7 +8,7 @@ import {
   LogOut,
   Pencil,
   RefreshCw,
-  FileText,
+  Newspaper,
   Send,
   Users,
   X,
@@ -497,8 +497,8 @@ export function AdminUsersPage() {
             Directorio
           </TabsTrigger>
           <TabsTrigger value="contenido">
-            <FileText className="size-4" aria-hidden />
-            Contenido
+            <Newspaper className="size-4" aria-hidden />
+            Boletines
           </TabsTrigger>
           <TabsTrigger value="campanas">
             <Send className="size-4" aria-hidden />

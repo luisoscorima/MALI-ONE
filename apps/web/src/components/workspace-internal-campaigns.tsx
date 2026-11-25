@@ -538,7 +538,7 @@ export function WorkspaceInternalCampaigns() {
       setNewsletterId(created.id);
       setSubject((current) => current.trim() || created.subject);
       setName((current) => current.trim() || created.title);
-      toast.success('Borrador creado en la biblioteca de contenido');
+      toast.success('Borrador creado en la biblioteca de boletines');
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo crear el boletín');
     } finally {
@@ -790,7 +790,7 @@ export function WorkspaceInternalCampaigns() {
 
       {!newsletters.length ? (
         <AlertBanner variant="info">
-          No hay contenido en la biblioteca de comunicaciones internas. Créalo en la pestaña Contenido.
+          No hay boletines en la biblioteca de comunicaciones internas. Créalo en la pestaña Boletines.
         </AlertBanner>
       ) : null}
 
@@ -1180,7 +1180,7 @@ export function WorkspaceInternalCampaigns() {
                 <div className="space-y-1">
                   <h3 className="text-base font-medium">Contenido</h3>
                   <p className="text-sm text-muted-foreground">
-                    Elige contenido de la biblioteca de comunicaciones internas o crea un borrador
+                    Elige un boletín de la biblioteca de comunicaciones internas o crea un borrador
                     nuevo.
                   </p>
                 </div>
@@ -1235,7 +1235,7 @@ export function WorkspaceInternalCampaigns() {
                       ) : (
                         <Plus className="size-4" aria-hidden />
                       )}
-                      {creatingNewsletter ? 'Creando…' : 'Crear contenido nuevo'}
+                      {creatingNewsletter ? 'Creando…' : 'Crear boletín nuevo'}
                     </Button>
                   </div>
                 )}

@@ -352,6 +352,12 @@ export interface MalichimpCampaignDetailDto {
   /** Exclusive working copy for draft edit/preview/snapshot. */
   workingNewsletterId?: string | null;
   newsletterTitle: string;
+  /** Library piece this campaign was sent from. */
+  libraryTitle: string;
+  /** Chosen group or tag names, or the recipient count when there is neither. */
+  audienceLabel: string;
+  /** Up to five recipients. Real sends when they exist; otherwise the email list. */
+  recipientSample: Array<{ email: string; name: string | null }>;
   newsletter: NewsletterDto;
   contentRevision?: string | null;
   subject: string;

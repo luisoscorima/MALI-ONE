@@ -79,6 +79,7 @@ import {
   firstNameFromDisplayName,
 } from '../../core/email-delivery/email-merge-tags';
 import { replyToWithSendToken } from '../../core/email-delivery/malichimp-reply-to';
+import { formatMalichimpAudienceLabel } from './lib/malichimp-audience-label';
 import {
   MALICHIMP_AUDIENCE_MODE,
   MALICHIMP_RESOLVE_EMAILS_MAX,
@@ -924,6 +925,7 @@ export class MalichimpService implements OnModuleInit {
       },
     });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
+    const audience = (await this.describeAudiences([campaign])).get(campaign.id);
     const working = campaign.workingNewsletter;
     const filters = this.filtersFromCampaign(campaign);
     const includeContacts = filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails
@@ -943,6 +945,9 @@ export class MalichimpService implements OnModuleInit {
       newsletterId: campaign.newsletterId,
       workingNewsletterId: campaign.workingNewsletterId,
       newsletterTitle: working?.title ?? campaign.newsletter.title,
+      libraryTitle: campaign.newsletter.title,
+      audienceLabel: audience?.label ?? '',
+      recipientSample: audience?.sample ?? [],
       newsletter: working
         ? {
             id: working.id,
@@ -1449,6 +1454,26 @@ export class MalichimpService implements OnModuleInit {
       throw new BadRequestException('No se encontraron campañas para exportar');
     }
 
+    const details = rows.length
+      ? await this.prisma.emailCampaign.findMany({
+          where: { id: { in: rows.map((campaign) => campaign.id) } },
+          select: {
+            id: true,
+            fromName: true,
+            fromEmail: true,
+            status: true,
+            audienceMode: true,
+            audienceSegments: true,
+            audienceExcludeSegments: true,
+            audienceIncludeContactIds: true,
+            audienceExcludeContactIds: true,
+            totalRecipients: true,
+          },
+        })
+      : [];
+    const audienceById = await this.describeAudiences(details);
+    const senderById = new Map(details.map((campaign) => [campaign.id, campaign]));
+
     const pct = (num: number, den: number) =>
       den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
 
@@ -1457,6 +1482,10 @@ export class MalichimpService implements OnModuleInit {
       [
         { key: 'name', header: 'Campaña', width: 32 },
         { key: 'subject', header: 'Asunto', width: 36 },
+        { key: 'newsletterTitle', header: 'Boletín', width: 32 },
+        { key: 'from', header: 'De', width: 36 },
+        { key: 'audience', header: 'Para', width: 48 },
+        { key: 'sample', header: 'Muestra', width: 36 },
         { key: 'status', header: 'Estado', width: 14 },
         { key: 'createdBy', header: 'Creada por', width: 24 },
         { key: 'createdAt', header: 'Creada', width: 20 },
@@ -1477,10 +1506,21 @@ export class MalichimpService implements OnModuleInit {
         { key: 'clickRate', header: '% clic', width: 12 },
         { key: 'replyRate', header: '% reply', width: 12 },
       ],
-      rows.map((campaign) => ({
-        name: campaign.name,
-        subject: campaign.subject,
-        status: campaign.status,
+      rows.map((campaign) => {
+        const sender = senderById.get(campaign.id);
+        const fromName = sender?.fromName?.trim() ?? '';
+        const fromEmail = sender?.fromEmail?.trim() ?? '';
+        const audience = audienceById.get(campaign.id);
+        return {
+          name: campaign.name,
+          subject: campaign.subject,
+          newsletterTitle: campaign.newsletterTitle,
+          from: fromName && fromEmail
+            ? `${fromName} <${fromEmail}>`
+            : fromName || fromEmail,
+          audience: audience?.label ?? '',
+          sample: (audience?.sample ?? []).map((recipient) => recipient.email).join(', '),
+          status: campaign.status,
         createdBy: campaign.createdBy?.name || campaign.createdBy?.email || '',
         createdAt: limaStamp(campaign.createdAt),
         scheduledAt: limaStamp(campaign.scheduledAt),
@@ -1499,7 +1539,8 @@ export class MalichimpService implements OnModuleInit {
         openRate: pct(campaign.opened, campaign.delivered),
         clickRate: pct(campaign.clicked, campaign.delivered),
         replyRate: pct(campaign.replied, campaign.delivered),
-      })),
+        };
+      }),
     );
 
     const stamp = new Date().toISOString().slice(0, 10);
@@ -2435,6 +2476,129 @@ export class MalichimpService implements OnModuleInit {
       audienceIncludeContactIds: filters.includeContactIds,
       audienceExcludeContactIds: filters.excludeContactIds,
     };
+  }
+
+  private async describeAudiences(
+    campaigns: Array<{
+      id: string;
+      totalRecipients: number;
+      audienceMode: string | null;
+      audienceSegments: string[];
+      audienceExcludeSegments: string[];
+      audienceIncludeContactIds: string[];
+      audienceExcludeContactIds: string[];
+    }>,
+  ) {
+    const described = new Map<string, {
+      label: string;
+      sample: Array<{ email: string; name: string | null }>;
+    }>();
+    if (!campaigns.length) return described;
+
+    const filters = campaigns.map((campaign) => ({
+      id: campaign.id,
+      totalRecipients: campaign.totalRecipients,
+      filters: this.filtersFromCampaign(campaign),
+    }));
+    const groupIds = new Set<string>();
+    const tagIds = new Set<string>();
+    const contactIds = new Set<string>();
+    for (const row of filters) {
+      for (const id of row.filters.groupOptionIds) groupIds.add(id);
+      for (const id of row.filters.tagIds) tagIds.add(id);
+      if (row.filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails) {
+        for (const id of row.filters.includeContactIds) contactIds.add(id);
+      }
+    }
+
+    const [optionsRows, tags, contacts, samples] = await Promise.all([
+      groupIds.size
+        ? this.prisma.malichimpGroupOption.findMany({
+            where: { id: { in: [...groupIds] } },
+            select: { id: true, name: true, group: { select: { name: true } } },
+          })
+        : [],
+      tagIds.size
+        ? this.prisma.malichimpTag.findMany({
+            where: { id: { in: [...tagIds] } },
+            select: { id: true, name: true },
+          })
+        : [],
+      contactIds.size
+        ? this.prisma.malichimpContact.findMany({
+            where: { id: { in: [...contactIds] } },
+            select: { id: true, email: true, firstName: true, lastName: true },
+          })
+        : [],
+      this.prisma.$queryRaw<Array<{
+        campaignId: string;
+        email: string;
+        firstName: string | null;
+        lastName: string | null;
+      }>>(Prisma.sql`
+        SELECT ranked."campaignId", ranked."email", ranked."firstName", ranked."lastName"
+        FROM (
+          SELECT
+            send."campaignId",
+            send."email",
+            send."firstName",
+            send."lastName",
+            row_number() OVER (PARTITION BY send."campaignId" ORDER BY send."email") AS rn
+          FROM "EmailSend" send
+          WHERE send."isTest" = false
+            AND send."campaignId" IN (${Prisma.join(campaigns.map((campaign) => campaign.id))})
+        ) ranked
+        WHERE ranked.rn <= 5
+        ORDER BY ranked."campaignId", ranked."email"
+      `),
+    ]);
+
+    const optionLabel = new Map(optionsRows.map((option) => [
+      option.id,
+      `${option.group.name}: ${option.name}`,
+    ]));
+    const tagLabel = new Map(tags.map((tag) => [tag.id, tag.name]));
+    const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
+    const sampleByCampaign = new Map<string, Array<{ email: string; name: string | null }>>();
+    for (const row of samples) {
+      const list = sampleByCampaign.get(row.campaignId) ?? [];
+      const name = [row.firstName, row.lastName].filter(Boolean).join(' ');
+      list.push({ email: row.email, name: name || null });
+      sampleByCampaign.set(row.campaignId, list);
+    }
+
+    const named = (ids: string[], labels: Map<string, string>) =>
+      ids.flatMap((id) => {
+        const label = labels.get(id);
+        return label ? [label] : [];
+      });
+
+    for (const row of filters) {
+      const mode = row.filters.audienceMode;
+      const included = mode === MALICHIMP_AUDIENCE_MODE.tags
+        ? named(row.filters.tagIds, tagLabel)
+        : mode === MALICHIMP_AUDIENCE_MODE.groups
+          ? named(row.filters.groupOptionIds, optionLabel)
+          : [];
+      let sample = sampleByCampaign.get(row.id) ?? [];
+      if (!sample.length && mode === MALICHIMP_AUDIENCE_MODE.emails) {
+        sample = row.filters.includeContactIds.slice(0, 5).flatMap((id) => {
+          const contact = contactById.get(id);
+          return contact
+            ? [{ email: contact.email, name: recipientName(contact) }]
+            : [];
+        });
+      }
+      described.set(row.id, {
+        label: formatMalichimpAudienceLabel({
+          audienceMode: mode,
+          included,
+          recipientCount: row.totalRecipients,
+        }),
+        sample,
+      });
+    }
+    return described;
   }
 
   private filtersFromCampaign(campaign: {

@@ -96,7 +96,7 @@ export function MalichimpContentEditor({
       setInitialHtml(row.htmlBody);
       setEditorKey((k) => k + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo abrir el contenido');
+      setError(e instanceof Error ? e.message : 'No se pudo abrir el boletín');
     } finally {
       setLoading(false);
     }
@@ -152,18 +152,18 @@ export function MalichimpContentEditor({
       }
       if (mode === 'create') {
         const created = await api.createMalichimpContent(body);
-        toast.success('Contenido creado');
+        toast.success('Boletín creado');
         onCreated?.(created.id);
       } else if (contentId) {
         if (!contentRevision) {
-          throw new Error('Recarga el contenido antes de guardar.');
+          throw new Error('Recarga el boletín antes de guardar.');
         }
         const updated = await api.updateMalichimpContent(contentId, {
           ...body,
           contentRevision,
         });
         setContentRevision(updated.contentRevisionToken ?? null);
-        toast.success('Contenido actualizado');
+        toast.success('Boletín actualizado');
         onClose();
       }
     } catch (e) {
@@ -189,7 +189,7 @@ export function MalichimpContentEditor({
     return (
       <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-        Cargando contenido…
+        Cargando boletín…
       </div>
     );
   }
@@ -230,15 +230,15 @@ export function MalichimpContentEditor({
           )}
           <h2 className="mt-2 text-base font-medium">
             {mode === 'create'
-              ? 'Nuevo contenido'
+              ? 'Nuevo boletín'
               : canEdit
-                ? 'Editar contenido'
-                : 'Contenido (solo lectura)'}
+                ? 'Editar boletín'
+                : 'Boletín (solo lectura)'}
           </h2>
           <p className="text-sm text-muted-foreground">
             {campaignName
-              ? `Contenido de la campaña: ${campaignName}`
-              : 'Pieza de la biblioteca MALICHIMP.'}
+              ? `Boletín de la campaña: ${campaignName}`
+              : 'Boletín de la biblioteca MALICHIMP.'}
           </p>
           {backToCampaignHref ? (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -259,7 +259,7 @@ export function MalichimpContentEditor({
 
       {!editable && mode === 'edit' ? (
         <AlertBanner>
-          Solo se puede editar el contenido de la campaña mientras esté en preparación.
+          Solo se puede editar el boletín de la campaña mientras esté en preparación.
         </AlertBanner>
       ) : null}
 
@@ -267,7 +267,7 @@ export function MalichimpContentEditor({
         <AlertBanner variant="error">
           <div className="space-y-2">
             <p>
-              Otra persona modificó este contenido. Puedes recargar la versión más reciente o
+              Otra persona modificó este boletín. Puedes recargar la versión más reciente o
               conservar tu trabajo para copiarlo.
             </p>
             <div className="flex flex-wrap gap-2">

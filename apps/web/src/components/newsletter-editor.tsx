@@ -163,6 +163,107 @@ const FONT =
 
 const TYPOGRAPHY_SECTOR = 'mali-typography';
 
+type LocaleTree = { [key: string]: string | LocaleTree };
+
+function mergeLocale(base: LocaleTree, extra: LocaleTree): LocaleTree {
+  const out: LocaleTree = { ...base };
+  for (const [key, value] of Object.entries(extra)) {
+    const current = out[key];
+    out[key] = typeof value === 'object' && typeof current === 'object'
+      ? mergeLocale(current, value)
+      : value;
+  }
+  return out;
+}
+
+const SIDES = { top: 'Arriba', right: 'Derecha', bottom: 'Abajo', left: 'Izquierda' } as const;
+
+/**
+ * GrapesJS resolves labels/titles from i18n before `name`/`attributes.title`,
+ * so every visible string must live here.
+ */
+const MALI_EDITOR_LOCALE = mergeLocale(es as LocaleTree, {
+  panels: {
+    buttons: {
+      titles: {
+        'set-device-desktop': 'Escritorio',
+        'set-device-mobile': 'Móvil',
+        undo: 'Deshacer',
+        redo: 'Rehacer',
+        'sw-visibility': 'Ver bordes',
+        preview: 'Vista previa',
+        fullscreen: 'Pantalla completa',
+        'export-template': 'Ver código HTML',
+        'gjs-open-import-template': 'Importar HTML (reemplaza todo el boletín)',
+        'insert-merge-first-name': `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG} (nombre del contacto)`,
+        'insert-merge-last-name': `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG} (apellidos del contacto)`,
+        'open-sm': 'Estilos',
+        'open-tm': 'Ajustes',
+        'open-layers': 'Capas',
+        'open-blocks': 'Bloques',
+      },
+    },
+  },
+  styleManager: {
+    properties: {
+      width: 'Ancho',
+      height: 'Alto',
+      'max-width': 'Ancho máximo',
+      'min-height': 'Alto mínimo',
+      margin: 'Margen',
+      ...Object.fromEntries(Object.entries(SIDES).map(([side, label]) => [`margin-${side}`, label])),
+      padding: 'Relleno',
+      ...Object.fromEntries(Object.entries(SIDES).map(([side, label]) => [`padding-${side}`, label])),
+      'font-family': 'Fuente',
+      'font-size': 'Tamaño',
+      'font-weight': 'Peso',
+      'letter-spacing': 'Espaciado',
+      color: 'Color de texto',
+      'line-height': 'Interlineado',
+      'text-align': 'Alineación',
+      'text-decoration': 'Decoración',
+      'font-style': 'Estilo',
+      'background-color': 'Fondo',
+      'border-radius': 'Esquinas redondeadas',
+      'border-top-left-radius': 'Sup. izquierda',
+      'border-top-right-radius': 'Sup. derecha',
+      'border-bottom-right-radius': 'Inf. derecha',
+      'border-bottom-left-radius': 'Inf. izquierda',
+      border: 'Borde',
+      'border-width': 'Grosor',
+      'border-style': 'Estilo de borde',
+      'border-color': 'Color de borde',
+    },
+    options: {
+      'font-weight': {
+        100: 'Fina',
+        200: 'Extra fina',
+        300: 'Ligera',
+        400: 'Normal',
+        500: 'Media',
+        600: 'Seminegrita',
+        700: 'Negrita',
+        800: 'Extra negrita',
+        900: 'Ultra negrita',
+      },
+      'border-style': {
+        none: 'Ninguno',
+        solid: 'Sólido',
+        dotted: 'Punteado',
+        dashed: 'Discontinuo',
+        double: 'Doble',
+        groove: 'Ranurado',
+        ridge: 'Relieve',
+        inset: 'Hundido',
+        outset: 'Resaltado',
+      },
+      'text-align': { left: 'Izq.', center: 'Centro', right: 'Der.', justify: 'Justificar' },
+      'text-decoration': { none: 'Ninguna', underline: 'Subrayado', 'line-through': 'Tachado' },
+      'font-style': { normal: 'Normal', italic: 'Cursiva' },
+    },
+  },
+});
+
 /** Compare CSS font stacks ignoring quote/spacing differences from computed styles. */
 function normalizeFontFamily(value: string): string {
   return value
@@ -748,7 +849,9 @@ export const NewsletterEditor = forwardRef<
       noticeOnUnload: false,
       i18n: {
         locale: 'es',
-        messages: { es },
+        localeFallback: 'es',
+        detectLocale: false,
+        messages: { es: MALI_EDITOR_LOCALE },
       },
       canvas: {
         styles: [],
@@ -876,14 +979,6 @@ export const NewsletterEditor = forwardRef<
               'margin',
               'padding',
             ],
-            properties: [
-              { property: 'width', name: 'Ancho' },
-              { property: 'height', name: 'Alto' },
-              { property: 'max-width', name: 'Ancho máximo' },
-              { property: 'min-height', name: 'Alto mínimo' },
-              { property: 'margin', name: 'Margen' },
-              { property: 'padding', name: 'Relleno' },
-            ],
           },
           {
             id: TYPOGRAPHY_SECTOR,
@@ -919,14 +1014,15 @@ export const NewsletterEditor = forwardRef<
                   { id: 'Trebuchet MS, Helvetica, sans-serif', label: 'Trebuchet MS' },
                 ],
               },
-              { property: 'font-size', name: 'Tamaño' },
-              { property: 'font-weight', name: 'Peso' },
-              { property: 'letter-spacing', name: 'Espaciado' },
-              { property: 'color', name: 'Color de texto' },
-              { property: 'line-height', name: 'Interlineado' },
+              {
+                property: 'line-height',
+                type: 'number',
+                units: ['', 'px', 'em', '%'],
+                unit: '',
+                default: 'normal',
+              },
               {
                 property: 'text-align',
-                name: 'Alineación',
                 type: 'radio',
                 default: 'left',
                 options: [
@@ -938,7 +1034,6 @@ export const NewsletterEditor = forwardRef<
               },
               {
                 property: 'text-decoration',
-                name: 'Decoración',
                 type: 'radio',
                 default: 'none',
                 options: [
@@ -949,7 +1044,6 @@ export const NewsletterEditor = forwardRef<
               },
               {
                 property: 'font-style',
-                name: 'Estilo',
                 type: 'radio',
                 default: 'normal',
                 options: [
@@ -966,11 +1060,6 @@ export const NewsletterEditor = forwardRef<
               'background-color',
               'border-radius',
               'border',
-            ],
-            properties: [
-              { property: 'background-color', name: 'Fondo' },
-              { property: 'border-radius', name: 'Radio' },
-              { property: 'border', name: 'Borde' },
             ],
           },
         ],
@@ -1007,47 +1096,13 @@ export const NewsletterEditor = forwardRef<
       className: 'gjs-pn-btn',
       command: 'insert-merge-first-name',
       label: '{{fn}}',
-      attributes: {
-        title: `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG} (nombre del contacto al enviar)`,
-      },
     });
     panels.addButton('options', {
       id: 'insert-merge-last-name',
       className: 'gjs-pn-btn',
       command: 'insert-merge-last-name',
       label: '{{ln}}',
-      attributes: {
-        title: `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG} (apellidos del contacto al enviar)`,
-      },
     });
-
-    const spanishButtonTitles: Array<[string, string, string]> = [
-      ['devices-c', 'set-device-desktop', 'Escritorio'],
-      ['devices-c', 'set-device-mobile', 'Móvil'],
-      ['options', 'undo', 'Deshacer'],
-      ['options', 'redo', 'Rehacer'],
-      ['options', 'sw-visibility', 'Ver bordes'],
-      ['options', 'preview', 'Vista previa'],
-      ['options', 'fullscreen', 'Pantalla completa'],
-      ['options', 'export-template', 'Ver código HTML'],
-      ['options', 'gjs-open-import-template', 'Importar HTML (reemplaza todo el boletín)'],
-      ['options', 'insert-merge-first-name', `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`],
-      ['options', 'insert-merge-last-name', `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG}`],
-      ['views', 'open-sm', 'Estilos'],
-      ['views', 'open-tm', 'Ajustes'],
-      ['views', 'open-layers', 'Capas'],
-      ['views', 'open-blocks', 'Bloques'],
-    ];
-    const applySpanishTitles = () => {
-      for (const [panel, id, title] of spanishButtonTitles) {
-        const btn = panels.getButton(panel, id);
-        if (btn) {
-          btn.set('attributes', { ...(btn.get('attributes') ?? {}), title });
-        }
-      }
-    };
-    applySpanishTitles();
-    editor.on('load', applySpanishTitles);
 
     registerMaliBlocks(editor, brand);
     loadInitialContent(editor, initialDesignJson, initialHtml, brand);

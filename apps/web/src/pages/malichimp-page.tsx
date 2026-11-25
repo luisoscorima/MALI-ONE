@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   Loader2,
   Mail,
+  Newspaper,
   Search,
   Send,
   Upload,
@@ -506,7 +507,7 @@ export function MalichimpPage() {
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
-          <TabsTrigger value="content">Contenido</TabsTrigger>
+          <TabsTrigger value="content"><Newspaper aria-hidden="true" /> Boletines</TabsTrigger>
           <TabsTrigger value="remitentes"><Mail aria-hidden="true" /> Remitentes</TabsTrigger>
         </TabsList>
 

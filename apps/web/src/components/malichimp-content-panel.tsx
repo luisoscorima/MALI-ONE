@@ -58,7 +58,7 @@ export function MalichimpContentPanel({
     try {
       setRows(await api.listMalichimpContent());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo cargar el contenido');
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los boletines');
       setRows([]);
     } finally {
       setLoading(false);
@@ -73,7 +73,7 @@ export function MalichimpContentPanel({
     setBusyId(row.id);
     try {
       const created = await api.duplicateMalichimpContent(row.id);
-      toast.success('Contenido duplicado');
+      toast.success('Boletín duplicado');
       await load();
       onEditContent?.(created.id);
     } catch (e) {
@@ -87,20 +87,20 @@ export function MalichimpContentPanel({
     const ok = await confirm({
       title: `¿Eliminar “${row.title}”?`,
       description: row.usedInCampaigns
-        ? 'Este contenido ya se usó en campañas y no se puede eliminar.'
+        ? 'Este boletín ya se usó en campañas y no se puede eliminar.'
         : 'Se eliminará de la biblioteca MALICHIMP.',
       confirmLabel: 'Eliminar',
       variant: 'destructive',
     });
     if (!ok) return;
     if (row.usedInCampaigns) {
-      toast.error('Este contenido ya fue usado en una campaña');
+      toast.error('Este boletín ya fue usado en una campaña');
       return;
     }
     setBusyId(row.id);
     try {
       await api.deleteMalichimpContent(row.id);
-      toast.success('Contenido eliminado');
+      toast.success('Boletín eliminado');
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
@@ -113,7 +113,7 @@ export function MalichimpContentPanel({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-medium">Contenido</h2>
+          <h2 className="text-base font-medium">Boletines</h2>
           <p className="text-sm text-muted-foreground">
             Biblioteca de correos de MALICHIMP. Crea y edita piezas aquí; al armar una campaña se
             copia una versión editable. Los remitentes del módulo están en la pestaña Remitentes;
@@ -132,7 +132,7 @@ export function MalichimpContentPanel({
           {onNewContent ? (
             <Button type="button" size="sm" onClick={onNewContent}>
               <Plus className="size-4" aria-hidden />
-              Nuevo contenido
+              Nuevo boletín
             </Button>
           ) : null}
         </div>
@@ -144,7 +144,7 @@ export function MalichimpContentPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-56 max-w-56">Contenido</TableHead>
+              <TableHead className="w-56 max-w-56">Boletín</TableHead>
               <TableHead>Marca</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Campañas</TableHead>
@@ -258,7 +258,7 @@ export function MalichimpContentPanel({
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                  No hay contenido todavía. Crea tu primer contenido para usarlo en campañas.
+                  No hay boletines todavía. Crea el primero para usarlo en campañas.
                 </TableCell>
               </TableRow>
             )}
