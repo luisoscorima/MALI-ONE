@@ -43,31 +43,46 @@ export class AuthService {
 
     const bootstrapAdmin = this.config.get<string>('BOOTSTRAP_ADMIN_EMAIL');
     const shouldBeAdmin = bootstrapAdmin && email === bootstrapAdmin;
+    const now = new Date();
+    const name = profile.displayName ?? email;
+    const picture = profile.photos?.[0]?.value ?? null;
 
     const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return this.prisma.user.update({
-        where: { email },
-        data: {
-          googleId: profile.id,
-          name: profile.displayName ?? email,
-          picture: profile.photos?.[0]?.value ?? null,
-          role: shouldBeAdmin ? UserRole.admin : UserRole.operator,
-        },
-      });
-    }
+    const user = existing
+      ? await this.prisma.user.update({
+          where: { email },
+          data: {
+            googleId: profile.id,
+            name,
+            picture,
+            role: shouldBeAdmin ? UserRole.admin : UserRole.operator,
+            lastLoginAt: now,
+            lastSeenAt: now,
+          },
+        })
+      : await this.prisma.user.create({
+          data: {
+            googleId: profile.id,
+            email,
+            name,
+            picture,
+            role: shouldBeAdmin ? UserRole.admin : UserRole.operator,
+            lastLoginAt: now,
+            lastSeenAt: now,
+          },
+        });
 
-    const role: UserRole = shouldBeAdmin ? 'admin' : 'operator';
-
-    return this.prisma.user.create({
+    await this.prisma.adminAuditLog.create({
       data: {
-        googleId: profile.id,
-        email,
-        name: profile.displayName ?? email,
-        picture: profile.photos?.[0]?.value ?? null,
-        role,
+        actorId: user.id,
+        actorEmail: user.email,
+        action: 'USER_LOGIN',
+        targetEmail: user.email,
+        payload: { googleId: profile.id, name: user.name },
       },
     });
+
+    return user;
   }
 
   signToken(user: User): string {

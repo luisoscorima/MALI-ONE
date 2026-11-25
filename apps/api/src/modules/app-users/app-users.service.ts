@@ -8,6 +8,9 @@ import { AppUserDto } from '@mali-one/shared';
 import { resolveUserModules } from '../../core/permissions/user-modules';
 import { PrismaService } from '../../core/prisma/prisma.service';
 
+/** Ventana de presencia aproximada para operadores (sin WebSocket). */
+const ONLINE_WINDOW_MS = 3 * 60_000;
+
 @Injectable()
 export class AppUsersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,7 +20,8 @@ export class AppUsersService {
       include: { moduleAccess: true },
       orderBy: [{ role: 'asc' }, { email: 'asc' }],
     });
-    return users.map((user) => this.toDto(user));
+    const now = Date.now();
+    return users.map((user) => this.toDto(user, now));
   }
 
   async updateModules(
@@ -70,7 +74,12 @@ export class AppUsersService {
 
   private toDto(
     user: User & { moduleAccess: { module: AppModule }[] },
+    nowMs = Date.now(),
   ): AppUserDto {
+    const lastSeenAt = user.lastSeenAt?.toISOString() ?? null;
+    const online =
+      !!user.lastSeenAt &&
+      nowMs - user.lastSeenAt.getTime() <= ONLINE_WINDOW_MS;
     return {
       id: user.id,
       email: user.email,
@@ -79,6 +88,8 @@ export class AppUsersService {
       role: user.role,
       modules: resolveUserModules(user),
       createdAt: user.createdAt.toISOString(),
+      lastSeenAt,
+      online,
     };
   }
 }

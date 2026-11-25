@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   SIGN_OUT_USER: 'Cerrar sesiones',
   SUSPEND_USER: 'Suspender usuario',
   UPDATE_USER_MODULES: 'Actualizar accesos',
+  USER_LOGIN: 'Inicio de sesión',
 };
 
 function describePayload(action: string, payload: unknown): string | null {

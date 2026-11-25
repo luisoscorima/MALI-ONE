@@ -4,13 +4,14 @@
 
 ## Qué es
 
-Panel del super admin para asignar módulos (`AppModule`) a usuarios que ya hicieron login.
+Panel del super admin para asignar módulos (`AppModule`) a usuarios que ya hicieron login, con presencia aproximada (`online` / `lastSeenAt`).
 
 ## Cómo funciona
 
 1. Tras el primer login, el usuario aparece en Accesos.
 2. Super admin marca módulos y guarda → `UserModuleAccess`.
 3. Sidebar y guards de API filtran por esos módulos. El bootstrap admin no se edita desde UI.
+4. `lastSeenAt` se actualiza en login y en requests JWT (throttle ~60 s). `online` = visto en los últimos ~3 min.
 
 ## Código
 

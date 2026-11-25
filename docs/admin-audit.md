@@ -4,11 +4,11 @@
 
 ## Qué es
 
-Consulta de `AdminAuditLog` para acciones administrativas sensibles (p. ej. cambios de accesos, operaciones de tesorería).
+Consulta de `AdminAuditLog` para acciones administrativas sensibles (p. ej. cambios de accesos, operaciones de tesorería) e inicios de sesión OAuth (`USER_LOGIN`).
 
 ## Cómo funciona
 
-Los servicios escriben en `AdminAuditLog`; el super admin lista eventos con filtros.
+Los servicios escriben en `AdminAuditLog`; el super admin lista eventos. El login con Google registra `USER_LOGIN` (actor = el usuario que entra).
 
 ## Código
 

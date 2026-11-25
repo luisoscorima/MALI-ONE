@@ -1109,6 +1109,10 @@ export interface AppUserDto {
   role: UserRole;
   modules: AppModule[];
   createdAt: string;
+  /** Última actividad autenticada en MALI ONE (ISO). */
+  lastSeenAt: string | null;
+  /** true si lastSeenAt está dentro de la ventana de presencia (~3 min). */
+  online: boolean;
 }
 
 export interface S3BucketInfo {

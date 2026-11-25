@@ -14,6 +14,9 @@ import {
   Input,
   Label,
   Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@/components/ui';
 
 type DraftModules = Record<string, AppModule[]>;
@@ -21,6 +24,57 @@ type DraftModules = Record<string, AppModule[]>;
 function modulesEqual(a: AppModule[], b: AppModule[]) {
   if (a.length !== b.length) return false;
   return a.every((module) => b.includes(module));
+}
+
+function formatLastSeen(iso: string | null | undefined): string {
+  if (!iso) return 'Sin actividad reciente';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) return date.toLocaleString();
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 45) return 'hace unos segundos';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `hace ${min} min`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `hace ${hrs} h`;
+  return date.toLocaleString();
+}
+
+function PresenceDot({
+  online,
+  lastSeenAt,
+}: {
+  online: boolean;
+  lastSeenAt: string | null;
+}) {
+  const absolute =
+    lastSeenAt && !Number.isNaN(new Date(lastSeenAt).getTime())
+      ? new Date(lastSeenAt).toLocaleString()
+      : null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            'size-2 shrink-0 rounded-full',
+            online ? 'bg-emerald-500' : 'bg-muted-foreground/40',
+          )}
+          aria-label={online ? 'En línea' : 'Desconectado'}
+        />
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-center">
+        <p>{online ? 'En línea' : 'Desconectado'}</p>
+        <p className="mt-0.5 text-[11px] opacity-80">
+          Última actividad: {formatLastSeen(lastSeenAt)}
+        </p>
+        {absolute ? (
+          <p className="mt-0.5 text-[11px] opacity-80">{absolute}</p>
+        ) : null}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function AppUsersPage() {
@@ -223,6 +277,10 @@ export function AppUsersPage() {
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
+                            <PresenceDot
+                              online={user.online}
+                              lastSeenAt={user.lastSeenAt}
+                            />
                             <p className="truncate font-medium">{user.name}</p>
                             {dirty ? (
                               <span
@@ -277,6 +335,10 @@ export function AppUsersPage() {
               <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
+                    <PresenceDot
+                      online={selectedUser.online}
+                      lastSeenAt={selectedUser.lastSeenAt}
+                    />
                     <h3 className="truncate text-lg font-semibold tracking-tight">
                       {selectedUser.name}
                     </h3>
@@ -291,6 +353,10 @@ export function AppUsersPage() {
                   </div>
                   <p className="mt-0.5 truncate text-sm text-muted">
                     {selectedUser.email}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    Última actividad:{' '}
+                    {formatLastSeen(selectedUser.lastSeenAt)}
                   </p>
                 </div>
                 {selectedIsAdmin ? (
