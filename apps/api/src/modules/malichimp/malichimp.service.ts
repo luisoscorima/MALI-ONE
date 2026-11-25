@@ -78,12 +78,34 @@ import {
   firstNameFromDisplayName,
 } from '../../core/email-delivery/email-merge-tags';
 import { replyToWithSendToken } from '../../core/email-delivery/malichimp-reply-to';
+import {
+  MALICHIMP_AUDIENCE_MODE,
+  MALICHIMP_RESOLVE_EMAILS_MAX,
+  resolveMalichimpAudienceMode,
+} from './lib/malichimp-audience-mode';
+import { MALICHIMP_ELIGIBLE_CONTACT_SQL } from './lib/malichimp-eligibility';
+import { isBasicEmail, normalizeEmail } from './lib/malichimp-import';
+import type {
+  MalichimpAudienceMode,
+  MalichimpBlockedEmailReason,
+  MalichimpResolveEmailsDto,
+} from '@mali-one/shared';
 
 type AudienceRecipient = {
   id: string;
   email: string;
   firstName: string | null;
   lastName: string | null;
+};
+
+type NormalizedAudience = {
+  audienceMode: MalichimpAudienceMode;
+  groupOptionIds: string[];
+  excludeGroupOptionIds: string[];
+  tagIds: string[];
+  excludeTagIds: string[];
+  excludeContactIds: string[];
+  includeContactIds: string[];
 };
 
 const MALI_PE_EMAIL = /^[^@\s]+@mali\.pe$/i;
@@ -399,25 +421,30 @@ export class MalichimpService implements OnModuleInit {
   }
 
   async listTags() {
-    const tags = await this.prisma.malichimpTag.findMany({
-      orderBy: { name: 'asc' },
-      include: { _count: { select: { contacts: true } } },
-    });
-    return tags.map(({ _count, ...tag }) => ({ ...tag, contacts: _count.contacts }));
+    const [tags, eligibleRows] = await Promise.all([
+      this.prisma.malichimpTag.findMany({
+        orderBy: { name: 'asc' },
+        include: { _count: { select: { contacts: true } } },
+      }),
+      this.prisma.$queryRaw<Array<{ tagId: string; contacts: bigint }>>(Prisma.sql`
+        SELECT membership."tagId" AS "tagId", COUNT(DISTINCT membership."contactId") AS contacts
+        FROM "MalichimpContactTag" membership
+        JOIN "MalichimpContact" contact ON contact."id" = membership."contactId"
+        WHERE ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
+        GROUP BY membership."tagId"
+      `),
+    ]);
+    const eligibleByTag = new Map(
+      eligibleRows.map((row) => [row.tagId, Number(row.contacts)]),
+    );
+    return tags.map(({ _count, ...tag }) => ({
+      ...tag,
+      contacts: _count.contacts,
+      eligibleContacts: eligibleByTag.get(tag.id) ?? 0,
+    }));
   }
 
   async listGroups() {
-    const eligibleMembership = Prisma.sql`
-      contact."status" = 'subscribed'::"MalichimpContactStatus"
-      AND NOT EXISTS (
-        SELECT 1 FROM "MalichimpSuppression" suppression
-        WHERE suppression."email" = contact."email"
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM "EmailGlobalSuppression" suppression
-        WHERE suppression."email" = contact."email"
-      )
-    `;
     const [groups, groupCounts, optionCounts] = await Promise.all([
       this.prisma.malichimpGroup.findMany({
         orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
@@ -432,14 +459,14 @@ export class MalichimpService implements OnModuleInit {
         FROM "MalichimpContactGroupOption" membership
         JOIN "MalichimpGroupOption" option ON option."id" = membership."optionId"
         JOIN "MalichimpContact" contact ON contact."id" = membership."contactId"
-        WHERE ${eligibleMembership}
+        WHERE ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
         GROUP BY option."groupId"
       `),
       this.prisma.$queryRaw<Array<{ optionId: string; contacts: bigint }>>(Prisma.sql`
         SELECT membership."optionId" AS "optionId", COUNT(DISTINCT membership."contactId") AS contacts
         FROM "MalichimpContactGroupOption" membership
         JOIN "MalichimpContact" contact ON contact."id" = membership."contactId"
-        WHERE ${eligibleMembership}
+        WHERE ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
         GROUP BY membership."optionId"
       `),
     ]);
@@ -546,13 +573,18 @@ export class MalichimpService implements OnModuleInit {
     const page = Math.max(Math.floor(dto.page ?? 1) || 1, 1);
     const offset = (page - 1) * pageSize;
     const q = (dto.q ?? '').trim().slice(0, 160);
-    const includedWhere = this.audienceWhere(filters.groupOptionIds, [], []);
-    const baseWhere = this.audienceWhere(
-      filters.groupOptionIds,
-      filters.excludeGroupOptionIds,
-      filters.excludeContactIds,
-      filters.includeContactIds,
-    );
+    const includedFilters: NormalizedAudience = {
+      ...filters,
+      excludeGroupOptionIds: [],
+      excludeTagIds: [],
+      excludeContactIds: [],
+      includeContactIds:
+        filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails
+          ? filters.includeContactIds
+          : [],
+    };
+    const includedWhere = this.audienceWhere(includedFilters);
+    const baseWhere = this.audienceWhere(filters);
     const searchWhere = this.audienceSearchWhere(q);
     const listedWhere = Prisma.sql`${baseWhere}${searchWhere}`;
     const [subscribed, included, eligible, matched, recipients] = await Promise.all([
@@ -596,12 +628,120 @@ export class MalichimpService implements OnModuleInit {
       page,
       pageSize,
       totalPages,
+      audienceMode: filters.audienceMode,
       groupOptionIds: filters.groupOptionIds,
       excludeGroupOptionIds: filters.excludeGroupOptionIds,
+      tagIds: filters.tagIds,
+      excludeTagIds: filters.excludeTagIds,
       excludeContactIds: filters.excludeContactIds,
       includeContactIds: filters.includeContactIds,
       recipients: mapped,
       sample: mapped,
+    };
+  }
+
+  async resolveEmails(emails: string[]): Promise<MalichimpResolveEmailsDto> {
+    const received = emails.length;
+    const uniqueByNormalized = new Map<string, string>();
+    const invalid: string[] = [];
+    for (const raw of emails) {
+      const display = raw.trim();
+      const normalized = normalizeEmail(raw);
+      if (!normalized) {
+        if (display) invalid.push(display);
+        continue;
+      }
+      if (uniqueByNormalized.has(normalized)) continue;
+      uniqueByNormalized.set(normalized, display || normalized);
+    }
+    const unique = uniqueByNormalized.size;
+    if (unique > MALICHIMP_RESOLVE_EMAILS_MAX) {
+      throw new BadRequestException(
+        `Máximo ${MALICHIMP_RESOLVE_EMAILS_MAX} correos únicos por solicitud`,
+      );
+    }
+
+    const eligible: MalichimpResolveEmailsDto['eligible'] = [];
+    const notFound: string[] = [];
+    const blocked: MalichimpResolveEmailsDto['blocked'] = [];
+
+    const lookupEmails: string[] = [];
+    for (const [normalized, display] of uniqueByNormalized) {
+      if (!isBasicEmail(normalized)) {
+        invalid.push(display);
+      } else {
+        lookupEmails.push(normalized);
+      }
+    }
+
+    const contacts = lookupEmails.length
+      ? await this.prisma.malichimpContact.findMany({
+          where: { email: { in: lookupEmails } },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            status: true,
+          },
+        })
+      : [];
+    const contactByEmail = new Map(contacts.map((contact) => [contact.email, contact]));
+
+    const suppressedEmails = lookupEmails.length
+      ? new Set(
+          (
+            await this.prisma.$queryRaw<Array<{ email: string }>>(Prisma.sql`
+              SELECT email FROM (
+                SELECT "email" AS email FROM "MalichimpSuppression"
+                WHERE "email" IN (${Prisma.join(lookupEmails)})
+                UNION
+                SELECT "email" AS email FROM "EmailGlobalSuppression"
+                WHERE "email" IN (${Prisma.join(lookupEmails)})
+              ) suppressions
+            `)
+          ).map((row) => row.email),
+        )
+      : new Set<string>();
+
+    for (const [normalized, display] of uniqueByNormalized) {
+      if (!isBasicEmail(normalized)) continue;
+      const contact = contactByEmail.get(normalized);
+      if (!contact) {
+        notFound.push(display);
+        continue;
+      }
+      if (isBlockedContactStatus(contact.status)) {
+        blocked.push({
+          email: display,
+          reason: contact.status as MalichimpBlockedEmailReason,
+        });
+        continue;
+      }
+      if (suppressedEmails.has(contact.email)) {
+        blocked.push({ email: display, reason: 'suppressed' });
+        continue;
+      }
+      eligible.push({
+        id: contact.id,
+        email: contact.email,
+        name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
+      });
+    }
+
+    return {
+      eligible,
+      notFound,
+      invalid,
+      blocked,
+      summary: {
+        received,
+        unique,
+        eligible: eligible.length,
+        notFound: notFound.length,
+        invalid: invalid.length,
+        blocked: blocked.length,
+      },
     };
   }
 
@@ -736,6 +876,22 @@ export class MalichimpService implements OnModuleInit {
     });
     if (!campaign) throw new NotFoundException('Campaña no encontrada');
     const working = campaign.workingNewsletter;
+    const filters = this.filtersFromCampaign(campaign);
+    const includeContacts =
+      filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails &&
+      filters.includeContactIds.length
+        ? (
+            await this.prisma.malichimpContact.findMany({
+              where: { id: { in: filters.includeContactIds } },
+              select: { id: true, email: true, firstName: true, lastName: true },
+              orderBy: { email: 'asc' },
+            })
+          ).map((contact) => ({
+            id: contact.id,
+            email: contact.email,
+            name: [contact.firstName, contact.lastName].filter(Boolean).join(' ') || null,
+          }))
+        : undefined;
     return {
       id: campaign.id,
       name: campaign.name,
@@ -765,10 +921,14 @@ export class MalichimpService implements OnModuleInit {
       fromName: campaign.fromName ?? '',
       fromEmail: campaign.fromEmail ?? '',
       replyTo: campaign.replyToEmail ?? campaign.fromEmail ?? '',
-      groupOptionIds: campaign.audienceSegments,
-      excludeGroupOptionIds: campaign.audienceExcludeSegments,
-      includeContactIds: campaign.audienceIncludeContactIds,
-      excludeContactIds: campaign.audienceExcludeContactIds,
+      audienceMode: campaign.audienceMode,
+      groupOptionIds: filters.groupOptionIds,
+      excludeGroupOptionIds: filters.excludeGroupOptionIds,
+      tagIds: filters.tagIds,
+      excludeTagIds: filters.excludeTagIds,
+      includeContactIds: filters.includeContactIds,
+      excludeContactIds: filters.excludeContactIds,
+      includeContacts,
       totalRecipients: campaign.totalRecipients,
       scheduledAt: campaign.scheduledAt,
       createdAt: campaign.createdAt,
@@ -1356,14 +1516,9 @@ export class MalichimpService implements OnModuleInit {
             subject: source.subjectSnapshot,
           };
 
-    const recipients = source.audienceSegments.length
-      ? await this.resolveAudience(
-          source.audienceSegments,
-          source.audienceExcludeSegments,
-          source.audienceExcludeContactIds,
-          source.audienceIncludeContactIds,
-        )
-      : [];
+    const sourceFilters = this.filtersFromCampaign(source);
+    const audienceFields = this.audiencePersistFields(sourceFilters);
+    const recipients = await this.resolveAudience(sourceFilters);
     const draftId = await this.prisma.$transaction(async (tx) => {
       const working = await this.newsletters.createWorkingCopy(tx, {
         userId,
@@ -1392,10 +1547,7 @@ export class MalichimpService implements OnModuleInit {
           managedByDispatcher: false,
           status: EmailCampaignStatus.draft,
           audienceArea: 'malichimp',
-          audienceSegments: source.audienceSegments,
-          audienceExcludeSegments: source.audienceExcludeSegments,
-          audienceIncludeContactIds: source.audienceIncludeContactIds,
-          audienceExcludeContactIds: source.audienceExcludeContactIds,
+          ...audienceFields,
           totalRecipients: recipients.length,
           scheduledAt: null,
           createdById: userId,
@@ -1448,12 +1600,7 @@ export class MalichimpService implements OnModuleInit {
       throw new BadRequestException('La respuesta debe ser un correo @mali.pe');
     }
     await this.emailSenders.assertEnabled(fromEmail, NewsletterScope.malichimp);
-    const recipients = await this.resolveAudience(
-      filters.groupOptionIds,
-      filters.excludeGroupOptionIds,
-      filters.excludeContactIds,
-      filters.includeContactIds,
-    );
+    const recipients = await this.resolveAudience(filters);
     if (!recipients.length) {
       throw new BadRequestException('La segmentación no tiene destinatarios elegibles');
     }
@@ -1525,10 +1672,7 @@ export class MalichimpService implements OnModuleInit {
             ? EmailCampaignStatus.scheduled
             : EmailCampaignStatus.queued,
           audienceArea: 'malichimp',
-          audienceSegments: prepared.filters.groupOptionIds,
-          audienceExcludeSegments: prepared.filters.excludeGroupOptionIds,
-          audienceIncludeContactIds: prepared.filters.includeContactIds,
-          audienceExcludeContactIds: prepared.filters.excludeContactIds,
+          ...this.audiencePersistFields(prepared.filters),
           totalRecipients: prepared.recipients.length,
           scheduledAt: prepared.scheduledAt,
           createdById: userId,
@@ -1610,10 +1754,7 @@ export class MalichimpService implements OnModuleInit {
           status: prepared.scheduledAt
             ? EmailCampaignStatus.scheduled
             : EmailCampaignStatus.queued,
-          audienceSegments: prepared.filters.groupOptionIds,
-          audienceExcludeSegments: prepared.filters.excludeGroupOptionIds,
-          audienceIncludeContactIds: prepared.filters.includeContactIds,
-          audienceExcludeContactIds: prepared.filters.excludeContactIds,
+          ...this.audiencePersistFields(prepared.filters),
           totalRecipients: prepared.recipients.length,
           scheduledAt: prepared.scheduledAt,
         },
@@ -2116,19 +2257,77 @@ export class MalichimpService implements OnModuleInit {
     return this.serializeJob(job);
   }
 
-  private async normalizeAudience(dto: MalichimpAudienceDto) {
-    const [included, excluded] = await Promise.all([
-      this.validateGroupOptionIds(dto.groupOptionIds ?? []),
-      this.validateGroupOptionIds(dto.excludeGroupOptionIds ?? [], false),
-    ]);
-    const groupOptionIds = included.map((option) => option.id);
-    const excludeGroupOptionIds = excluded.map((option) => option.id);
-    const includedIds = new Set(groupOptionIds);
-    if (excludeGroupOptionIds.some((id) => includedIds.has(id))) {
-      throw new BadRequestException(
-        'Una opción de grupo no puede estar incluida y excluida a la vez',
-      );
+  private audiencePersistFields(filters: NormalizedAudience) {
+    if (filters.audienceMode === MALICHIMP_AUDIENCE_MODE.tags) {
+      return {
+        audienceMode: MALICHIMP_AUDIENCE_MODE.tags,
+        audienceSegments: filters.tagIds,
+        audienceExcludeSegments: filters.excludeTagIds,
+        audienceIncludeContactIds: filters.includeContactIds,
+        audienceExcludeContactIds: filters.excludeContactIds,
+      };
     }
+    if (filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails) {
+      return {
+        audienceMode: MALICHIMP_AUDIENCE_MODE.emails,
+        audienceSegments: [] as string[],
+        audienceExcludeSegments: [] as string[],
+        audienceIncludeContactIds: filters.includeContactIds,
+        audienceExcludeContactIds: [] as string[],
+      };
+    }
+    return {
+      audienceMode: MALICHIMP_AUDIENCE_MODE.groups,
+      audienceSegments: filters.groupOptionIds,
+      audienceExcludeSegments: filters.excludeGroupOptionIds,
+      audienceIncludeContactIds: filters.includeContactIds,
+      audienceExcludeContactIds: filters.excludeContactIds,
+    };
+  }
+
+  private filtersFromCampaign(campaign: {
+    audienceMode: string | null;
+    audienceSegments: string[];
+    audienceExcludeSegments: string[];
+    audienceIncludeContactIds: string[];
+    audienceExcludeContactIds: string[];
+  }): NormalizedAudience {
+    const audienceMode = resolveMalichimpAudienceMode(campaign.audienceMode);
+    if (audienceMode === MALICHIMP_AUDIENCE_MODE.tags) {
+      return {
+        audienceMode,
+        groupOptionIds: [],
+        excludeGroupOptionIds: [],
+        tagIds: campaign.audienceSegments,
+        excludeTagIds: campaign.audienceExcludeSegments,
+        includeContactIds: campaign.audienceIncludeContactIds,
+        excludeContactIds: campaign.audienceExcludeContactIds,
+      };
+    }
+    if (audienceMode === MALICHIMP_AUDIENCE_MODE.emails) {
+      return {
+        audienceMode,
+        groupOptionIds: [],
+        excludeGroupOptionIds: [],
+        tagIds: [],
+        excludeTagIds: [],
+        includeContactIds: campaign.audienceIncludeContactIds,
+        excludeContactIds: [],
+      };
+    }
+    return {
+      audienceMode: MALICHIMP_AUDIENCE_MODE.groups,
+      groupOptionIds: campaign.audienceSegments,
+      excludeGroupOptionIds: campaign.audienceExcludeSegments,
+      tagIds: [],
+      excludeTagIds: [],
+      includeContactIds: campaign.audienceIncludeContactIds,
+      excludeContactIds: campaign.audienceExcludeContactIds,
+    };
+  }
+
+  private async normalizeAudience(dto: MalichimpAudienceDto): Promise<NormalizedAudience> {
+    const audienceMode = resolveMalichimpAudienceMode(dto.audienceMode);
     const excludeContactIds = [
       ...new Set(
         (dto.excludeContactIds ?? [])
@@ -2143,14 +2342,85 @@ export class MalichimpService implements OnModuleInit {
           .filter(Boolean),
       ),
     ];
+
+    if (audienceMode === MALICHIMP_AUDIENCE_MODE.emails) {
+      if (excludeContactIds.length) {
+        throw new BadRequestException(
+          'El modo por correos no admite exclusiones de contactos',
+        );
+      }
+      if (!includeContactIds.length) {
+        throw new BadRequestException('Indica al menos un contacto en la audiencia');
+      }
+      const hasSegments =
+        (dto.groupOptionIds?.length ?? 0) > 0 ||
+        (dto.excludeGroupOptionIds?.length ?? 0) > 0 ||
+        (dto.tagIds?.length ?? 0) > 0 ||
+        (dto.excludeTagIds?.length ?? 0) > 0;
+      if (hasSegments) {
+        throw new BadRequestException(
+          'El modo por correos no admite segmentos por grupos o etiquetas',
+        );
+      }
+      return {
+        audienceMode,
+        groupOptionIds: [],
+        excludeGroupOptionIds: [],
+        tagIds: [],
+        excludeTagIds: [],
+        excludeContactIds: [],
+        includeContactIds,
+      };
+    }
+
     if (includeContactIds.length && excludeContactIds.length) {
       throw new BadRequestException(
         'Usa solo exclusiones o solo inclusiones de contactos, no ambas',
       );
     }
+
+    if (audienceMode === MALICHIMP_AUDIENCE_MODE.tags) {
+      const [included, excluded] = await Promise.all([
+        this.validateTagIds(dto.tagIds ?? []),
+        this.validateTagIds(dto.excludeTagIds ?? [], false),
+      ]);
+      const tagIds = included;
+      const excludeTagIds = excluded;
+      const includedIds = new Set(tagIds);
+      if (excludeTagIds.some((id) => includedIds.has(id))) {
+        throw new BadRequestException(
+          'Una etiqueta no puede estar incluida y excluida a la vez',
+        );
+      }
+      return {
+        audienceMode,
+        groupOptionIds: [],
+        excludeGroupOptionIds: [],
+        tagIds,
+        excludeTagIds,
+        excludeContactIds,
+        includeContactIds,
+      };
+    }
+
+    const [included, excluded] = await Promise.all([
+      this.validateGroupOptionIds(dto.groupOptionIds ?? []),
+      this.validateGroupOptionIds(dto.excludeGroupOptionIds ?? [], false),
+    ]);
+    const groupOptionIds = included.map((option) => option.id);
+    const excludeGroupOptionIds = excluded.map((option) => option.id);
+    const includedIds = new Set(groupOptionIds);
+    if (excludeGroupOptionIds.some((id) => includedIds.has(id))) {
+      throw new BadRequestException(
+        'Una opción de grupo no puede estar incluida y excluida a la vez',
+      );
+    }
     return {
+      audienceMode,
       groupOptionIds,
       excludeGroupOptionIds,
+      tagIds: [],
+      excludeTagIds: [],
       excludeContactIds,
       includeContactIds,
     };
@@ -2180,6 +2450,25 @@ export class MalichimpService implements OnModuleInit {
     return normalizedIds.map((id) => byId.get(id)!);
   }
 
+  private async validateTagIds(tagIds: string[], required = true) {
+    const normalizedIds = [
+      ...new Set(tagIds.map((id) => id.trim()).filter(Boolean)),
+    ];
+    if (!normalizedIds.length && required) {
+      throw new BadRequestException('Selecciona al menos una etiqueta');
+    }
+    if (!normalizedIds.length) return [];
+    const existing = await this.prisma.malichimpTag.findMany({
+      where: { id: { in: normalizedIds } },
+      select: { id: true },
+    });
+    const known = new Set(existing.map((tag) => tag.id));
+    if (normalizedIds.some((id) => !known.has(id))) {
+      throw new BadRequestException('La audiencia contiene etiquetas que ya no existen');
+    }
+    return normalizedIds;
+  }
+
   private audienceSearchWhere(q: string): Prisma.Sql {
     if (!q) return Prisma.sql``;
     const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
@@ -2193,66 +2482,76 @@ export class MalichimpService implements OnModuleInit {
     `;
   }
 
-  private audienceWhere(
-    groupOptionIds: string[],
-    excludeGroupOptionIds: string[],
-    excludeContactIds: string[] = [],
-    includeContactIds: string[] = [],
-  ): Prisma.Sql {
-    const exclusion = excludeGroupOptionIds.length
+  private audienceWhere(filters: NormalizedAudience): Prisma.Sql {
+    if (filters.audienceMode === MALICHIMP_AUDIENCE_MODE.emails) {
+      return Prisma.sql`
+        ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
+        AND contact."id" IN (${Prisma.join(filters.includeContactIds)})
+      `;
+    }
+
+    const contactExclusion = filters.excludeContactIds.length
+      ? Prisma.sql`
+        AND contact."id" NOT IN (${Prisma.join(filters.excludeContactIds)})
+      `
+      : Prisma.sql``;
+    const contactInclusion = filters.includeContactIds.length
+      ? Prisma.sql`
+        AND contact."id" IN (${Prisma.join(filters.includeContactIds)})
+      `
+      : Prisma.sql``;
+
+    if (filters.audienceMode === MALICHIMP_AUDIENCE_MODE.tags) {
+      const tagExclusion = filters.excludeTagIds.length
+        ? Prisma.sql`
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "MalichimpContactTag" excluded_membership
+            WHERE excluded_membership."contactId" = contact."id"
+              AND excluded_membership."tagId" IN (${Prisma.join(filters.excludeTagIds)})
+          )
+        `
+        : Prisma.sql``;
+      return Prisma.sql`
+        ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
+        AND EXISTS (
+          SELECT 1
+          FROM "MalichimpContactTag" membership
+          WHERE membership."contactId" = contact."id"
+            AND membership."tagId" IN (${Prisma.join(filters.tagIds)})
+        )
+        ${tagExclusion}
+        ${contactExclusion}
+        ${contactInclusion}
+      `;
+    }
+
+    const groupExclusion = filters.excludeGroupOptionIds.length
       ? Prisma.sql`
         AND NOT EXISTS (
           SELECT 1
           FROM "MalichimpContactGroupOption" excluded_membership
           WHERE excluded_membership."contactId" = contact."id"
-            AND excluded_membership."optionId" IN (${Prisma.join(excludeGroupOptionIds)})
+            AND excluded_membership."optionId" IN (${Prisma.join(filters.excludeGroupOptionIds)})
         )
       `
       : Prisma.sql``;
-    const contactExclusion = excludeContactIds.length
-      ? Prisma.sql`
-        AND contact."id" NOT IN (${Prisma.join(excludeContactIds)})
-      `
-      : Prisma.sql``;
-    const contactInclusion = includeContactIds.length
-      ? Prisma.sql`
-        AND contact."id" IN (${Prisma.join(includeContactIds)})
-      `
-      : Prisma.sql``;
     return Prisma.sql`
-      contact."status" = 'subscribed'::"MalichimpContactStatus"
-      AND NOT EXISTS (
-        SELECT 1 FROM "MalichimpSuppression" suppression
-        WHERE suppression."email" = contact."email"
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM "EmailGlobalSuppression" suppression
-        WHERE suppression."email" = contact."email"
-      )
+      ${MALICHIMP_ELIGIBLE_CONTACT_SQL}
       AND EXISTS (
         SELECT 1
         FROM "MalichimpContactGroupOption" membership
         WHERE membership."contactId" = contact."id"
-          AND membership."optionId" IN (${Prisma.join(groupOptionIds)})
+          AND membership."optionId" IN (${Prisma.join(filters.groupOptionIds)})
       )
-      ${exclusion}
+      ${groupExclusion}
       ${contactExclusion}
       ${contactInclusion}
     `;
   }
 
-  private resolveAudience(
-    groupOptionIds: string[],
-    excludeGroupOptionIds: string[],
-    excludeContactIds: string[] = [],
-    includeContactIds: string[] = [],
-  ) {
-    const where = this.audienceWhere(
-      groupOptionIds,
-      excludeGroupOptionIds,
-      excludeContactIds,
-      includeContactIds,
-    );
+  private resolveAudience(filters: NormalizedAudience) {
+    const where = this.audienceWhere(filters);
     return this.prisma.$queryRaw<AudienceRecipient[]>(Prisma.sql`
       SELECT contact."id", contact."email", contact."firstName", contact."lastName"
       FROM "MalichimpContact" contact

@@ -1194,6 +1194,8 @@ model EmailCampaign {
   audienceExcludeSegments String[]            @default([])
   audienceIncludeContactIds String[]          @default([])
   audienceExcludeContactIds String[]          @default([])
+  /// malichimp: 'groups' | 'tags' | 'emails'; null = legacy groups.
+  audienceMode            String?
   audienceAttrKey         String?
   audienceAttrValue       String?
   totalRecipients         Int                 @default(0)

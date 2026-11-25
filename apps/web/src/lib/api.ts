@@ -731,6 +731,13 @@ export const api = {
     { method: 'POST', body: JSON.stringify(body) },
   ),
 
+  resolveMalichimpEmails: (
+    emails: string[],
+  ) => request<import('@mali-one/shared').MalichimpResolveEmailsDto>(
+    '/api/malichimp/campaigns/resolve-emails',
+    { method: 'POST', body: JSON.stringify({ emails }) },
+  ),
+
   createMalichimpCampaign: (
     body: import('@mali-one/shared').CreateMalichimpCampaignDto,
   ) => request<{ id: string; status: string; totalRecipients: number; scheduledAt: string | null }>(

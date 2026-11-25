@@ -600,6 +600,7 @@ export function MalichimpPage() {
         <TabsContent value="campaigns">
           <MalichimpCampaigns
             groups={groups}
+            tags={tags}
             delivery={stats?.delivery ?? null}
             senders={senders}
             openNew={section === 'campaigns' && searchParams.get('new') === '1'}

@@ -17,15 +17,35 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import {
+  MALICHIMP_AUDIENCE_MODE,
+  MALICHIMP_RESOLVE_EMAILS_MAX,
+  type MalichimpAudienceMode,
+} from '@mali-one/shared';
+
+const AUDIENCE_MODES = Object.values(MALICHIMP_AUDIENCE_MODE);
+
+function audienceModeOf(dto: {
+  audienceMode?: string | null;
+}): MalichimpAudienceMode {
+  if (dto.audienceMode === MALICHIMP_AUDIENCE_MODE.tags) return 'tags';
+  if (dto.audienceMode === MALICHIMP_AUDIENCE_MODE.emails) return 'emails';
+  return 'groups';
+}
 
 export class MalichimpAudienceDto {
+  @IsOptional()
+  @IsIn(AUDIENCE_MODES)
+  audienceMode?: MalichimpAudienceMode;
+
+  @ValidateIf((dto: MalichimpAudienceDto) => audienceModeOf(dto) === 'groups')
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
   @ArrayUnique()
   @IsString({ each: true })
   @MaxLength(120, { each: true })
-  groupOptionIds!: string[];
+  groupOptionIds?: string[];
 
   @IsOptional()
   @IsArray()
@@ -35,6 +55,23 @@ export class MalichimpAudienceDto {
   @MaxLength(120, { each: true })
   excludeGroupOptionIds?: string[];
 
+  @ValidateIf((dto: MalichimpAudienceDto) => audienceModeOf(dto) === 'tags')
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  tagIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  excludeTagIds?: string[];
+
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50_000)
@@ -43,6 +80,7 @@ export class MalichimpAudienceDto {
   @MaxLength(120, { each: true })
   excludeContactIds?: string[];
 
+  /** Required (≥1) for emails mode (enforced in service); optional allowlist for groups/tags. */
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(50_000)
@@ -116,6 +154,15 @@ export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
   @IsString()
   @MaxLength(64)
   contentRevision?: string;
+}
+
+export class ResolveMalichimpEmailsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MALICHIMP_RESOLVE_EMAILS_MAX)
+  @IsString({ each: true })
+  @MaxLength(320, { each: true })
+  emails!: string[];
 }
 
 const MALICHIMP_CONTENT_BRANDS = [

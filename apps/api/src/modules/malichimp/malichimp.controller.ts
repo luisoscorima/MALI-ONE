@@ -28,6 +28,7 @@ import {
   MalichimpAudienceDto,
   MalichimpCampaignSendsQueryDto,
   MalichimpCampaignStatsQueryDto,
+  ResolveMalichimpEmailsDto,
   SendMalichimpTestDto,
   UpdateMalichimpContactDto,
   UpdateMalichimpWorkingCopyDto,
@@ -238,6 +239,11 @@ export class MalichimpController {
   @Post('campaigns/preview')
   previewCampaign(@Body() body: MalichimpAudienceDto) {
     return this.malichimp.previewAudience(body);
+  }
+
+  @Post('campaigns/resolve-emails')
+  resolveEmails(@Body() body: ResolveMalichimpEmailsDto) {
+    return this.malichimp.resolveEmails(body.emails);
   }
 
   @Post('campaigns')

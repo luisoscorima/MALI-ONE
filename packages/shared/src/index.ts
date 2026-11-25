@@ -44,11 +44,50 @@ export type MalichimpContactStatus =
   | 'cleaned'
   | 'nonsubscribed';
 
+/** MALICHIMP campaign audience source. null/omitted = legacy groups. */
+export type MalichimpAudienceMode = 'groups' | 'tags' | 'emails';
+
+export const MALICHIMP_AUDIENCE_MODE = {
+  groups: 'groups',
+  tags: 'tags',
+  emails: 'emails',
+} as const satisfies Record<MalichimpAudienceMode, MalichimpAudienceMode>;
+
+export const MALICHIMP_RESOLVE_EMAILS_MAX = 10_000;
+
+export type MalichimpBlockedEmailReason =
+  | 'unsubscribed'
+  | 'cleaned'
+  | 'suppressed'
+  | 'nonsubscribed';
+
+export interface MalichimpResolveEmailsRequestDto {
+  emails: string[];
+}
+
+export interface MalichimpResolveEmailsDto {
+  eligible: Array<{ id: string; email: string; name: string | null }>;
+  notFound: string[];
+  invalid: string[];
+  blocked: Array<{ email: string; reason: MalichimpBlockedEmailReason }>;
+  summary: {
+    received: number;
+    unique: number;
+    eligible: number;
+    notFound: number;
+    invalid: number;
+    blocked: number;
+  };
+}
+
 export interface MalichimpTagDto {
   id: string;
   name: string;
   normalizedName: string;
+  /** Historical membership count (all statuses). */
   contacts?: number;
+  /** Subscribed + not suppressed — sendable for campaigns. */
+  eligibleContacts?: number;
 }
 
 export interface MalichimpGroupOptionDto {
@@ -212,11 +251,15 @@ export interface MalichimpXlsxImportResultDto {
 }
 
 export interface MalichimpAudienceFilterDto {
-  groupOptionIds: string[];
+  /** Omitted/null → treated as groups (legacy clients). */
+  audienceMode?: MalichimpAudienceMode | null;
+  groupOptionIds?: string[];
   excludeGroupOptionIds?: string[];
-  /** Contact IDs to drop one-by-one after segment filters. */
+  tagIds?: string[];
+  excludeTagIds?: string[];
+  /** Contact IDs to drop one-by-one after segment filters (groups/tags). */
   excludeContactIds?: string[];
-  /** Allowlist after segment filters; when set, only these contacts are kept. */
+  /** Allowlist after segment filters; in emails mode this is the primary audience. */
   includeContactIds?: string[];
 }
 
@@ -228,8 +271,13 @@ export interface MalichimpAudiencePreviewRequestDto extends MalichimpAudienceFil
 }
 
 export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto {
+  audienceMode: MalichimpAudienceMode;
+  groupOptionIds: string[];
   excludeGroupOptionIds: string[];
+  tagIds: string[];
+  excludeTagIds: string[];
   excludeContactIds: string[];
+  includeContactIds: string[];
   subscribed: number;
   included: number;
   eligible: number;
@@ -302,10 +350,16 @@ export interface MalichimpCampaignDetailDto {
   fromName: string;
   fromEmail: string;
   replyTo: string;
+  /** null = legacy campaign stored before audienceMode existed → treat as groups. */
+  audienceMode: MalichimpAudienceMode | null;
   groupOptionIds: string[];
   excludeGroupOptionIds: string[];
+  tagIds: string[];
+  excludeTagIds: string[];
   includeContactIds?: string[];
   excludeContactIds?: string[];
+  /** Hydrated contacts for emails-mode drafts (id/email/name). */
+  includeContacts?: Array<{ id: string; email: string; name: string | null }>;
   totalRecipients: number;
   scheduledAt: string | null;
   createdAt: string;
