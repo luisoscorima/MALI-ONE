@@ -352,6 +352,7 @@ export function MalichimpContentEditor({
         initialDesignJson={initialDesignJson}
         initialHtml={initialHtml}
         brand={brand}
+        assetScope={contentId ?? 'library'}
       />
     </div>
   );

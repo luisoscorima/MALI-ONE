@@ -15,6 +15,8 @@ import {
   newsletterCopyrightLine,
   wrapNewsletterWithBrandChrome,
 } from '@mali-one/shared';
+import { toast } from 'sonner';
+import { api } from '@/lib/api';
 import 'grapesjs/dist/css/grapes.min.css';
 
 export type NewsletterEditorExport = {
@@ -78,6 +80,8 @@ type NewsletterEditorProps = {
   initialDesignJson?: string | null;
   initialHtml?: string | null;
   brand?: NewsletterBrand | null;
+  /** S3 key scope under newsletters/{scope}/… (content id, slug, or library). */
+  assetScope?: string;
   className?: string;
 };
 
@@ -512,11 +516,19 @@ export const NewsletterEditor = forwardRef<
   NewsletterEditorHandle,
   NewsletterEditorProps
 >(function NewsletterEditor(
-  { initialDesignJson, initialHtml, brand = null, className },
+  {
+    initialDesignJson,
+    initialHtml,
+    brand = null,
+    assetScope = 'library',
+    className,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
+  const assetScopeRef = useRef(assetScope);
+  assetScopeRef.current = assetScope;
 
   useImperativeHandle(ref, () => ({
     getExport: () => {
@@ -573,6 +585,76 @@ export const NewsletterEditor = forwardRef<
             widthMedia: '480px',
           },
         ],
+      },
+      assetManager: {
+        embedAsBase64: false,
+        upload: false,
+        autoAdd: true,
+        // Regular function: GrapesJS binds `this` to FileUploaderView.
+        uploadFile: async function uploadNewsletterFiles(ev: {
+          dataTransfer?: DataTransfer | null;
+          target?: EventTarget | null;
+        }) {
+          const files = ev.dataTransfer?.files ??
+            (ev.target as HTMLInputElement | null)?.files;
+          if (!files?.length) return;
+
+          const data: Array<{
+            src: string;
+            name: string;
+            type: string;
+            width: number;
+            height: number;
+          }> = [];
+
+          try {
+            for (const file of Array.from(files)) {
+              const uploaded = await api.uploadNewsletterAsset(
+                file,
+                assetScopeRef.current,
+              );
+              data.push({
+                src: uploaded.url,
+                name: uploaded.fileName,
+                type: 'image',
+                width: uploaded.width ?? 0,
+                height: uploaded.height ?? 0,
+              });
+            }
+
+            // `this` is FileUploaderView (bound by GrapesJS).
+            (
+              this as {
+                onUploadResponse?: (res: { data: typeof data }) => void;
+              }
+            ).onUploadResponse?.({ data });
+
+            const select = (
+              editor.AssetManager as {
+                __getBehaviour?: () => {
+                  select?: (asset: unknown, complete: boolean) => void;
+                };
+              }
+            ).__getBehaviour?.()?.select;
+            const firstSrc = data[0]?.src;
+            if (typeof select === 'function' && firstSrc) {
+              const match = editor.AssetManager.getAll().find(
+                (asset: { get: (key: string) => unknown }) =>
+                  asset.get('src') === firstSrc,
+              );
+              if (match) select(match, true);
+            }
+          } catch (err) {
+            const message =
+              err instanceof Error ? err.message : 'No se pudo subir la imagen';
+            toast.error(message);
+            (
+              this as { onUploadError?: (error: unknown) => void }
+            ).onUploadError?.(err);
+          }
+        },
+        // GrapesJS runtime supports this; typings omit it.
+        ...({ disableUpload: false } as Record<string, unknown>),
       },
       plugins: [
         (ed) =>

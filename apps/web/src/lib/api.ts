@@ -2018,6 +2018,19 @@ export const api = {
     );
   },
 
+  uploadNewsletterAsset: (file: File, scope?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (scope) form.append('scope', scope);
+    return request<import('@mali-one/shared').NewsletterAssetUploadResultDto>(
+      '/api/newsletters/assets/upload',
+      {
+        method: 'POST',
+        body: form,
+      },
+    );
+  },
+
   getBsaleOffices: () =>
     request<import('@mali-one/shared').BsaleOfficeDto[]>('/api/bsale/offices'),
 

@@ -925,6 +925,17 @@ export interface ScreenCastUploadResultDto {
   durationMs: number | null;
 }
 
+export interface NewsletterAssetUploadResultDto {
+  url: string;
+  key: string;
+  fileName: string;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  originalBytes: number;
+  optimizedBytes: number;
+}
+
 export interface ScreenCastPublicItemDto {
   mediaUrl: string;
   mediaType: ScreenCastMediaType;

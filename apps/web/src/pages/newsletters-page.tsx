@@ -626,6 +626,7 @@ export function NewslettersPage() {
             initialDesignJson={initialDesignJson}
             initialHtml={initialHtml}
             brand={brand}
+            assetScope={slug.trim() || editingId || 'library'}
           />
         </div>
       ) : null}
