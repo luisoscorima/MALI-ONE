@@ -206,6 +206,8 @@ export class GoogleAdminService {
           id: user.id ?? user.primaryEmail ?? '',
           email: user.primaryEmail?.trim().toLowerCase() ?? '',
           name: user.name?.fullName?.trim() || user.primaryEmail?.split('@')[0] || '',
+          firstName: user.name?.givenName?.trim() || null,
+          lastName: user.name?.familyName?.trim() || null,
           orgUnitPath: user.orgUnitPath ?? '/',
           lastActivityAt: user.lastLoginTime as string,
         }));

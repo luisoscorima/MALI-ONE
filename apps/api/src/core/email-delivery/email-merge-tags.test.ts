@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   EMAIL_MERGE_FIRST_NAME_FALLBACK,
   applyEmailMergeTags,
+  emailSendNames,
   firstNameFromDisplayName,
   resolveEmailFirstName,
 } from './email-merge-tags';
@@ -48,4 +49,24 @@ test('applyEmailMergeTags uses estimado(a) when name is missing', () => {
     applyEmailMergeTags('Hola <<First Name>>,', { firstName: null }),
     `Hola ${EMAIL_MERGE_FIRST_NAME_FALLBACK},`,
   );
+});
+
+test('keeps compound names and surnames in separate merge fields', () => {
+  const names = emailSendNames({ name: 'María José De la Cruz', firstName: 'María José', lastName: 'De la Cruz' });
+  assert.equal(applyEmailMergeTags('{{first_name}} / {{last_name}} / {{firstname}} {{lastname}}', names),
+    'María José / De la Cruz / María José De la Cruz');
+});
+
+test('uses the available name when the complete name is requested', () => {
+  assert.equal(applyEmailMergeTags('Hola, {{first_name}} {{last_name}}', { lastName: 'De la Cruz' }),
+    'Hola, De la Cruz');
+  assert.equal(applyEmailMergeTags('Hola, {{first_name}} {{last_name}}', { firstName: 'María José' }),
+    'Hola, María José');
+  assert.equal(applyEmailMergeTags('{{last_name}}', emailSendNames({ name: 'Ana López' })), '');
+  assert.equal(applyEmailMergeTags('{{first_name}}', emailSendNames({ name: 'Ana López' })), 'Ana');
+});
+
+test('escapes recipient names in HTML', () => {
+  assert.equal(applyEmailMergeTags('<p>{{last_name}}</p>', { lastName: 'A & B' }, { html: true }),
+    '<p>A &amp; B</p>');
 });

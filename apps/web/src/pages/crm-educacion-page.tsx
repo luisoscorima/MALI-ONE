@@ -226,11 +226,15 @@ export function CrmEducacionPage() {
   const [contacts, setContacts] = useState<EducationContact[]>([]);
   const [contactTotal, setContactTotal] = useState(0);
   const [contactPage, setContactPage] = useState(1);
-  const [contactLoading, setContactLoading] = useState(true);
+  const [contactLoading, setContactLoading] = useState(false);
   const [contactError, setContactError] = useState('');
   const contactRequestId = useRef(0);
   const cycleRequestId = useRef(0);
   const reviewEntryRequestId = useRef(0);
+  const needsCatalogs = tab === 'contacts' || tab === 'opportunities';
+  const needsContacts = tab === 'contacts';
+  const needsOpportunities = tab === 'opportunities';
+  const needsProspectiaStatus = tab === 'opportunities' || tab === 'tools';
   const [contactQ, setContactQ] = useState('');
   const [debouncedContactQ, setDebouncedContactQ] = useState('');
   const [segment, setSegment] = useState('');
@@ -256,7 +260,7 @@ export function CrmEducacionPage() {
   const [cycles, setCycles] = useState<EducationCycle[]>([]);
   const [cycleTotal, setCycleTotal] = useState(0);
   const [cyclePage, setCyclePage] = useState(1);
-  const [cycleLoading, setCycleLoading] = useState(true);
+  const [cycleLoading, setCycleLoading] = useState(false);
   const [cycleError, setCycleError] = useState('');
   const [opportunityQ, setOpportunityQ] = useState('');
   const [debouncedOpportunityQ, setDebouncedOpportunityQ] = useState('');
@@ -300,15 +304,18 @@ export function CrmEducacionPage() {
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visible])); }, [visible]);
   useEffect(() => {
-    void api.getCrmEducationCatalogs().then(setCatalog).catch((error) => {
+    if (!needsCatalogs) return;
+    const ac = new AbortController();
+    void api.getCrmEducationCatalogs(ac.signal).then(setCatalog).catch((error) => {
+      if (ac.signal.aborted) return;
       toast.error(error instanceof Error ? error.message : 'No se pudieron cargar los catálogos');
     });
-  }, [toast]);
-  useEffect(() => {
-    void api.getCrmEducationManagementCatalogs().then(setManagementCatalog).catch((error) => {
+    void api.getCrmEducationManagementCatalogs(ac.signal).then(setManagementCatalog).catch((error) => {
+      if (ac.signal.aborted) return;
       toast.error(error instanceof Error ? error.message : 'No se pudieron cargar asesores y estados');
     });
-  }, [toast]);
+    return () => ac.abort();
+  }, [needsCatalogs, toast]);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedContactQ(contactQ.trim()), 300);
     return () => window.clearTimeout(timer);
@@ -326,64 +333,81 @@ export function CrmEducacionPage() {
     categoria, q: debouncedContactQ, segment, attr_key: attrKey,
     attr_value: debouncedAttrValue, page: contactPage, limit: PAGE_SIZE,
   }), [categoria, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage]);
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++contactRequestId.current;
     setContactLoading(true);
     setContactError('');
     try {
-      const data = await api.listCrmEducationContacts(contactParams);
-      if (requestId === contactRequestId.current) {
-        setContacts(data.items);
-        setContactTotal(data.total);
-      }
+      const data = await api.listCrmEducationContacts(contactParams, signal);
+      if (signal?.aborted || requestId !== contactRequestId.current) return;
+      setContacts(data.items);
+      setContactTotal(data.total);
     } catch (error) {
-      if (requestId === contactRequestId.current) {
-        setContactError(error instanceof Error ? error.message : 'No se pudieron cargar los contactos');
-      }
+      if (signal?.aborted || requestId !== contactRequestId.current) return;
+      setContactError(error instanceof Error ? error.message : 'No se pudieron cargar los contactos');
     } finally {
-      if (requestId === contactRequestId.current) setContactLoading(false);
+      if (!signal?.aborted && requestId === contactRequestId.current) {
+        setContactLoading(false);
+      }
     }
   }, [contactParams]);
-  useEffect(() => { void loadContacts(); }, [loadContacts]);
+  useEffect(() => {
+    if (!needsContacts) return;
+    const ac = new AbortController();
+    void loadContacts(ac.signal);
+    return () => ac.abort();
+  }, [needsContacts, loadContacts]);
   const cycleParams = useMemo(() => ({
     categoria, channel, q: debouncedOpportunityQ, view: opportunityView,
     page: cyclePage, limit: PAGE_SIZE,
   }), [categoria, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
-  const loadCycles = useCallback(async () => {
+  const loadCycles = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++cycleRequestId.current;
     setCycleLoading(true);
     setCycleError('');
     try {
-      const data = await api.listCrmEducationCycles(cycleParams);
-      if (requestId !== cycleRequestId.current) return;
+      const data = await api.listCrmEducationCycles(cycleParams, signal);
+      if (signal?.aborted || requestId !== cycleRequestId.current) return;
       setCycles(data.items);
       setCycleTotal(data.total);
       setCycleCounts(data.counts);
     } catch (error) {
-      if (requestId !== cycleRequestId.current) return;
+      if (signal?.aborted || requestId !== cycleRequestId.current) return;
       setCycleError(error instanceof Error ? error.message : 'No se pudieron cargar las oportunidades');
     } finally {
-      if (requestId === cycleRequestId.current) setCycleLoading(false);
+      if (!signal?.aborted && requestId === cycleRequestId.current) {
+        setCycleLoading(false);
+      }
     }
   }, [cycleParams]);
-  useEffect(() => { void loadCycles(); }, [loadCycles]);
+  useEffect(() => {
+    if (!needsOpportunities) return;
+    const ac = new AbortController();
+    void loadCycles(ac.signal);
+    return () => ac.abort();
+  }, [needsOpportunities, loadCycles]);
 
-  const loadSla = useCallback(async () => {
+  const loadSla = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++slaRequestId.current;
     setSlaError('');
     try {
-      const data = await api.getCrmEducationSla({ categoria });
-      if (requestId !== slaRequestId.current) return;
+      const data = await api.getCrmEducationSla({ categoria }, signal);
+      if (signal?.aborted || requestId !== slaRequestId.current) return;
       setSla(data);
     } catch (error) {
-      if (requestId !== slaRequestId.current) return;
+      if (signal?.aborted || requestId !== slaRequestId.current) return;
       setSla(null);
       setSlaError(error instanceof Error ? error.message : 'No se pudo cargar el SLA');
     }
   }, [categoria]);
-  useEffect(() => { void loadSla(); }, [loadSla]);
+  useEffect(() => {
+    if (!needsOpportunities) return;
+    const ac = new AbortController();
+    void loadSla(ac.signal);
+    return () => ac.abort();
+  }, [needsOpportunities, loadSla]);
 
-  const loadReviewEntries = useCallback(async () => {
+  const loadReviewEntries = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++reviewEntryRequestId.current;
     setReviewEntryLoading(true);
     setReviewEntryError('');
@@ -391,18 +415,25 @@ export function CrmEducacionPage() {
       const data = await api.listCrmEducationLeads({
         categoria, channel, q: debouncedOpportunityQ, view: 'conflict',
         page: reviewEntryPage, limit: PAGE_SIZE,
-      });
-      if (requestId !== reviewEntryRequestId.current) return;
+      }, signal);
+      if (signal?.aborted || requestId !== reviewEntryRequestId.current) return;
       setReviewEntries(data.items);
       setReviewEntryTotal(data.total);
     } catch (error) {
-      if (requestId !== reviewEntryRequestId.current) return;
+      if (signal?.aborted || requestId !== reviewEntryRequestId.current) return;
       setReviewEntryError(error instanceof Error ? error.message : 'No se pudieron cargar los conflictos comerciales');
     } finally {
-      if (requestId === reviewEntryRequestId.current) setReviewEntryLoading(false);
+      if (!signal?.aborted && requestId === reviewEntryRequestId.current) {
+        setReviewEntryLoading(false);
+      }
     }
   }, [categoria, channel, debouncedOpportunityQ, reviewEntryPage]);
-  useEffect(() => { void loadReviewEntries(); }, [loadReviewEntries]);
+  useEffect(() => {
+    if (!needsOpportunities) return;
+    const ac = new AbortController();
+    void loadReviewEntries(ac.signal);
+    return () => ac.abort();
+  }, [needsOpportunities, loadReviewEntries]);
 
   const seedSaleReadyPrompt = useCallback((
     contactId: number,
@@ -614,6 +645,7 @@ export function CrmEducacionPage() {
   }, [loadContacts, loadCycles, loadReviewEntries, toast]);
 
   useEffect(() => {
+    if (!needsProspectiaStatus) return;
     let cancel = false;
     let timer = 0;
     async function pollIngest() {
@@ -639,10 +671,10 @@ export function CrmEducacionPage() {
     }
     void pollIngest();
     return () => { cancel = true; window.clearTimeout(timer); };
-  }, [prospectiaIngestWatch]);
+  }, [needsProspectiaStatus, prospectiaIngestWatch]);
 
   useEffect(() => {
-    if (opportunityView !== 'solo_contacto') {
+    if (!needsOpportunities || opportunityView !== 'solo_contacto') {
       setNativeSoloContacto([]);
       setNativeSoloTotal(0);
       return;
@@ -661,7 +693,7 @@ export function CrmEducacionPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [opportunityView, categoria, cyclePage]);
+  }, [needsOpportunities, opportunityView, categoria, cyclePage]);
 
   async function ingestProspectia() {
     setIngestingProspectia(true);

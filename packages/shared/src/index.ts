@@ -1597,6 +1597,31 @@ export interface NewsletterDto {
   publicUrl?: string;
 }
 
+/** Hub / library tables — metadata only (no htmlBody / designJson). */
+export interface NewsletterListItemDto {
+  id: string;
+  slug: string;
+  title: string;
+  subject: string;
+  brand?: NewsletterBrand | null;
+  status: NewsletterStatus;
+  scope?: 'shared' | 'malichimp' | 'internal_communications';
+  createdAt: string;
+  updatedAt: string;
+  publicUrl?: string | null;
+  campaignsCount?: number;
+  createdBy?: { email: string; name: string | null } | null;
+  editable?: boolean;
+}
+
+export interface PaginatedNewslettersDto {
+  items: NewsletterListItemDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface CreateNewsletterDto {
   slug: string;
   title: string;

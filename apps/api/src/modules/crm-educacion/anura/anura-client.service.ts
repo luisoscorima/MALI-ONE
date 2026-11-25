@@ -61,6 +61,9 @@ export class AnuraClientService {
     const url = `${this.apiBase}/GCAPI/rest/tenants/stats/cdrs/?${qs}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(
+        Number(process.env.ANURA_CDR_TIMEOUT_MS ?? 15_000),
+      ),
     });
     if (!res.ok) {
       const text = await res.text();
@@ -124,6 +127,9 @@ export class AnuraClientService {
       method: 'POST',
       headers,
       body,
+      signal: AbortSignal.timeout(
+        Number(process.env.ANURA_TOKEN_TIMEOUT_MS ?? 10_000),
+      ),
     });
     if (!res.ok) {
       const text = await res.text();

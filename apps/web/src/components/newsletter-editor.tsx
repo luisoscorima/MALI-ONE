@@ -24,16 +24,17 @@ import { normalizeNewsletterLink, type NewsletterEditorExport } from '@/lib/news
 import 'grapesjs/dist/css/grapes.min.css';
 
 export const NEWSLETTER_FIRST_NAME_MERGE_TAG = '{{first_name}}';
+export const NEWSLETTER_LAST_NAME_MERGE_TAG = '{{last_name}}';
 
 export type NewsletterEditorHandle = {
   getExport: () => NewsletterEditorExport;
   hasPendingUploads: () => boolean;
   /** Inserts {{first_name}} at the caret, into the selection, or as a greeting block. */
   insertFirstNameMergeTag: () => boolean;
+  insertNameMergeTag: (tag: string) => boolean;
 };
 
-function insertFirstNameMergeTag(editor: Editor): boolean {
-  const tag = NEWSLETTER_FIRST_NAME_MERGE_TAG;
+function insertNameMergeTag(editor: Editor, tag = NEWSLETTER_FIRST_NAME_MERGE_TAG): boolean {
   const frame = editor.Canvas.getFrameEl();
   const doc = frame?.contentDocument;
   if (doc) {
@@ -117,6 +118,88 @@ const IMG_WIDE =
 
 const FONT =
   "Arial, Helvetica, 'Helvetica Neue', sans-serif";
+
+const TYPOGRAPHY_SECTOR = 'mali-typography';
+
+/** Compare CSS font stacks ignoring quote/spacing differences from computed styles. */
+function normalizeFontFamily(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/["']/g, '')
+    .replace(/\s*,\s*/g, ',')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function showEffectiveTypography(editor: Editor, container: HTMLElement) {
+  let frame = 0;
+  const update = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      const selected = editor.getSelected();
+      const element = selected?.getEl();
+      const view = element?.ownerDocument.defaultView;
+      const computed = element && view?.getComputedStyle(element);
+      const parent = element?.parentElement && view?.getComputedStyle(element.parentElement);
+      const styles = selected?.getStyle();
+      const controls = editor.StyleManager.getSector(TYPOGRAPHY_SECTOR)?.getProperties();
+
+      for (const property of ['font-family', 'font-size'] as const) {
+        const field = container.querySelector<HTMLElement>(`.gjs-sm-property__${property}`);
+        if (!field) continue;
+        let hint = field.querySelector<HTMLElement>('[data-mali-effective-style]');
+        const value = computed?.getPropertyValue(property)?.trim();
+        if (!value) {
+          hint?.remove();
+          continue;
+        }
+        const control = controls?.find((item) => item.getName() === property);
+        const directStyle = styles?.[property];
+        const own = Boolean(directStyle || control?.hasValue({ noParent: true }));
+        const inherited = !own && parent?.getPropertyValue(property) === value;
+        if (!hint) {
+          hint = document.createElement('div');
+          hint.dataset.maliEffectiveStyle = '';
+          hint.className = 'mt-1 break-words text-[11px] leading-tight opacity-80';
+          field.append(hint);
+        }
+        hint.textContent = `${value} · ${own ? 'Aplicado' : inherited ? 'Heredado' : 'Valor efectivo'}`;
+
+        if (property === 'font-size') {
+          const input = field.querySelector<HTMLInputElement>('input');
+          if (input) input.placeholder = value;
+          continue;
+        }
+
+        const select = field.querySelector<HTMLSelectElement>('select');
+        if (!select) continue;
+        select.querySelector('option[data-mali-effective-font]')?.remove();
+        // Prefer the authored stack when present; otherwise show the computed/effective one.
+        const target = directStyle || control?.getValue({ noDefault: true });
+        const display = own && typeof target === 'string' && target ? target : value;
+        const normalizedDisplay = normalizeFontFamily(display);
+        const matched = [...select.options].find(
+          (option) => normalizeFontFamily(option.value) === normalizedDisplay,
+        );
+        if (matched) {
+          select.value = matched.value;
+        } else {
+          const option = new Option(display, display);
+          option.dataset.maliEffectiveFont = '';
+          select.add(option);
+          select.value = display;
+        }
+      }
+    });
+  };
+  const events = 'component:selected component:deselected component:styleUpdate style:target style:property:update device:select run:open-sm canvas:frame:load:body';
+  editor.on(events, update);
+  update();
+  return () => {
+    cancelAnimationFrame(frame);
+    editor.off(events, update);
+  };
+}
 
 function socialSrc(file: string): string {
   return `${BRAND_LOGO_ORIGIN}/newsletter-brands/social/${file}`;
@@ -605,8 +688,9 @@ export const NewsletterEditor = forwardRef<
     insertFirstNameMergeTag: () => {
       const editor = editorRef.current;
       if (!editor) return false;
-      return insertFirstNameMergeTag(editor);
+      return insertNameMergeTag(editor);
     },
+    insertNameMergeTag: (tag) => Boolean(editorRef.current && insertNameMergeTag(editorRef.current, tag)),
   }));
 
   useEffect(() => {
@@ -738,6 +822,7 @@ export const NewsletterEditor = forwardRef<
             ],
           },
           {
+            id: TYPOGRAPHY_SECTOR,
             name: 'Tipografía',
             open: true,
             buildProps: [
@@ -749,6 +834,26 @@ export const NewsletterEditor = forwardRef<
               'line-height',
               'text-align',
               'text-decoration',
+            ],
+            properties: [
+              {
+                property: 'font-family',
+                name: 'Fuente',
+                type: 'select',
+                default: FONT,
+                options: [
+                  { id: FONT, label: 'Arial / Helvetica (MALI)' },
+                  { id: 'Arial, Helvetica, sans-serif', label: 'Arial' },
+                  { id: 'Helvetica, sans-serif', label: 'Helvetica' },
+                  { id: "'Helvetica Neue', Helvetica, Arial, sans-serif", label: 'Helvetica Neue' },
+                  { id: 'Georgia, serif', label: 'Georgia' },
+                  { id: 'Times New Roman, Times, serif', label: 'Times New Roman' },
+                  { id: 'Courier New, Courier, monospace', label: 'Courier New' },
+                  { id: 'Verdana, Geneva, sans-serif', label: 'Verdana' },
+                  { id: 'Tahoma, Geneva, sans-serif', label: 'Tahoma' },
+                  { id: 'Trebuchet MS, Helvetica, sans-serif', label: 'Trebuchet MS' },
+                ],
+              },
             ],
           },
           {
@@ -776,7 +881,12 @@ export const NewsletterEditor = forwardRef<
     });
     editor.Commands.add('insert-merge-first-name', {
       run: (ed) => {
-        insertFirstNameMergeTag(ed);
+        insertNameMergeTag(ed, NEWSLETTER_FIRST_NAME_MERGE_TAG);
+      },
+    });
+    editor.Commands.add('insert-merge-last-name', {
+      run: (ed) => {
+        insertNameMergeTag(ed, NEWSLETTER_LAST_NAME_MERGE_TAG);
       },
     });
     panels.removeButton('devices-c', 'set-device-tablet');
@@ -790,6 +900,15 @@ export const NewsletterEditor = forwardRef<
       label: '{{fn}}',
       attributes: {
         title: `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG} (nombre del contacto al enviar)`,
+      },
+    });
+    panels.addButton('options', {
+      id: 'insert-merge-last-name',
+      className: 'gjs-pn-btn',
+      command: 'insert-merge-last-name',
+      label: '{{ln}}',
+      attributes: {
+        title: `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG} (apellidos del contacto al enviar)`,
       },
     });
     for (const [panel, id, title] of [
@@ -811,6 +930,11 @@ export const NewsletterEditor = forwardRef<
         'insert-merge-first-name',
         `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
       ],
+      [
+        'options',
+        'insert-merge-last-name',
+        `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG}`,
+      ],
     ] as const) {
       const btn = panels.getButton(panel, id);
       if (btn) {
@@ -821,6 +945,7 @@ export const NewsletterEditor = forwardRef<
     registerMaliBlocks(editor, brand);
     loadInitialContent(editor, initialDesignJson, initialHtml, brand);
     editorRef.current = editor;
+    const stopTypography = showEffectiveTypography(editor, containerRef.current);
 
     if (editLinks) {
       const syncLink = () => queueMicrotask(() => {
@@ -835,6 +960,7 @@ export const NewsletterEditor = forwardRef<
 
     return () => {
       active = false;
+      stopTypography();
       editor.destroy();
       editorRef.current = null;
     };

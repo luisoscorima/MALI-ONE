@@ -45,18 +45,62 @@ export class NewslettersService {
   }
 
   /**
-   * Hub Campañas y Boletines: all library scopes (shared + modules).
-   * Create/edit of rows still restricted to shared in admin controllers.
+   * Hub Campañas y Boletines: library metadata only (no htmlBody/designJson).
+   * Editor loads full content via get(id).
    */
-  list() {
-    return this.prisma.newsletter.findMany({
-      where: { kind: NewsletterKind.library },
-      orderBy: { updatedAt: 'desc' },
-      include: {
-        _count: { select: { campaigns: true } },
-        createdBy: { select: { email: true, name: true } },
-      },
-    });
+  async list(options?: { page?: number; pageSize?: number }) {
+    const page = Math.max(1, options?.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 50));
+    const where = { kind: NewsletterKind.library } as const;
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.newsletter.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          subject: true,
+          brand: true,
+          status: true,
+          scope: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: { select: { campaigns: true } },
+          createdBy: { select: { email: true, name: true } },
+        },
+      }),
+      this.prisma.newsletter.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        subject: row.subject,
+        brand: row.brand,
+        status: row.status,
+        scope: row.scope,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        campaignsCount: row._count.campaigns,
+        createdBy: row.createdBy,
+        publicUrl:
+          row.scope === NewsletterScope.shared &&
+          row.status === NewsletterStatus.published
+            ? `${this.appUrl}/n/${row.slug}`
+            : null,
+        editable: row.scope === NewsletterScope.shared,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   /** Cross-module campaign registry (read-only hub). */
@@ -109,7 +153,11 @@ export class NewslettersService {
     });
   }
 
-  /** Module library pieces (e.g. MALICHIMP Contenido). */
+  /**
+   * Module library pieces (e.g. MALICHIMP Contenido).
+   * Still includes bodies so contentRevisionOf() and campaign pickers stay correct;
+   * hub list() above is the slim metadata endpoint.
+   */
   listModuleLibrary(scope: WorkingCopyScope) {
     return this.prisma.newsletter.findMany({
       where: moduleLibraryListWhere(scope),

@@ -356,11 +356,11 @@ export class LinksService {
       ? {}
       : { archivedAt: null };
 
-    const tagRows = await this.prisma.shortLink.findMany({
-      where: { ...ownershipWhere, ...visibilityWhere },
-      select: { tags: true },
+    const tags = await this.listDistinctTags({
+      createdById:
+        user.role === UserRole.admin ? undefined : user.id,
+      includeArchived: Boolean(options.includeArchived),
     });
-    const tags = [...new Set(tagRows.flatMap((row) => row.tags))].sort();
     const matchingTags = searchLower
       ? tags.filter((tag) => tag.toLowerCase().includes(searchLower))
       : [];
@@ -1019,6 +1019,32 @@ export class LinksService {
   private emptyCatalogId(value: string | null | undefined) {
     const id = String(value ?? '').trim();
     return id || null;
+  }
+
+  /** Distinct tags via SQL unnest — avoids loading every ShortLink.tags array. */
+  private async listDistinctTags(options: {
+    createdById?: string;
+    includeArchived: boolean;
+  }): Promise<string[]> {
+    const conditions: Prisma.Sql[] = [];
+    if (options.createdById) {
+      conditions.push(Prisma.sql`"createdById" = ${options.createdById}`);
+    }
+    if (!options.includeArchived) {
+      conditions.push(Prisma.sql`"archivedAt" IS NULL`);
+    }
+    const whereSql =
+      conditions.length > 0
+        ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`
+        : Prisma.empty;
+
+    const rows = await this.prisma.$queryRaw<{ tag: string }[]>(Prisma.sql`
+      SELECT DISTINCT unnest(tags) AS tag
+      FROM "ShortLink"
+      ${whereSql}
+      ORDER BY tag ASC
+    `);
+    return rows.map((row) => row.tag).filter(Boolean);
   }
 
   private normalizeTags(tags?: string[]): string[] {

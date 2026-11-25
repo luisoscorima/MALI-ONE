@@ -13,7 +13,7 @@ import { useSearchParams } from 'react-router-dom';
 import type {
   EmailSenderDto,
   NewsletterBrand,
-  NewsletterDto,
+  NewsletterListItemDto,
 } from '@mali-one/shared';
 import {
   NEWSLETTER_BRANDS,
@@ -23,6 +23,7 @@ import { EmailSendersPanel } from '@/components/email-senders-panel';
 import { NewsletterCampaignsRegistry } from '@/components/newsletter-campaigns-registry';
 import {
   NEWSLETTER_FIRST_NAME_MERGE_TAG,
+  NEWSLETTER_LAST_NAME_MERGE_TAG,
   NewsletterEditor,
   type NewsletterEditorHandle,
 } from '@/components/newsletter-editor';
@@ -76,7 +77,9 @@ export function NewslettersPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
+  const [newsletters, setNewsletters] = useState<NewsletterListItemDto[]>([]);
+  const [listPage, setListPage] = useState(1);
+  const [listTotalPages, setListTotalPages] = useState(1);
   const [senders, setSenders] = useState<EmailSenderDto[]>([]);
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -109,15 +112,17 @@ export function NewslettersPage() {
     setSlug(value);
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (page: number) => {
     setLoading(true);
     setError('');
     try {
-      const [nextNewsletters, nextSenders] = await Promise.all([
-        api.listNewsletters(),
+      const [nextPage, nextSenders] = await Promise.all([
+        api.listNewsletters({ page, pageSize: 50 }),
         api.listEmailSenders().catch(() => [] as EmailSenderDto[]),
       ]);
-      setNewsletters(nextNewsletters);
+      setNewsletters(nextPage.items);
+      setListPage(nextPage.page);
+      setListTotalPages(nextPage.totalPages);
       setSenders(nextSenders);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cargar boletines');
@@ -127,8 +132,8 @@ export function NewslettersPage() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(listPage);
+  }, [listPage, load]);
 
   function resetMeta() {
     setSlug('');
@@ -218,7 +223,7 @@ export function NewslettersPage() {
         toast.success('Boletín actualizado');
       }
       closeEditor();
-      await load();
+      await load(listPage);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo guardar');
     } finally {
@@ -226,7 +231,7 @@ export function NewslettersPage() {
     }
   }
 
-  async function togglePublish(n: NewsletterDto, publish: boolean) {
+  async function togglePublish(n: NewsletterListItemDto, publish: boolean) {
     if (!publish) {
       const ok = await confirm({
         title: `¿Despublicar “${n.title}”?`,
@@ -242,7 +247,7 @@ export function NewslettersPage() {
       await api.updateNewsletter(n.id, {
         status: publish ? 'published' : 'draft',
       });
-      await load();
+      await load(listPage);
       toast.success(publish ? 'Boletín publicado' : 'Pasó a borrador');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al actualizar');
@@ -251,7 +256,7 @@ export function NewslettersPage() {
     }
   }
 
-  async function handleDelete(n: NewsletterDto) {
+  async function handleDelete(n: NewsletterListItemDto) {
     const ok = await confirm({
       title: `¿Eliminar el boletín “${n.title}”?`,
       confirmLabel: 'Eliminar',
@@ -261,18 +266,18 @@ export function NewslettersPage() {
     try {
       await api.deleteNewsletter(n.id);
       if (editingId === n.id) closeEditor();
-      await load();
+      await load(listPage);
       toast.success('Boletín eliminado');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo eliminar');
     }
   }
 
-  async function handleDuplicate(n: NewsletterDto) {
+  async function handleDuplicate(n: NewsletterListItemDto) {
     setDuplicatingId(n.id);
     try {
       const draft = await api.duplicateNewsletter(n.id);
-      await load();
+      await load(listPage);
       toast.success('Boletín duplicado como borrador');
       await openEdit(draft.id);
     } catch (e) {
@@ -494,6 +499,33 @@ export function NewslettersPage() {
                 </Table>
               </TableShell>
             )}
+            {listTotalPages > 1 ? (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={listPage <= 1 || loading}
+                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  Página {listPage} de {listTotalPages}
+                </span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={listPage >= listTotalPages || loading}
+                  onClick={() =>
+                    setListPage((p) => Math.min(listTotalPages, p + 1))
+                  }
+                >
+                  Siguiente
+                </Button>
+              </div>
+            ) : null}
           </TabsContent>
         </Tabs>
       ) : null}
@@ -548,19 +580,34 @@ export function NewslettersPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="subject">Asunto del correo</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() =>
-                    setSubject((current) =>
-                      `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
-                    )
-                  }
-                >
-                  + {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-                </Button>
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() =>
+                      setSubject((current) =>
+                        `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
+                      )
+                    }
+                  >
+                    + {NEWSLETTER_FIRST_NAME_MERGE_TAG}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() =>
+                      setSubject((current) =>
+                        `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_LAST_NAME_MERGE_TAG}`,
+                      )
+                    }
+                  >
+                    + {NEWSLETTER_LAST_NAME_MERGE_TAG}
+                  </Button>
+                </div>
               </div>
               <Input
                 id="subject"
@@ -597,27 +644,39 @@ export function NewslettersPage() {
               derecha. Para el saludo personalizado al enviar, usa{' '}
               <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
                 {NEWSLETTER_FIRST_NAME_MERGE_TAG}
+              </code>{' '}
+              y{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+                {NEWSLETTER_LAST_NAME_MERGE_TAG}
               </code>
               ; si el contacto no tiene nombre, se envía como estimado(a).
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              onClick={() => {
-                const ok = editorRef.current?.insertFirstNameMergeTag();
-                if (ok) {
-                  toast.success(
-                    `Se insertó ${NEWSLETTER_FIRST_NAME_MERGE_TAG} en el boletín`,
-                  );
-                } else {
-                  toast.error('No se pudo insertar la variable en el editor');
-                }
-              }}
-            >
-              Insertar {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-            </Button>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {(
+                [
+                  ['Nombre', NEWSLETTER_FIRST_NAME_MERGE_TAG],
+                  ['Apellidos', NEWSLETTER_LAST_NAME_MERGE_TAG],
+                ] as const
+              ).map(([label, tag]) => (
+                <Button
+                  key={tag}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    const ok = editorRef.current?.insertNameMergeTag(tag);
+                    if (ok) {
+                      toast.success(`Se insertó «${label}» (${tag}) en el boletín`);
+                    } else {
+                      toast.error('No se pudo insertar la variable en el editor');
+                    }
+                  }}
+                >
+                  Insertar {tag}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <NewsletterEditor

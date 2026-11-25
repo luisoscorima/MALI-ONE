@@ -227,8 +227,8 @@ export function CrmPamPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState('contacts');
-  const [loading, setLoading] = useState(true);
-  const [paymentsLoading, setPaymentsLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [payments, setPayments] = useState<PamRegistrationDto[]>([]);
@@ -385,41 +385,49 @@ export function CrmPamPage() {
   const [linkedPaymentIds, setLinkedPaymentIds] = useState<Set<string>>(
     new Set(),
   );
-  const loadContacts = useCallback(async () => {
+  const loadContacts = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError('');
     try {
-      const [data, linkedPage] = await Promise.all([
-        api.listCrmPamContacts({
-          q: debouncedQ || undefined,
-          segment: segment || undefined,
-          attr_key: attrKey || undefined,
-          attr_value:
-            attrKey && debouncedAttrValue ? debouncedAttrValue : undefined,
-          page,
-          limit: pageSize,
-        }),
-        api.listCrmPamContacts({
-          attr_key: 'payment_id',
-          limit: 500,
-          page: 1,
-        }),
-      ]);
+      const data = await api.listCrmPamContacts({
+        q: debouncedQ || undefined,
+        segment: segment || undefined,
+        attr_key: attrKey || undefined,
+        attr_value:
+          attrKey && debouncedAttrValue ? debouncedAttrValue : undefined,
+        page,
+        limit: pageSize,
+      }, signal);
+      if (signal?.aborted) return;
       setContacts(data.items);
       setTotal(data.total);
       setPages(data.pages || (data.total > 0 ? Math.ceil(data.total / pageSize) : 0));
+    } catch (e) {
+      if (signal?.aborted) return;
+      setError(e instanceof Error ? e.message : 'Error al cargar contactos');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [debouncedQ, segment, attrKey, debouncedAttrValue, page, pageSize]);
+
+  const loadLinkedPaymentIds = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const linkedPage = await api.listCrmPamContacts({
+        attr_key: 'payment_id',
+        limit: 500,
+        page: 1,
+      }, signal);
+      if (signal?.aborted) return;
       const linked = new Set<string>();
       for (const c of linkedPage.items) {
         const pid = c.attributes.payment_id?.trim();
         if (pid) linked.add(pid);
       }
       setLinkedPaymentIds(linked);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al cargar contactos');
-    } finally {
-      setLoading(false);
+    } catch {
+      if (!signal?.aborted) setLinkedPaymentIds(new Set());
     }
-  }, [debouncedQ, segment, attrKey, debouncedAttrValue, page, pageSize]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQ(q.trim()), 300);
@@ -434,25 +442,29 @@ export function CrmPamPage() {
     return () => window.clearTimeout(timer);
   }, [attrValue]);
 
-  const loadPayments = useCallback(async () => {
+  const loadPayments = useCallback(async (signal?: AbortSignal) => {
     setPaymentsLoading(true);
     try {
-      const rows = await api.listCrmPamPayments().catch(() =>
+      const rows = await api.listCrmPamPayments(signal).catch(() =>
         api.listPamRegistrations(),
       );
+      if (signal?.aborted) return;
       setPayments(rows);
     } catch (e) {
+      if (signal?.aborted) return;
       toast.error(e instanceof Error ? e.message : 'Error al cargar pagos');
     } finally {
-      setPaymentsLoading(false);
+      if (!signal?.aborted) setPaymentsLoading(false);
     }
   }, [toast]);
 
-  const loadPaymentMethods = useCallback(async () => {
+  const loadPaymentMethods = useCallback(async (signal?: AbortSignal) => {
     try {
-      const rows = await api.listCrmPamPaymentMethods();
+      const rows = await api.listCrmPamPaymentMethods(signal);
+      if (signal?.aborted) return;
       setPaymentMethods(rows);
     } catch (e) {
+      if (signal?.aborted) return;
       toast.error(
         e instanceof Error ? e.message : 'Error al cargar medios de pago',
       );
@@ -576,30 +588,46 @@ export function CrmPamPage() {
     }
   }
 
-  const loadAttrDefs = useCallback(async () => {
+  const loadAttrDefs = useCallback(async (signal?: AbortSignal) => {
     try {
       const [defs, segs] = await Promise.all([
-        api.listCrmPamAttributeDefinitions(),
-        api.listCrmPamSegments().catch(() => []),
+        api.listCrmPamAttributeDefinitions(signal),
+        api.listCrmPamSegments(signal).catch(() => []),
       ]);
+      if (signal?.aborted) return;
       setAttrDefs(defs);
       setSegments(segs);
     } catch {
-      setAttrDefs([]);
-      setSegments([]);
+      if (!signal?.aborted) {
+        setAttrDefs([]);
+        setSegments([]);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void loadContacts();
-  }, [loadContacts]);
+    if (tab !== 'contacts') return;
+    const ac = new AbortController();
+    void loadContacts(ac.signal);
+    void loadAttrDefs(ac.signal);
+    return () => ac.abort();
+  }, [tab, loadContacts, loadAttrDefs]);
 
   useEffect(() => {
-    void loadPayments();
+    if (tab !== 'payments') return;
+    const ac = new AbortController();
+    void loadPayments(ac.signal);
+    void loadPaymentMethods(ac.signal);
+    void loadPamPlans();
+    void loadLinkedPaymentIds(ac.signal);
+    return () => ac.abort();
+  }, [tab, loadPayments, loadPaymentMethods, loadPamPlans, loadLinkedPaymentIds]);
+
+  useEffect(() => {
+    if (!showNewPayment && !showMethodsManager) return;
     void loadPaymentMethods();
     void loadPamPlans();
-    void loadAttrDefs();
-  }, [loadPayments, loadPaymentMethods, loadPamPlans, loadAttrDefs]);
+  }, [showNewPayment, showMethodsManager, loadPaymentMethods, loadPamPlans]);
 
   useEffect(() => {
     if (activePamPlans.length === 0) return;
@@ -794,7 +822,7 @@ export function CrmPamPage() {
       setNewPayment(EMPTY_NEW_PAYMENT);
       setContactSuggestions([]);
       setSuggestField(null);
-      await Promise.all([loadPayments(), loadContacts()]);
+      await Promise.all([loadPayments(), loadContacts(), loadLinkedPaymentIds()]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear pago');
     } finally {
@@ -828,7 +856,7 @@ export function CrmPamPage() {
     try {
       await api.linkCrmPamPayment(id);
       toast.success('Pago vinculado (payment_id en contacto)');
-      await Promise.all([loadContacts(), loadPayments()]);
+      await Promise.all([loadContacts(), loadPayments(), loadLinkedPaymentIds()]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al vincular');
     }
@@ -849,7 +877,7 @@ export function CrmPamPage() {
         `Vinculados ${result.linked} teléfonos` +
           (result.errors.length ? ` (${result.errors.length} errores)` : ''),
       );
-      await Promise.all([loadContacts(), loadPayments()]);
+      await Promise.all([loadContacts(), loadPayments(), loadLinkedPaymentIds()]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al vincular');
     } finally {

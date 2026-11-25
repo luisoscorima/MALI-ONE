@@ -111,7 +111,7 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     });
     const contacts = await Promise.all(emails.map((email) =>
       prisma.malichimpContact.create({
-        data: { email, firstName: 'Persona', status: 'subscribed' },
+        data: { email, firstName: 'María José', lastName: 'De la Cruz', status: 'subscribed' },
       })));
     await prisma.malichimpContactGroupOption.createMany({
       data: [
@@ -192,6 +192,8 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     assert.deepEqual(campaign.audienceSegments, [option.id, secondOption.id]);
     assert.deepEqual(campaign.audienceExcludeSegments, [exclusionOption.id]);
     assert.equal(campaign.sends.length, 1);
+    assert.equal(campaign.sends[0].firstName, 'María José');
+    assert.equal(campaign.sends[0].lastName, 'De la Cruz');
     assert.deepEqual(
       campaign.sends.map((send) => send.email).sort(),
       [emails[0]],

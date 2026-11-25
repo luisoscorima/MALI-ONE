@@ -8,6 +8,7 @@ import {
 } from '@mali-one/shared';
 import {
   NEWSLETTER_FIRST_NAME_MERGE_TAG,
+  NEWSLETTER_LAST_NAME_MERGE_TAG,
   NewsletterEditor,
   type NewsletterEditorHandle,
 } from '@/components/newsletter-editor';
@@ -347,28 +348,30 @@ export function MalichimpContentEditor({
             {brand
               ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
               : '.'}{' '}
-            Para el saludo personalizado usa{' '}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-              {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-            </code>
-            .
+            Selecciona dónde quieres insertar la personalización.
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={saving}
-            onClick={() => {
-              const ok = editorRef.current?.insertFirstNameMergeTag();
-              if (ok) {
-                toast.success(`Se insertó ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`);
-              } else {
-                toast.error('No se pudo insertar la variable');
-              }
-            }}
-          >
-            Insertar {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-          </Button>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Personalizar con datos del contacto">
+            {[
+              ['Nombre', NEWSLETTER_FIRST_NAME_MERGE_TAG],
+              ['Apellidos', NEWSLETTER_LAST_NAME_MERGE_TAG],
+              ['Nombre y apellidos', `${NEWSLETTER_FIRST_NAME_MERGE_TAG} ${NEWSLETTER_LAST_NAME_MERGE_TAG}`],
+            ].map(([label, tag]) => (
+              <Button
+                key={label}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={saving}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (editorRef.current?.insertNameMergeTag(tag)) toast.success(`Se insertó «${label}»`);
+                  else toast.error('No se pudo insertar la variable');
+                }}
+              >
+                Insertar {label}
+              </Button>
+            ))}
+          </div>
         </div>
       ) : null}
 

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import { AppModule, User } from '@prisma/client';
@@ -23,8 +24,14 @@ export class NewslettersAdminController {
   constructor(private readonly newsletters: NewslettersService) {}
 
   @Get()
-  list() {
-    return this.newsletters.list();
+  list(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.newsletters.list({
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
   }
 
   /** Cross-module campaign registry (read-only). Must be registered before `:id`. */

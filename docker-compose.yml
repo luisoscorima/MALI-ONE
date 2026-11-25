@@ -47,7 +47,7 @@ services:
     volumes:
       - ${GOOGLE_SECRETS_DIR:-./secrets}:/run/secrets:ro
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health/ready']
       interval: 15s
       timeout: 5s
       retries: 5

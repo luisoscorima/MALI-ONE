@@ -890,13 +890,14 @@ export const api = {
   listCrmEducationContacts: (params: {
     categoria?: EducationCategoryScope; q?: string; segment?: string;
     attr_key?: string; attr_value?: string; page?: number; limit?: number;
-  }) => {
+  }, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') qs.set(key, String(value));
     }
     return request<{ items: EducationContact[]; total: number; page: number; limit: number; pages: number }>(
       `/api/crm-educacion/contacts?${qs}`,
+      { signal },
     );
   },
   patchCrmEducationContact: (
@@ -908,14 +909,14 @@ export const api = {
   ) => request<EducationContact>(`/api/crm-educacion/contacts/${id}`, {
     method: 'PATCH', body: JSON.stringify(body),
   }),
-  getCrmEducationCatalogs: () =>
-    request<EducationCatalog>('/api/crm-educacion/catalogs'),
+  getCrmEducationCatalogs: (signal?: AbortSignal) =>
+    request<EducationCatalog>('/api/crm-educacion/catalogs', { signal }),
   listCrmEducationLeads: (params: {
     categoria?: EducationCategoryScope; channel?: string; q?: string;
     view?: 'recent' | 'new_number' | 'duplicate' | 'reassignable' | 'conflict' | 'in_progress' | 'all';
     unassigned?: boolean;
     page?: number; limit?: number;
-  }) => {
+  }, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') qs.set(key, String(value));
@@ -923,12 +924,13 @@ export const api = {
     return request<{ items: EducationLead[]; counts: EducationLeadCounts;
       total: number; page: number; limit: number; pages: number }>(
       `/api/crm-educacion/leads?${qs}`,
+      { signal },
     );
   },
   listCrmEducationCycles: (params: {
     categoria?: EducationCategoryScope; channel?: string; q?: string;
     view?: EducationCycleView; page?: number; limit?: number;
-  }) => {
+  }, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') qs.set(key, String(value));
@@ -936,19 +938,22 @@ export const api = {
     return request<{ items: EducationCycle[]; counts: EducationCycleCounts;
       total: number; page: number; limit: number; pages: number }>(
       `/api/crm-educacion/cycles?${qs}`,
+      { signal },
     );
   },
   getCrmEducationSla: (params: {
     categoria?: EducationCategoryScope; from?: string; to?: string;
-  }) => {
+  }, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined && value !== '') qs.set(key, String(value));
     }
-    return request<EducationSlaReport>(`/api/crm-educacion/sla?${qs}`);
+    return request<EducationSlaReport>(`/api/crm-educacion/sla?${qs}`, { signal });
   },
-  getCrmEducationManagementCatalogs: () =>
-    request<EducationManagementCatalog>('/api/crm-educacion/management-catalogs'),
+  getCrmEducationManagementCatalogs: (signal?: AbortSignal) =>
+    request<EducationManagementCatalog>('/api/crm-educacion/management-catalogs', {
+      signal,
+    }),
   patchCrmEducationManagement: (id: number, body: {
     area: EducationArea; assigned_user_id?: number | null; lead_status_id?: number | null;
     lead_id?: number;
@@ -2109,8 +2114,15 @@ export const api = {
     URL.revokeObjectURL(url);
   },
 
-  listNewsletters: () =>
-    request<import('@mali-one/shared').NewsletterDto[]>('/api/newsletters'),
+  listNewsletters: (params?: { page?: number; pageSize?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.pageSize) q.set('pageSize', String(params.pageSize));
+    const qs = q.toString();
+    return request<import('@mali-one/shared').PaginatedNewslettersDto>(
+      `/api/newsletters${qs ? `?${qs}` : ''}`,
+    );
+  },
 
   getNewsletter: (id: string) =>
     request<import('@mali-one/shared').NewsletterDto>(
@@ -2338,7 +2350,7 @@ export const api = {
     has_email?: boolean;
     page?: number;
     limit?: number;
-  }) => {
+  }, signal?: AbortSignal) => {
     const qs = new URLSearchParams();
     if (params?.q) qs.set('q', params.q);
     if (params?.segment) qs.set('segment', params.segment);
@@ -2375,7 +2387,7 @@ export const api = {
         created_at: string;
         updated_at: string;
       }>;
-    }>(`/api/crm-pam/contacts${q ? `?${q}` : ''}`);
+    }>(`/api/crm-pam/contacts${q ? `?${q}` : ''}`, { signal });
   },
 
   patchCrmPamContact: (
@@ -2396,7 +2408,7 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  listCrmPamAttributeDefinitions: () =>
+  listCrmPamAttributeDefinitions: (signal?: AbortSignal) =>
     request<
       Array<{
         id: number;
@@ -2408,11 +2420,12 @@ export const api = {
         required: boolean;
         active: boolean;
       }>
-    >('/api/crm-pam/attribute-definitions'),
+    >('/api/crm-pam/attribute-definitions', { signal }),
 
-  listCrmPamSegments: () =>
+  listCrmPamSegments: (signal?: AbortSignal) =>
     request<Array<{ slug: string; label: string; color_key?: string }>>(
       '/api/crm-pam/segments',
+      { signal },
     ),
 
   createCrmPamAttributeDefinition: (body: {
@@ -2444,14 +2457,16 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  listCrmPamPayments: () =>
+  listCrmPamPayments: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').PamRegistrationDto[]>(
       '/api/crm-pam/payments',
+      { signal },
     ),
 
-  listCrmPamPaymentMethods: () =>
+  listCrmPamPaymentMethods: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').PamPaymentMethodDto[]>(
       '/api/crm-pam/payment-methods',
+      { signal },
     ),
 
   createCrmPamPaymentMethod: (

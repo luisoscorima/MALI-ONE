@@ -1248,6 +1248,8 @@ model EmailSend {
   /// Identifier in the audience module; intentionally has no cross-module foreign key.
   sourceContactId String?         @db.VarChar(120)
   name            String?
+  firstName       String?
+  lastName        String?
   status          EmailSendStatus @default(pending)
   openToken       String          @unique @default(cuid())
   sesMessageId    String?

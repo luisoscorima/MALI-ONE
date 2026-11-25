@@ -1356,9 +1356,9 @@ export class MalichimpService implements OnModuleInit {
 
     const directoryUsers = await this.googleAdmin
       .listRecentlyActiveInternalUsers(90)
-      .catch(() => [] as Array<{ email: string; name: string }>);
-    const nameByEmail = new Map(
-      directoryUsers.map((entry) => [entry.email, entry.name] as const),
+      .catch(() => []);
+    const directoryByEmail = new Map(
+      directoryUsers.map((entry) => [entry.email, entry] as const),
     );
 
     const sends: Array<{
@@ -1369,25 +1369,28 @@ export class MalichimpService implements OnModuleInit {
     }> = [];
 
     for (const email of emails) {
+      const directoryUser = directoryByEmail.get(email);
       const displayName =
-        nameByEmail.get(email) ||
+        directoryUser?.name ||
         (email === sessionEmail ? user.name : email.split('@')[0]);
+      const names = {
+        firstName: directoryUser?.firstName ?? (!directoryUser?.lastName ? firstNameFromDisplayName(displayName) : null),
+        lastName: directoryUser?.lastName ?? null,
+      };
       const send = await this.prisma.emailSend.create({
         data: {
           campaignId,
           email,
           name: displayName,
+          ...names,
           isTest: true,
           status: EmailSendStatus.pending,
         },
       });
 
       try {
-        const firstName = firstNameFromDisplayName(displayName);
-        const personalizedSubject = applyEmailMergeTags(subject, { firstName });
-        const personalizedHtml = applyEmailMergeTags(workingHtml, {
-          firstName,
-        });
+        const personalizedSubject = applyEmailMergeTags(subject, names);
+        const personalizedHtml = applyEmailMergeTags(workingHtml, names, { html: true });
         const viewInBrowserUrl = this.emailTracking.publicUrl(
           `mail/view/${send.openToken}`,
         );
@@ -1802,6 +1805,8 @@ export class MalichimpService implements OnModuleInit {
             email: recipient.email,
             sourceContactId: recipient.id,
             name: recipientName(recipient),
+            firstName: recipient.firstName,
+            lastName: recipient.lastName,
             isTest: false,
           })),
         });
@@ -1881,6 +1886,8 @@ export class MalichimpService implements OnModuleInit {
             email: recipient.email,
             sourceContactId: recipient.id,
             name: recipientName(recipient),
+            firstName: recipient.firstName,
+            lastName: recipient.lastName,
             isTest: false,
           })),
         });

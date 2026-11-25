@@ -1,11 +1,14 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { PrismaModule } from './core/prisma/prisma.module';
 import { QrModule } from './core/qr/qr.module';
 import { RedisModule } from './core/redis/redis.module';
 import { S3Module } from './core/s3/s3.module';
+import { EventLoopLagService } from './core/observability/event-loop-lag.service';
+import { HttpTimingInterceptor } from './core/observability/http-timing.interceptor';
+import { RequestIdMiddleware } from './core/observability/request-id.middleware';
 import { JwtAuthGuard } from './core/guards/jwt-auth.guard';
 import { ModuleGuard } from './core/guards/module.guard';
 import { PermissionGuard } from './core/guards/permission.guard';
@@ -68,6 +71,8 @@ import { InternalCommunicationsModule } from './modules/internal-communications/
   ],
   controllers: [HealthController],
   providers: [
+    EventLoopLagService,
+    { provide: APP_INTERCEPTOR, useClass: HttpTimingInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ModuleGuard },
@@ -75,4 +80,8 @@ import { InternalCommunicationsModule } from './modules/internal-communications/
     { provide: APP_GUARD, useClass: SuperAdminGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

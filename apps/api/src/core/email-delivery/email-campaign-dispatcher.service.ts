@@ -4,7 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { EmailCampaignStatus, EmailSendStatus, Prisma } from '@prisma/client';
 import { MALICHIMP_ELIGIBLE_CONTACT_SQL } from '../../modules/malichimp/lib/malichimp-eligibility';
 import { PrismaService } from '../prisma/prisma.service';
-import { applyEmailMergeTags, firstNameFromDisplayName } from './email-merge-tags';
+import { applyEmailMergeTags, emailSendNames } from './email-merge-tags';
 import { EmailDeliveryService } from './email-delivery.service';
 import { EmailTrackingService } from './email-tracking.service';
 import { replyToWithSendToken } from './malichimp-reply-to';
@@ -123,11 +123,9 @@ export class EmailCampaignDispatcherService {
           const viewInBrowserUrl = this.tracking.publicUrl(
             `mail/view/${send.openToken}`,
           );
-          const firstName = firstNameFromDisplayName(send.name);
-          const subject = applyEmailMergeTags(campaign.subjectSnapshot, { firstName });
-          const personalizedHtml = applyEmailMergeTags(campaign.htmlSnapshot, {
-            firstName,
-          });
+          const names = emailSendNames(send);
+          const subject = applyEmailMergeTags(campaign.subjectSnapshot, names);
+          const personalizedHtml = applyEmailMergeTags(campaign.htmlSnapshot, names, { html: true });
           const result = await this.delivery.sendHtml({
             to: send.email,
             subject,

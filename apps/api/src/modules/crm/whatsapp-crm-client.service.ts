@@ -826,6 +826,20 @@ export class WhatsappCrmClientService {
       { action, actor_email });
   }
 
+  /** Timeouts by operation class — lists fail fast; heavy mutations get more room. */
+  private timeoutMsFor(method: 'GET' | 'POST' | 'PATCH', path: string): number {
+    const getMs = Number(this.config.get('WHATSAPP_CRM_GET_TIMEOUT_MS') ?? 12_000);
+    const mutationMs = Number(
+      this.config.get('WHATSAPP_CRM_MUTATION_TIMEOUT_MS') ?? 15_000,
+    );
+    const heavyMs = Number(this.config.get('WHATSAPP_CRM_HEAVY_TIMEOUT_MS') ?? 30_000);
+    if (method === 'GET') return Number.isFinite(getMs) && getMs > 0 ? getMs : 12_000;
+    if (path.includes('/distribute') || path.includes('/ingest')) {
+      return Number.isFinite(heavyMs) && heavyMs > 0 ? heavyMs : 30_000;
+    }
+    return Number.isFinite(mutationMs) && mutationMs > 0 ? mutationMs : 15_000;
+  }
+
   private async request<T = unknown>(
     method: 'GET' | 'POST' | 'PATCH',
     path: string,
@@ -835,17 +849,37 @@ export class WhatsappCrmClientService {
       throw new Error('WhatsApp CRM no configurado');
     }
 
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Crm-Service-Token': this.token,
-      },
-      body:
-        method === 'POST' || method === 'PATCH'
-          ? JSON.stringify(body ?? {})
-          : undefined,
-    });
+    const timeoutMs = this.timeoutMsFor(method, path);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Crm-Service-Token': this.token,
+        },
+        body:
+          method === 'POST' || method === 'PATCH'
+            ? JSON.stringify(body ?? {})
+            : undefined,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        this.logger.warn(
+          `CRM timeout method=${method} path=${path} timeoutMs=${timeoutMs}`,
+        );
+        throw new Error(
+          `CRM WhatsApp no respondió a tiempo (${timeoutMs} ms) en ${method} ${path}`,
+        );
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
 
     const json = (await res.json().catch(() => ({}))) as {
       ok?: boolean;

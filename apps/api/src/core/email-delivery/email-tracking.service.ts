@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EmailEventType, EmailSendStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { applyEmailMergeTags, firstNameFromDisplayName } from './email-merge-tags';
+import { applyEmailMergeTags, emailSendNames } from './email-merge-tags';
 import { stripViewInBrowserFromHtml } from './strip-view-in-browser';
 
 const PIXEL_GIF = Buffer.from(
@@ -116,6 +116,8 @@ export class EmailTrackingService {
         openToken: true,
         sentAt: true,
         name: true,
+        firstName: true,
+        lastName: true,
         campaign: {
           select: {
             htmlSnapshot: true,
@@ -128,10 +130,7 @@ export class EmailTrackingService {
       throw new NotFoundException('Correo no encontrado');
     }
 
-    const firstName = firstNameFromDisplayName(send.name);
-    const personalizedHtml = applyEmailMergeTags(send.campaign.htmlSnapshot, {
-      firstName,
-    });
+    const personalizedHtml = applyEmailMergeTags(send.campaign.htmlSnapshot, emailSendNames(send), { html: true });
     const unsubscribeUrl = send.campaign.unsubscribePath
       ? this.publicUrl(`${send.campaign.unsubscribePath}/${send.openToken}`)
       : undefined;
