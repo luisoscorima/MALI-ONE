@@ -58,6 +58,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  Pagination,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -288,33 +289,12 @@ function PaginatedStringList({
           </li>
         ))}
       </ul>
-      {totalPages > 1 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>
-            {nf.format(items.length)} en total · página {safePage} de {totalPages}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={safePage <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-            >
-              Anterior
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={safePage >= totalPages}
-              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-            >
-              Ver más
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <Pagination
+        page={safePage}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        summary={`${nf.format(items.length)} en total`}
+      />
     </div>
   );
 }
@@ -2408,41 +2388,17 @@ function audienceSelectionPayload() {
                             </li>
                           ) : null}
                         </ul>
-                        {recipientPage.totalPages > 1 ? (
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                            <span className="text-xs text-muted-foreground">
-                              Página {recipientPage.page} de {recipientPage.totalPages}
-                            </span>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={previewBusy || recipientPage.page <= 1}
-                                onClick={() => void loadAudiencePage(recipientPage.page - 1, {
-                                  resetSelection: false,
-                                  notify: false,
-                                })}
-                              >
-                                <ChevronLeft className="size-4" aria-hidden />
-                                Anterior
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={previewBusy || recipientPage.page >= recipientPage.totalPages}
-                                onClick={() => void loadAudiencePage(recipientPage.page + 1, {
-                                  resetSelection: false,
-                                  notify: false,
-                                })}
-                              >
-                                Siguiente
-                                <ChevronRight className="size-4" aria-hidden />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : null}
+                        <Pagination
+                          page={recipientPage.page}
+                          totalPages={recipientPage.totalPages}
+                          disabled={previewBusy}
+                          onPageChange={(next) => {
+                            void loadAudiencePage(next, {
+                              resetSelection: false,
+                              notify: false,
+                            });
+                          }}
+                        />
                       </div>
                     ) : recipientPage ? (
                       <p className="text-sm text-muted-foreground">

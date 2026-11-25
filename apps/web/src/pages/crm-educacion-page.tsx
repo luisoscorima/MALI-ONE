@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
+import { Columns3, Download, Link2, Plus, Save, UsersRound } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
@@ -17,6 +17,7 @@ import {
   Badge, Button, DataTable, Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, DropdownMenu, DropdownMenuCheckboxItem,
   DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger, Input, Label,
+  Pagination,
   Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
   Tabs, TabsContent, TabsList, TabsTrigger,
 } from '@/components/ui';
@@ -137,6 +138,7 @@ const STORAGE_KEY = 'crm-educacion-contact-cols-v6';
 const PREVIOUS_STORAGE_KEY = 'crm-educacion-contact-cols-v5';
 const LEGACY_STORAGE_KEY = 'crm-educacion-contact-cols-v4';
 const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
 function storedColumns(): Set<string> {
   try {
@@ -226,6 +228,7 @@ export function CrmEducacionPage() {
   const [contacts, setContacts] = useState<EducationContact[]>([]);
   const [contactTotal, setContactTotal] = useState(0);
   const [contactPage, setContactPage] = useState(1);
+  const [contactPageSize, setContactPageSize] = useState(PAGE_SIZE);
   const [contactLoading, setContactLoading] = useState(false);
   const [contactError, setContactError] = useState('');
   const contactRequestId = useRef(0);
@@ -260,6 +263,7 @@ export function CrmEducacionPage() {
   const [cycles, setCycles] = useState<EducationCycle[]>([]);
   const [cycleTotal, setCycleTotal] = useState(0);
   const [cyclePage, setCyclePage] = useState(1);
+  const [cyclePageSize, setCyclePageSize] = useState(PAGE_SIZE);
   const [cycleLoading, setCycleLoading] = useState(false);
   const [cycleError, setCycleError] = useState('');
   const [opportunityQ, setOpportunityQ] = useState('');
@@ -331,8 +335,8 @@ export function CrmEducacionPage() {
 
   const contactParams = useMemo(() => ({
     categoria, q: debouncedContactQ, segment, attr_key: attrKey,
-    attr_value: debouncedAttrValue, page: contactPage, limit: PAGE_SIZE,
-  }), [categoria, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage]);
+    attr_value: debouncedAttrValue, page: contactPage, limit: contactPageSize,
+  }), [categoria, debouncedContactQ, segment, attrKey, debouncedAttrValue, contactPage, contactPageSize]);
   const loadContacts = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++contactRequestId.current;
     setContactLoading(true);
@@ -359,8 +363,8 @@ export function CrmEducacionPage() {
   }, [needsContacts, loadContacts]);
   const cycleParams = useMemo(() => ({
     categoria, channel, q: debouncedOpportunityQ, view: opportunityView,
-    page: cyclePage, limit: PAGE_SIZE,
-  }), [categoria, channel, debouncedOpportunityQ, opportunityView, cyclePage]);
+    page: cyclePage, limit: cyclePageSize,
+  }), [categoria, channel, debouncedOpportunityQ, opportunityView, cyclePage, cyclePageSize]);
   const loadCycles = useCallback(async (signal?: AbortSignal) => {
     const requestId = ++cycleRequestId.current;
     setCycleLoading(true);
@@ -1346,13 +1350,20 @@ export function CrmEducacionPage() {
             isRowExpanded={(contact) => expandedId === contact.contact_id}
             renderExpandedRow={renderContactEditor}
           />}
-        <div className="flex items-center justify-end gap-3 text-sm">
-          <span>Página {contactPage} de {Math.max(1, Math.ceil(contactTotal / PAGE_SIZE))}</span>
-          <Button variant="outline" disabled={contactPage <= 1}
-            onClick={() => setContactPage((page) => page - 1)}>Anterior</Button>
-          <Button variant="outline" disabled={contactPage * PAGE_SIZE >= contactTotal}
-            onClick={() => setContactPage((page) => page + 1)}>Siguiente</Button>
-        </div>
+        <Pagination
+          page={contactPage}
+          totalPages={Math.max(1, Math.ceil(contactTotal / contactPageSize))}
+          disabled={contactLoading}
+          onPageChange={setContactPage}
+          summary={`${contactTotal} en total`}
+          pageSize={contactPageSize}
+          pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+          onPageSizeChange={(size) => {
+            setContactPageSize(size);
+            setContactPage(1);
+          }}
+          showWhenSinglePage
+        />
       </TabsContent>
       <TabsContent value="opportunities" className="space-y-4">
         {cycleError && <AlertBanner variant="error">{cycleError}</AlertBanner>}
@@ -1490,13 +1501,20 @@ export function CrmEducacionPage() {
             />
           </div>
         )}
-        <div className="flex items-center justify-end gap-3 text-sm">
-          <span>Página {cyclePage} de {Math.max(1, Math.ceil(cycleTotal / PAGE_SIZE))}</span>
-          <Button variant="outline" disabled={cyclePage <= 1}
-            onClick={() => setCyclePage((page) => page - 1)}>Anterior</Button>
-          <Button variant="outline" disabled={cyclePage * PAGE_SIZE >= cycleTotal}
-            onClick={() => setCyclePage((page) => page + 1)}>Siguiente</Button>
-        </div>
+        <Pagination
+          page={cyclePage}
+          totalPages={Math.max(1, Math.ceil(cycleTotal / cyclePageSize))}
+          disabled={cycleLoading}
+          onPageChange={setCyclePage}
+          summary={`${cycleTotal} en total`}
+          pageSize={cyclePageSize}
+          pageSizeOptions={[...PAGE_SIZE_OPTIONS]}
+          onPageSizeChange={(size) => {
+            setCyclePageSize(size);
+            setCyclePage(1);
+          }}
+          showWhenSinglePage
+        />
         {opportunityView === 'review' && <div className="space-y-3 border-t pt-4">
           <div>
             <h3 className="text-sm font-semibold">Conflictos comerciales</h3>
@@ -1509,13 +1527,13 @@ export function CrmEducacionPage() {
             <EmptyState title="Sin conflictos comerciales" description="No hay captaciones pendientes de decisión." /> :
             <DataTable columns={reviewEntryColumns} data={reviewEntries}
               getRowId={(lead) => String(lead.id)} tableClassName="min-w-full" />}
-          <div className="flex items-center justify-end gap-3 text-sm">
-            <span>Página {reviewEntryPage} de {Math.max(1, Math.ceil(reviewEntryTotal / PAGE_SIZE))}</span>
-            <Button variant="outline" disabled={reviewEntryPage <= 1}
-              onClick={() => setReviewEntryPage((page) => page - 1)}>Anterior</Button>
-            <Button variant="outline" disabled={reviewEntryPage * PAGE_SIZE >= reviewEntryTotal}
-              onClick={() => setReviewEntryPage((page) => page + 1)}>Siguiente</Button>
-          </div>
+          <Pagination
+            page={reviewEntryPage}
+            totalPages={Math.max(1, Math.ceil(reviewEntryTotal / PAGE_SIZE))}
+            disabled={reviewEntryLoading}
+            onPageChange={setReviewEntryPage}
+            summary={`${reviewEntryTotal} en total`}
+          />
         </div>}
       </TabsContent>
       <TabsContent value="activities" className="space-y-4">
@@ -1691,11 +1709,12 @@ function HistorialLeadsPanel({ categoria }: { categoria: EducationCategoryScope 
       getRowId={(row) => row.id}
       tableClassName="min-w-full"
     />
-    <div className="flex items-center justify-end gap-3 text-sm">
-      <span>Página {page} de {Math.max(1, Math.ceil(Math.max(total, 1) / PAGE_SIZE))}</span>
-      <Button variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
-      <Button variant="outline" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>Siguiente</Button>
-    </div>
+    <Pagination
+      page={page}
+      totalPages={Math.max(1, Math.ceil(Math.max(total, 1) / PAGE_SIZE))}
+      onPageChange={setPage}
+      summary={`${total} en total`}
+    />
   </div>;
 }
 
@@ -2259,33 +2278,15 @@ function ActivityPanel() {
                 current === row.id ? null : row.id)}
               isRowExpanded={(row) => anuraExpandedId === row.id}
               renderExpandedRow={(row) => <AnuraCallDetail row={row} />}
-              footer={(anuraPages > 1 || anuraTotal > anuraPageSize) ? (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">
-                    Página {anuraPages === 0 ? 0 : anuraPage} de {Math.max(1, anuraPages)} · {anuraTotal} llamadas
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy || anuraPage <= 1}
-                      onClick={() => setAnuraPage((current) => Math.max(1, current - 1))}
-                    >
-                      <ChevronLeft className="size-4" /> Anterior
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy || anuraPage >= anuraPages}
-                      onClick={() => setAnuraPage((current) => current + 1)}
-                    >
-                      Siguiente <ChevronRight className="size-4" />
-                    </Button>
-                  </div>
-                </div>
-              ) : undefined}
+              footer={
+                <Pagination
+                  page={anuraPage}
+                  totalPages={Math.max(1, anuraPages)}
+                  disabled={busy}
+                  onPageChange={setAnuraPage}
+                  summary={`${anuraTotal} llamadas`}
+                />
+              }
             />
           </>}
     </div>

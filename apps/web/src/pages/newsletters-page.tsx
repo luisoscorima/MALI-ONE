@@ -22,22 +22,27 @@ import {
 import { EmailSendersPanel } from '@/components/email-senders-panel';
 import { NewsletterCampaignsRegistry } from '@/components/newsletter-campaigns-registry';
 import {
-  NEWSLETTER_FIRST_NAME_MERGE_TAG,
-  NEWSLETTER_LAST_NAME_MERGE_TAG,
-  NewsletterEditor,
-  type NewsletterEditorHandle,
-} from '@/components/newsletter-editor';
+  NewsletterEditorChrome,
+  NewsletterSubjectMergeButtons,
+  appendNewsletterSubjectTag,
+} from '@/components/newsletter-editor-chrome';
+import { type NewsletterEditorHandle } from '@/components/newsletter-editor';
 import { PageHeader } from '@/components/page-header';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { api } from '@/lib/api';
+import { ApiRequestError, api } from '@/lib/api';
 import { slugify } from '@/lib/coordinates';
+import {
+  exportNewsletterForSave,
+  preserveEditorExport,
+} from '@/lib/newsletter-editor-save';
 import {
   Badge,
   Button,
   Input,
   Label,
+  Pagination,
   Select,
   SelectContent,
   SelectItem,
@@ -63,6 +68,7 @@ export function NewslettersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const editorRef = useRef<NewsletterEditorHandle>(null);
+  const uploadedImages = useRef(new Map<string, string>());
   const openedFromQueryRef = useRef<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -183,12 +189,21 @@ export function NewslettersPage() {
     resetMeta();
   }
 
-  async function handleSave() {
-    const exported = editorRef.current?.getExport();
-    if (!exported?.htmlBody?.trim()) {
-      toast.error('El boletín no tiene contenido');
-      return;
+  function applyBrand(next: NewsletterBrand | null) {
+    try {
+      const exported = preserveEditorExport(editorRef);
+      if (exported) {
+        setInitialHtml(exported.htmlBody);
+        setInitialDesignJson(exported.designJson);
+      }
+      setBrand(next);
+      setEditorKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo cambiar la marca.');
     }
+  }
+
+  async function handleSave() {
     if (!title.trim() || !subject.trim()) {
       toast.error('Completa título y asunto');
       return;
@@ -200,6 +215,20 @@ export function NewslettersPage() {
 
     setSaving(true);
     try {
+      const exported = await exportNewsletterForSave(
+        editorRef,
+        async (file) => {
+          try {
+            return (await api.uploadNewsletterAsset(file, slug.trim() || editingId || 'library')).url;
+          } catch (uploadError) {
+            const message = uploadError instanceof ApiRequestError && uploadError.status === 413
+              ? 'La imagen supera el límite de carga.'
+              : uploadError instanceof Error ? uploadError.message : 'Error de carga.';
+            throw new Error(`No se pudo subir una imagen incrustada. ${message}`);
+          }
+        },
+        uploadedImages.current,
+      );
       if (mode === 'create') {
         await api.createNewsletter({
           slug: slug.trim().toLowerCase(),
@@ -499,33 +528,12 @@ export function NewslettersPage() {
                 </Table>
               </TableShell>
             )}
-            {listTotalPages > 1 ? (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={listPage <= 1 || loading}
-                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
-                >
-                  Anterior
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Página {listPage} de {listTotalPages}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={listPage >= listTotalPages || loading}
-                  onClick={() =>
-                    setListPage((p) => Math.min(listTotalPages, p + 1))
-                  }
-                >
-                  Siguiente
-                </Button>
-              </div>
-            ) : null}
+            <Pagination
+              page={listPage}
+              totalPages={listTotalPages}
+              disabled={loading}
+              onPageChange={setListPage}
+            />
           </TabsContent>
         </Tabs>
       ) : null}
@@ -559,9 +567,7 @@ export function NewslettersPage() {
               <Select
                 value={brand ?? 'none'}
                 onValueChange={(v) => {
-                  const next = v === 'none' ? null : (v as NewsletterBrand);
-                  setBrand(next);
-                  if (mode === 'create') setEditorKey((k) => k + 1);
+                  applyBrand(v === 'none' ? null : (v as NewsletterBrand));
                 }}
               >
                 <SelectTrigger>
@@ -580,34 +586,12 @@ export function NewslettersPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="subject">Asunto del correo</Label>
-                <div className="flex flex-wrap items-center justify-end gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() =>
-                      setSubject((current) =>
-                        `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
-                      )
-                    }
-                  >
-                    + {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() =>
-                      setSubject((current) =>
-                        `${current}${current && !/\s$/.test(current) ? ' ' : ''}${NEWSLETTER_LAST_NAME_MERGE_TAG}`,
-                      )
-                    }
-                  >
-                    + {NEWSLETTER_LAST_NAME_MERGE_TAG}
-                  </Button>
-                </div>
+                <NewsletterSubjectMergeButtons
+                  disabled={saving}
+                  onAppend={(tag) =>
+                    setSubject((current) => appendNewsletterSubjectTag(current, tag))
+                  }
+                />
               </div>
               <Input
                 id="subject"
@@ -632,60 +616,20 @@ export function NewslettersPage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <p className="text-xs text-muted-foreground">
-              En el panel izquierdo usa la categoría <strong>MALI</strong>:
-              cabecera, columnas, color por marca (Museo / Cursos / Extensión),
-              CTA entradas u outline, redes y pie
-              {brand
-                ? `. Con marca ${NEWSLETTER_BRAND_LABELS[brand]} también aparecen su header y footer.`
-                : '.'}{' '}
-              Selecciona un elemento y cambia color / alineación en Estilos a la
-              derecha. Para el saludo personalizado al enviar, usa{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-                {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-              </code>{' '}
-              y{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-                {NEWSLETTER_LAST_NAME_MERGE_TAG}
-              </code>
-              ; si el contacto no tiene nombre, se envía como estimado(a).
-            </p>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              {(
-                [
-                  ['Nombre', NEWSLETTER_FIRST_NAME_MERGE_TAG],
-                  ['Apellidos', NEWSLETTER_LAST_NAME_MERGE_TAG],
-                ] as const
-              ).map(([label, tag]) => (
-                <Button
-                  key={tag}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    const ok = editorRef.current?.insertNameMergeTag(tag);
-                    if (ok) {
-                      toast.success(`Se insertó «${label}» (${tag}) en el boletín`);
-                    } else {
-                      toast.error('No se pudo insertar la variable en el editor');
-                    }
-                  }}
-                >
-                  Insertar {tag}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          <NewsletterEditor
-            key={`${editorKey}-${brand ?? 'none'}`}
-            ref={editorRef}
+          <NewsletterEditorChrome
+            editorRef={editorRef}
+            editorKey={`${editorKey}-${brand ?? 'none'}`}
+            brand={brand}
             initialDesignJson={initialDesignJson}
             initialHtml={initialHtml}
-            brand={brand}
             assetScope={slug.trim() || editingId || 'library'}
+            disabled={saving}
+            onInsertSuccess={(label, tag) =>
+              toast.success(`Se insertó «${label}» (${tag}) en el boletín`)
+            }
+            onInsertError={() =>
+              toast.error('No se pudo insertar la variable en el editor')
+            }
           />
         </div>
       ) : null}

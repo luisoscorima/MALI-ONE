@@ -78,6 +78,8 @@ export type { TableDensity } from './table';
 export { TableShell } from './table-shell';
 export { DataTable } from './data-table';
 export type { DataTableColumnMeta } from './data-table';
+export { Pagination, buildPaginationItems } from './pagination';
+export type { PaginationProps, PaginationItem } from './pagination';
 export {
   Breadcrumb,
   BreadcrumbEllipsis,

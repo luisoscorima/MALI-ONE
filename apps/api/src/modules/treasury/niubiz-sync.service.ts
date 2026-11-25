@@ -1,7 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { BackgroundJobType } from '@prisma/client';
 import { execFile } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { BackgroundJobsService } from '../../core/background-jobs/background-jobs.service';
+import { isBackgroundProcess, shouldEnqueueBackgroundWork } from '../../core/process-role';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TreasuryPaymentsService } from './treasury-payments.service';
 import { parseNiubizRows } from './niubiz-import';
@@ -29,6 +32,7 @@ export class NiubizSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly payments: TreasuryPaymentsService,
+    private readonly jobs: BackgroundJobsService,
   ) {}
 
   private async resolveVaultItemId() {
@@ -61,15 +65,33 @@ export class NiubizSyncService {
   // Every 15 minutes in Lima; disabled until the first production login is verified.
   @Cron('0 */15 * * * *', { timeZone: 'America/Lima' })
   async scheduled() {
+    if (!isBackgroundProcess()) return;
     if (process.env.NIUBIZ_SYNC_ENABLED !== 'true') return;
     try {
-      await this.start({});
+      await this.start({}, undefined, { forceLocal: true });
     } catch (error) {
       if (!(error instanceof ConflictException)) this.logger.warn('NIUBIZ_SCHEDULE_NOT_STARTED');
     }
   }
 
-  async start(range: { from?: string; to?: string }, actor?: { id: string; email: string }) {
+  async start(
+    range: { from?: string; to?: string },
+    actor?: { id: string; email: string },
+    opts?: { forceLocal?: boolean },
+  ) {
+    if (!opts?.forceLocal && shouldEnqueueBackgroundWork()) {
+      const job = await this.jobs.enqueue(
+        BackgroundJobType.niubiz_sales_sync,
+        {
+          from: range.from ?? null,
+          to: range.to ?? null,
+          actorId: actor?.id ?? null,
+          actorEmail: actor?.email ?? null,
+        },
+        actor?.id,
+      );
+      return { runId: job.id, queued: true as const };
+    }
     if (!vaultRuntime.every((key) => !!process.env[key])) {
       throw new ServiceUnavailableException('Configura el acceso a Vaultwarden y el runtime Niubiz en el servidor.');
     }
@@ -131,9 +153,19 @@ export class NiubizSyncService {
     });
     if (!locked.count) throw new ConflictException('Ya existe una sincronización en curso.');
     // The durable lease survives process crashes; the UI marks an expired run interrupted.
-    void this.run(runId, from, to, vaultItemId, merchants.map((m) => m.reference), actor).catch(() =>
-      this.logger.error('NIUBIZ_RUN_STATE_WRITE_FAILED'),
-    );
+    const runPromise = this.run(
+      runId,
+      from,
+      to,
+      vaultItemId,
+      merchants.map((m) => m.reference),
+      actor,
+    ).catch(() => this.logger.error('NIUBIZ_RUN_STATE_WRITE_FAILED'));
+    if (opts?.forceLocal) {
+      await runPromise;
+    } else {
+      void runPromise;
+    }
     return { runId };
   }
 

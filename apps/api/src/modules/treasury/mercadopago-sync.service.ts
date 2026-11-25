@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { Prisma, User } from '@prisma/client';
+import { BackgroundJobType, Prisma, User } from '@prisma/client';
+import { BackgroundJobsService } from '../../core/background-jobs/background-jobs.service';
+import { shouldEnqueueBackgroundWork } from '../../core/process-role';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { MercadoPagoPaymentQueryDto } from './dto/treasury.dto';
 import { sanitizePaymentPayload } from './payment-payload';
@@ -26,7 +28,10 @@ const clip = (value: unknown, max: number) => {
 
 @Injectable()
 export class MercadoPagoSyncService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jobs: BackgroundJobsService,
+  ) {}
 
   private async source(sourceId: string) {
     const source = await this.prisma.treasurySource.findFirst({
@@ -45,7 +50,26 @@ export class MercadoPagoSyncService {
     return { configured: vaultRuntime.every(key => !!process.env[key]) && !!source.vaultItemId, lastRun };
   }
 
-  async start(sourceId: string, range: { from?: string; to?: string }, actor: Pick<User, 'id' | 'email'>) {
+  async start(
+    sourceId: string,
+    range: { from?: string; to?: string },
+    actor: Pick<User, 'id' | 'email'>,
+    opts?: { forceLocal?: boolean },
+  ) {
+    if (!opts?.forceLocal && shouldEnqueueBackgroundWork()) {
+      const job = await this.jobs.enqueue(
+        BackgroundJobType.mercadopago_sync,
+        {
+          sourceId,
+          from: range.from ?? null,
+          to: range.to ?? null,
+          actorId: actor.id,
+          actorEmail: actor.email,
+        },
+        actor.id,
+      );
+      return { runId: job.id, queued: true as const };
+    }
     if (!vaultRuntime.every(key => !!process.env[key])) {
       throw new ServiceUnavailableException('Configura el acceso a Vaultwarden y el runtime en el servidor.');
     }
@@ -67,7 +91,12 @@ export class MercadoPagoSyncService {
         leaseUntil: new Date(now.getTime() + 90 * 60000), fromDate: from, toDate: to, errorCode: null, rowCount: 0 },
     });
     if (!locked.count) throw new ConflictException('Ya existe una sincronización en curso.');
-    void this.run(sourceId, source.vaultItemId, runId, from, to, actor);
+    const runPromise = this.run(sourceId, source.vaultItemId, runId, from, to, actor);
+    if (opts?.forceLocal) {
+      await runPromise;
+    } else {
+      void runPromise;
+    }
     return { runId };
   }
 

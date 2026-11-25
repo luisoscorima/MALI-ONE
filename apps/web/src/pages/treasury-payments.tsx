@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Pagination,
   Switch,
   Table,
   TableBody,
@@ -359,27 +360,15 @@ export function TreasuryPayments({
             </TableShell>
           )}
 
-          {data.total > 0 && (
-            <div className="flex items-center justify-between gap-3">
-              <Button
-                variant="outline"
-                disabled={filters.page <= 1}
-                onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm tabular-nums">
-                Página {data.page} de {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                disabled={filters.page * data.pageSize >= data.total}
-                onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
+          {data.total > 0 ? (
+            <Pagination
+              page={data.page}
+              totalPages={totalPages}
+              onPageChange={(page) => setFilters((f) => ({ ...f, page }))}
+              summary={`${data.total} en total`}
+              showWhenSinglePage
+            />
+          ) : null}
         </>
       ) : null}
 

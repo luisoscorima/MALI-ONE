@@ -6,6 +6,34 @@ services:
     environment:
       NODE_ENV: production
       TRUST_PROXY: 'true'
+      PROCESS_ROLE: http
+
+  api-worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      TRUST_PROXY: 'true'
+      PROCESS_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - ${GOOGLE_SECRETS_DIR:-./secrets}:/run/secrets:ro
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health/ready']
+      interval: 20s
+      timeout: 5s
+      retries: 5
 
   web:
     container_name: mali-one-web

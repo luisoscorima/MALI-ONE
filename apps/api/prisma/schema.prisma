@@ -1582,3 +1582,36 @@ model OperationalService {
   @@index([status])
   @@index([ownerId, sortOrder])
 }
+
+/// Cross-process work queue: HTTP enqueues, worker claims (Niubiz/Playwright, ingest, etc.).
+enum BackgroundJobType {
+  niubiz_sales_sync
+  niubiz_paycash_sync
+  mercadopago_sync
+  prospectia_ingest
+}
+
+enum BackgroundJobStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+model BackgroundJob {
+  id          String              @id @default(cuid())
+  type        BackgroundJobType
+  status      BackgroundJobStatus @default(pending)
+  payload     Json?
+  createdById String?
+  error       String?             @db.VarChar(2000)
+  attempts    Int                 @default(0)
+  lockedAt    DateTime?
+  lockedBy    String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  finishedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([type, status])
+}

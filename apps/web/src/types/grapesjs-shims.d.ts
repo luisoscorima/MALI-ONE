@@ -14,6 +14,10 @@ declare module 'grapesjs-preset-newsletter' {
     importPlaceholder?: string;
     cellStyle?: Record<string, string>;
     blocks?: string[];
+    block?: (blockId: string) => Record<string, unknown>;
+    updateStyleManager?: boolean;
+    showStylesOnChange?: boolean;
+    showBlocksOnLoad?: boolean;
   };
 
   const plugin: Plugin<NewsletterPluginOptions>;

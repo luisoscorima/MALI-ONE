@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { EmailCampaignStatus, EmailSendStatus, Prisma } from '@prisma/client';
 import { MALICHIMP_ELIGIBLE_CONTACT_SQL } from '../../modules/malichimp/lib/malichimp-eligibility';
+import { isBackgroundProcess } from '../process-role';
 import { PrismaService } from '../prisma/prisma.service';
 import { applyEmailMergeTags, emailSendNames } from './email-merge-tags';
 import { EmailDeliveryService } from './email-delivery.service';
@@ -32,6 +33,7 @@ export class EmailCampaignDispatcherService {
 
   @Cron('*/5 * * * * *')
   async processQueue() {
+    if (!isBackgroundProcess()) return;
     if (this.processing || !this.delivery.status.configured) return;
     this.processing = true;
     try {

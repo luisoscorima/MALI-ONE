@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Prisma } from '@prisma/client';
+import { BackgroundJobType, Prisma } from '@prisma/client';
+import { BackgroundJobsService } from '../../../core/background-jobs/background-jobs.service';
+import { isBackgroundProcess, shouldEnqueueBackgroundWork } from '../../../core/process-role';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 import {
   ProspectiaClientService,
@@ -37,6 +39,7 @@ export class ProspectiaIngestService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly prospectia: ProspectiaClientService,
+    private readonly jobs: BackgroundJobsService,
   ) {}
 
   async status() {
@@ -60,21 +63,37 @@ export class ProspectiaIngestService {
   /** Cron cada 10 min (Lima). Sin token no corre. */
   @Cron('0 */10 * * * *', { timeZone: 'America/Lima' })
   async cronIngest() {
+    if (!isBackgroundProcess()) return;
     if (!this.prospectia.enabled) return;
     await this.run({ mode: 'incremental', maxPages: MAX_PAGES_PER_RUN });
   }
 
-  async start(opts?: { mode?: 'incremental' | 'backfill'; maxPages?: number }) {
+  async start(
+    opts?: { mode?: 'incremental' | 'backfill'; maxPages?: number },
+    startOpts?: { forceLocal?: boolean },
+  ) {
     if (!this.prospectia.enabled) {
       return { started: false, reason: 'no_token' as const };
+    }
+    if (!startOpts?.forceLocal && shouldEnqueueBackgroundWork()) {
+      await this.jobs.enqueue(BackgroundJobType.prospectia_ingest, {
+        mode: opts?.mode ?? 'incremental',
+        maxPages: opts?.maxPages ?? MAX_PAGES_PER_RUN,
+      });
+      return { started: true as const, queued: true as const };
     }
     if (this.running) {
       return { started: false, reason: 'already_running' as const };
     }
-    void this.run({
-      mode: opts?.mode ?? 'incremental',
+    const runOpts = {
+      mode: opts?.mode ?? 'incremental' as const,
       maxPages: opts?.maxPages ?? MAX_PAGES_PER_RUN,
-    });
+    };
+    if (startOpts?.forceLocal) {
+      await this.run(runOpts);
+    } else {
+      void this.run(runOpts);
+    }
     return { started: true as const };
   }
 

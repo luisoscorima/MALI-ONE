@@ -12,6 +12,7 @@ import {
   Card,
   Checkbox,
   Input,
+  Pagination,
   Table,
   TableBody,
   TableCell,
@@ -424,34 +425,14 @@ export function MalichimpCampaignStatsPanel({
           </TableShell>
 
           {sends ? (
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground tabular-nums">
-                {nf.format(sends.total)} resultado{sends.total === 1 ? '' : 's'}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={sendsPage <= 1 || sendsLoading}
-                  onClick={() => setSendsPage((p) => Math.max(1, p - 1))}
-                >
-                  Anterior
-                </Button>
-                <span className="tabular-nums">
-                  {sends.page}/{sends.pages}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={sendsPage >= sends.pages || sendsLoading}
-                  onClick={() => setSendsPage((p) => p + 1)}
-                >
-                  Siguiente
-                </Button>
-              </div>
-            </div>
+            <Pagination
+              page={sends.page}
+              totalPages={Math.max(1, sends.pages)}
+              disabled={sendsLoading}
+              onPageChange={setSendsPage}
+              summary={`${nf.format(sends.total)} resultado${sends.total === 1 ? '' : 's'}`}
+              showWhenSinglePage
+            />
           ) : null}
         </Card>
       ) : null}

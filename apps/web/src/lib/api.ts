@@ -2457,11 +2457,19 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  listCrmPamPayments: (signal?: AbortSignal) =>
-    request<import('@mali-one/shared').PamRegistrationDto[]>(
-      '/api/crm-pam/payments',
+  listCrmPamPayments: (
+    params?: { page?: number; limit?: number },
+    signal?: AbortSignal,
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.page != null) qs.set('page', String(params.page));
+    if (params?.limit != null) qs.set('limit', String(params.limit));
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return request<import('@mali-one/shared').PaginatedPamPaymentsDto>(
+      `/api/crm-pam/payments${suffix}`,
       { signal },
-    ),
+    );
+  },
 
   listCrmPamPaymentMethods: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').PamPaymentMethodDto[]>(

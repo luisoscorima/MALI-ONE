@@ -103,10 +103,24 @@ export class CrmPamService {
     return this.crm.patchContact(contactId, dto, 'pam');
   }
 
-  listPayments() {
-    return this.prisma.pamRegistration.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async listPayments(query: { page?: number; limit?: number } = {}) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const [total, items] = await Promise.all([
+      this.prisma.pamRegistration.count(),
+      this.prisma.pamRegistration.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+    return {
+      items,
+      total,
+      page,
+      limit,
+      pages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 
   async ensureDefaultPaymentMethod() {

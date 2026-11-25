@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { isBackgroundProcess } from '../../core/process-role';
 import { SftpgoFilesService } from './sftpgo-files.service';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class SftpgoFilesSchedulerService {
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async purgeTrash() {
+    if (!isBackgroundProcess()) return;
     try {
       const purged = await this.files.purgeExpiredTrash();
       if (purged > 0) {

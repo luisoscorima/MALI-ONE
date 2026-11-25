@@ -6,6 +6,7 @@ import { PrismaModule } from './core/prisma/prisma.module';
 import { QrModule } from './core/qr/qr.module';
 import { RedisModule } from './core/redis/redis.module';
 import { S3Module } from './core/s3/s3.module';
+import { BackgroundJobsModule } from './core/background-jobs/background-jobs.module';
 import { EventLoopLagService } from './core/observability/event-loop-lag.service';
 import { HttpTimingInterceptor } from './core/observability/http-timing.interceptor';
 import { RequestIdMiddleware } from './core/observability/request-id.middleware';
@@ -44,6 +45,7 @@ import { InternalCommunicationsModule } from './modules/internal-communications/
     ScheduleModule.forRoot(),
     PrismaModule,
     RedisModule,
+    BackgroundJobsModule,
     S3Module,
     QrModule,
     EmailDeliveryModule,

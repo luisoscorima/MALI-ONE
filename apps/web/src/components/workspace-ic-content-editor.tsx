@@ -6,13 +6,18 @@ import {
   NEWSLETTER_BRAND_LABELS,
 } from '@mali-one/shared';
 import {
-  NEWSLETTER_FIRST_NAME_MERGE_TAG,
-  NewsletterEditor,
-  type NewsletterEditorHandle,
-} from '@/components/newsletter-editor';
+  NewsletterEditorChrome,
+  NewsletterSubjectMergeButtons,
+  appendNewsletterSubjectTag,
+} from '@/components/newsletter-editor-chrome';
+import { type NewsletterEditorHandle } from '@/components/newsletter-editor';
 import { AlertBanner } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { ApiRequestError, api } from '@/lib/api';
+import {
+  exportNewsletterForSave,
+  preserveEditorExport,
+} from '@/lib/newsletter-editor-save';
 import {
   Button,
   Input,
@@ -40,6 +45,7 @@ export function WorkspaceIcContentEditor({
 }) {
   const toast = useToast();
   const editorRef = useRef<NewsletterEditorHandle>(null);
+  const uploadedImages = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -80,21 +86,20 @@ export function WorkspaceIcContentEditor({
   }, [load]);
 
   function applyBrand(next: NewsletterBrand | null) {
-    const exported = editorRef.current?.getExport();
-    if (exported?.htmlBody?.trim()) {
-      setInitialHtml(exported.htmlBody);
-      setInitialDesignJson(exported.designJson ?? null);
+    try {
+      const exported = preserveEditorExport(editorRef);
+      if (exported) {
+        setInitialHtml(exported.htmlBody);
+        setInitialDesignJson(exported.designJson ?? null);
+      }
+      setBrand(next);
+      setEditorKey((k) => k + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo cambiar la marca.');
     }
-    setBrand(next);
-    setEditorKey((k) => k + 1);
   }
 
   async function handleSave() {
-    const exported = editorRef.current?.getExport();
-    if (!exported?.htmlBody?.trim()) {
-      toast.error('El contenido no tiene HTML');
-      return;
-    }
     if (!title.trim() || !subject.trim()) {
       toast.error('Completa título y asunto');
       return;
@@ -102,6 +107,20 @@ export function WorkspaceIcContentEditor({
     setSaving(true);
     setSaveConflict(false);
     try {
+      const exported = await exportNewsletterForSave(
+        editorRef,
+        async (file) => {
+          try {
+            return (await api.uploadNewsletterAsset(file, contentId ?? 'library')).url;
+          } catch (uploadError) {
+            const message = uploadError instanceof ApiRequestError && uploadError.status === 413
+              ? 'La imagen supera el límite de carga.'
+              : uploadError instanceof Error ? uploadError.message : 'Error de carga.';
+            throw new Error(`No se pudo subir una imagen incrustada. ${message}`);
+          }
+        },
+        uploadedImages.current,
+      );
       if (mode === 'create') {
         const created = await api.createInternalContent({
           title: title.trim(),
@@ -212,21 +231,32 @@ export function WorkspaceIcContentEditor({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
+            disabled={saving}
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="ic-content-subject">Asunto</Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="ic-content-subject">Asunto</Label>
+            <NewsletterSubjectMergeButtons
+              disabled={saving}
+              onAppend={(tag) =>
+                setSubject((current) => appendNewsletterSubjectTag(current, tag))
+              }
+            />
+          </div>
           <Input
             id="ic-content-subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             maxLength={200}
+            disabled={saving}
           />
         </div>
         <div className="space-y-1">
           <Label>Marca (opcional)</Label>
           <Select
             value={brand ?? 'none'}
+            disabled={saving}
             onValueChange={(v) => {
               applyBrand(v === 'none' ? null : (v as NewsletterBrand));
             }}
@@ -246,38 +276,16 @@ export function WorkspaceIcContentEditor({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          Para el saludo personalizado usa{' '}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-            {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-          </code>
-          .
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const ok = editorRef.current?.insertFirstNameMergeTag();
-            if (ok) {
-              toast.success(`Se insertó ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`);
-            } else {
-              toast.error('No se pudo insertar la variable');
-            }
-          }}
-        >
-          Insertar {NEWSLETTER_FIRST_NAME_MERGE_TAG}
-        </Button>
-      </div>
-
-      <NewsletterEditor
-        key={`${editorKey}-${brand ?? 'none'}-${mode}`}
-        ref={editorRef}
+      <NewsletterEditorChrome
+        editorRef={editorRef}
+        editorKey={`${editorKey}-${brand ?? 'none'}-${mode}`}
+        brand={brand}
         initialDesignJson={initialDesignJson}
         initialHtml={initialHtml}
-        brand={brand}
         assetScope={contentId ?? 'library'}
+        disabled={saving}
+        onInsertSuccess={(label) => toast.success(`Se insertó «${label}»`)}
+        onInsertError={() => toast.error('No se pudo insertar la variable')}
       />
     </div>
   );

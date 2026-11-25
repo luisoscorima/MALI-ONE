@@ -11,6 +11,7 @@ import {
   SQSClient,
 } from '@aws-sdk/client-sqs';
 import { optionalAwsCredentials } from '../aws/aws-client-options';
+import { isBackgroundProcess } from '../process-role';
 import { SesEventProcessorService } from './ses-event-processor.service';
 
 @Injectable()
@@ -42,6 +43,10 @@ export class SesEventConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
+    if (!isBackgroundProcess()) {
+      this.logger.log('Consumidor SES/SQS omitido (PROCESS_ROLE=http)');
+      return;
+    }
     if (!this.client) {
       this.logger.warn('Consumidor SES/SQS deshabilitado: falta AWS_SES_EVENTS_QUEUE_URL');
       return;

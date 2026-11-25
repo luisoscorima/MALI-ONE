@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { randomUUID } from 'node:crypto';
-import { Prisma } from '@prisma/client';
+import { BackgroundJobType, Prisma } from '@prisma/client';
+import { BackgroundJobsService } from '../../core/background-jobs/background-jobs.service';
+import { isBackgroundProcess, shouldEnqueueBackgroundWork } from '../../core/process-role';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { TreasuryPaymentQueryDto } from './dto/treasury.dto';
 import { NiubizSyncService } from './niubiz-sync.service';
@@ -21,7 +23,11 @@ const stateId = 'niubiz_paycash';
 @Injectable()
 export class NiubizPayCashService {
   private readonly logger = new Logger(NiubizPayCashService.name);
-  constructor(private readonly prisma: PrismaService, private readonly niubiz: NiubizSyncService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly niubiz: NiubizSyncService,
+    private readonly jobs: BackgroundJobsService,
+  ) {}
 
   private async merchant() {
     const target = await resolvePayCashMerchant(this.prisma);
@@ -57,15 +63,30 @@ export class NiubizPayCashService {
   // Offset +7 min from Ventas so both do not open Vault/login at the same second.
   @Cron('0 7,22,37,52 * * * *', { timeZone: 'America/Lima' })
   async scheduled() {
+    if (!isBackgroundProcess()) return;
     if (process.env.NIUBIZ_SYNC_ENABLED !== 'true') return;
     try {
-      await this.start();
+      await this.start(undefined, { forceLocal: true });
     } catch (error) {
       if (!(error instanceof ConflictException)) this.logger.warn('PAYCASH_SCHEDULE_NOT_STARTED');
     }
   }
 
-  async start(actor?: { id: string; email: string }) {
+  async start(
+    actor?: { id: string; email: string },
+    opts?: { forceLocal?: boolean },
+  ) {
+    if (!opts?.forceLocal && shouldEnqueueBackgroundWork()) {
+      const job = await this.jobs.enqueue(
+        BackgroundJobType.niubiz_paycash_sync,
+        {
+          actorId: actor?.id ?? null,
+          actorEmail: actor?.email ?? null,
+        },
+        actor?.id,
+      );
+      return { runId: job.id, queued: true as const };
+    }
     if (!(await this.niubiz.status()).configured) {
       throw new ServiceUnavailableException('Configura el acceso de Niubiz Comercio en el servidor.');
     }
@@ -82,7 +103,14 @@ export class NiubizPayCashService {
         rowCount: 0, createdCount: 0, updatedCount: 0 },
     });
     if (!locked.count) throw new ConflictException('Ya existe una actualización de PagoEfectivo en curso.');
-    void this.run(runId, paycash.reference, actor).catch(() => this.logger.error('PAYCASH_RUN_STATE_WRITE_FAILED'));
+    const runPromise = this.run(runId, paycash.reference, actor).catch(() =>
+      this.logger.error('PAYCASH_RUN_STATE_WRITE_FAILED'),
+    );
+    if (opts?.forceLocal) {
+      await runPromise;
+    } else {
+      void runPromise;
+    }
     return { runId };
   }
 

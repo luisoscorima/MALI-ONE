@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { CopyableValue } from '@/components/copyable-value';
 import { EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { api, type EducationCategoryScope } from '@/lib/api';
 import {
-  Badge, Button, DataTable, Input, Label, Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
+  Badge, Button, DataTable, Input, Label, Pagination, Select, SelectContent,
+  SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui';
 
 type BandejaRow = Awaited<ReturnType<typeof api.listCrmEducationBandeja>>['items'][number];
@@ -435,33 +434,17 @@ export function CrmEducacionBandejaPanel({
                 )}
               </div>
             )}
-            footer={(pages > 1 || total > PAGE_SIZE) ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-sm text-muted-foreground">
-                  Página {page} de {pages} · {total} filas
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={page <= 1}
-                    onClick={() => { const next = page - 1; setPage(next); void load(next); }}
-                  >
-                    <ChevronLeft className="size-4" /> Anterior
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={page >= pages}
-                    onClick={() => { const next = page + 1; setPage(next); void load(next); }}
-                  >
-                    Siguiente <ChevronRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            ) : undefined}
+            footer={
+              <Pagination
+                page={page}
+                totalPages={Math.max(1, pages)}
+                onPageChange={(next) => {
+                  setPage(next);
+                  void load(next);
+                }}
+                summary={`${total} filas`}
+              />
+            }
           />
         )}
     </div>

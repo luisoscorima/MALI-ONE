@@ -77,8 +77,14 @@ export class CrmPamController {
 
   @Get('payments')
   @RequirePermission('pam.registros.read')
-  listPayments() {
-    return this.crmPam.listPayments();
+  listPayments(
+    @Query('page') pageRaw?: string,
+    @Query('limit') limitRaw?: string,
+  ) {
+    return this.crmPam.listPayments({
+      page: pageRaw ? Number(pageRaw) : 1,
+      limit: limitRaw ? Number(limitRaw) : 50,
+    });
   }
 
   @Get('payment-methods')

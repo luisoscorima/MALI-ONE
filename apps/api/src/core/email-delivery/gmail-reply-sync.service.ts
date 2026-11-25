@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { google, gmail_v1 } from 'googleapis';
+import { isBackgroundProcess } from '../process-role';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   baseMailboxFromReplyTo,
@@ -35,6 +36,7 @@ export class GmailReplySyncService {
 
   @Cron('*/5 * * * *')
   async pollReplies() {
+    if (!isBackgroundProcess()) return;
     if (!this.enabled() || this.running) return;
     this.running = true;
     try {

@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/toast-context';
 import { Spinner } from '@/components/feedback';
 import { TreasuryStatusBadge, TreasuryStatusFilter } from './treasury-status';
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-  Input, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
+  Input, Pagination, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
 
 const emptyFilters = { q: '', status: '', from: '', to: '', page: 1 };
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PE', {
@@ -183,11 +183,15 @@ export function NiubizPayCashPayments({ updateOpen, onUpdateOpenChange, refreshK
           : <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
             {hasFilters ? 'No hay operaciones para estos filtros.' : 'Todavía no hay operaciones guardadas. Actualiza PagoEfectivo para consultar Niubiz.'}
           </div>}
-        {data.total > 0 && <div className="flex items-center justify-between gap-3 text-sm">
-          <Button variant="outline" disabled={filters.page <= 1} onClick={() => setFilters(current => ({ ...current, page: current.page - 1 }))}>Anterior</Button>
-          <span>Página {data.page} de {Math.max(1, Math.ceil(data.total / data.pageSize))}</span>
-          <Button variant="outline" disabled={filters.page * data.pageSize >= data.total} onClick={() => setFilters(current => ({ ...current, page: current.page + 1 }))}>Siguiente</Button>
-        </div>}
+        {data.total > 0 ? (
+          <Pagination
+            page={data.page}
+            totalPages={Math.max(1, Math.ceil(data.total / data.pageSize))}
+            onPageChange={(page) => setFilters((current) => ({ ...current, page }))}
+            summary={`${data.total} en total`}
+            showWhenSinglePage
+          />
+        ) : null}
       </>}
     <Dialog open={updateOpen} onOpenChange={onUpdateOpenChange}><DialogContent>
       <DialogHeader>

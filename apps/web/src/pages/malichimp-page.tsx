@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Download,
   FileArchive,
   FileSpreadsheet,
@@ -49,6 +47,7 @@ import {
   DialogTitle,
   Input,
   Label,
+  Pagination,
   Select,
   SelectContent,
   SelectGroup,
@@ -631,17 +630,14 @@ export function MalichimpPage() {
         </TableShell>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">
-          <span className="text-muted-foreground">{nf.format(total)} resultado{total === 1 ? '' : 's'}</span>
-          <div className="flex items-center gap-2">
-            <span className="tabular-nums">Página {page} de {pages}</span>
-            <Button size="icon" variant="outline" aria-label="Página anterior" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button size="icon" variant="outline" aria-label="Página siguiente" disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
+        <div className="border-t p-4">
+          <Pagination
+            page={page}
+            totalPages={Math.max(1, pages)}
+            onPageChange={setPage}
+            summary={`${nf.format(total)} resultado${total === 1 ? '' : 's'}`}
+            showWhenSinglePage
+          />
         </div>
           </Card>
         </TabsContent>

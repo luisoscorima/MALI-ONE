@@ -1415,6 +1415,14 @@ export interface PamRegistrationDto {
   expiryDate: string | null;
 }
 
+export interface PaginatedPamPaymentsDto {
+  items: PamRegistrationDto[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
 /** Único medio de pago de sistema / default del widget. */
 export const PAM_DEFAULT_PAYMENT_METHOD = 'mercado_pago';
 

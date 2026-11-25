@@ -34,6 +34,33 @@ export type NewsletterEditorHandle = {
   insertNameMergeTag: (tag: string) => boolean;
 };
 
+function componentTag(component: Component): string {
+  return String(component.get('tagName') ?? '').toLowerCase();
+}
+
+function isTextLikeComponent(component: Component): boolean {
+  const type = String(component.get('type') ?? '');
+  if (type === 'text' || type === 'textnode' || type === 'link') return true;
+  const tag = componentTag(component);
+  if (['img', 'table', 'tbody', 'thead', 'tr', 'colgroup', 'col', 'br', 'hr'].includes(tag)) {
+    return false;
+  }
+  return ['p', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'li', 'label', 'td', 'th'].includes(tag)
+    || Boolean(component.get('editable'));
+}
+
+function findTextInsertTarget(component: Component): Component | undefined {
+  if (isTextLikeComponent(component)) return component;
+  const byType = component.findType('text');
+  if (byType.length) return byType[0];
+  for (const selector of ['p', 'span', 'h1', 'h2', 'h3', 'h4', 'a', 'td'] as const) {
+    const matches = component.find(selector);
+    const hit = matches.find((item) => isTextLikeComponent(item));
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
 function insertNameMergeTag(editor: Editor, tag = NEWSLETTER_FIRST_NAME_MERGE_TAG): boolean {
   const frame = editor.Canvas.getFrameEl();
   const doc = frame?.contentDocument;
@@ -47,16 +74,21 @@ function insertNameMergeTag(editor: Editor, tag = NEWSLETTER_FIRST_NAME_MERGE_TA
 
   const selected = editor.getSelected();
   if (selected) {
-    selected.append(`<span>${tag}</span>`);
-    return true;
+    const target = findTextInsertTarget(selected);
+    if (target) {
+      target.append(`<span>${tag}</span>`);
+      return true;
+    }
   }
 
   const wrapper = editor.getWrapper();
   if (!wrapper) return false;
-  wrapper.append(
-    `<div data-gjs-type="text" style="font-family:${FONT};font-size:14px;color:${MALI_BLACK};padding:8px 0">Hola ${tag},</div>`,
-  );
-  return true;
+  const fallback = findTextInsertTarget(wrapper);
+  if (fallback) {
+    fallback.append(`<span>${tag}</span>`);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -82,8 +114,18 @@ type NewsletterEditorProps = {
   brand?: NewsletterBrand | null;
   /** S3 key scope under newsletters/{scope}/… (content id, slug, or library). */
   assetScope?: string;
+  /** When true (default), show the URL field for the selected button/link. */
   editLinks?: boolean;
   className?: string;
+};
+
+const PRESET_BLOCK_LABELS: Record<string, string> = {
+  sect100: 'Sección 1',
+  sect50: 'Sección 1/2',
+  text: 'Texto',
+  image: 'Imagen',
+  link: 'Enlace',
+  divider: 'Separador básico',
 };
 
 function getSelectedLink(editor: Editor): Component | undefined {
@@ -619,7 +661,7 @@ export const NewsletterEditor = forwardRef<
     initialHtml,
     brand = null,
     assetScope = 'library',
-    editLinks = false,
+    editLinks = true,
     className,
   },
   ref,
@@ -726,10 +768,13 @@ export const NewsletterEditor = forwardRef<
         embedAsBase64: false,
         upload: false,
         autoAdd: true,
-        uploadFile: async function uploadNewsletterFiles(ev: {
-          dataTransfer?: DataTransfer | null;
-          target?: EventTarget | null;
-        }) {
+        uploadFile: async function uploadNewsletterFiles(
+          ev: {
+            dataTransfer?: DataTransfer | null;
+            target?: EventTarget | null;
+          },
+          clb?: (response: { data: Array<string | { src: string }> }) => void,
+        ) {
           const input = ev.target instanceof HTMLInputElement ? ev.target : null;
           const files = Array.from(ev.dataTransfer?.files ?? input?.files ?? []);
           if (input) input.value = '';
@@ -764,6 +809,10 @@ export const NewsletterEditor = forwardRef<
               }
             }
 
+            if (firstSrc && typeof clb === 'function') {
+              clb({ data: [firstSrc] });
+            }
+
             // The picker still contains the uploaded assets if auto-selection is unavailable.
             try {
               const select = (
@@ -791,6 +840,13 @@ export const NewsletterEditor = forwardRef<
       plugins: [
         (ed) =>
           newsletterPlugin(ed, {
+            updateStyleManager: false,
+            blocks: ['sect100', 'sect50', 'text', 'image', 'link', 'divider'],
+            block: (blockId) => ({
+              label: PRESET_BLOCK_LABELS[blockId] ?? blockId,
+              category: 'Básico',
+              attributes: { title: PRESET_BLOCK_LABELS[blockId] ?? blockId },
+            }),
             modalTitleImport: 'Importar HTML',
             modalTitleExport: 'Exportar HTML',
             modalLabelImport:
@@ -820,6 +876,14 @@ export const NewsletterEditor = forwardRef<
               'margin',
               'padding',
             ],
+            properties: [
+              { property: 'width', name: 'Ancho' },
+              { property: 'height', name: 'Alto' },
+              { property: 'max-width', name: 'Ancho máximo' },
+              { property: 'min-height', name: 'Alto mínimo' },
+              { property: 'margin', name: 'Margen' },
+              { property: 'padding', name: 'Relleno' },
+            ],
           },
           {
             id: TYPOGRAPHY_SECTOR,
@@ -834,6 +898,7 @@ export const NewsletterEditor = forwardRef<
               'line-height',
               'text-align',
               'text-decoration',
+              'font-style',
             ],
             properties: [
               {
@@ -854,6 +919,44 @@ export const NewsletterEditor = forwardRef<
                   { id: 'Trebuchet MS, Helvetica, sans-serif', label: 'Trebuchet MS' },
                 ],
               },
+              { property: 'font-size', name: 'Tamaño' },
+              { property: 'font-weight', name: 'Peso' },
+              { property: 'letter-spacing', name: 'Espaciado' },
+              { property: 'color', name: 'Color de texto' },
+              { property: 'line-height', name: 'Interlineado' },
+              {
+                property: 'text-align',
+                name: 'Alineación',
+                type: 'radio',
+                default: 'left',
+                options: [
+                  { id: 'left', label: 'Izq.' },
+                  { id: 'center', label: 'Centro' },
+                  { id: 'right', label: 'Der.' },
+                  { id: 'justify', label: 'Justificar' },
+                ],
+              },
+              {
+                property: 'text-decoration',
+                name: 'Decoración',
+                type: 'radio',
+                default: 'none',
+                options: [
+                  { id: 'none', label: 'Ninguna' },
+                  { id: 'underline', label: 'Subrayado' },
+                  { id: 'line-through', label: 'Tachado' },
+                ],
+              },
+              {
+                property: 'font-style',
+                name: 'Estilo',
+                type: 'radio',
+                default: 'normal',
+                options: [
+                  { id: 'normal', label: 'Normal' },
+                  { id: 'italic', label: 'Cursiva' },
+                ],
+              },
             ],
           },
           {
@@ -861,10 +964,13 @@ export const NewsletterEditor = forwardRef<
             open: true,
             buildProps: [
               'background-color',
-              'color',
               'border-radius',
               'border',
-              'background',
+            ],
+            properties: [
+              { property: 'background-color', name: 'Fondo' },
+              { property: 'border-radius', name: 'Radio' },
+              { property: 'border', name: 'Borde' },
             ],
           },
         ],
@@ -873,11 +979,14 @@ export const NewsletterEditor = forwardRef<
 
     const panels = editor.Panels;
     // El preset llama setDevice('Desktop'|'Mobile portrait'); re-mapear a Escritorio/Móvil.
+    // `stop` vacío evita que GrapesJS desactive el botón al instante (noStop).
     editor.Commands.add('set-device-desktop', {
       run: (ed) => ed.setDevice('Escritorio'),
+      stop: () => undefined,
     });
     editor.Commands.add('set-device-mobile', {
       run: (ed) => ed.setDevice('Móvil'),
+      stop: () => undefined,
     });
     editor.Commands.add('insert-merge-first-name', {
       run: (ed) => {
@@ -911,7 +1020,8 @@ export const NewsletterEditor = forwardRef<
         title: `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG} (apellidos del contacto al enviar)`,
       },
     });
-    for (const [panel, id, title] of [
+
+    const spanishButtonTitles: Array<[string, string, string]> = [
       ['devices-c', 'set-device-desktop', 'Escritorio'],
       ['devices-c', 'set-device-mobile', 'Móvil'],
       ['options', 'undo', 'Deshacer'],
@@ -920,27 +1030,24 @@ export const NewsletterEditor = forwardRef<
       ['options', 'preview', 'Vista previa'],
       ['options', 'fullscreen', 'Pantalla completa'],
       ['options', 'export-template', 'Ver código HTML'],
-      [
-        'options',
-        'gjs-open-import-template',
-        'Importar HTML (reemplaza todo el boletín)',
-      ],
-      [
-        'options',
-        'insert-merge-first-name',
-        `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`,
-      ],
-      [
-        'options',
-        'insert-merge-last-name',
-        `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG}`,
-      ],
-    ] as const) {
-      const btn = panels.getButton(panel, id);
-      if (btn) {
-        btn.set('attributes', { ...(btn.get('attributes') ?? {}), title });
+      ['options', 'gjs-open-import-template', 'Importar HTML (reemplaza todo el boletín)'],
+      ['options', 'insert-merge-first-name', `Insertar ${NEWSLETTER_FIRST_NAME_MERGE_TAG}`],
+      ['options', 'insert-merge-last-name', `Insertar ${NEWSLETTER_LAST_NAME_MERGE_TAG}`],
+      ['views', 'open-sm', 'Estilos'],
+      ['views', 'open-tm', 'Ajustes'],
+      ['views', 'open-layers', 'Capas'],
+      ['views', 'open-blocks', 'Bloques'],
+    ];
+    const applySpanishTitles = () => {
+      for (const [panel, id, title] of spanishButtonTitles) {
+        const btn = panels.getButton(panel, id);
+        if (btn) {
+          btn.set('attributes', { ...(btn.get('attributes') ?? {}), title });
+        }
       }
-    }
+    };
+    applySpanishTitles();
+    editor.on('load', applySpanishTitles);
 
     registerMaliBlocks(editor, brand);
     loadInitialContent(editor, initialDesignJson, initialHtml, brand);

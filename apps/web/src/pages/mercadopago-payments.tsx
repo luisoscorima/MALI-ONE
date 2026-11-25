@@ -6,7 +6,7 @@ import { CopyableValue } from '@/components/copyable-value';
 import { useToast } from '@/contexts/toast-context';
 import { Spinner } from '@/components/feedback';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
+  Pagination, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableShell } from '@/components/ui';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat('es-PE', {
   timeZone: 'America/Lima', dateStyle: 'short', timeStyle: 'short',
@@ -138,8 +138,15 @@ export function MercadoPagoPayments({ sourceId, sourceName, updateOpen, onUpdate
             <TableCell className="text-right tabular-nums">{money(payment.currency, payment.netAmount)}</TableCell>
             <TableCell><Badge variant="secondary">{payment.status}</Badge></TableCell>
           </TableRow>)}</TableBody></Table></TableShell>}
-        {data.total > 0 && <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={filters.page <= 1} onClick={() => setFilters(old => ({ ...old, page: old.page - 1 }))}>Anterior</Button>
-          <span className="text-sm">Página {data.page} de {totalPages}</span><Button variant="outline" disabled={filters.page >= totalPages} onClick={() => setFilters(old => ({ ...old, page: old.page + 1 }))}>Siguiente</Button></div>}
+        {data.total > 0 ? (
+          <Pagination
+            page={data.page}
+            totalPages={totalPages}
+            onPageChange={(page) => setFilters((old) => ({ ...old, page }))}
+            summary={`${data.total} en total`}
+            showWhenSinglePage
+          />
+        ) : null}
       </>}
 
     <Dialog open={updateOpen} onOpenChange={onUpdateOpenChange}><DialogContent><DialogHeader><DialogTitle>Actualizar ventas de Mercado Pago</DialogTitle>

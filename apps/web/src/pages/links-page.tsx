@@ -1,5 +1,5 @@
 import { FormEvent, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Archive, ArchiveRestore, BarChart3, ChevronDown, ChevronLeft, ChevronRight, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2, Upload } from 'lucide-react';
+import { Archive, ArchiveRestore, BarChart3, ChevronDown, Copy, Download, FileSpreadsheet, Pencil, QrCode, Trash2, Upload } from 'lucide-react';
 import type { QrStyleDto, ShortLinkDto, UpdateShortLinkDto } from '@mali-one/shared';
 import { DEFAULT_QR_STYLE, formatLimaDateTime } from '@mali-one/shared';
 import { IconActionButton } from '@/components/icon-action-button';
@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Pagination,
   Select,
   SelectContent,
   SelectItem,
@@ -1340,33 +1341,17 @@ export function LinksPage() {
             )}
           </Table>
         </TableShell>
-        {!listLoading && (totalPages > 1 || total > pageSize) && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <span className="text-sm text-muted">
-              Página {totalPages === 0 ? 0 : page} de {Math.max(1, totalPages)} · {total} enlaces
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={page <= 1}
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-              >
-                <ChevronLeft className="size-4" /> Anterior
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={page >= totalPages}
-                onClick={() => setPage((current) => current + 1)}
-              >
-                Siguiente <ChevronRight className="size-4" />
-              </Button>
-            </div>
+        {!listLoading ? (
+          <div className="border-t border-border px-4 py-3">
+            <Pagination
+              page={Math.max(1, page)}
+              totalPages={Math.max(1, totalPages)}
+              onPageChange={setPage}
+              summary={`${total} enlaces`}
+              showWhenSinglePage={total > 0}
+            />
           </div>
-        )}
+        ) : null}
       </Card>
 
       <Dialog

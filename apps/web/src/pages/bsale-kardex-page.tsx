@@ -15,6 +15,7 @@ import {
   Checkbox,
   Input,
   Label,
+  Pagination,
   Table,
   TableBody,
   TableCell,
@@ -490,29 +491,11 @@ export function BsaleKardexPage() {
               </TableBody>
             </Table>
           </TableShell>
-          {pageCount > 1 && (
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Anterior
-              </Button>
-              <span className="text-sm text-muted">
-                Página {page + 1} de {pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= pageCount - 1}
-                onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
-              >
-                Siguiente
-              </Button>
-            </div>
-          )}
+          <Pagination
+            page={page + 1}
+            totalPages={pageCount}
+            onPageChange={(next) => setPage(Math.max(0, next - 1))}
+          />
         </div>
       )}
     </div>

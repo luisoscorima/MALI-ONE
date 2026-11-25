@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
   Input,
   Label,
+  Pagination,
   Select,
   SelectContent,
   SelectItem,
@@ -232,6 +233,10 @@ export function CrmPamPage() {
   const [error, setError] = useState('');
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [payments, setPayments] = useState<PamRegistrationDto[]>([]);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [paymentsPages, setPaymentsPages] = useState(0);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentsPageSize, setPaymentsPageSize] = useState(50);
   const [attrDefs, setAttrDefs] = useState<AttrDef[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(0);
@@ -442,21 +447,28 @@ export function CrmPamPage() {
     return () => window.clearTimeout(timer);
   }, [attrValue]);
 
-  const loadPayments = useCallback(async (signal?: AbortSignal) => {
+  const loadPayments = useCallback(async (
+    signal?: AbortSignal,
+    opts?: { page?: number; limit?: number },
+  ) => {
+    const page = opts?.page ?? paymentsPage;
+    const limit = opts?.limit ?? paymentsPageSize;
     setPaymentsLoading(true);
     try {
-      const rows = await api.listCrmPamPayments(signal).catch(() =>
-        api.listPamRegistrations(),
-      );
+      const data = await api.listCrmPamPayments({ page, limit }, signal);
       if (signal?.aborted) return;
-      setPayments(rows);
+      setPayments(data.items);
+      setPaymentsTotal(data.total);
+      setPaymentsPages(
+        data.pages || (data.total > 0 ? Math.ceil(data.total / limit) : 0),
+      );
     } catch (e) {
       if (signal?.aborted) return;
       toast.error(e instanceof Error ? e.message : 'Error al cargar pagos');
     } finally {
       if (!signal?.aborted) setPaymentsLoading(false);
     }
-  }, [toast]);
+  }, [paymentsPage, paymentsPageSize, toast]);
 
   const loadPaymentMethods = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -621,7 +633,15 @@ export function CrmPamPage() {
     void loadPamPlans();
     void loadLinkedPaymentIds(ac.signal);
     return () => ac.abort();
-  }, [tab, loadPayments, loadPaymentMethods, loadPamPlans, loadLinkedPaymentIds]);
+  }, [
+    tab,
+    paymentsPage,
+    paymentsPageSize,
+    loadPayments,
+    loadPaymentMethods,
+    loadPamPlans,
+    loadLinkedPaymentIds,
+  ]);
 
   useEffect(() => {
     if (!showNewPayment && !showMethodsManager) return;
@@ -822,7 +842,12 @@ export function CrmPamPage() {
       setNewPayment(EMPTY_NEW_PAYMENT);
       setContactSuggestions([]);
       setSuggestField(null);
-      await Promise.all([loadPayments(), loadContacts(), loadLinkedPaymentIds()]);
+      setPaymentsPage(1);
+      await Promise.all([
+        loadPayments(undefined, { page: 1 }),
+        loadContacts(),
+        loadLinkedPaymentIds(),
+      ]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al crear pago');
     } finally {
@@ -1511,57 +1536,19 @@ export function CrmPamPage() {
                 ) : null
               }
               footer={
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm text-muted-foreground">
-                    {total} en total
-                  </span>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm text-muted-foreground">
-                        Por página
-                      </Label>
-                      <Select
-                        value={String(pageSize)}
-                        onValueChange={(value) => {
-                          setPageSize(Number(value));
-                          setPage(1);
-                        }}
-                      >
-                        <SelectTrigger className="w-24">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {[25, 50, 100].map((n) => (
-                            <SelectItem key={n} value={String(n)}>
-                              {n}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={page <= 1 || loading}
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      >
-                        Anterior
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        Página {pages === 0 ? 0 : page} de {pages || 1}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={loading || pages === 0 || page >= pages}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        Siguiente
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <Pagination
+                  page={Math.max(1, page)}
+                  totalPages={Math.max(1, pages)}
+                  disabled={loading}
+                  onPageChange={setPage}
+                  summary={`${total} en total`}
+                  pageSize={pageSize}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setPage(1);
+                  }}
+                  showWhenSinglePage
+                />
               }
             />
           )}
@@ -1574,6 +1561,9 @@ export function CrmPamPage() {
               Ledger local. Cruce vía <code className="text-xs">payment_id</code>
               . Widget → Mercado Pago; históricos desde Contactos (Crear pago) o
               Añadir pago con autocompletado CRM.
+              {paymentsTotal > 0
+                ? ` · ${paymentsTotal} registro${paymentsTotal === 1 ? '' : 's'}`
+                : ''}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setShowNewPayment((v) => !v)}>
@@ -2243,6 +2233,21 @@ export function CrmPamPage() {
                   </div>
                 );
               }}
+              footer={
+                <Pagination
+                  page={Math.max(1, paymentsPage)}
+                  totalPages={Math.max(1, paymentsPages)}
+                  disabled={paymentsLoading}
+                  onPageChange={setPaymentsPage}
+                  summary={`${paymentsTotal} en total`}
+                  pageSize={paymentsPageSize}
+                  onPageSizeChange={(size) => {
+                    setPaymentsPageSize(size);
+                    setPaymentsPage(1);
+                  }}
+                  showWhenSinglePage
+                />
+              }
             />
           )}
         </TabsContent>
