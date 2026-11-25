@@ -1,11 +1,9 @@
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { NEWSLETTER_CONTENT_REQUEST_MAX_BYTES } from '@mali-one/shared';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-
-/** HTML + designJson de boletines supera el default Express (~100kb) → 413. */
-const JSON_BODY_LIMIT = '25mb';
 
 function parseCorsOrigins(): Set<string> {
   const origins = new Set<string>();
@@ -28,8 +26,8 @@ async function bootstrap() {
     rawBody: true,
     bodyParser: false,
   });
-  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
-  app.useBodyParser('urlencoded', { limit: JSON_BODY_LIMIT, extended: true });
+  app.useBodyParser('json', { limit: NEWSLETTER_CONTENT_REQUEST_MAX_BYTES });
+  app.useBodyParser('urlencoded', { limit: NEWSLETTER_CONTENT_REQUEST_MAX_BYTES, extended: true });
   app.enableShutdownHooks();
 
   app.setGlobalPrefix('api', {

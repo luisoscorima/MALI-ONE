@@ -290,6 +290,16 @@ export function MalichimpPage() {
     setImportOpen(true);
   }
 
+  useEffect(() => {
+    if (section !== 'audience' || searchParams.get('import') !== 'xlsx') return;
+    openImport();
+    const next = new URLSearchParams(searchParams);
+    next.delete('import');
+    setSearchParams(next, { replace: true });
+    // Consume the import deep link once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, searchParams, setSearchParams]);
+
   function selectImportMode(value: string) {
     if (value === 'zip' && !isAdmin) return;
     setImportMode(value as 'xlsx' | 'zip');

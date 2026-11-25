@@ -24,11 +24,11 @@ export default defineConfig({
         timeout: 900_000,
         proxyTimeout: 900_000,
       },
-      '/r': {
+      '/r/': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
-      '/n': {
+      '/n/': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

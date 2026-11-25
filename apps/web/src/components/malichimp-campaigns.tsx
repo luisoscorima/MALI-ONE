@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -32,6 +33,7 @@ import type {
   EmailSenderDto,
   MalichimpAudienceMode,
   MalichimpAudiencePreviewDto,
+  MalichimpAudienceReviewDto,
   MalichimpBlockedEmailReason,
   MalichimpCampaignDetailDto,
   MalichimpCampaignDto,
@@ -47,7 +49,7 @@ import { IconActionButton } from '@/components/icon-action-button';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
-import { api } from '@/lib/api';
+import { api, ApiRequestError } from '@/lib/api';
 import {
   Badge,
   Button,
@@ -93,6 +95,7 @@ const pf = new Intl.NumberFormat('es-PE', {
 const df = new Intl.DateTimeFormat('es-PE', {
   dateStyle: 'medium',
   timeStyle: 'short',
+  timeZone: 'America/Lima',
 });
 const maliPeEmailPattern = /^[^@\s]+@mali\.pe$/i;
 const RECIPIENT_PAGE_SIZE = 50;
@@ -116,6 +119,7 @@ const statusLabel: Record<MalichimpCampaignDto['status'], string> = {
   sending: 'Enviando',
   completed: 'Completada',
   failed: 'Fallida',
+  cancelled: 'Cancelada',
 };
 
 type Props = {
@@ -166,7 +170,7 @@ function clearPasteSession() {
 }
 
 function openMalichimpAudienceImport() {
-  const url = `${window.location.origin}/admin/malichimp?tab=audience`;
+  const url = `${window.location.origin}/admin/malichimp?tab=audience&import=xlsx`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
@@ -643,6 +647,7 @@ export function MalichimpCampaigns({
   const [showAdvancedSender, setShowAdvancedSender] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [openingDraftId, setOpeningDraftId] = useState<string | null>(null);
   const [campaignPreview, setCampaignPreview] = useState<MalichimpCampaignDetailDto | null>(null);
   const [statsCampaign, setStatsCampaign] = useState<MalichimpCampaignDto | null>(null);
@@ -650,6 +655,12 @@ export function MalichimpCampaigns({
   const [refreshingContent, setRefreshingContent] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [preview, setPreview] = useState<MalichimpAudiencePreviewDto | null>(null);
+  const previewRequest = useRef(0);
+  const [emailPage, setEmailPage] = useState(1);
+  const [audienceReview, setAudienceReview] = useState<MalichimpAudienceReviewDto | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const reviewRequest = useRef(0);
   /** `all` = everyone selected except `manualExcludeIds`; `none` = only `manualIncludeIds`. */
   const [recipientSelectionMode, setRecipientSelectionMode] = useState<'all' | 'none'>('all');
   const [manualExcludeIds, setManualExcludeIds] = useState<Set<string>>(new Set());
@@ -670,6 +681,7 @@ export function MalichimpCampaigns({
   const [pasteText, setPasteText] = useState('');
   const [resolveResult, setResolveResult] = useState<MalichimpResolveEmailsDto | null>(null);
   const [resolveBusy, setResolveBusy] = useState(false);
+  const resolveRequest = useRef(0);
   const [resolveTouched, setResolveTouched] = useState(false);
   const [showGroupExclude, setShowGroupExclude] = useState(false);
   const [showTagExclude, setShowTagExclude] = useState(false);
@@ -766,13 +778,28 @@ export function MalichimpCampaigns({
   ]);
   const effectiveName = (
     name.trim()
-    || selectedNewsletter?.title
+    || selectedNewsletter?.title.slice(0, 160)
     || `Envío ${new Date().toLocaleString('es-PE')}`
   ).trim();
 
-  const previewUniverse = audienceMode === 'emails'
-    ? (preview?.eligible ?? emailsAvailableCount)
-    : (preview?.eligible ?? 0);
+  const filteredEmailRecipients = useMemo(() => {
+    const query = recipientQuery.trim().toLowerCase();
+    return (resolveResult?.eligible ?? []).filter((row) =>
+      !query || row.email.toLowerCase().includes(query) || row.name?.toLowerCase().includes(query),
+    );
+  }, [recipientQuery, resolveResult]);
+  const recipientPage = audienceMode === 'emails'
+    ? {
+        page: emailPage,
+        totalPages: Math.max(1, Math.ceil(filteredEmailRecipients.length / RECIPIENT_PAGE_SIZE)),
+        matched: filteredEmailRecipients.length,
+        recipients: filteredEmailRecipients.slice(
+          (emailPage - 1) * RECIPIENT_PAGE_SIZE,
+          emailPage * RECIPIENT_PAGE_SIZE,
+        ),
+      }
+    : preview;
+  const previewUniverse = audienceMode === 'emails' ? emailsAvailableCount : (preview?.eligible ?? 0);
   const selectedCount = audienceMode === 'emails'
     ? manualIncludeIds.size
     : preview
@@ -780,7 +807,7 @@ export function MalichimpCampaigns({
         ? Math.max(0, preview.eligible - manualExcludeIds.size)
         : manualIncludeIds.size
       : 0;
-  const audienceReady = Boolean(preview && preview.eligible > 0 && selectedCount > 0);
+  const audienceReady = previewUniverse > 0 && selectedCount > 0 && !resolveBusy;
   const senderReady = Boolean(
     fromName.trim()
       && senderEmails.includes(fromEmail)
@@ -792,7 +819,8 @@ export function MalichimpCampaigns({
   const scheduleReady = scheduleMode === 'now' || Boolean(
     scheduledAt && new Date(limaDateTimeToIso(scheduledAt)).getTime() > Date.now(),
   );
-  const campaignReady = audienceReady && senderReady && contentReady && scheduleReady;
+  const draftReady = audienceReady && senderReady && contentReady;
+  const campaignReady = draftReady && scheduleReady && Boolean(audienceReview?.totalRecipients);
   const stepIndex = CAMPAIGN_STEPS.findIndex((step) => step.id === formStep);
   const stepReady: Record<CampaignStepId, boolean> = {
     to: audienceReady,
@@ -902,6 +930,7 @@ export function MalichimpCampaigns({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link one-shot
   }, [loading, openNew, openCampaignId]);
   useEffect(() => {
+    if (audienceMode === 'emails') return;
     if (!preview) {
       setDebouncedRecipientQuery(recipientQuery.trim());
       return;
@@ -917,6 +946,9 @@ export function MalichimpCampaigns({
   }, [recipientQuery]);
 
   function resetForm() {
+    previewRequest.current++;
+    resolveRequest.current++;
+    clearFinalReview();
     setDraftCampaignId(null);
     setAttachedNewsletter(null);
     setDraftNewsletterId(null);
@@ -949,6 +981,7 @@ export function MalichimpCampaigns({
     setManualIncludeIds(new Set());
     setRecipientQuery('');
     setDebouncedRecipientQuery('');
+    setEmailPage(1);
     setFormStep('to');
   }
 
@@ -962,10 +995,8 @@ export function MalichimpCampaigns({
       setExcludeTagIds([]);
       setShowTagExclude(false);
     } else {
-      setPasteText('');
-      setResolveResult(null);
+      changePastedEmails('');
       setResolveTouched(false);
-      setExpandedResolveBuckets(new Set());
       clearPasteSession();
     }
     clearAudiencePreview();
@@ -1002,12 +1033,24 @@ export function MalichimpCampaigns({
   }
 
   function clearAudiencePreview() {
+    previewRequest.current++;
+    setPreviewBusy(false);
     setPreview(null);
     setRecipientSelectionMode('all');
     setManualExcludeIds(new Set());
     setManualIncludeIds(new Set());
     setRecipientQuery('');
     setDebouncedRecipientQuery('');
+    setEmailPage(1);
+  }
+
+  function changePastedEmails(value: string) {
+    resolveRequest.current++;
+    setResolveBusy(false);
+    setPasteText(value);
+    setResolveResult(null);
+    setExpandedResolveBuckets(new Set());
+    clearAudiencePreview();
   }
 
   function isRecipientSelected(id: string) {
@@ -1027,16 +1070,7 @@ export function MalichimpCampaigns({
       });
       return;
     }
-    if (recipientSelectionMode === 'all') {
-      setManualExcludeIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-      return;
-    }
-    setManualIncludeIds((prev) => {
+    setManualExcludeIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -1077,11 +1111,15 @@ export function MalichimpCampaigns({
       return;
     }
     const next = CAMPAIGN_STEPS[stepIndex + 1];
-    if (next) setFormStep(next.id);
+    if (next) {
+      setFormStep(next.id);
+      if (next.id === 'send') void reviewFinalAudience();
+    }
   }
 
   function goBack() {
     const prev = CAMPAIGN_STEPS[stepIndex - 1];
+    clearFinalReview();
     if (prev) setFormStep(prev.id);
   }
 
@@ -1101,7 +1139,7 @@ export function MalichimpCampaigns({
       ? newsletter?.subject ?? ''
       : current);
     setName((current) => !current.trim() || current === selectedNewsletter?.title
-      ? newsletter?.title ?? ''
+      ? newsletter?.title.slice(0, 160) ?? ''
       : current);
   }
 
@@ -1133,6 +1171,8 @@ export function MalichimpCampaigns({
   }
 
   async function hydrateDraftCampaign(detail: MalichimpCampaignDetailDto) {
+    clearAudiencePreview();
+    clearFinalReview();
     setDraftCampaignId(detail.id);
     setAttachedNewsletter(detail.newsletter);
     const workingId =
@@ -1164,7 +1204,6 @@ export function MalichimpCampaigns({
 
     if (mode === 'emails') {
       const contacts = detail.includeContacts ?? [];
-      const effectiveIds = includeIds.length ? includeIds : contacts.map((row) => row.id);
       setResolveResult({
         eligible: contacts,
         notFound: [],
@@ -1180,7 +1219,7 @@ export function MalichimpCampaigns({
         },
       });
       setRecipientSelectionMode('none');
-      setManualIncludeIds(new Set(effectiveIds));
+      setManualIncludeIds(new Set(contacts.map((row) => row.id)));
       setManualExcludeIds(new Set());
     } else if (includeIds.length) {
       setRecipientSelectionMode('none');
@@ -1194,21 +1233,20 @@ export function MalichimpCampaigns({
     }
     setRecipientQuery('');
     setDebouncedRecipientQuery('');
-    setScheduleMode('now');
-    setScheduledAt('');
+    setScheduleMode(detail.scheduledAt ? 'scheduled' : 'now');
+    setScheduledAt(detail.scheduledAt
+      ? new Date(detail.scheduledAt).toLocaleString('sv-SE', { timeZone: 'America/Lima' })
+          .replace(' ', 'T').slice(0, 16)
+      : '');
     setShowAdvancedSender(detail.replyTo !== detail.fromEmail);
     setFormStep('to');
     setOpen(true);
+    if (mode === 'emails') return;
+    if (mode === 'tags' ? !detail.tagIds.length : !detail.groupOptionIds.length) return;
+    const request = ++previewRequest.current;
     setPreviewBusy(true);
     try {
-      const previewPayload = mode === 'emails'
-        ? {
-            audienceMode: 'emails' as const,
-            includeContactIds: includeIds.length
-              ? includeIds
-              : (detail.includeContacts ?? []).map((row) => row.id),
-          }
-        : mode === 'tags'
+      const previewPayload = mode === 'tags'
           ? {
               audienceMode: 'tags' as const,
               tagIds: detail.tagIds,
@@ -1224,12 +1262,13 @@ export function MalichimpCampaigns({
         page: 1,
         pageSize: RECIPIENT_PAGE_SIZE,
       });
-      setPreview(next);
+      if (request === previewRequest.current) setPreview(next);
     } catch (reason) {
-      clearAudiencePreview();
-      toast.error(reason instanceof Error ? reason.message : 'No se pudo recalcular la audiencia');
+      if (request === previewRequest.current) {
+        toast.error(reason instanceof Error ? reason.message : 'No se pudo recalcular la audiencia');
+      }
     } finally {
-      setPreviewBusy(false);
+      if (request === previewRequest.current) setPreviewBusy(false);
     }
   }
 
@@ -1284,6 +1323,26 @@ export function MalichimpCampaigns({
     }
   }
 
+  async function cancelScheduledCampaign(campaign: MalichimpCampaignDto) {
+    const ok = await confirm({
+      title: 'Cancelar programación',
+      description: `Se detendrá el envío de «${campaign.name}» si todavía no empezó.`,
+      confirmLabel: 'Cancelar programación',
+      cancelLabel: 'Mantener programación',
+    });
+    if (!ok) return;
+    setCancellingId(campaign.id);
+    try {
+      await api.cancelMalichimpCampaign(campaign.id);
+      toast.success('Programación cancelada');
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo cancelar la programación');
+    } finally {
+      await load(true);
+      setCancellingId(null);
+    }
+  }
+
   async function openCampaignPreview(campaignId: string) {
     setPreviewCampaignId(campaignId);
     try {
@@ -1302,12 +1361,8 @@ export function MalichimpCampaigns({
     try {
       if (draftCampaignId) {
         const detail = await api.getMalichimpCampaign(draftCampaignId);
-        setAttachedNewsletter(detail.newsletter);
-        setContentRevision(detail.contentRevision ?? null);
-        if (detail.workingNewsletterId) {
-          setDraftNewsletterId(detail.workingNewsletterId);
-          setNewsletterId(detail.workingNewsletterId);
-        }
+        setSubject((current) => current === attachedNewsletter?.subject ? detail.subject : current);
+        attachDraft(detail);
       } else {
         const content = await api.getMalichimpContent(newsletterToRefresh);
         setAttachedNewsletter(content);
@@ -1327,7 +1382,6 @@ export function MalichimpCampaigns({
       resetSelection?: boolean;
       notify?: boolean;
       q?: string;
-      includeContactIds?: string[];
     },
   ) {
     if (audienceMode === 'groups' && !groupOptionIds.length) {
@@ -1338,38 +1392,33 @@ export function MalichimpCampaigns({
       toast.error('Selecciona al menos una etiqueta para incluir');
       return;
     }
-    const emailIncludeIds = options?.includeContactIds ?? [...manualIncludeIds];
-    if (audienceMode === 'emails' && !emailIncludeIds.length) {
-      toast.error('No hay contactos listos para enviar');
+    if (audienceMode === 'emails') {
+      setEmailPage(page);
       return;
     }
     const q = (options?.q ?? debouncedRecipientQuery).trim();
+    const request = ++previewRequest.current;
     setPreviewBusy(true);
     try {
-      const filterPayload = audienceMode === 'emails'
-        ? {
-            audienceMode: 'emails' as const,
-            includeContactIds: emailIncludeIds,
-          }
-        : buildAudienceFilterPayload();
       const next = await api.previewMalichimpAudience({
-        ...filterPayload,
+        ...buildAudienceFilterPayload(),
         page,
         pageSize: RECIPIENT_PAGE_SIZE,
         ...(q ? { q } : {}),
       });
+      if (request !== previewRequest.current) return;
       applyAudiencePreview(next, { resetSelection: options?.resetSelection });
       if (options?.notify !== false) {
         toast.success(
-          audienceMode === 'emails'
-            ? `${nf.format(next.eligible)} contactos listos para enviar`
-            : `${nf.format(next.eligible)} contactos disponibles`,
+          `${nf.format(next.eligible)} contactos disponibles`,
         );
       }
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : 'No se pudo calcular la audiencia');
+      if (request === previewRequest.current) {
+        toast.error(reason instanceof Error ? reason.message : 'No se pudo calcular la audiencia');
+      }
     } finally {
-      setPreviewBusy(false);
+      if (request === previewRequest.current) setPreviewBusy(false);
     }
   }
 
@@ -1389,29 +1438,39 @@ export function MalichimpCampaigns({
       toast.error(`La lista no puede superar ${nf.format(MAX_PASTE_EMAILS)} correos únicos`);
       return;
     }
+    const request = ++resolveRequest.current;
+    const deselected = new Set(
+      resolveResult?.eligible.filter((row) => !manualIncludeIds.has(row.id)).map((row) => row.id),
+    );
     setResolveBusy(true);
     setResolveTouched(true);
     try {
       const result = await api.resolveMalichimpEmails(emails);
-      setResolveResult(result);
-      const ids = result.eligible.map((row) => row.id);
-      setRecipientSelectionMode('none');
-      setManualIncludeIds(new Set(ids));
-      setManualExcludeIds(new Set());
+      if (request !== resolveRequest.current) return;
       clearAudiencePreview();
-      if (ids.length) {
-        await loadAudiencePage(1, {
-          resetSelection: false,
-          notify: false,
-          q: '',
-          includeContactIds: ids,
-        });
-      }
+      setResolveResult(result);
+      setRecipientSelectionMode('none');
+      setManualIncludeIds(new Set(
+        result.eligible.filter((row) => !deselected.has(row.id)).map((row) => row.id),
+      ));
     } catch (reason) {
-      setResolveResult(null);
-      toast.error(reason instanceof Error ? reason.message : 'No se pudo revisar la lista');
+      if (request === resolveRequest.current) {
+        setResolveResult(null);
+        toast.error(reason instanceof Error ? reason.message : 'No se pudo revisar la lista');
+      }
     } finally {
-      setResolveBusy(false);
+      if (request === resolveRequest.current) setResolveBusy(false);
+    }
+  }
+
+  async function copyMissingEmails() {
+    if (!resolveResult?.notFound.length) return;
+    try {
+      await navigator.clipboard.writeText(resolveResult.notFound.join('\n'));
+      toast.success('Correos faltantes copiados');
+    } catch {
+      toast.error('No se pudieron copiar. Puedes seleccionarlos en la lista de abajo.');
+      setExpandedResolveBuckets((current) => new Set(current).add('notFound'));
     }
   }
 
@@ -1472,58 +1531,113 @@ export function MalichimpCampaigns({
     tagIds.length,
   ]);
 
-  async function submitCampaign() {
-    if (!campaignReady || !preview || !selectedCount) return;
-    const excludeContactIds = audienceMode !== 'emails' && recipientSelectionMode === 'all'
-      ? [...manualExcludeIds]
-      : [];
-    const includeContactIds = audienceMode === 'emails' || recipientSelectionMode === 'none'
-      ? [...manualIncludeIds]
-      : [];
-    const when = scheduleMode === 'scheduled' && scheduledAt
-      ? `programada para ${df.format(new Date(limaDateTimeToIso(scheduledAt)))}`
-      : 'envío inmediato';
-    const manualNote = audienceMode !== 'emails' && recipientSelectionMode === 'all' && excludeContactIds.length
-      ? ` · ${nf.format(excludeContactIds.length)} excluido(s) a mano`
-      : audienceMode !== 'emails' && recipientSelectionMode === 'none'
-        ? ` · selección manual de ${nf.format(includeContactIds.length)}`
-        : '';
-    const ok = await confirm({
-      title: scheduleMode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
-      description: [
-        ...audienceConfirmSummary,
-        '',
-        `Se creará la campaña (${when}) hacia ${nf.format(selectedCount)} destinatarios${manualNote}.`,
-      ].join('\n'),
-      confirmLabel: scheduleMode === 'scheduled' ? 'Programar' : 'Enviar',
-    });
-    if (!ok) return;
+function audienceSelectionPayload() {
+    return {
+      ...buildAudienceFilterPayload(),
+      ...(audienceMode !== 'emails' && recipientSelectionMode === 'all' && manualExcludeIds.size
+        ? { excludeContactIds: [...manualExcludeIds] } : {}),
+      ...(audienceMode !== 'emails' && recipientSelectionMode === 'none'
+        ? { includeContactIds: [...manualIncludeIds] } : {}),
+    };
+  }
 
+  function draftPayload() {
+    return {
+      ...audienceSelectionPayload(),
+      name: effectiveName,
+      newsletterId,
+      ...(contentRevision ? { contentRevision } : {}),
+      subject: subject.trim(),
+      fromName: fromName.trim(),
+      fromEmail,
+      replyTo: replyTo.trim(),
+      ...(scheduleMode === 'scheduled' && scheduledAt
+        ? { scheduledAt: limaDateTimeToIso(scheduledAt) } : {}),
+    };
+  }
+
+  function clearFinalReview() {
+    reviewRequest.current++;
+    setAudienceReview(null);
+    setReviewBusy(false);
+    setReviewError('');
+  }
+
+  async function reviewFinalAudience() {
+    const request = ++reviewRequest.current;
+    setAudienceReview(null);
+    setReviewBusy(true);
+    setReviewError('');
+    try {
+      const result = await api.reviewMalichimpAudience(audienceSelectionPayload());
+      if (request !== reviewRequest.current) return;
+      setAudienceReview(result);
+      if (!result.totalRecipients) {
+        setReviewError('La selección ya no tiene destinatarios elegibles. Vuelve a Para para revisarla.');
+      }
+    } catch (reason) {
+      if (request === reviewRequest.current) {
+        setReviewError(reason instanceof Error ? reason.message : 'No se pudo revisar la audiencia.');
+      }
+    } finally {
+      if (request === reviewRequest.current) setReviewBusy(false);
+    }
+  }
+
+  function attachDraft(detail: MalichimpCampaignDetailDto) {
+    setDraftCampaignId(detail.id);
+    setAttachedNewsletter(detail.newsletter);
+    setContentRevision(detail.contentRevision ?? null);
+    if (detail.workingNewsletterId) {
+      setDraftNewsletterId(detail.workingNewsletterId);
+      setNewsletterId(detail.workingNewsletterId);
+    }
+  }
+
+  async function saveCampaignDraft() {
+    if (!draftReady || busy) return;
     setBusy(true);
     try {
-      const audiencePayload = buildAudienceFilterPayload();
-      const payload = {
-        name: effectiveName,
-        newsletterId,
-        ...(contentRevision ? { contentRevision } : {}),
-        subject: subject.trim(),
-        fromName: fromName.trim(),
-        fromEmail,
-        replyTo: replyTo.trim(),
-        ...audiencePayload,
-        ...(audienceMode === 'emails'
-          ? { includeContactIds }
-          : {
-              ...(excludeContactIds.length ? { excludeContactIds } : {}),
-              ...(includeContactIds.length ? { includeContactIds } : {}),
-            }),
-        ...(scheduleMode === 'scheduled' && scheduledAt
-          ? { scheduledAt: limaDateTimeToIso(scheduledAt) }
-          : {}),
-      };
-      const result = draftCampaignId
-        ? await api.sendMalichimpDraftCampaign(draftCampaignId, payload)
-        : await api.createMalichimpCampaign(payload);
+      attachDraft(await api.saveMalichimpDraft(draftPayload(), draftCampaignId));
+      toast.success('Borrador guardado');
+      await load(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : 'No se pudo guardar el borrador');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitCampaign() {
+    if (!campaignReady || !audienceReview || busy) return;
+    setBusy(true);
+    try {
+      const when = scheduleMode === 'scheduled' && scheduledAt
+        ? `programada para ${df.format(new Date(limaDateTimeToIso(scheduledAt)))}`
+        : 'envío inmediato';
+      const ok = await confirm({
+        title: scheduleMode === 'scheduled' ? 'Programar campaña' : 'Enviar campaña',
+        description: `Se confirmará el envío a ${nf.format(audienceReview.totalRecipients)} destinatarios (${when}).`,
+        confirmLabel: scheduleMode === 'scheduled' ? 'Programar' : 'Enviar',
+      });
+      if (!ok) return;
+
+      let payload = draftPayload();
+      let campaignId = draftCampaignId;
+      if (!campaignId) {
+        const draft = await api.saveMalichimpDraft(payload);
+        attachDraft(draft);
+        campaignId = draft.id;
+        payload = {
+          ...payload,
+          newsletterId: draft.workingNewsletterId ?? draft.newsletterId,
+          contentRevision: draft.contentRevision ?? undefined,
+        };
+      }
+      const result = await api.sendMalichimpDraftCampaign(campaignId, {
+        ...payload,
+        audienceRevision: audienceReview.audienceRevision,
+      });
       toast.success(
         result.status === 'scheduled'
           ? `Campaña programada para ${nf.format(result.totalRecipients)} destinatarios`
@@ -1533,13 +1647,18 @@ export function MalichimpCampaigns({
       resetForm();
       await load(true);
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : 'No se pudo crear la campaña');
+      if (reason instanceof ApiRequestError && reason.code === 'MALICHIMP_AUDIENCE_CHANGED') {
+        setAudienceReview(null);
+        setReviewError(reason.message);
+      } else {
+        toast.error(reason instanceof Error ? reason.message : 'No se pudo enviar la campaña');
+      }
     } finally {
       setBusy(false);
     }
   }
 
-  const testReady = senderReady && contentReady && Boolean(delivery?.configured)
+  const testReady = draftReady && Boolean(delivery?.configured)
     && maliPeEmailPattern.test(sessionEmail);
 
   function openTestDialog() {
@@ -1587,40 +1706,36 @@ export function MalichimpCampaigns({
     }
     setTestBusy(true);
     try {
+      const draft = await api.saveMalichimpDraft(draftPayload(), draftCampaignId);
+      attachDraft(draft);
       const result = await api.sendMalichimpTestCampaign({
-        ...(draftCampaignId ? { campaignId: draftCampaignId } : {}),
+        campaignId: draft.id,
         name: effectiveName,
-        newsletterId,
-        ...(contentRevision ? { contentRevision } : {}),
+        newsletterId: draft.workingNewsletterId ?? draft.newsletterId,
+        ...(draft.contentRevision ? { contentRevision: draft.contentRevision } : {}),
         subject: subject.trim(),
         fromName: fromName.trim(),
         fromEmail,
         replyTo: replyTo.trim(),
         emails,
       });
-      setDraftCampaignId(result.campaignId);
       try {
-        const detail = await api.getMalichimpCampaign(result.campaignId);
-        setAttachedNewsletter(detail.newsletter);
-        setContentRevision(detail.contentRevision ?? null);
-        if (detail.workingNewsletterId) {
-          setDraftNewsletterId(detail.workingNewsletterId);
-          setNewsletterId(detail.workingNewsletterId);
-        }
+        attachDraft(await api.getMalichimpCampaign(result.campaignId));
       } catch {
         /* revision refresh is best-effort; next Actualizar recovers */
       }
       const sent = result.sends.filter((row) => row.status === 'sent').length;
       const failed = result.sends.filter((row) => row.status === 'failed').length;
-      toast.success(
-        failed
-          ? `Prueba: ${nf.format(sent)} enviada(s), ${nf.format(failed)} fallida(s)`
-          : `Prueba enviada a ${nf.format(sent)} destinatario(s)`,
-      );
+      const message = failed
+        ? `Prueba: ${nf.format(sent)} enviada(s), ${nf.format(failed)} fallida(s)`
+        : `Prueba enviada a ${nf.format(sent)} destinatario(s)`;
+      if (failed) toast.error(message);
+      else toast.success(message);
       setTestOpen(false);
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo enviar la prueba');
     } finally {
+      await load(true);
       setTestBusy(false);
     }
   }
@@ -1792,8 +1907,15 @@ export function MalichimpCampaigns({
                   </TableCell>
                   <TableCell>
                     <Badge variant={campaign.status === 'failed' ? 'destructive' : campaign.status === 'completed' ? 'default' : 'secondary'}>
-                      {statusLabel[campaign.status]}
+                      {campaign.status === 'completed' && campaign.failed
+                        ? 'Completada con fallos'
+                        : statusLabel[campaign.status]}
                     </Badge>
+                    {campaign.completedAt ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {nf.format(campaign.sent)} enviados · {nf.format(campaign.failed)} fallidos · {nf.format(campaign.suppressed)} omitidos
+                      </p>
+                    ) : null}
                   </TableCell>
                   <TableCell>{nf.format(campaign.sent)} / {nf.format(campaign.totalRecipients)}</TableCell>
                   <TableCell className="tabular-nums">
@@ -1812,6 +1934,15 @@ export function MalichimpCampaigns({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+                      {campaign.scheduledAt && ['scheduled', 'queued'].includes(campaign.status) ? (
+                        <IconActionButton
+                          label="Cancelar programación"
+                          disabled={cancellingId === campaign.id}
+                          onClick={() => void cancelScheduledCampaign(campaign)}
+                        >
+                          <X className="size-4" aria-hidden />
+                        </IconActionButton>
+                      ) : null}
                       <IconActionButton
                         label="Estadísticas"
                         onClick={() => setStatsCampaign(campaign)}
@@ -1877,7 +2008,11 @@ export function MalichimpCampaigns({
         </Table>
       </TableShell>
 
-      <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) resetForm(); }}>
+      <Dialog open={open} onOpenChange={(value) => {
+        if (!value && (busy || testBusy)) return;
+        setOpen(value);
+        if (!value) resetForm();
+      }}>
         <DialogContent className="flex max-h-[calc(100vh-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
           <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-5 sm:px-6">
             <DialogTitle>
@@ -2011,7 +2146,7 @@ export function MalichimpCampaigns({
                       <Textarea
                         id="malichimp-paste-emails"
                         value={pasteText}
-                        onChange={(event) => setPasteText(event.target.value)}
+                        onChange={(event) => changePastedEmails(event.target.value)}
                         rows={8}
                         className="font-mono text-sm"
                         placeholder="correo1@ejemplo.com, correo2@ejemplo.com"
@@ -2059,17 +2194,21 @@ export function MalichimpCampaigns({
                             : null}
                         </p>
                         {resolveResult.summary.notFound > 0 ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={openMalichimpAudienceImport}
-                          >
-                            <ExternalLink className="size-4" aria-hidden />
-                            {resolveResult.summary.notFound === 1
-                              ? 'Ir a importar 1 contacto'
-                              : `Ir a importar ${nf.format(resolveResult.summary.notFound)} contactos`}
-                          </Button>
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Button type="button" size="sm" variant="outline" onClick={() => void copyMissingEmails()}>
+                                <Copy className="size-4" aria-hidden />
+                                Copiar faltantes
+                              </Button>
+                              <Button type="button" size="sm" variant="outline" onClick={openMalichimpAudienceImport}>
+                                <ExternalLink className="size-4" aria-hidden />
+                                Importar XLSX
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Pega los faltantes en la plantilla XLSX. Después de importar, vuelve aquí y revisa la lista nuevamente.
+                            </p>
+                          </div>
                         ) : null}
 
                         {resolveResult.summary.notFound > 0 ? (
@@ -2166,10 +2305,9 @@ export function MalichimpCampaigns({
                       </div>
                     ) : null}
 
-                    {preview && previewUniverse > 0 ? (
+                    {recipientPage && previewUniverse > 0 ? (
                       <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                          {audienceMode !== 'emails' ? (
                             <div className="flex gap-2">
                               <Button type="button" size="sm" variant="ghost" onClick={selectAllRecipients}>
                                 Marcar todos
@@ -2178,14 +2316,9 @@ export function MalichimpCampaigns({
                                 Ninguno
                               </Button>
                             </div>
-                          ) : (
+                          {recipientQuery.trim() ? (
                             <span className="text-xs text-muted-foreground">
-                              Desmarca quien no deba recibir este envío
-                            </span>
-                          )}
-                          {debouncedRecipientQuery ? (
-                            <span className="text-xs text-muted-foreground">
-                              {nf.format(preview.matched)} coincidencia{preview.matched === 1 ? '' : 's'}
+                              {nf.format(recipientPage.matched)} coincidencia{recipientPage.matched === 1 ? '' : 's'}
                             </span>
                           ) : null}
                         </div>
@@ -2193,14 +2326,17 @@ export function MalichimpCampaigns({
                           <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" aria-hidden />
                           <Input
                             value={recipientQuery}
-                            onChange={(event) => setRecipientQuery(event.target.value)}
+                            onChange={(event) => {
+                              setRecipientQuery(event.target.value);
+                              setEmailPage(1);
+                            }}
                             placeholder="Buscar por nombre o email"
                             className="pl-8"
                             aria-label="Buscar destinatarios"
                           />
                         </div>
                         <ul className="max-h-72 divide-y overflow-y-auto rounded-md border bg-background text-sm">
-                          {preview.recipients.map((row) => {
+                          {recipientPage.recipients.map((row) => {
                             const checked = isRecipientSelected(row.id);
                             const inputId = `malichimp-recipient-${row.id}`;
                             return (
@@ -2220,26 +2356,26 @@ export function MalichimpCampaigns({
                               </li>
                             );
                           })}
-                          {!preview.recipients.length ? (
+                          {!recipientPage.recipients.length ? (
                             <li className="px-3 py-6 text-center text-muted-foreground">
-                              {debouncedRecipientQuery
+                              {recipientQuery.trim()
                                 ? 'Sin coincidencias para esta búsqueda'
                                 : 'Sin contactos en esta página'}
                             </li>
                           ) : null}
                         </ul>
-                        {preview.totalPages > 1 ? (
+                        {recipientPage.totalPages > 1 ? (
                           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                             <span className="text-xs text-muted-foreground">
-                              Página {preview.page} de {preview.totalPages}
+                              Página {recipientPage.page} de {recipientPage.totalPages}
                             </span>
                             <div className="flex gap-2">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={previewBusy || preview.page <= 1}
-                                onClick={() => void loadAudiencePage(preview.page - 1, {
+                                disabled={previewBusy || recipientPage.page <= 1}
+                                onClick={() => void loadAudiencePage(recipientPage.page - 1, {
                                   resetSelection: false,
                                   notify: false,
                                 })}
@@ -2251,8 +2387,8 @@ export function MalichimpCampaigns({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={previewBusy || preview.page >= preview.totalPages}
-                                onClick={() => void loadAudiencePage(preview.page + 1, {
+                                disabled={previewBusy || recipientPage.page >= recipientPage.totalPages}
+                                onClick={() => void loadAudiencePage(recipientPage.page + 1, {
                                   resetSelection: false,
                                   notify: false,
                                 })}
@@ -2264,7 +2400,7 @@ export function MalichimpCampaigns({
                           </div>
                         ) : null}
                       </div>
-                    ) : preview ? (
+                    ) : recipientPage ? (
                       <p className="text-sm text-muted-foreground">
                         No hay contactos disponibles con los filtros actuales.
                       </p>
@@ -2373,7 +2509,7 @@ export function MalichimpCampaigns({
                   <div className="space-y-3">
                     <NewsletterSearchSelect
                       id="malichimp-newsletter"
-                      label="Contenido (MALICHIMP o Boletines publicados)"
+                      label="Biblioteca MALICHIMP"
                       newsletters={selectableNewsletters}
                       value={newsletterId}
                       onChange={selectNewsletter}
@@ -2381,8 +2517,7 @@ export function MalichimpCampaigns({
                     />
                     {!selectableNewsletters.length ? (
                       <p className="text-sm text-muted-foreground">
-                        No hay contenido disponible. Crea una pieza en la pestaña Contenido o
-                        publica un boletín en Boletines.
+                        No hay contenido disponible. Crea una pieza en la pestaña Contenido de MALICHIMP.
                       </p>
                     ) : null}
                   </div>
@@ -2422,10 +2557,34 @@ export function MalichimpCampaigns({
                   </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11.5rem]">
-                  <div className="space-y-3 rounded-md border px-3 py-3 text-sm">
-                    <p className="font-medium">
-                      Enviarás a {nf.format(selectedCount)} contactos disponibles.
+                  <div className="space-y-3 rounded-md border px-3 py-3 text-sm" aria-busy={reviewBusy}>
+                    {reviewError ? <p role="alert" className="text-destructive">{reviewError}</p> : null}
+                    <p className="font-medium" role="status">
+                      {reviewBusy
+                        ? 'Revisando destinatarios…'
+                        : audienceReview
+                          ? `Destinatarios revisados: ${nf.format(audienceReview.totalRecipients)}`
+                          : 'Revisa la selección antes de confirmar.'}
                     </p>
+                    {audienceReview?.sample.length ? (
+                      <div className="text-xs text-muted-foreground">
+                        <p>Muestra de destinatarios</p>
+                        <ul className="space-y-0.5">
+                          {audienceReview.sample.map((row) => (
+                            <li className="break-all" key={row.id}>{row.email}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || testBusy || reviewBusy}
+                      onClick={() => void reviewFinalAudience()}
+                    >
+                      Revisar destinatarios
+                    </Button>
                     <ul className="space-y-1.5 text-muted-foreground">
                       {audienceConfirmSummary.map((line) => (
                         <li key={line}>{line}</li>
@@ -2521,13 +2680,21 @@ export function MalichimpCampaigns({
                 type="button"
                 variant="outline"
                 onClick={goBack}
-                disabled={stepIndex === 0 || busy}
+                disabled={stepIndex === 0 || busy || testBusy}
               >
                 <ChevronLeft className="size-4" aria-hidden />
                 Atrás
               </Button>
               {formStep === 'send' ? (
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void saveCampaignDraft()}
+                    disabled={busy || testBusy || !draftReady}
+                  >
+                    Guardar borrador
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -2540,7 +2707,7 @@ export function MalichimpCampaigns({
                   <Button
                     type="button"
                     onClick={() => void submitCampaign()}
-                    disabled={busy || !campaignReady}
+                    disabled={busy || testBusy || reviewBusy || !campaignReady}
                   >
                     {busy ? (
                       <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
@@ -2555,10 +2722,17 @@ export function MalichimpCampaigns({
                   </Button>
                 </div>
               ) : (
-                <Button type="button" onClick={goNext} disabled={busy || !stepReady[formStep]}>
-                  Siguiente
-                  <ChevronRight className="size-4" aria-hidden />
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {formStep === 'content' ? (
+                    <Button type="button" variant="outline" onClick={() => void saveCampaignDraft()} disabled={busy || !draftReady}>
+                      Guardar borrador
+                    </Button>
+                  ) : null}
+                  <Button type="button" onClick={goNext} disabled={busy || !stepReady[formStep]}>
+                    Siguiente
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                </div>
               )}
             </div>
           </DialogFooter>

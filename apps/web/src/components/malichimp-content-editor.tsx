@@ -4,6 +4,7 @@ import type { NewsletterBrand } from '@mali-one/shared';
 import {
   NEWSLETTER_BRANDS,
   NEWSLETTER_BRAND_LABELS,
+  NEWSLETTER_CONTENT_REQUEST_MAX_BYTES,
 } from '@mali-one/shared';
 import {
   NEWSLETTER_FIRST_NAME_MERGE_TAG,
@@ -13,6 +14,7 @@ import {
 import { AlertBanner } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { ApiRequestError, api } from '@/lib/api';
+import { externalizeNewsletterImages } from '@/lib/newsletter-content';
 import {
   Button,
   Input,
@@ -52,10 +54,12 @@ export function MalichimpContentEditor({
 }) {
   const toast = useToast();
   const editorRef = useRef<NewsletterEditorHandle>(null);
+  const uploadedImages = useRef(new Map<string, string>());
   const [loading, setLoading] = useState(mode === 'edit');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saveConflict, setSaveConflict] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('');
   const [brand, setBrand] = useState<NewsletterBrand | null>(null);
@@ -74,6 +78,7 @@ export function MalichimpContentEditor({
     setLoading(true);
     setError('');
     setSaveConflict(false);
+    setSaveError('');
     try {
       const row = (await api.getMalichimpContent(contentId)) as LoadedContent;
       setTitle(row.title);
@@ -98,50 +103,64 @@ export function MalichimpContentEditor({
   }, [load]);
 
   function applyBrand(next: NewsletterBrand | null) {
-    const exported = editorRef.current?.getExport();
-    if (exported?.htmlBody?.trim()) {
-      setInitialHtml(exported.htmlBody);
-      setInitialDesignJson(exported.designJson ?? null);
+    try {
+      if (editorRef.current?.hasPendingUploads()) {
+        throw new Error('Espera a que termine la subida de imágenes para cambiar la marca.');
+      }
+      const exported = editorRef.current?.getExport();
+      if (exported?.htmlBody?.trim()) {
+        setInitialHtml(exported.htmlBody);
+        setInitialDesignJson(exported.designJson);
+      }
+      setSaveError('');
+      setBrand(next);
+      setEditorKey((k) => k + 1);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'No se pudo cambiar la marca.');
     }
-    setBrand(next);
-    setEditorKey((k) => k + 1);
   }
 
   async function handleSave() {
-    if (!editable && mode === 'edit') return;
-    const exported = editorRef.current?.getExport();
-    if (!exported?.htmlBody?.trim()) {
-      toast.error('El contenido no tiene HTML');
+    if (saving || (!editable && mode === 'edit')) return;
+    if (editorRef.current?.hasPendingUploads()) {
+      setSaveError('Espera a que termine la subida de imágenes y vuelve a guardar.');
       return;
     }
     if (!title.trim() || !subject.trim()) {
-      toast.error('Completa título y asunto');
+      setSaveError('Completa el título y el asunto para guardar.');
       return;
     }
     setSaving(true);
     setSaveConflict(false);
+    setSaveError('');
     try {
+      const exported = editorRef.current?.getExport();
+      if (!exported?.htmlBody?.trim()) throw new Error('El contenido no tiene HTML.');
+      const content = await externalizeNewsletterImages(exported, async (file) => {
+        try {
+          return (await api.uploadNewsletterAsset(file, contentId ?? 'library')).url;
+        } catch (uploadError) {
+          const message = uploadError instanceof ApiRequestError && uploadError.status === 413
+            ? 'La imagen supera el límite de carga.'
+            : uploadError instanceof Error ? uploadError.message : 'Error de carga.';
+          throw new Error(`No se pudo subir una imagen incrustada. ${message}`);
+        }
+      }, uploadedImages.current);
+      const body = { title: title.trim(), subject: subject.trim(), ...content, brand };
+      const requestBody = mode === 'edit' ? { ...body, contentRevision } : body;
+      if (new TextEncoder().encode(JSON.stringify(requestBody)).byteLength > NEWSLETTER_CONTENT_REQUEST_MAX_BYTES) {
+        throw new Error('El boletín supera los 25 MB de guardado. Reduce el HTML importado o reemplaza los recursos pesados.');
+      }
       if (mode === 'create') {
-        const created = await api.createMalichimpContent({
-          title: title.trim(),
-          subject: subject.trim(),
-          htmlBody: exported.htmlBody,
-          designJson: exported.designJson,
-          brand,
-        });
+        const created = await api.createMalichimpContent(body);
         toast.success('Contenido creado');
         onCreated?.(created.id);
       } else if (contentId) {
         if (!contentRevision) {
-          toast.error('Recarga el contenido antes de guardar');
-          return;
+          throw new Error('Recarga el contenido antes de guardar.');
         }
         const updated = await api.updateMalichimpContent(contentId, {
-          title: title.trim(),
-          subject: subject.trim(),
-          htmlBody: exported.htmlBody,
-          designJson: exported.designJson,
-          brand,
+          ...body,
           contentRevision,
         });
         setContentRevision(updated.contentRevisionToken ?? null);
@@ -154,8 +173,12 @@ export function MalichimpContentEditor({
       if (isConflict) {
         setSaveConflict(true);
         toast.error(message);
+      } else if (e instanceof ApiRequestError && e.status === 413) {
+        setSaveError('El servidor rechazó el tamaño del boletín (413). Tu trabajo sigue abierto para reducir el contenido o reintentar.');
+      } else if (e instanceof ApiRequestError && (e.status === 401 || e.status === 403)) {
+        setSaveError(`El servidor rechazó el acceso al guardar (${e.status}). Revisa tu sesión y acceso a MALICHIMP.`);
       } else {
-        toast.error(message);
+        setSaveError(message);
       }
       // Keep local draft; never auto-reload after a failed save.
     } finally {
@@ -270,6 +293,8 @@ export function MalichimpContentEditor({
         </AlertBanner>
       ) : null}
 
+      {saveError ? <AlertBanner variant="error">{saveError}</AlertBanner> : null}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="malichimp-wc-title">Título</Label>
@@ -277,7 +302,7 @@ export function MalichimpContentEditor({
             id="malichimp-wc-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            disabled={!canEdit}
+            disabled={!canEdit || saving}
             maxLength={200}
           />
         </div>
@@ -287,20 +312,20 @@ export function MalichimpContentEditor({
             id="malichimp-wc-subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            disabled={!canEdit}
-            maxLength={200}
+            disabled={!canEdit || saving}
+            maxLength={campaignId ? 300 : 200}
           />
         </div>
         <div className="space-y-1">
-          <Label>Marca (opcional)</Label>
+          <Label htmlFor="malichimp-wc-brand">Marca (opcional)</Label>
           <Select
             value={brand ?? 'none'}
-            disabled={!canEdit}
+            disabled={!canEdit || saving}
             onValueChange={(v) => {
               applyBrand(v === 'none' ? null : (v as NewsletterBrand));
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger id="malichimp-wc-brand">
               <SelectValue placeholder="Sin marca" />
             </SelectTrigger>
             <SelectContent>
@@ -332,6 +357,7 @@ export function MalichimpContentEditor({
             type="button"
             variant="outline"
             size="sm"
+            disabled={saving}
             onClick={() => {
               const ok = editorRef.current?.insertFirstNameMergeTag();
               if (ok) {
@@ -346,14 +372,27 @@ export function MalichimpContentEditor({
         </div>
       ) : null}
 
-      <NewsletterEditor
-        key={`${editorKey}-${brand ?? 'none'}-${mode}`}
-        ref={editorRef}
-        initialDesignJson={initialDesignJson}
-        initialHtml={initialHtml}
-        brand={brand}
-        assetScope={contentId ?? 'library'}
-      />
+      <div inert={saving} aria-busy={saving}>
+        {canEdit ? (
+          <NewsletterEditor
+            key={`${editorKey}-${brand ?? 'none'}-${mode}`}
+            ref={editorRef}
+            initialDesignJson={initialDesignJson}
+            initialHtml={initialHtml}
+            brand={brand}
+            assetScope={contentId ?? 'library'}
+            editLinks
+          />
+        ) : (
+          <iframe
+            className="min-h-[34rem] w-full rounded-lg border bg-white"
+            title="Contenido del boletín"
+            sandbox=""
+            referrerPolicy="no-referrer"
+            srcDoc={initialHtml ?? ''}
+          />
+        )}
+      </div>
     </div>
   );
 }

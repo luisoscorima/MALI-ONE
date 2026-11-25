@@ -237,6 +237,7 @@ test('campaign create forks from MALICHIMP library brand', {
     });
 
     const created = await service.createCampaign(user.id, {
+      audienceRevision: (await service.reviewAudience({ groupOptionIds: [option.id] })).audienceRevision,
       name: 'Campaña desde MALICHIMP',
       newsletterId: content.id,
       subject: 'Asunto campaña',
@@ -244,6 +245,7 @@ test('campaign create forks from MALICHIMP library brand', {
       fromEmail: senderEmail,
       replyTo: senderEmail,
       groupOptionIds: [option.id],
+      scheduledAt: new Date(Date.now() + 60 * 60_000).toISOString(),
     });
     campaignId = created.id;
 
@@ -254,6 +256,15 @@ test('campaign create forks from MALICHIMP library brand', {
     assert.equal(campaign.newsletterId, content.id);
     assert.ok(campaign.workingNewsletterId);
     workingId = campaign.workingNewsletterId!;
+    assert.equal(campaign.status, 'scheduled');
+    await service.cancelCampaign(campaign.id);
+    await service.cancelCampaign(campaign.id);
+    const cancelled = await prisma.emailCampaign.findUniqueOrThrow({
+      where: { id: campaign.id },
+      include: { sends: true },
+    });
+    assert.equal(cancelled.status, 'cancelled');
+    assert.deepEqual(cancelled.sends.map((row) => row.status), ['suppressed']);
     assert.equal(campaign.workingNewsletter?.scope, NewsletterScope.malichimp);
     assert.equal(
       campaign.workingNewsletter?.kind,

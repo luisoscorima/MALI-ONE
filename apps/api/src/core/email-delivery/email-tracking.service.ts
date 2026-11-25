@@ -53,12 +53,13 @@ export class EmailTrackingService {
 
     if (mode === 'email') {
       out = out.replace(
-        /href=(["'])(https?:\/\/[^"']+)\1/gi,
-        (_match, quote: string, href: string) => {
+        /(\shref\s*=\s*)(["'])(https?:\/\/[^"']+)\2/gi,
+        (_match, attribute: string, quote: string, href: string) => {
+          const target = href.replace(/&(?:amp|#0*38|#x0*26);/gi, '&');
           const tracked = this.publicUrl(
-            `mail/c/${options.openToken}?u=${encodeURIComponent(href)}`,
+            `mail/c/${options.openToken}?u=${encodeURIComponent(target)}`,
           );
-          return `href=${quote}${tracked}${quote}`;
+          return `${attribute}${quote}${tracked}${quote}`;
         },
       );
     }

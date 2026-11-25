@@ -109,7 +109,7 @@ export class MalichimpAudienceDto {
   q?: string;
 }
 
-export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
+export class SaveMalichimpDraftDto extends MalichimpAudienceDto {
   @IsString()
   @MinLength(3)
   @MaxLength(160)
@@ -154,6 +154,12 @@ export class CreateMalichimpCampaignDto extends MalichimpAudienceDto {
   @IsString()
   @MaxLength(64)
   contentRevision?: string;
+}
+
+export class CreateMalichimpCampaignDto extends SaveMalichimpDraftDto {
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  audienceRevision!: string;
 }
 
 export class ResolveMalichimpEmailsDto {
@@ -209,7 +215,7 @@ export class UpdateMalichimpWorkingCopyDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
-  @MaxLength(200)
+  @MaxLength(300)
   @Matches(/^[^\r\n]+$/)
   subject?: string;
 

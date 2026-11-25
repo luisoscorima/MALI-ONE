@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Post,
   UploadedFile,
   UseInterceptors,
@@ -9,10 +10,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AppModule } from '@prisma/client';
 import { RequireModule } from '../../core/guards/module.decorator';
-import { NewsletterAssetsService } from './newsletter-assets.service';
-
-/** Allow ~30MB camera exports before sharp shrinks them for email. */
-const MAX_UPLOAD_BYTES = 40 * 1024 * 1024;
+import { NEWSLETTER_ASSET_MAX_BYTES, NewsletterAssetsService } from './newsletter-assets.service';
 
 type UploadedAssetFile = {
   originalname: string;
@@ -30,10 +28,15 @@ type UploadedAssetFile = {
 export class NewsletterAssetsController {
   constructor(private readonly assets: NewsletterAssetsService) {}
 
+  @Get('assets/limits')
+  getLimits() {
+    return { maxBytes: this.assets.maxUploadBytes };
+  }
+
   @Post('assets/upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { files: 1, fileSize: MAX_UPLOAD_BYTES },
+      limits: { files: 1, fileSize: NEWSLETTER_ASSET_MAX_BYTES + 1 },
     }),
   )
   upload(

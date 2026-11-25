@@ -27,6 +27,17 @@ test('injects shared click/open tracking and an audience-owned unsubscribe link'
   assert.match(html, /https:\/\/mali\.example\/mail\/unsubscribe\/send-token/);
 });
 
+test('preserves the exact query and fragment of tracked HTML button URLs', () => {
+  const html = trackingService().inject(
+    '<a href="https://mali.pe/agenda?utm_source=email&amp;utm_campaign=arte&#38;id=2&#x26;v=a%26b#entradas">Entradas</a>',
+    'send-token',
+  );
+  const href = html.match(/href="([^"]+)"/)?.[1];
+  assert.ok(href);
+  assert.equal(new URL(href).searchParams.get('u'),
+    'https://mali.pe/agenda?utm_source=email&utm_campaign=arte&id=2&v=a%26b#entradas');
+});
+
 test('injects standard view-in-browser block when URL is provided', () => {
   const html = trackingService().inject(
     '<html><body><p>Contenido</p></body></html>',

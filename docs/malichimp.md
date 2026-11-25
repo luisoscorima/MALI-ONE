@@ -33,15 +33,15 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 1. En **Nueva campaña** el flujo es un panel numerado: **Para** → **De** → **Contenido** → **Envío**. En Para se elige **una** forma de audiencia (Grupos por defecto en campañas nuevas).
 2. **Grupos** o **Etiquetas**: incluir una o más (unión: al menos una); exclusiones opcionales y secundarias (siempre prevalecen). **Lista de correos**: pegar direcciones ya en MALICHIMP → `POST /campaigns/resolve-emails` clasifica listos / no encontrados / inválidos / no pueden recibir; solo los no encontrados llevan a Importar (con consentimiento). Tope 10 000 correos únicos.
 3. Elegibilidad única en todo el módulo: `subscribed` + sin supresión MALICHIMP + sin supresión global (`eligibleContacts` en tags; preview/create/send).
-4. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar. En lista de correos el afinado quita IDs de `includeContactIds` (sin `excludeContactIds`).
+4. La API calcula una vista previa de destinatarios y, en Envío, devuelve el total final, una muestra y una revisión de la selección. Si cambian los destinatarios antes de confirmar, la API devuelve `409` y el asistente pide revisar nuevamente. En lista de correos se conservan por separado los contactos resueltos y los marcados.
 5. **Contenido** es la biblioteca acotada MALICHIMP (`scope=malichimp`, `kind=library`): se crea/edita sin campaña y sin permiso de Boletines. El asistente de campañas usa **solo** esa biblioteca (no `shared` published).
-6. Al crear o duplicar una campaña se genera un **fork exclusivo** (`workingNewsletterId`, `campaign_working_copy`) en la misma transacción. El asunto se propone desde la base; el nombre interno del envío es opcional.
+6. Al guardar un borrador, duplicar o confirmar una campaña nueva se genera un **fork exclusivo** (`workingNewsletterId`, `campaign_working_copy`). Guardar y continuar conserva modo, criterios, selección manual, remitente, contenido y fecha de programación. La prueba del asistente usa ese borrador.
 7. El fork de una campaña en borrador se edita con el mismo editor (`?tab=content&edit={id}`). La URL pública `/n/:slug` es solo para biblioteca `shared` published del hub.
 8. Remitentes: pestaña **Remitentes** en MALICHIMP (CRUD `scope=malichimp`) y también visibles en el hub. El selector de campaña filtra ese catálogo; reply-to en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
 9. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita. Prueba y envío envían `contentRevision`; si el fork cambió → `409`.
 10. Al confirmar se congelan asunto, HTML, diseño, marca, criterios de audiencia y destinatarios desde el fork.
 11. **Duplicar** crea campaña + fork desde snapshots. Copia modo de audiencia (grupos/etiquetas/correos), remitente, asunto e inclusiones/exclusiones; limpia programación y métricas. En modo correos reconstruye destinatarios desde IDs guardados (no copia no encontrados/bloqueados).
-12. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
+12. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta hasta tres veces. Antes de entregar cada pendiente a SES verifica que el contacto de MALICHIMP siga siendo elegible. La programación puede cancelarse hasta que empiece el despacho. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
 13. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
 14. Chrome de envío (estilo de plataforma): arriba, “Ver este correo en el navegador” → `{APP_URL}/mail/view/{openToken}` (snapshot + personalización; sin contar apertura); abajo, “Cancelar suscripción” → `/mail/unsubscribe/{token}`. `/n/{slug}` es solo el boletín público vigente de biblioteca.
 
@@ -128,11 +128,14 @@ El catálogo `EmailSender` con `scope=malichimp` se administra en **MALICHIMP �
 - `GET /api/malichimp/test-recipients?q=`
 - `POST /api/malichimp/campaigns/test-send` — exige `contentRevision` si ya hay fork
 - `POST /api/malichimp/campaigns/preview` — `audienceMode` opcional (`groups` por defecto)
+- `POST /api/malichimp/campaigns/review` — total, muestra y `audienceRevision` de la selección final
 - `POST /api/malichimp/campaigns/resolve-emails` — clasifica lista pegada (máx. 10 000 únicos)
-- `POST /api/malichimp/campaigns` — campaña + fork desde library MALICHIMP; persiste `audienceMode`
+- `POST /api/malichimp/campaigns/drafts` · `PATCH /api/malichimp/campaigns/{id}/draft` — guarda el borrador completo
+- `POST /api/malichimp/campaigns` — campaña + fork desde la biblioteca MALICHIMP, exige `audienceRevision`
 - `POST /api/malichimp/campaigns/{id}/duplicate`
 - `DELETE /api/malichimp/campaigns/{id}` — borradores (elimina el fork)
-- `POST /api/malichimp/campaigns/{id}/send` — snapshot desde fork; `contentRevision` obligatorio
+- `POST /api/malichimp/campaigns/{id}/send` — exige `contentRevision` y `audienceRevision`
+- `POST /api/malichimp/campaigns/{id}/cancel` — cancela un envío programado que aún no empezó
 - `GET /api/email-delivery/senders` — autenticado (selector de campañas)
 - `POST|PATCH|DELETE /api/email-delivery/senders…` — administrador (UI en Boletines)
 - `POST /api/malichimp/imports/xlsx/preview` — multipart `file` + `groupOptionIds` + `consentConfirmed`
@@ -163,7 +166,10 @@ En el wizard (paso Envío) → **Enviar prueba**:
 - **Lock de importación.** Solo un `MalichimpImportJob` `queued`/`running` a la vez (ZIP o XLSX).
 - **Auditoría XLSX.** Cada apply crea job + run con huella SHA-256, admin, consentimiento y conteos finales.
 - **SES vs catálogo.** Registrar un remitente no garantiza que SES lo acepte. Un fallo de identidad aparece al despachar, no al guardar el catálogo.
-- **Exclusiones de audiencia.** Una misma opción no puede estar en incluir y excluir. La exclusión se evalúa por membresía actual al crear la campaña; después el snapshot de destinatarios no cambia.
+- **Exclusiones de audiencia.** Una misma opción no puede estar en incluir y excluir. La membresía se evalúa al confirmar. Luego el motor puede omitir pendientes que perdieron elegibilidad, sin añadir destinatarios al snapshot.
+- **Imágenes y guardado.** La carga multipart usa `NEWSLETTER_ASSET_MAX_MB` o `UPLOAD_MAX_MB`, con tope de 40 MB. JPG, PNG y WebP salen como JPEG optimizado, de hasta 1600 px por lado. Un GIF válido conserva la animación. La API comprueba la lectura anónima en S3. Al guardar MALICHIMP, las imágenes Base64 de formatos admitidos se suben una sola vez y se sustituyen en el HTML y en el proyecto editable. El JSON de guardado tiene un límite de 25 MB.
+- **Enlaces.** Selecciona un botón o enlace en el lienzo para ver y editar su URL. El editor admite direcciones web, `mailto:` y `tel:`. El seguimiento de clics conserva los parámetros de la URL.
+- **Proxy externo.** El Nginx incluido tiene un límite de 100 MB. Si el Nginx Proxy Manager de EC2 aplica uno menor, un `413` puede ocurrir antes de que la API reciba la carga. Configura `client_max_body_size 100m;` en ese host proxy para admitir ambos límites.
 - **Programación.** Fechas vencidas se rechazan al crear. Cambios de reloj o de zona horaria del cliente deben enviarse como ISO futuro absoluto.
 - **Plantilla pública.** El XLSX en `/plantillas/` es estático y descargable sin autenticación; no contiene datos de audiencia.
 
@@ -190,6 +196,6 @@ usar una dirección, el dominio o la dirección debe estar autorizado en SES.
 
 El conjunto publica eventos en EventBridge y la cola SQS. El consumidor guarda
 cada evento de forma idempotente en `SesEventRecord`. Rebotes, quejas y bajas
-globales se sincronizan con `EmailGlobalSuppression`; nunca con una audiencia
-de negocio específica. El dispatcher compartido solo utiliza snapshots de
-campaña y no conoce MALICHIMP, Workspace ni ningún CRM.
+globales se sincronizan con `EmailGlobalSuppression`. El dispatcher compartido
+envía a partir de los snapshots de campaña. Para MALICHIMP consulta el estado y
+las supresiones actuales únicamente para omitir destinatarios pendientes.

@@ -30,6 +30,7 @@ import {
   MalichimpCampaignStatsQueryDto,
   ResolveMalichimpEmailsDto,
   SendMalichimpTestDto,
+  SaveMalichimpDraftDto,
   UpdateMalichimpContactDto,
   UpdateMalichimpWorkingCopyDto,
 } from './dto/malichimp-campaign.dto';
@@ -244,6 +245,30 @@ export class MalichimpController {
   @Post('campaigns/resolve-emails')
   resolveEmails(@Body() body: ResolveMalichimpEmailsDto) {
     return this.malichimp.resolveEmails(body.emails);
+  }
+
+  @Post('campaigns/review')
+  reviewAudience(@Body() body: MalichimpAudienceDto) {
+    return this.malichimp.reviewAudience(body);
+  }
+
+  @Post('campaigns/drafts')
+  createDraft(@Req() req: { user: User }, @Body() body: SaveMalichimpDraftDto) {
+    return this.malichimp.saveDraftCampaign(req.user.id, body);
+  }
+
+  @Patch('campaigns/:id/draft')
+  updateDraft(
+    @Req() req: { user: User },
+    @Param('id') id: string,
+    @Body() body: SaveMalichimpDraftDto,
+  ) {
+    return this.malichimp.saveDraftCampaign(req.user.id, body, id);
+  }
+
+  @Post('campaigns/:id/cancel')
+  cancelCampaign(@Param('id') id: string) {
+    return this.malichimp.cancelCampaign(id);
   }
 
   @Post('campaigns')

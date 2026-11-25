@@ -111,7 +111,7 @@ export function buildWorkingCopyCreateData(input: {
   return {
     slug: duplicateNewsletterSlug(input.slugBase, 'wc'),
     title: input.title.slice(0, 200),
-    subject: input.subject.slice(0, 200),
+    subject: input.subject.slice(0, input.scope === Scope.malichimp ? 300 : 200),
     htmlBody: input.htmlBody,
     designJson: input.designJson ?? null,
     brand: input.brand ?? null,

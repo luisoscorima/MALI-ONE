@@ -731,6 +731,21 @@ export const api = {
     { method: 'POST', body: JSON.stringify(body) },
   ),
 
+  reviewMalichimpAudience: (body: import('@mali-one/shared').MalichimpAudienceFilterDto) =>
+    request<import('@mali-one/shared').MalichimpAudienceReviewDto>(
+      '/api/malichimp/campaigns/review',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  saveMalichimpDraft: (body: import('@mali-one/shared').SaveMalichimpDraftDto, id?: string | null) =>
+    request<import('@mali-one/shared').MalichimpCampaignDetailDto>(
+      id ? `/api/malichimp/campaigns/${encodeURIComponent(id)}/draft` : '/api/malichimp/campaigns/drafts',
+      { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) },
+    ),
+
+  cancelMalichimpCampaign: (id: string) =>
+    request<{ ok: true }>(`/api/malichimp/campaigns/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
+
   resolveMalichimpEmails: (
     emails: string[],
   ) => request<import('@mali-one/shared').MalichimpResolveEmailsDto>(
@@ -2024,6 +2039,8 @@ export const api = {
       },
     );
   },
+
+  getNewsletterAssetLimits: () => request<{ maxBytes: number }>('/api/newsletters/assets/limits'),
 
   uploadNewsletterAsset: (file: File, scope?: string) => {
     const form = new FormData();

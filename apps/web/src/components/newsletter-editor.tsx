@@ -1,10 +1,12 @@
 import {
   forwardRef,
   useEffect,
+  useId,
   useImperativeHandle,
   useRef,
+  useState,
 } from 'react';
-import grapesjs, { type Editor } from 'grapesjs';
+import grapesjs, { type Component, type Editor } from 'grapesjs';
 import newsletterPlugin from 'grapesjs-preset-newsletter';
 import es from 'grapesjs/locale/es';
 import type { NewsletterBrand } from '@mali-one/shared';
@@ -16,18 +18,16 @@ import {
   wrapNewsletterWithBrandChrome,
 } from '@mali-one/shared';
 import { toast } from 'sonner';
-import { api } from '@/lib/api';
+import { ApiRequestError, api } from '@/lib/api';
+import { Button, Input, Label } from '@/components/ui';
+import { normalizeNewsletterLink, type NewsletterEditorExport } from '@/lib/newsletter-content';
 import 'grapesjs/dist/css/grapes.min.css';
-
-export type NewsletterEditorExport = {
-  htmlBody: string;
-  designJson: string;
-};
 
 export const NEWSLETTER_FIRST_NAME_MERGE_TAG = '{{first_name}}';
 
 export type NewsletterEditorHandle = {
   getExport: () => NewsletterEditorExport;
+  hasPendingUploads: () => boolean;
   /** Inserts {{first_name}} at the caret, into the selection, or as a greeting block. */
   insertFirstNameMergeTag: () => boolean;
 };
@@ -60,8 +60,7 @@ function insertFirstNameMergeTag(editor: Editor): boolean {
 
 /**
  * Brand chrome logos (absolute: required inside email HTML).
- * Served from the web origin because mali-one-files blocks anonymous GetObject
- * despite S3_PUBLIC_READ. Copies also live under s3://mali-one-files/newsletters/brands/.
+ * These bundled files keep a stable web URL. Copies also live in the newsletter S3 prefix.
  */
 const BRAND_LOGO_ORIGIN =
   (typeof window !== 'undefined' && window.location?.origin) ||
@@ -82,8 +81,24 @@ type NewsletterEditorProps = {
   brand?: NewsletterBrand | null;
   /** S3 key scope under newsletters/{scope}/… (content id, slug, or library). */
   assetScope?: string;
+  editLinks?: boolean;
   className?: string;
 };
+
+function getSelectedLink(editor: Editor): Component | undefined {
+  const selected = editor.getSelected();
+  if (!selected || selected === editor.getWrapper()) return;
+  for (let parent: Component | undefined = selected; parent; parent = parent.parent()) {
+    if (parent.get('tagName') === 'a') return parent;
+  }
+  const links = selected.find('a');
+  if (links.length === 1) return links[0];
+}
+
+function linkDestination(component: Component): string {
+  const href = component.getAttributes().href;
+  return typeof href === 'string' && href !== '#' ? href : '';
+}
 
 function brandAssetsFor(brand: NewsletterBrand): { logoUrl: string } {
   return { logoUrl: NEWSLETTER_BRAND_LOGO_URLS[brand] };
@@ -521,6 +536,7 @@ export const NewsletterEditor = forwardRef<
     initialHtml,
     brand = null,
     assetScope = 'library',
+    editLinks = false,
     className,
   },
   ref,
@@ -528,13 +544,48 @@ export const NewsletterEditor = forwardRef<
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const assetScopeRef = useRef(assetScope);
+  const [assetLimit, setAssetLimit] = useState<number | null>(null);
+  const assetLimitRef = useRef<number | null>(null);
+  const pendingUploads = useRef(0);
+  const [uploading, setUploading] = useState(false);
+  const linkInputId = useId();
+  const [linkComponent, setLinkComponent] = useState<Component>();
+  const [linkValue, setLinkValue] = useState('');
+  const [linkError, setLinkError] = useState('');
   assetScopeRef.current = assetScope;
 
+  useEffect(() => {
+    let active = true;
+    void api.getNewsletterAssetLimits().then(({ maxBytes }) => {
+      if (!active) return;
+      assetLimitRef.current = maxBytes;
+      setAssetLimit(maxBytes);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  function applyLink(): boolean {
+    if (!linkComponent) return true;
+    const destination = normalizeNewsletterLink(linkValue);
+    if (!destination) {
+      setLinkError('Escribe una URL, un enlace mailto: o un enlace tel: válido.');
+      return false;
+    }
+    linkComponent.addAttributes({ href: destination });
+    setLinkValue(destination);
+    setLinkError('');
+    return true;
+  }
+
   useImperativeHandle(ref, () => ({
+    hasPendingUploads: () => pendingUploads.current > 0,
     getExport: () => {
       const editor = editorRef.current;
       if (!editor) {
         return { htmlBody: '', designJson: '{}' };
+      }
+      if (linkComponent && linkValue !== linkDestination(linkComponent) && !applyLink()) {
+        throw new Error('Corrige la URL del botón antes de guardar.');
       }
       let htmlBody = '';
       try {
@@ -561,6 +612,7 @@ export const NewsletterEditor = forwardRef<
   useEffect(() => {
     if (!containerRef.current) return;
 
+    let active = true;
     const editor = grapesjs.init({
       container: containerRef.current,
       height: '100%',
@@ -590,67 +642,63 @@ export const NewsletterEditor = forwardRef<
         embedAsBase64: false,
         upload: false,
         autoAdd: true,
-        // Regular function: GrapesJS binds `this` to FileUploaderView.
         uploadFile: async function uploadNewsletterFiles(ev: {
           dataTransfer?: DataTransfer | null;
           target?: EventTarget | null;
         }) {
-          const files = ev.dataTransfer?.files ??
-            (ev.target as HTMLInputElement | null)?.files;
-          if (!files?.length) return;
-
-          const data: Array<{
-            src: string;
-            name: string;
-            type: string;
-            width: number;
-            height: number;
-          }> = [];
-
+          const input = ev.target instanceof HTMLInputElement ? ev.target : null;
+          const files = Array.from(ev.dataTransfer?.files ?? input?.files ?? []);
+          if (input) input.value = '';
+          if (!files.length) return;
+          let firstSrc: string | undefined;
+          pendingUploads.current++;
+          setUploading(true);
           try {
-            for (const file of Array.from(files)) {
-              const uploaded = await api.uploadNewsletterAsset(
-                file,
-                assetScopeRef.current,
-              );
-              data.push({
-                src: uploaded.url,
-                name: uploaded.fileName,
-                type: 'image',
-                width: uploaded.width ?? 0,
-                height: uploaded.height ?? 0,
-              });
+            for (const file of files) {
+              if (!active) return;
+              try {
+                const maxBytes = assetLimitRef.current;
+                if (maxBytes && file.size > maxBytes) {
+                  throw new Error(`Cada imagen admite hasta ${maxBytes / (1024 * 1024)} MB.`);
+                }
+                const uploaded = await api.uploadNewsletterAsset(file, assetScopeRef.current);
+                if (!active) return;
+                editor.AssetManager.add({
+                  src: uploaded.url,
+                  name: uploaded.fileName,
+                  type: 'image',
+                  width: uploaded.width ?? 0,
+                  height: uploaded.height ?? 0,
+                });
+                firstSrc ??= uploaded.url;
+              } catch (error) {
+                if (!active) return;
+                const message = error instanceof ApiRequestError && error.status === 413
+                  ? 'La imagen supera el límite de carga del servidor.'
+                  : error instanceof Error ? error.message : 'No se pudo subir la imagen.';
+                toast.error(`${file.name} · ${message}`);
+              }
             }
 
-            // `this` is FileUploaderView (bound by GrapesJS).
-            (
-              this as {
-                onUploadResponse?: (res: { data: typeof data }) => void;
+            // The picker still contains the uploaded assets if auto-selection is unavailable.
+            try {
+              const select = (
+                editor.AssetManager as {
+                  __getBehaviour?: () => {
+                    select?: (asset: unknown, complete: boolean) => void;
+                  };
+                }
+              ).__getBehaviour?.()?.select;
+              if (typeof select === 'function' && firstSrc) {
+                const match = editor.AssetManager.get(firstSrc);
+                if (match) select(match, true);
               }
-            ).onUploadResponse?.({ data });
-
-            const select = (
-              editor.AssetManager as {
-                __getBehaviour?: () => {
-                  select?: (asset: unknown, complete: boolean) => void;
-                };
-              }
-            ).__getBehaviour?.()?.select;
-            const firstSrc = data[0]?.src;
-            if (typeof select === 'function' && firstSrc) {
-              const match = editor.AssetManager.getAll().find(
-                (asset: { get: (key: string) => unknown }) =>
-                  asset.get('src') === firstSrc,
-              );
-              if (match) select(match, true);
+            } catch {
+              // Selection is optional after the upload.
             }
-          } catch (err) {
-            const message =
-              err instanceof Error ? err.message : 'No se pudo subir la imagen';
-            toast.error(message);
-            (
-              this as { onUploadError?: (error: unknown) => void }
-            ).onUploadError?.(err);
+          } finally {
+            pendingUploads.current--;
+            if (active && !pendingUploads.current) setUploading(false);
           }
         },
         // GrapesJS runtime supports this; typings omit it.
@@ -774,7 +822,19 @@ export const NewsletterEditor = forwardRef<
     loadInitialContent(editor, initialDesignJson, initialHtml, brand);
     editorRef.current = editor;
 
+    if (editLinks) {
+      const syncLink = () => queueMicrotask(() => {
+        if (!active) return;
+        const selected = getSelectedLink(editor);
+        setLinkComponent(selected);
+        setLinkValue(selected ? linkDestination(selected) : '');
+        setLinkError('');
+      });
+      editor.on('component:selected component:deselected component:update:attributes:href', syncLink);
+    }
+
     return () => {
+      active = false;
       editor.destroy();
       editorRef.current = null;
     };
@@ -782,15 +842,69 @@ export const NewsletterEditor = forwardRef<
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional once-per-mount init
   }, []);
 
+  const appliedLink = linkComponent ? normalizeNewsletterLink(linkDestination(linkComponent)) : null;
   return (
-    <div
-      className={
-        className ??
-        'newsletter-gjs overflow-hidden rounded-lg border border-border/60'
-      }
-      style={{ minHeight: 620, height: 'min(72vh, 820px)' }}
-    >
-      <div ref={containerRef} className="h-full w-full" />
-    </div>
+    <>
+      {editLinks ? (
+        <div className="mb-3 space-y-2">
+          <Label htmlFor={linkInputId}>URL del botón o enlace</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              id={linkInputId}
+              className="min-w-48 flex-1"
+              type="text"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              value={linkValue}
+              placeholder="https://mali.pe/agenda"
+              disabled={!linkComponent}
+              aria-invalid={Boolean(linkError)}
+              aria-describedby={`${linkInputId}-hint`}
+              onChange={(event) => {
+                setLinkValue(event.target.value);
+                setLinkError('');
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  applyLink();
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => applyLink()} disabled={!linkComponent}>
+              Aplicar enlace
+            </Button>
+            {appliedLink ? (
+              <Button variant="ghost" asChild>
+                <a href={appliedLink} target="_blank" rel="noreferrer">
+                  Probar enlace
+                </a>
+              </Button>
+            ) : null}
+          </div>
+          <p id={`${linkInputId}-hint`} className={linkError ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'} role={linkError ? 'alert' : undefined}>
+            {linkError || (linkComponent
+              ? 'Pega la dirección y pulsa Aplicar enlace.'
+              : 'Selecciona un botón o enlace en el boletín para editar su dirección.')}
+          </p>
+        </div>
+      ) : null}
+      {uploading ? <p role="status" className="mb-2 text-xs text-muted-foreground">Subiendo imágenes…</p> : null}
+      {assetLimit ? (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Imágenes de hasta {assetLimit / (1024 * 1024)} MB por archivo.
+        </p>
+      ) : null}
+      <div
+        className={
+          className ??
+          'newsletter-gjs overflow-hidden rounded-lg border border-border/60'
+        }
+        style={{ minHeight: 620, height: 'min(72vh, 820px)' }}
+      >
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
+    </>
   );
 });

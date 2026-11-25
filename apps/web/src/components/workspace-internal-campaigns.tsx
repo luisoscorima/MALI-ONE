@@ -93,6 +93,7 @@ const statusLabel: Record<InternalCampaignDto['status'], string> = {
   sending: 'Enviando',
   completed: 'Completada',
   failed: 'Fallida',
+  cancelled: 'Cancelada',
 };
 
 function limaDateTimeToIso(value: string): string {

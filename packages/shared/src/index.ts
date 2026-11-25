@@ -294,7 +294,7 @@ export interface MalichimpAudiencePreviewDto extends MalichimpAudienceFilterDto 
   sample: Array<{ id: string; email: string; name: string | null }>;
 }
 
-export interface CreateMalichimpCampaignDto extends MalichimpAudienceFilterDto {
+export interface SaveMalichimpDraftDto extends MalichimpAudienceFilterDto {
   name: string;
   newsletterId: string;
   /** Token from campaign detail / content review; mismatch → 409. */
@@ -304,6 +304,16 @@ export interface CreateMalichimpCampaignDto extends MalichimpAudienceFilterDto {
   fromEmail: string;
   replyTo: string;
   scheduledAt?: string;
+}
+
+export interface CreateMalichimpCampaignDto extends SaveMalichimpDraftDto {
+  audienceRevision: string;
+}
+
+export interface MalichimpAudienceReviewDto {
+  audienceRevision: string;
+  totalRecipients: number;
+  sample: Array<{ id: string; email: string; name: string | null }>;
 }
 
 export interface MalichimpCampaignCreatorDto {
@@ -979,6 +989,9 @@ export interface ScreenCastUploadResultDto {
   durationMs: number | null;
 }
 
+/** HTTP JSON ceiling for the rendered HTML and editable project together. */
+export const NEWSLETTER_CONTENT_REQUEST_MAX_BYTES = 25 * 1024 * 1024;
+
 export interface NewsletterAssetUploadResultDto {
   url: string;
   key: string;
@@ -1559,6 +1572,7 @@ export type EmailCampaignStatus =
   | 'queued'
   | 'sending'
   | 'completed'
+  | 'cancelled'
   | 'failed';
 
 export interface NewsletterDto {

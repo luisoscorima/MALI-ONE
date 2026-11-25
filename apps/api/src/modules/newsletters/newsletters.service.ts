@@ -542,7 +542,7 @@ export class NewslettersService {
       },
       data: {
         ...(options?.subject !== undefined
-          ? { subject: options.subject.slice(0, 200) }
+          ? { subject: options.subject.slice(0, working.scope === NewsletterScope.malichimp ? 300 : 200) }
           : {}),
         contentRevision: { increment: 1 },
       },

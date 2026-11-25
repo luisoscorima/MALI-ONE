@@ -102,7 +102,7 @@ export function NewsletterCampaignsRegistry() {
                       {AREA_LABEL[row.audienceArea] ?? row.audienceArea}
                     </Badge>
                   </TableCell>
-                  <TableCell>{row.status}</TableCell>
+                  <TableCell>{row.status === 'cancelled' ? 'Cancelada' : row.status}</TableCell>
                   <TableCell className="tabular-nums">
                     {row.sentCount}/{row.totalRecipients}
                   </TableCell>

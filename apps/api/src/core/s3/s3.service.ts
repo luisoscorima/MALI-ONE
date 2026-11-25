@@ -61,6 +61,15 @@ export class S3Service {
     return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
   }
 
+  async isPubliclyReadable(key: string): Promise<boolean> {
+    const response = await fetch(this.getPublicUrl(key), {
+      method: 'HEAD',
+      redirect: 'error',
+      signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  }
+
   async uploadFile(
     key: string,
     body: Buffer,

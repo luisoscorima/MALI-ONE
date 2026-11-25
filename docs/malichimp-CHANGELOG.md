@@ -2,12 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- La lista pegada conserva la selección al buscar o paginar. Editar la lista invalida la revisión y los suprimidos quedan fuera del flujo de importación XLSX.
+- Confirmar exige la revisión de audiencia. La cola vuelve a verificar la elegibilidad MALICHIMP antes de entregar cada pendiente a SES.
+- Guardar o enviar una prueba desde el asistente conserva el borrador completo. Las programaciones se pueden cancelar antes del despacho y la lista muestra el resultado final de los envíos.
+- El editor indica el límite efectivo de imágenes y verifica lectura anónima en S3 antes de insertarlas.
+- El editor de MALICHIMP permite editar la URL al seleccionar el botón. El seguimiento conserva los parámetros de enlaces HTML y el guardado mueve imágenes Base64 admitidas a S3 antes de enviar el JSON.
+
 ### Added
 
 - Audiencia de campaña con tres modos exclusivos: **Grupos**, **Etiquetas**, **Lista de correos** (`EmailCampaign.audienceMode`).
 - `POST /api/malichimp/campaigns/resolve-emails` (listos / no en MALICHIMP / a revisar / no pueden recibir; solo no encontrados → Importar).
 - `eligibleContacts` en `GET /api/malichimp/tags` sin cambiar el significado de `contacts`.
 - Wizard: Contrato UX (Grupos por defecto solo en campañas nuevas; resumen humano; Enviarás a X de Y contactos disponibles).
+- Tests de integración de audiencia: unión/exclusión de etiquetas, buckets de `resolve-emails`, dedupe, límite 10 000, legacy `null`→groups, duplicate en modo correos.
 
 ### Changed
 

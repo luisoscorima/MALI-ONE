@@ -3,6 +3,7 @@ import test from 'node:test';
 import { ConfigService } from '@nestjs/config';
 import { NewsletterKind, NewsletterScope, NewsletterStatus } from '@prisma/client';
 import { EmailDeliveryService } from '../../core/email-delivery/email-delivery.service';
+import { EmailCampaignDispatcherService } from '../../core/email-delivery/email-campaign-dispatcher.service';
 import { EmailSenderService } from '../../core/email-delivery/email-sender.service';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { contentRevisionOf } from '../newsletters/newsletter-working-copy';
@@ -48,6 +49,7 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
   let newsletterId = '';
   let campaignId = '';
   let duplicatedCampaignId = '';
+  let savedDraftId = '';
   let duplicatedNewsletterId = '';
   let groupId = '';
   let senderId = '';
@@ -150,6 +152,10 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     assert.equal(preview.sample[0]?.email, emails[0]);
 
     const created = await service.createCampaign(user.id, {
+      audienceRevision: (await service.reviewAudience({
+        groupOptionIds: [option.id, secondOption.id],
+        excludeGroupOptionIds: [exclusionOption.id],
+      })).audienceRevision,
       name: 'Campaña congelada',
       newsletterId: newsletter.id,
       subject: 'Asunto de la campaña',
@@ -228,16 +234,61 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     const workingFresh = await prisma.newsletter.findUniqueOrThrow({
       where: { id: duplicatedBeforeSend.workingNewsletterId! },
     });
-    const sentDuplicate = await service.sendDraftCampaign(duplicated.id, {
+    const draftData = {
       name: duplicated.name,
       newsletterId: duplicated.workingNewsletterId || duplicated.newsletterId,
       subject: duplicated.subject,
       fromName: duplicated.fromName,
       fromEmail: duplicated.fromEmail,
       replyTo: duplicated.replyTo,
-      groupOptionIds: duplicated.groupOptionIds,
-      excludeGroupOptionIds: duplicated.excludeGroupOptionIds,
+      audienceMode: 'emails' as const,
+      includeContactIds: [contacts[0].id],
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+    };
+    const firstDraft = await service.saveDraftCampaign(user.id, { ...draftData, newsletterId: newsletter.id });
+    savedDraftId = firstDraft.id;
+    assert.equal(firstDraft.status, 'draft');
+    assert.deepEqual(firstDraft.includeContactIds, [contacts[0].id]);
+
+    const saved = await service.saveDraftCampaign(user.id, {
+      ...draftData,
       contentRevision: contentRevisionOf(workingFresh),
+    }, duplicated.id);
+    assert.equal(saved.audienceMode, 'emails');
+    assert.equal(saved.scheduledAt?.toISOString(), draftData.scheduledAt);
+    assert.equal(saved.previewHtml, '<p>Copia editada</p>');
+
+    let deliveredToTransport = 0;
+    delivery.sendHtml = async () => {
+      deliveredToTransport++;
+      return { messageId: 'mock-ses-id' };
+    };
+    const testResult = await service.sendTestCampaign(user, {
+      campaignId: saved.id,
+      ...draftData,
+      contentRevision: saved.contentRevision ?? undefined,
+      emails: [user.email],
+    });
+    assert.equal(testResult.sends[0]?.status, 'sent');
+    const resumed = await service.getCampaign(saved.id);
+    assert.equal(resumed.audienceMode, 'emails');
+    assert.deepEqual(resumed.includeContactIds, [contacts[0].id]);
+    assert.equal(resumed.scheduledAt?.toISOString(), draftData.scheduledAt);
+
+    const sentDuplicate = await service.sendDraftCampaign(duplicated.id, {
+      audienceRevision: (await service.reviewAudience({
+        audienceMode: 'emails',
+        includeContactIds: [contacts[0].id],
+      })).audienceRevision,
+      name: duplicated.name,
+      newsletterId: duplicated.workingNewsletterId || duplicated.newsletterId,
+      subject: duplicated.subject,
+      fromName: duplicated.fromName,
+      fromEmail: duplicated.fromEmail,
+      replyTo: duplicated.replyTo,
+      audienceMode: 'emails',
+      includeContactIds: [contacts[0].id],
+      contentRevision: resumed.contentRevision ?? undefined,
     });
     assert.equal(sentDuplicate.status, 'queued');
     assert.equal(sentDuplicate.totalRecipients, 1);
@@ -247,8 +298,20 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     });
     assert.equal(duplicatedAfterSend.managedByDispatcher, true);
     assert.equal(duplicatedAfterSend.htmlSnapshot, '<p>Copia editada</p>');
-    assert.equal(duplicatedAfterSend.sends.length, 1);
+    assert.equal(duplicatedAfterSend.sends.filter((send) => !send.isTest).length, 1);
+
+    await prisma.emailCampaign.update({ where: { id: created.id }, data: { managedByDispatcher: false } });
+    await prisma.malichimpSuppression.create({
+      data: { email: contacts[0].email, reason: 'mailchimp_cleaned', source: 'mailchimp_import' },
+    });
+    await new EmailCampaignDispatcherService(prisma, delivery, emailTracking, config).processQueue();
+    const suppressed = await prisma.emailSend.findFirstOrThrow({
+      where: { campaignId: duplicated.id, isTest: false },
+    });
+    assert.equal(suppressed.status, 'suppressed');
+    assert.equal(deliveredToTransport, 1, 'Solo la prueba debe llegar al transporte simulado');
   } finally {
+    if (savedDraftId) await service.deleteDraftCampaign(savedDraftId);
     const workingIds: string[] = [];
     if (duplicatedCampaignId) {
       const dup = await prisma.emailCampaign.findUnique({
