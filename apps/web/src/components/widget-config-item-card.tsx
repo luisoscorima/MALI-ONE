@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { CircleHelp, ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ensureMaterialIcons } from '@/lib/ensure-material-icons';
 import { googleEmbedMapUrl } from '@/lib/google-embed-map';
 
 const THUMB_CLASS = 'h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/40';
@@ -221,6 +223,10 @@ export function WidgetConfigItemMaterialIconThumb({
   icon: string;
   label?: string;
 }) {
+  useEffect(() => {
+    ensureMaterialIcons();
+  }, []);
+
   const glyph = icon.trim();
 
   if (!glyph) {

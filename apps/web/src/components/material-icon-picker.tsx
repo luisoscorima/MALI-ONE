@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import {
   isKnownSelectorIcon,
   SELECTOR_SEDE_ICONS,
 } from '@/lib/selector-sede-icons';
+import { ensureMaterialIcons } from '@/lib/ensure-material-icons';
 import { Input } from '@/components/ui';
 
 export function MaterialIconPicker({
@@ -12,6 +14,10 @@ export function MaterialIconPicker({
   value: string;
   onChange: (icon: string) => void;
 }) {
+  useEffect(() => {
+    ensureMaterialIcons();
+  }, []);
+
   const trimmed = value.trim();
   const showCustom = Boolean(trimmed) && !isKnownSelectorIcon(trimmed);
 
