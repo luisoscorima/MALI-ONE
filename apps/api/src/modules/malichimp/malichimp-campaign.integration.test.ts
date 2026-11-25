@@ -310,6 +310,15 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
     });
     assert.equal(suppressed.status, 'suppressed');
     assert.equal(deliveredToTransport, 1, 'Solo la prueba debe llegar al transporte simulado');
+
+    const setup = await service.getCampaignSetup();
+    assert.ok(setup.groups.some((item) => item.id === groupId));
+    assert.ok(setup.senders.some((item) => item.email === senderEmail));
+    const listing = await service.listCampaigns();
+    const listed = listing.find((item) => item.id === duplicated.id);
+    assert.equal(listed?.suppressed, 1);
+    assert.equal(listed?.sent, 0, 'El envío de prueba no cuenta en el listado de producción');
+    assert.equal(listing.find((item) => item.id === savedDraftId)?.suppressed, 0);
   } finally {
     if (savedDraftId) await service.deleteDraftCampaign(savedDraftId);
     const workingIds: string[] = [];

@@ -167,6 +167,11 @@ export class MalichimpController {
     return this.malichimp.listCampaigns();
   }
 
+  @Get('campaigns/setup')
+  campaignSetup() {
+    return this.malichimp.getCampaignSetup();
+  }
+
   @Post('campaigns/export')
   async exportCampaigns(
     @Body() body: ExportMalichimpCampaignsDto = {},

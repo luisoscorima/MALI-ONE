@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -27,7 +27,7 @@ import type {
   MalichimpXlsxImportPreviewDto,
   MalichimpXlsxImportResultDto,
 } from '@mali-one/shared';
-import { AlertBanner, PageLoading } from '@/components/feedback';
+import { AlertBanner, TableShellSkeleton } from '@/components/feedback';
 import { PageHeader } from '@/components/page-header';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
@@ -127,10 +127,12 @@ export function MalichimpPage() {
     tabParam === 'remitentes'
       ? tabParam
       : 'audience';
+  const showingAudience = section === 'audience';
+  const showingSenders = section === 'remitentes';
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [tags, setTags] = useState<MalichimpTagDto[]>([]);
-  const [senders, setSenders] = useState<EmailSenderDto[]>([]);
+  const [senders, setSenders] = useState<EmailSenderDto[] | null>(null);
   const [contacts, setContacts] = useState<MalichimpContactDto[]>([]);
   const [selectedContact, setSelectedContact] = useState<MalichimpContactDto | null>(null);
   const [total, setTotal] = useState(0);
@@ -142,7 +144,11 @@ export function MalichimpPage() {
   const [groupOptionId, setGroupOptionId] = useState('all');
   const [tagId, setTagId] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [contactsError, setContactsError] = useState('');
+  const [audienceError, setAudienceError] = useState('');
+  const [groupsError, setGroupsError] = useState('');
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [sendersError, setSendersError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [importMode, setImportMode] = useState<'xlsx' | 'zip'>('xlsx');
@@ -171,6 +177,7 @@ export function MalichimpPage() {
     groupOptionIds: string[];
   } | null>(null);
   const [contactSaving, setContactSaving] = useState(false);
+  const needsGroups = showingAudience || (importOpen && importMode === 'xlsx');
 
   useEffect(() => {
     const jobId = window.sessionStorage.getItem(importJobStorageKey);
@@ -193,48 +200,79 @@ export function MalichimpPage() {
 
   useEffect(() => setPage(1), [debouncedQuery, status, groupOptionId, tagId]);
 
-  const loadContacts = useCallback(async () => {
-    const result = await api.listMalichimpContacts({
+  useEffect(() => {
+    if (!showingAudience) return;
+    const request = new AbortController();
+    setContactsError('');
+    void api.listMalichimpContacts({
       q: debouncedQuery || undefined,
       status: status === 'all' ? undefined : status,
       groupOptionId: groupOptionId === 'all' ? undefined : groupOptionId,
       tagId: tagId === 'all' ? undefined : tagId,
       page,
       pageSize: 50,
+    }, request.signal).then((result) => {
+      if (request.signal.aborted) return;
+      setContacts(result.items);
+      setTotal(result.total);
+      setPages(result.pages);
+    }).catch((reason: unknown) => {
+      if (!request.signal.aborted) {
+        setContactsError(reason instanceof Error ? reason.message : 'No se pudieron cargar los contactos');
+      }
+    }).finally(() => {
+      if (!request.signal.aborted) setLoading(false);
     });
-    setContacts(result.items);
-    setTotal(result.total);
-    setPages(result.pages);
-  }, [debouncedQuery, groupOptionId, page, status, tagId]);
+    return () => request.abort();
+  }, [showingAudience, debouncedQuery, groupOptionId, page, status, tagId, refreshKey]);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError('');
-    Promise.all([
-      api.getMalichimpStats(),
-      api.listMalichimpGroups(),
-      api.listMalichimpTags(),
-      api.listEmailSenders('malichimp').catch(() => [] as EmailSenderDto[]),
-      loadContacts(),
-    ])
-      .then(([nextStats, nextGroups, nextTags, nextSenders]) => {
-        if (!active) return;
+    if (!showingAudience) return;
+    const request = new AbortController();
+    setAudienceError('');
+    void Promise.all([api.getMalichimpStats(request.signal), api.listMalichimpTags(request.signal)])
+      .then(([nextStats, nextTags]) => {
+        if (request.signal.aborted) return;
         setStats(nextStats);
-        setGroups(nextGroups);
         setTags(nextTags);
-        setSenders(nextSenders);
       })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : 'No se pudo cargar MALICHIMP');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+        if (!request.signal.aborted) {
+          setAudienceError(reason instanceof Error ? reason.message : 'No se pudo cargar el resumen de audiencia');
+        }
       });
-    return () => {
-      active = false;
-    };
-  }, [isAdmin, loadContacts, refreshKey]);
+    return () => request.abort();
+  }, [showingAudience, refreshKey]);
+
+  useEffect(() => {
+    if (!needsGroups) return;
+    const request = new AbortController();
+    setGroupsLoading(true);
+    setGroupsError('');
+    void api.listMalichimpGroups(request.signal)
+      .then((next) => { if (!request.signal.aborted) setGroups(next); })
+      .catch((reason: unknown) => {
+        if (!request.signal.aborted) {
+          setGroupsError(reason instanceof Error ? reason.message : 'No se pudieron cargar los grupos');
+        }
+      })
+      .finally(() => { if (!request.signal.aborted) setGroupsLoading(false); });
+    return () => request.abort();
+  }, [needsGroups, refreshKey]);
+
+  useEffect(() => {
+    if (!showingSenders) return;
+    const request = new AbortController();
+    setSendersError('');
+    void api.listMalichimpSenders(request.signal)
+      .then((next) => { if (!request.signal.aborted) setSenders(next); })
+      .catch((reason: unknown) => {
+        if (!request.signal.aborted) {
+          setSendersError(reason instanceof Error ? reason.message : 'No se pudieron cargar los remitentes');
+        }
+      });
+    return () => request.abort();
+  }, [showingSenders]);
 
   useEffect(() => {
     if (!importJob || !['queued', 'running'].includes(importJob.status)) return;
@@ -418,8 +456,6 @@ export function MalichimpPage() {
     }
   }
 
-  if (loading && !stats) return <PageLoading variant="table" />;
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -433,15 +469,13 @@ export function MalichimpPage() {
         )}
       />
 
-      {error ? <AlertBanner>{error}</AlertBanner> : null}
-
-      {stats && !stats.delivery.configured ? (
+      {showingAudience && stats && !stats.delivery.configured ? (
         <AlertBanner variant="info">
           La audiencia está lista, pero los envíos no están disponibles en este entorno.
         </AlertBanner>
       ) : null}
 
-      {stats ? (
+      {showingAudience && stats ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Elegibles" value={stats.eligible} hint="Suscritos con consentimiento" />
           <StatCard label="Total importado" value={stats.total} hint="Todos los estados de Mailchimp" />
@@ -478,6 +512,9 @@ export function MalichimpPage() {
         </TabsList>
 
         <TabsContent value="audience">
+          {audienceError || groupsError || contactsError ? (
+            <AlertBanner variant="error">{audienceError || groupsError || contactsError}</AlertBanner>
+          ) : null}
           <Card className="gap-0 py-0">
         <div className="grid gap-3 border-b p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_220px_220px]">
           <label className="relative block">
@@ -528,6 +565,7 @@ export function MalichimpPage() {
           </Select>
         </div>
 
+        {loading ? <TableShellSkeleton rows={6} cols={5} /> : (
         <TableShell>
           <Table className="min-w-[960px]">
             <TableHeader>
@@ -591,6 +629,7 @@ export function MalichimpPage() {
             </TableBody>
           </Table>
         </TableShell>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t p-4 text-sm">
           <span className="text-muted-foreground">{nf.format(total)} resultado{total === 1 ? '' : 's'}</span>
@@ -609,10 +648,6 @@ export function MalichimpPage() {
 
         <TabsContent value="campaigns">
           <MalichimpCampaigns
-            groups={groups}
-            tags={tags}
-            delivery={stats?.delivery ?? null}
-            senders={senders}
             openNew={section === 'campaigns' && searchParams.get('new') === '1'}
             openCampaignId={section === 'campaigns' ? searchParams.get('campaign') : null}
             onDeepLinkConsumed={(keys) => {
@@ -676,11 +711,10 @@ export function MalichimpPage() {
         </TabsContent>
 
         <TabsContent value="remitentes">
-          <EmailSendersPanel
-            scope="malichimp"
-            senders={senders}
-            onChange={setSenders}
-          />
+          {sendersError ? <AlertBanner variant="error">{sendersError}</AlertBanner> : null}
+          {senders ? (
+            <EmailSendersPanel scope="malichimp" senders={senders} onChange={setSenders} />
+          ) : !sendersError ? <TableShellSkeleton rows={3} cols={3} /> : null}
         </TabsContent>
       </Tabs>
 
@@ -961,6 +995,9 @@ export function MalichimpPage() {
                           Se agregarán a cada contacto importable sin quitar sus grupos actuales.
                         </p>
                       </div>
+                      {groupsLoading ? (
+                        <p role="status" className="text-xs text-muted-foreground">Cargando grupos…</p>
+                      ) : groupsError ? <AlertBanner variant="error">{groupsError}</AlertBanner> : null}
                       <div className="max-h-60 space-y-4 overflow-y-auto pr-2">
                         {groups.filter((group) => group.options.length).map((group) => (
                           <fieldset key={group.id} className="space-y-2">

@@ -776,6 +776,15 @@ export class MalichimpService implements OnModuleInit {
     };
   }
 
+  async getCampaignSetup() {
+    const [groups, tags, senders] = await Promise.all([
+      this.listGroups(),
+      this.listTags(),
+      this.emailSenders.list(NewsletterScope.malichimp),
+    ]);
+    return { groups, tags, senders, delivery: this.emailDelivery.status };
+  }
+
   async listCampaigns(options?: { limit?: number | null }) {
     /** UI list stays capped; pass `limit: null` for full export. */
     const limit =
@@ -819,27 +828,36 @@ export class MalichimpService implements OnModuleInit {
         campaign."totalRecipients",
         campaign."sentCount" AS "sent",
         campaign."errorCount" AS "failed",
-        COUNT(send."id") FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
-        COUNT(send."id") FILTER (WHERE send."deliveredAt" IS NOT NULL) AS "delivered",
-        COUNT(send."id") FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
-        COUNT(send."id") FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
-        COUNT(send."id") FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
-        COUNT(send."id") FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
-        COUNT(send."id") FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied",
+        metrics.*,
         campaign."scheduledAt",
         campaign."createdAt",
         campaign."completedAt",
         campaign."createdById",
         creator."name" AS "createdByName",
         creator."email" AS "createdByEmail"
-      FROM "EmailCampaign" campaign
+      FROM (
+        SELECT "id", "name", "newsletterId", "subjectSnapshot", "status", "totalRecipients",
+          "sentCount", "errorCount", "scheduledAt", "createdAt", "completedAt", "createdById"
+        FROM "EmailCampaign"
+        WHERE "audienceArea" = 'malichimp'
+        ORDER BY "createdAt" DESC, "id" DESC
+        ${limitSql}
+      ) campaign
       JOIN "Newsletter" newsletter ON newsletter."id" = campaign."newsletterId"
       LEFT JOIN "User" creator ON creator."id" = campaign."createdById"
-      LEFT JOIN "EmailSend" send ON send."campaignId" = campaign."id" AND send."isTest" = false
-      WHERE campaign."audienceArea" = 'malichimp'
-      GROUP BY campaign."id", newsletter."title", creator."name", creator."email"
-      ORDER BY campaign."createdAt" DESC
-      ${limitSql}
+      CROSS JOIN LATERAL (
+        SELECT
+          COUNT(*) FILTER (WHERE send."status" = 'suppressed'::"EmailSendStatus") AS "suppressed",
+          COUNT(*) FILTER (WHERE send."deliveredAt" IS NOT NULL) AS "delivered",
+          COUNT(*) FILTER (WHERE send."bouncedAt" IS NOT NULL) AS "bounced",
+          COUNT(*) FILTER (WHERE send."complainedAt" IS NOT NULL) AS "complaints",
+          COUNT(*) FILTER (WHERE send."openedAt" IS NOT NULL) AS "opened",
+          COUNT(*) FILTER (WHERE send."clickedAt" IS NOT NULL) AS "clicked",
+          COUNT(*) FILTER (WHERE send."repliedAt" IS NOT NULL) AS "replied"
+        FROM "EmailSend" send
+        WHERE send."campaignId" = campaign."id" AND send."isTest" = false
+      ) metrics
+      ORDER BY campaign."createdAt" DESC, campaign."id" DESC
     `);
     return rows.map((row) => ({
       id: row.id,

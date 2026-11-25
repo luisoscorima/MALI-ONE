@@ -390,8 +390,8 @@ type EducacionDistritoDto = {
 };
 
 export const api = {
-  getMalichimpStats: () =>
-    request<import('@mali-one/shared').MalichimpStatsDto>('/api/malichimp/stats'),
+  getMalichimpStats: (signal?: AbortSignal) =>
+    request<import('@mali-one/shared').MalichimpStatsDto>('/api/malichimp/stats', { signal }),
 
   listEmailSenders: (scope?: import('@mali-one/shared').EmailSenderScope) => {
     const query = scope ? `?scope=${encodeURIComponent(scope)}` : '';
@@ -447,8 +447,8 @@ export const api = {
       }>
     >('/api/newsletters/campaigns'),
 
-  listMalichimpSenders: () =>
-    request<import('@mali-one/shared').EmailSenderDto[]>('/api/malichimp/senders'),
+  listMalichimpSenders: (signal?: AbortSignal) =>
+    request<import('@mali-one/shared').EmailSenderDto[]>('/api/malichimp/senders', { signal }),
 
   createMalichimpSender: (email: string) =>
     request<import('@mali-one/shared').EmailSenderDto>('/api/malichimp/senders', {
@@ -467,11 +467,11 @@ export const api = {
       method: 'DELETE',
     }),
 
-  listMalichimpTags: () =>
-    request<import('@mali-one/shared').MalichimpTagDto[]>('/api/malichimp/tags'),
+  listMalichimpTags: (signal?: AbortSignal) =>
+    request<import('@mali-one/shared').MalichimpTagDto[]>('/api/malichimp/tags', { signal }),
 
-  listMalichimpGroups: () =>
-    request<import('@mali-one/shared').MalichimpGroupDto[]>('/api/malichimp/groups'),
+  listMalichimpGroups: (signal?: AbortSignal) =>
+    request<import('@mali-one/shared').MalichimpGroupDto[]>('/api/malichimp/groups', { signal }),
 
   listMalichimpContacts: (filters: {
     q?: string;
@@ -480,7 +480,7 @@ export const api = {
     tagId?: string;
     page?: number;
     pageSize?: number;
-  } = {}) => {
+  } = {}, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     if (filters.q) params.set('q', filters.q);
     if (filters.status) params.set('status', filters.status);
@@ -494,7 +494,7 @@ export const api = {
       page: number;
       pageSize: number;
       pages: number;
-    }>(`/api/malichimp/contacts?${params}`);
+    }>(`/api/malichimp/contacts?${params}`, { signal });
   },
 
   previewMalichimpImport: (file: File) => {
@@ -538,9 +538,10 @@ export const api = {
       { method: 'POST', body: '{}' },
     ),
 
-  listMalichimpNewsletters: () =>
+  listMalichimpNewsletters: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').NewsletterDto[]>(
       '/api/malichimp/newsletters/library',
+      { signal },
     ),
 
   listMalichimpContent: () =>
@@ -611,10 +612,19 @@ export const api = {
       { method: 'DELETE' },
     ),
 
-  listMalichimpCampaigns: () =>
+  listMalichimpCampaigns: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').MalichimpCampaignDto[]>(
       '/api/malichimp/campaigns',
+      { signal },
     ),
+
+  getMalichimpCampaignSetup: (signal?: AbortSignal) =>
+    request<{
+      groups: import('@mali-one/shared').MalichimpGroupDto[];
+      tags: import('@mali-one/shared').MalichimpTagDto[];
+      senders: import('@mali-one/shared').EmailSenderDto[];
+      delivery: import('@mali-one/shared').MalichimpStatsDto['delivery'];
+    }>('/api/malichimp/campaigns/setup', { signal }),
 
   getMalichimpCampaign: (id: string) =>
     request<import('@mali-one/shared').MalichimpCampaignDetailDto>(
