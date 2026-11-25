@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- Audiencia de campaña con tres modos exclusivos: **Grupos**, **Etiquetas**, **Lista de correos** (`EmailCampaign.audienceMode`).
+- `POST /api/malichimp/campaigns/resolve-emails` (listos / no en MALICHIMP / a revisar / no pueden recibir; solo no encontrados → Importar).
+- `eligibleContacts` en `GET /api/malichimp/tags` sin cambiar el significado de `contacts`.
+- Wizard: Contrato UX (Grupos por defecto solo en campañas nuevas; resumen humano; Enviarás a X de Y contactos disponibles).
+
 ### Changed
 
 - Migración: boletines operativos (Asamblea, invitaciones, boletines mensuales/auditorio/EP/CA, etc.) pasan a biblioteca MALICHIMP.

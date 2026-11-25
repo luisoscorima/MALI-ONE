@@ -4,7 +4,7 @@
 
 ## Qué es
 
-Base de audiencia de correo independiente de los CRM de WhatsApp. Conserva contactos, estados, grupos, etiquetas históricas y campos importados desde Mailchimp o desde lotes XLSX manuales. Las opciones de grupo son la segmentación operativa para enviar boletines.
+Base de audiencia de correo independiente de los CRM de WhatsApp. Conserva contactos, estados, grupos, etiquetas históricas y campos importados desde Mailchimp o desde lotes XLSX manuales. En campañas nuevas la audiencia se elige con **una sola fuente**: opciones de grupo, etiquetas o lista de correos ya existentes en MALICHIMP.
 
 ## Responsabilidades
 
@@ -18,7 +18,8 @@ Base de audiencia de correo independiente de los CRM de WhatsApp. Conserva conta
 
 - `MalichimpContact`: perfil y estado de Mailchimp / importaciones manuales.
 - `MalichimpGroup`, `MalichimpGroupOption` y `MalichimpContactGroupOption`: categorías, opciones y pertenencias usadas para segmentar boletines.
-- `MalichimpTag` y `MalichimpContactTag`: metadato histórico recuperado; no decide los destinatarios de campañas nuevas.
+- `MalichimpTag` y `MalichimpContactTag`: etiquetas históricas de Mailchimp; también pueden segmentar campañas (modo Etiquetas).
+- `EmailCampaign.audienceMode`: `groups` | `tags` | `emails` (null = campaña histórica → grupos).
 - `MalichimpSuppression`: bajas y limpiados exclusivos de esta audiencia.
 - `EmailGlobalSuppression`: rebotes, quejas y bloqueos del proveedor aplicables a cualquier módulo.
 - `MalichimpImportRun` / `MalichimpImportJob`: huella, consentimiento (XLSX) y progreso de ZIP y XLSX.
@@ -29,19 +30,20 @@ Solo `subscribed` es elegible para campañas. También se excluyen las supresion
 
 ## Campañas
 
-1. En **Nueva campaña** el flujo es un panel numerado compacto (estilo del envío histórico de CRM PAM): incluir opciones → excluir (opcional) → vista previa → boletín/asunto → enviar o programar.
-2. Debe seleccionar una o más opciones de grupo para **incluir** (desplegable multi-select). **Excluir** es un segundo desplegable opcional; la exclusión siempre prevalece. Cada correo se deduplica. No existe un envío accidental a “todos”.
-3. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar.
-4. **Contenido** es la biblioteca acotada MALICHIMP (`scope=malichimp`, `kind=library`): se crea/edita sin campaña y sin permiso de Boletines. El asistente de campañas usa **solo** esa biblioteca (no `shared` published).
-5. Al crear o duplicar una campaña se genera un **fork exclusivo** (`workingNewsletterId`, `campaign_working_copy`) en la misma transacción. El asunto se propone desde la base; el nombre interno del envío es opcional.
-6. El fork de una campaña en borrador se edita con el mismo editor (`?tab=content&edit={id}`). La URL pública `/n/:slug` es solo para biblioteca `shared` published del hub.
-7. Remitentes: pestaña **Remitentes** en MALICHIMP (CRUD `scope=malichimp`) y también visibles en el hub. El selector de campaña filtra ese catálogo; reply-to en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
-8. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita. Prueba y envío envían `contentRevision`; si el fork cambió → `409`.
-9. Al confirmar se congelan asunto, HTML, diseño, marca, criterios de audiencia y destinatarios desde el fork.
-10. **Duplicar** crea campaña + fork desde snapshots históricos. Copia remitente, asunto, grupos e inclusiones/exclusiones manuales; limpia programación, destinatarios materializados y métricas.
-11. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
-12. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
-13. Chrome de envío (estilo de plataforma): arriba, “Ver este correo en el navegador” → `{APP_URL}/mail/view/{openToken}` (snapshot + personalización; sin contar apertura); abajo, “Cancelar suscripción” → `/mail/unsubscribe/{token}`. `/n/{slug}` es solo el boletín público vigente de biblioteca.
+1. En **Nueva campaña** el flujo es un panel numerado: **Para** → **De** → **Contenido** → **Envío**. En Para se elige **una** forma de audiencia (Grupos por defecto en campañas nuevas).
+2. **Grupos** o **Etiquetas**: incluir una o más (unión: al menos una); exclusiones opcionales y secundarias (siempre prevalecen). **Lista de correos**: pegar direcciones ya en MALICHIMP → `POST /campaigns/resolve-emails` clasifica listos / no encontrados / inválidos / no pueden recibir; solo los no encontrados llevan a Importar (con consentimiento). Tope 10 000 correos únicos.
+3. Elegibilidad única en todo el módulo: `subscribed` + sin supresión MALICHIMP + sin supresión global (`eligibleContacts` en tags; preview/create/send).
+4. La API calcula destinatarios finales y una muestra tabular (nombre/email) antes de confirmar. En lista de correos el afinado quita IDs de `includeContactIds` (sin `excludeContactIds`).
+5. **Contenido** es la biblioteca acotada MALICHIMP (`scope=malichimp`, `kind=library`): se crea/edita sin campaña y sin permiso de Boletines. El asistente de campañas usa **solo** esa biblioteca (no `shared` published).
+6. Al crear o duplicar una campaña se genera un **fork exclusivo** (`workingNewsletterId`, `campaign_working_copy`) en la misma transacción. El asunto se propone desde la base; el nombre interno del envío es opcional.
+7. El fork de una campaña en borrador se edita con el mismo editor (`?tab=content&edit={id}`). La URL pública `/n/:slug` es solo para biblioteca `shared` published del hub.
+8. Remitentes: pestaña **Remitentes** en MALICHIMP (CRUD `scope=malichimp`) y también visibles en el hub. El selector de campaña filtra ese catálogo; reply-to en opciones avanzadas. `fromEmail` y `replyTo` deben ser `@mali.pe`.
+9. Radios **Enviar ahora** / **Programar envío**, con confirmación explícita. Prueba y envío envían `contentRevision`; si el fork cambió → `409`.
+10. Al confirmar se congelan asunto, HTML, diseño, marca, criterios de audiencia y destinatarios desde el fork.
+11. **Duplicar** crea campaña + fork desde snapshots. Copia modo de audiencia (grupos/etiquetas/correos), remitente, asunto e inclusiones/exclusiones; limpia programación y métricas. En modo correos reconstruye destinatarios desde IDs guardados (no copia no encontrados/bloqueados).
+12. `EmailCampaignDispatcherService` procesa lotes persistidos, personaliza placeholders por destinatario, respeta la tasa configurada y reintenta fallos temporales hasta tres veces. En asunto y HTML se sustituyen `{{first_name}}`, `*|FNAME|*` y `<<First Name>>` con el primer nombre del contacto (`EmailSend.name`); si falta, usa `estimado(a)`.
+13. SES publica entrega, rebote, complaint, apertura y clic. El procesador compartido proyecta esos eventos sobre `EmailSend`.
+14. Chrome de envío (estilo de plataforma): arriba, “Ver este correo en el navegador” → `{APP_URL}/mail/view/{openToken}` (snapshot + personalización; sin contar apertura); abajo, “Cancelar suscripción” → `/mail/unsubscribe/{token}`. `/n/{slug}` es solo el boletín público vigente de biblioteca.
 
 El mismo dispatcher ya atiende Campañas internas (Usuarios Workspace) y queda disponible para otros módulos. Los consumidores crean campañas con snapshots; nunca entregan al motor una consulta a sus tablas de contactos.
 
@@ -79,7 +81,7 @@ Un administrador abre el mismo diálogo y elige **ZIP de Mailchimp**:
 
 La importación corre en segundo plano y es idempotente. Los cambios de cada ZIP se confirman en una sola transacción: si falla, no se aplican lotes parciales. El estado del trabajo se guarda en PostgreSQL y la UI lo recupera tras recargar la página. Un ZIP ya importado muestra una advertencia, pero puede reaplicarse sin duplicar contactos. La vista previa también se persiste en disco con el mismo TTL.
 
-Las 13 columnas de grupos del export se normalizan como categorías y opciones. La migración también promueve automáticamente los valores que versiones anteriores conservaron en `MalichimpContact.attributes`, evitando una reimportación obligatoria. Las etiquetas siguen guardándose, pero las campañas nuevas no las consultan.
+Las 13 columnas de grupos del export se normalizan como categorías y opciones. La migración también promueve automáticamente los valores que versiones anteriores conservaron en `MalichimpContact.attributes`, evitando una reimportación obligatoria. Las etiquetas se conservan y pueden usarse como fuente de audiencia en campañas (modo Etiquetas).
 
 Las supresiones globales originadas por SES viven fuera de MALICHIMP y prevalecen sobre cualquier importación. El contador de elegibles excluye ambas listas.
 
@@ -108,7 +110,7 @@ El catálogo `EmailSender` con `scope=malichimp` se administra en **MALICHIMP �
 - `GET /api/malichimp/stats`
 - `GET /api/malichimp/contacts` — opcional `tagId`, `groupOptionId`, `q`
 - `PATCH /api/malichimp/contacts/{id}` — perfil + grupos; no cambia email ni status
-- `GET /api/malichimp/tags`
+- `GET /api/malichimp/tags` — `contacts` (histórico) + `eligibleContacts` (enviables)
 - `GET /api/malichimp/groups`
 - `GET /api/malichimp/newsletters/library` — bases: solo library MALICHIMP
 - `GET|POST|PATCH|DELETE /api/malichimp/senders` — catálogo remitentes del módulo
@@ -125,8 +127,9 @@ El catálogo `EmailSender` con `scope=malichimp` se administra en **MALICHIMP �
 - `GET /api/malichimp/campaigns/{id}/view`
 - `GET /api/malichimp/test-recipients?q=`
 - `POST /api/malichimp/campaigns/test-send` — exige `contentRevision` si ya hay fork
-- `POST /api/malichimp/campaigns/preview`
-- `POST /api/malichimp/campaigns` — campaña + fork desde library MALICHIMP
+- `POST /api/malichimp/campaigns/preview` — `audienceMode` opcional (`groups` por defecto)
+- `POST /api/malichimp/campaigns/resolve-emails` — clasifica lista pegada (máx. 10 000 únicos)
+- `POST /api/malichimp/campaigns` — campaña + fork desde library MALICHIMP; persiste `audienceMode`
 - `POST /api/malichimp/campaigns/{id}/duplicate`
 - `DELETE /api/malichimp/campaigns/{id}` — borradores (elimina el fork)
 - `POST /api/malichimp/campaigns/{id}/send` — snapshot desde fork; `contentRevision` obligatorio
