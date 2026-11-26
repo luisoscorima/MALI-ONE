@@ -4,7 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
-- _(vacío — registrar aquí cada cambio evolutivo)_
+- Sedes: campos `whatsapp` (número) y `correo` propios. En el mapa de sedes reemplazan al WhatsApp y al correo generales; vacíos, se usan los generales. La línea "Llamadas" sigue siendo general.
 
 ## [2026-11-05] — baseline documental
 

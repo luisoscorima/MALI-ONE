@@ -352,6 +352,8 @@ type EducacionCatalogSedeDto = {
   slug: string;
   nombre: string;
   direccion: string | null;
+  whatsapp: string | null;
+  correo: string | null;
   brochureUrl: string | null;
   icon: string;
   horarioHtml: string | null;
@@ -368,6 +370,8 @@ type EducacionCatalogSedeDto = {
 type EducacionSedeInput = {
   nombre: string;
   direccion?: string | null;
+  whatsapp?: string | null;
+  correo?: string | null;
   brochureUrl?: string | null;
   icon?: string | null;
   horarioHtml?: string | null;

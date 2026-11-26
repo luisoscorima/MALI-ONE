@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsEmail,
   IsIn,
   IsInt,
   IsNumber,
@@ -10,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export const EDUCACION_CRM_AREAS = [
@@ -166,6 +168,17 @@ export class UpsertEducacionSedeDto {
   @IsString()
   @MaxLength(240)
   direccion?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  whatsapp?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== '')
+  @IsEmail()
+  @MaxLength(160)
+  correo?: string | null;
 
   @IsOptional()
   @IsString()

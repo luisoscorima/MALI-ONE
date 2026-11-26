@@ -302,6 +302,8 @@ export class CatalogEducacionService {
     return {
       nombre: dto.nombre.trim(),
       direccion: emptyToNull(dto.direccion),
+      whatsapp: emptyToNull(dto.whatsapp),
+      correo: emptyToNull(dto.correo),
       brochureUrl: emptyToNull(dto.brochureUrl),
       icon: emptyToNull(dto.icon) || 'location_on',
       horarioHtml: emptyToNull(dto.horarioHtml),
@@ -318,6 +320,8 @@ export class CatalogEducacionService {
     const data: {
       nombre?: string;
       direccion?: string | null;
+      whatsapp?: string | null;
+      correo?: string | null;
       brochureUrl?: string | null;
       icon?: string;
       horarioHtml?: string | null;
@@ -331,6 +335,8 @@ export class CatalogEducacionService {
     } = {};
     if (dto.nombre !== undefined) data.nombre = dto.nombre.trim();
     if (dto.direccion !== undefined) data.direccion = emptyToNull(dto.direccion);
+    if (dto.whatsapp !== undefined) data.whatsapp = emptyToNull(dto.whatsapp);
+    if (dto.correo !== undefined) data.correo = emptyToNull(dto.correo);
     if (dto.brochureUrl !== undefined) data.brochureUrl = emptyToNull(dto.brochureUrl);
     if (dto.icon !== undefined) data.icon = emptyToNull(dto.icon) || 'location_on';
     if (dto.horarioHtml !== undefined) data.horarioHtml = emptyToNull(dto.horarioHtml);
@@ -434,6 +440,8 @@ export class CatalogEducacionService {
     slug: string;
     nombre: string;
     direccion: string | null;
+    whatsapp: string | null;
+    correo: string | null;
     brochureUrl: string | null;
     icon: string;
     horarioHtml: string | null;
@@ -451,6 +459,8 @@ export class CatalogEducacionService {
       slug: row.slug,
       nombre: row.nombre,
       direccion: row.direccion,
+      whatsapp: row.whatsapp,
+      correo: row.correo,
       brochureUrl: row.brochureUrl,
       icon: row.icon,
       horarioHtml: row.horarioHtml,

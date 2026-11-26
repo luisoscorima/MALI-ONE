@@ -80,6 +80,8 @@ type Sede = {
   slug: string;
   nombre: string;
   direccion: string | null;
+  whatsapp: string | null;
+  correo: string | null;
   brochureUrl: string | null;
   icon: string;
   horarioHtml: string | null;
@@ -956,6 +958,8 @@ function SedeDialog({
   const open = sede !== undefined;
   const [nombre, setNombre] = useState('');
   const [direccion, setDireccion] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [correo, setCorreo] = useState('');
   const [brochureUrl, setBrochureUrl] = useState('');
   const [icon, setIcon] = useState('location_on');
   const [horarioHtml, setHorarioHtml] = useState('');
@@ -969,6 +973,8 @@ function SedeDialog({
   useEffect(() => {
     setNombre(sede?.nombre ?? '');
     setDireccion(sede?.direccion ?? '');
+    setWhatsapp(sede?.whatsapp ?? '');
+    setCorreo(sede?.correo ?? '');
     setBrochureUrl(sede?.brochureUrl ?? '');
     setIcon(sede?.icon || 'location_on');
     setHorarioHtml(sede?.horarioHtml ?? '');
@@ -986,6 +992,8 @@ function SedeDialog({
     const body = {
       nombre,
       direccion,
+      whatsapp,
+      correo,
       brochureUrl,
       icon,
       horarioHtml,
@@ -1016,7 +1024,7 @@ function SedeDialog({
         <DialogHeader>
           <DialogTitle>{sede?.id ? 'Editar sede' : 'Nueva sede'}</DialogTitle>
           <DialogDescription>
-            Dirección, brochure, horario y distrito se editan aquí. El ícono también se puede cambiar en el selector de sedes: es el mismo dato.
+            Dirección, WhatsApp, correo, brochure, horario y distrito se editan aquí. El ícono también se puede cambiar en el selector de sedes: es el mismo dato.
           </DialogDescription>
         </DialogHeader>
         <form className="grid gap-3" onSubmit={(event) => void save(event)}>
@@ -1045,6 +1053,23 @@ function SedeDialog({
           <label className="grid gap-2 text-sm">
             Dirección (opcional)
             <Input value={direccion} onChange={(event) => setDireccion(event.target.value)} />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Número de WhatsApp (opcional)
+            <Input
+              value={whatsapp}
+              onChange={(event) => setWhatsapp(event.target.value)}
+              placeholder="Vacío: se usa el WhatsApp general del mapa"
+            />
+          </label>
+          <label className="grid gap-2 text-sm">
+            Correo (opcional)
+            <Input
+              type="email"
+              value={correo}
+              onChange={(event) => setCorreo(event.target.value)}
+              placeholder="Vacío: se usa el correo general del mapa"
+            />
           </label>
           <label className="grid gap-2 text-sm">
             Brochure (opcional)

@@ -1336,6 +1336,8 @@ export interface EducacionSedeDto {
   nombre: string;
   nombreMapa: string | null;
   direccion: string | null;
+  whatsapp: string | null;
+  correo: string | null;
   lat: number | null;
   lng: number | null;
   horarioHtml: string | null;

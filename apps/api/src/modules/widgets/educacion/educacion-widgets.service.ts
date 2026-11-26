@@ -377,6 +377,8 @@ export class EducacionWidgetsService {
     nombre: string;
     nombreMapa: string | null;
     direccion: string | null;
+    whatsapp: string | null;
+    correo: string | null;
     lat: number | null;
     lng: number | null;
     horarioHtml: string | null;
@@ -391,6 +393,8 @@ export class EducacionWidgetsService {
       slug: s.slug,
       nombre: s.nombreMapa?.trim() || s.nombre,
       direccion: s.direccion,
+      whatsapp: s.whatsapp,
+      correo: s.correo,
       lat: s.lat,
       lng: s.lng,
       horarioHtml: s.horarioHtml,
@@ -408,6 +412,8 @@ export class EducacionWidgetsService {
     nombre: string;
     nombreMapa: string | null;
     direccion: string | null;
+    whatsapp: string | null;
+    correo: string | null;
     lat: number | null;
     lng: number | null;
     horarioHtml: string | null;
@@ -430,6 +436,8 @@ export class EducacionWidgetsService {
       nombre: s.nombre,
       nombreMapa: s.nombreMapa,
       direccion: s.direccion,
+      whatsapp: s.whatsapp,
+      correo: s.correo,
       lat: s.lat,
       lng: s.lng,
       horarioHtml: s.horarioHtml,

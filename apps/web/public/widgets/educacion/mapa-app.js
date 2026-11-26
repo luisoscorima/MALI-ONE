@@ -117,8 +117,12 @@
           '</p>' +
           '<div class="info-block"><span style="color:#CF85E3;"><img class="dynamic-img" data-img="RECTANGULO" style="height: 15px" alt=""></span><strong>Información:</strong></div>' +
           '<div class="info-block"><span style="color:#CF85E3;"><img class="dynamic-img" data-img="WHATSAPP" style="height: 23px" alt=""></span>' +
-          '<p>WhatsApp: <span data-contact="whatsapp"></span><br>Llamadas: <span data-contact="telefono"></span></p></div>' +
-          '<div class="info-block"><span style="color:#CF85E3;"><img class="dynamic-img" data-img="CORREO" style="height: 23px" alt=""></span><span data-contact="email"></span></div>' +
+          '<p>WhatsApp: ' +
+          (sede.whatsapp ? '<span>' + esc(sede.whatsapp) + '</span>' : '<span data-contact="whatsapp"></span>') +
+          '<br>Llamadas: <span data-contact="telefono"></span></p></div>' +
+          '<div class="info-block"><span style="color:#CF85E3;"><img class="dynamic-img" data-img="CORREO" style="height: 23px" alt=""></span>' +
+          (sede.correo ? '<span>' + esc(sede.correo) + '</span>' : '<span data-contact="email"></span>') +
+          '</div>' +
           (sede.brochureUrl
             ? '<button type="button" class="brochure-btn">Descargar Brochure</button>'
             : '');

@@ -105,7 +105,7 @@ export function WidgetEducacionMapaPage() {
         <div>
           <h2 className="font-semibold">Sedes del mapa ({state.sedes.filter((sede) => sede.showOnMap).length})</h2>
           <p className="text-sm text-muted">
-            El nombre oficial, la dirección, el horario, el brochure y el distrito se editan en{' '}
+            El nombre oficial, la dirección, el WhatsApp y el correo propios, el horario, el brochure y el distrito se editan en{' '}
             <Link className="underline" to="/admin/catalogo-educacion">Catálogo Educación</Link>.
             Aquí eliges si la sede se muestra, su nombre visible y las coordenadas.
           </p>
