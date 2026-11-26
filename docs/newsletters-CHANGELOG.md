@@ -4,6 +4,10 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Rutas canónicas: `/admin/email` (hub), `/admin/workspace` (Google Workspace). Aliases `/admin/newsletters`, `/admin/mailing`, `/admin/users`, `/admin/comunicacion-interna` redirigen preservando query.
+- Pestañas canónicas `newsletters` / `campaigns` / `senders` (y `audience` / `directory` donde aplica). Columnas **Catálogo** y **Origen** en tablas del hub.
+- Permisos `AppModule.newsletters` → `email_hub` y `workspace_users` → `google_workspace` (migración `20261126010000_app_module_email_hub_google_workspace`). En una base de prueba, comparar `UserModuleAccess` por usuario con la equivalencia de nombres y comprobar el rechazo 403 para una cuenta sin el módulo. Desplegar web, API y worker juntos. La API HTTP aplica las migraciones al arrancar.
+- Reversión de permisos: **no** ejecutar `ALTER TYPE` a mano en el host. Agregar una migración Prisma nueva con ambos renombrados inversos (`email_hub` → `newsletters`, `google_workspace` → `workspace_users`), junto con el esquema y el código de las versiones compatibles de web, API y worker. Desplegar por Git y Compose. Conservar la migración original en el historial. Para reintroducir los IDs nuevos después, otra migración hacia delante.
 - El catálogo de piezas reutilizables se llama catálogo en UI y código (`NewsletterKind.catalog`; antes `library`). Koha (`widget_biblioteca`) no cambia.
 - Migración de piezas sembradas: boletines operativos MALI → `scope=malichimp`; `boletin-prueba-ti` → `internal_communications` (dejan de ser solo “Org / Boletines”).
 - Hub **Campañas y Boletines**: listado multi-scope de libraries, pestaña registro de campañas (readonly), remitentes con `scope` y badge de módulo.

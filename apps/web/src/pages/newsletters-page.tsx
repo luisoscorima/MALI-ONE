@@ -34,6 +34,15 @@ import { useConfirm } from '@/hooks/use-confirm';
 import { ApiRequestError, api } from '@/lib/api';
 import { slugify } from '@/lib/coordinates';
 import {
+  CATALOG_LABEL,
+  EMAIL_HUB_DEFAULT_TAB,
+  canonicalEmailAdminSearch,
+  malichimpNewsletterEditHref,
+  resolveEmailHubTab,
+  workspaceNewsletterEditHref,
+  type EmailHubTab,
+} from '@/lib/email-admin-routes';
+import {
   exportNewsletterForSave,
   preserveEditorExport,
 } from '@/lib/newsletter-editor-save';
@@ -72,14 +81,12 @@ export function NewslettersPage() {
   const openedFromQueryRef = useRef<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const section =
-    tabParam === 'remitentes' || tabParam === 'campanas' ? tabParam : 'boletines';
+  const section = resolveEmailHubTab(tabParam);
 
-  const SCOPE_LABEL: Record<string, string> = {
-    shared: 'newsletters',
-    malichimp: 'malichimp',
-    internal_communications: 'users',
-  };
+  useEffect(() => {
+    const next = canonicalEmailAdminSearch(searchParams, section, EMAIL_HUB_DEFAULT_TAB);
+    if (next) setSearchParams(next, { replace: true });
+  }, [section, searchParams, setSearchParams]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -319,10 +326,10 @@ export function NewslettersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Campañas y Boletines"
-        description="Boletines, campañas y remitentes. El módulo es la ruta: newsletters, malichimp o users."
+        title="Campañas y boletines"
+        description="Boletines, campañas y remitentes. Cada pieza pertenece a un catálogo: Institucional, MALICHIMP o Comunicaciones internas."
         actions={
-          mode === 'closed' && section === 'boletines' ? (
+          mode === 'closed' && section === 'newsletters' ? (
             <Button type="button" onClick={openCreate}>
               <Plus className="mr-1 size-4" />
               Nuevo boletín
@@ -354,36 +361,37 @@ export function NewslettersPage() {
         <Tabs
           value={section}
           onValueChange={(value) => {
+            const tab = value as EmailHubTab;
             const next = new URLSearchParams(searchParams);
-            if (value === 'boletines') next.delete('tab');
-            else next.set('tab', value);
+            if (tab === EMAIL_HUB_DEFAULT_TAB) next.delete('tab');
+            else next.set('tab', tab);
             setSearchParams(next, { replace: true });
           }}
         >
           <TabsList>
-            <TabsTrigger value="boletines">
+            <TabsTrigger value="newsletters">
               <Newspaper className="size-4" aria-hidden />
               Boletines
             </TabsTrigger>
-            <TabsTrigger value="campanas">
+            <TabsTrigger value="campaigns">
               <Mail className="size-4" aria-hidden />
               Campañas
             </TabsTrigger>
-            <TabsTrigger value="remitentes">
+            <TabsTrigger value="senders">
               <Mail className="size-4" aria-hidden />
               Remitentes
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="campanas" className="mt-6">
+          <TabsContent value="campaigns" className="mt-6">
             <NewsletterCampaignsRegistry />
           </TabsContent>
 
-          <TabsContent value="remitentes" className="mt-6">
+          <TabsContent value="senders" className="mt-6">
             <EmailSendersPanel hubMode senders={senders} onChange={setSenders} />
           </TabsContent>
 
-          <TabsContent value="boletines" className="mt-6 space-y-6">
+          <TabsContent value="newsletters" className="mt-6 space-y-6">
             {loading ? (
               <TableShellSkeleton rows={4} cols={5} />
             ) : newsletters.length === 0 ? (
@@ -397,7 +405,7 @@ export function NewslettersPage() {
                   <TableHeader>
                   <TableRow>
                     <TableHead className="w-[280px] max-w-[280px]">Título</TableHead>
-                    <TableHead className="w-[130px]">Módulo</TableHead>
+                    <TableHead className="w-[170px]">Catálogo</TableHead>
                     <TableHead className="w-[180px] max-w-[180px]">Slug</TableHead>
                     <TableHead className="w-[120px]">Marca</TableHead>
                     <TableHead className="w-[150px]">Estado</TableHead>
@@ -423,8 +431,8 @@ export function NewslettersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono font-normal">
-                          {SCOPE_LABEL[n.scope ?? 'shared'] ?? n.scope}
+                        <Badge variant="outline">
+                          {CATALOG_LABEL[n.scope ?? 'shared'] ?? n.scope}
                         </Badge>
                       </TableCell>
                       <TableCell
@@ -457,9 +465,7 @@ export function NewslettersPage() {
                           </span>
                         </div>
                         ) : (
-                          <span className="font-mono text-sm text-muted-foreground">
-                            {SCOPE_LABEL[n.scope ?? 'shared'] ?? n.scope}
-                          </span>
+                          <span className="text-sm text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="space-x-1 text-right">
@@ -509,14 +515,14 @@ export function NewslettersPage() {
                         </>
                         ) : n.scope === 'malichimp' ? (
                           <Button size="sm" variant="ghost" asChild>
-                            <a href={`/admin/malichimp?tab=content&edit=${encodeURIComponent(n.id)}`}>
+                            <a href={malichimpNewsletterEditHref(n.id)}>
                               Abrir en MALICHIMP
                             </a>
                           </Button>
                         ) : n.scope === 'internal_communications' ? (
                           <Button size="sm" variant="ghost" asChild>
-                            <a href={`/admin/users?tab=contenido&edit=${encodeURIComponent(n.id)}`}>
-                              Abrir en Usuarios Workspace
+                            <a href={workspaceNewsletterEditHref(n.id)}>
+                              Abrir en Google Workspace
                             </a>
                           </Button>
                         ) : (

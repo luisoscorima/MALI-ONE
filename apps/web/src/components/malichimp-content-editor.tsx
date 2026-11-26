@@ -15,6 +15,7 @@ import { type NewsletterEditorHandle } from '@/components/newsletter-editor';
 import { AlertBanner } from '@/components/feedback';
 import { useToast } from '@/contexts/toast-context';
 import { ApiRequestError, api } from '@/lib/api';
+import { malichimpCampaignHref } from '@/lib/email-admin-routes';
 import {
   exportNewsletterForSave,
   preserveEditorExport,
@@ -208,7 +209,7 @@ export function MalichimpContentEditor({
 
   const canEdit = editable || mode === 'create';
   const backToCampaignHref = campaignId
-    ? `/admin/malichimp?tab=campaigns&campaign=${encodeURIComponent(campaignId)}`
+    ? malichimpCampaignHref(campaignId)
     : null;
 
   return (

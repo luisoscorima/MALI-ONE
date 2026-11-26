@@ -11,8 +11,8 @@ Hub global de correo: catálogo de boletines (`shared`), visibilidad de piezas d
 | Concepto UI | `audienceArea` | `NewsletterScope` / sender scope | `AppModule` |
 |-------------|---------------|----------------------------------|-------------|
 | MALICHIMP | `malichimp` | `malichimp` | `malichimp` |
-| Campañas internas | `internal_workspace` | `internal_communications` | `workspace_users` |
-| Hub Campañas y Boletines | — | `shared` (CRUD) + ve todos | `newsletters` |
+| Campañas internas | `internal_workspace` | `internal_communications` | `google_workspace` |
+| Hub Campañas y Boletines | — | `shared` (CRUD) + ve todos | `email_hub` |
 | Legacy | `pam` | — | `mailing` (enum muerto) |
 
 ## Cómo funciona
@@ -28,12 +28,12 @@ Hub global de correo: catálogo de boletines (`shared`), visibilidad de piezas d
 
 | Ruta | Uso |
 |------|-----|
-| `/admin/newsletters` | Hub: Boletines (multi-scope) |
-| `/admin/newsletters?tab=campanas` | Registro de campañas |
-| `/admin/newsletters?tab=remitentes` | Remitentes globales |
+| `/admin/email` | Hub: Boletines (multi-scope) |
+| `/admin/email?tab=campaigns` | Registro de campañas |
+| `/admin/email?tab=senders` | Remitentes globales |
 | `/n/:slug` | Público shared published |
 | MALICHIMP → Boletines / Remitentes | Catálogo y CRUD remitentes `malichimp` |
-| Usuarios → Boletines | Catálogo `internal_communications` |
+| Google Workspace → Boletines | Catálogo `internal_communications` |
 
 ## API
 
@@ -51,7 +51,7 @@ Hub global de correo: catálogo de boletines (`shared`), visibilidad de piezas d
 
 ## Permisos
 
-Módulo: `newsletters` (hub). Operación de campañas: `malichimp` / `workspace_users`.
+Módulo: `email_hub` (hub). Operación de campañas: `malichimp` / `google_workspace`.
 
 ## Relacionados
 

@@ -21,9 +21,9 @@ type UploadedAssetFile = {
 
 @Controller('newsletters')
 @RequireModule(
-  AppModule.newsletters,
+  AppModule.email_hub,
   AppModule.malichimp,
-  AppModule.workspace_users,
+  AppModule.google_workspace,
 )
 export class NewsletterAssetsController {
   constructor(private readonly assets: NewsletterAssetsService) {}

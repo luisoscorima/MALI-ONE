@@ -34,7 +34,7 @@ function escapeHtml(value: string): string {
 }
 
 @Controller('internal-communications')
-@RequireModule(AppModule.workspace_users)
+@RequireModule(AppModule.google_workspace)
 export class InternalCommunicationsController {
   constructor(private readonly communications: InternalCommunicationsService) {}
 

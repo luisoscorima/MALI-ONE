@@ -14,7 +14,7 @@ enum UserRole {
 
 enum AppModule {
   links
-  workspace_users
+  google_workspace
   s3_manager
   password_vault
   widget_educacion
@@ -25,7 +25,7 @@ enum AppModule {
   bsale_reports
   mailing
   malichimp
-  newsletters
+  email_hub
   landings
   crm_pam
   crm_educacion

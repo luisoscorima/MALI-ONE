@@ -18,7 +18,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('admin/users')
-@RequireModule(AppModule.workspace_users)
+@RequireModule(AppModule.google_workspace)
 export class GoogleAdminController {
   constructor(private readonly googleAdmin: GoogleAdminService) {}
 

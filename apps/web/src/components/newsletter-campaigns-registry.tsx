@@ -3,6 +3,10 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import { AlertBanner, EmptyState, TableShellSkeleton } from '@/components/feedback';
 import { api } from '@/lib/api';
 import {
+  ORIGIN_LABEL,
+  campaignRegistryHref,
+} from '@/lib/email-admin-routes';
+import {
   Badge,
   Button,
   Table,
@@ -18,22 +22,6 @@ const df = new Intl.DateTimeFormat('es-PE', {
   dateStyle: 'medium',
   timeStyle: 'short',
 });
-
-const AREA_LABEL: Record<string, string> = {
-  malichimp: 'malichimp',
-  internal_workspace: 'users',
-  pam: 'pam',
-};
-
-function deepLinkFor(audienceArea: string, campaignId: string): string | null {
-  if (audienceArea === 'malichimp') {
-    return `/admin/malichimp?tab=campaigns&campaign=${encodeURIComponent(campaignId)}`;
-  }
-  if (audienceArea === 'internal_workspace') {
-    return `/admin/users?tab=campanas&campaign=${encodeURIComponent(campaignId)}`;
-  }
-  return null;
-}
 
 type Row = Awaited<ReturnType<typeof api.listNewsletterCampaignRegistry>>[number];
 
@@ -64,7 +52,7 @@ export function NewsletterCampaignsRegistry() {
     return (
       <EmptyState
         title="Sin campañas"
-        description="Registro global vacío. Las campañas se crean y operan en MALICHIMP o Usuarios Workspace."
+        description="Las campañas se crean en MALICHIMP o Google Workspace."
       />
     );
   }
@@ -72,14 +60,14 @@ export function NewsletterCampaignsRegistry() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Vista de solo lectura. Para editar o enviar, ábrela en MALICHIMP o en Usuarios Workspace.
+        Para editar o enviar una campaña, ábrela en MALICHIMP o Google Workspace.
       </p>
       <TableShell>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Campaña</TableHead>
-              <TableHead>Módulo</TableHead>
+              <TableHead>Origen</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Destinatarios</TableHead>
               <TableHead>Actualizado</TableHead>
@@ -88,7 +76,7 @@ export function NewsletterCampaignsRegistry() {
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const href = deepLinkFor(row.audienceArea, row.id);
+              const href = campaignRegistryHref(row.audienceArea, row.id);
               return (
                 <TableRow key={row.id}>
                   <TableCell>
@@ -98,8 +86,8 @@ export function NewsletterCampaignsRegistry() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="font-mono font-normal">
-                      {AREA_LABEL[row.audienceArea] ?? row.audienceArea}
+                    <Badge variant="outline">
+                      {ORIGIN_LABEL[row.audienceArea] ?? row.audienceArea}
                     </Badge>
                   </TableCell>
                   <TableCell>{row.status === 'cancelled' ? 'Cancelada' : row.status}</TableCell>
@@ -114,7 +102,7 @@ export function NewsletterCampaignsRegistry() {
                       <Button type="button" size="sm" variant="ghost" asChild>
                         <a href={href}>
                           <ExternalLink className="size-4" aria-hidden />
-                          Módulo
+                          Abrir
                         </a>
                       </Button>
                     ) : (

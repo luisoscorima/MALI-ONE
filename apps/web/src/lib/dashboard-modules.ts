@@ -19,6 +19,11 @@ import {
   FolderOpen,
   Database,
 } from 'lucide-react';
+import {
+  EMAIL_HUB_PATH,
+  MALICHIMP_PATH,
+  WORKSPACE_PATH,
+} from '@/lib/email-admin-routes';
 import type { ModuleCardAccent } from '@/lib/module-card-accents';
 
 export const moduleMeta: Record<
@@ -45,8 +50,8 @@ export const moduleMeta: Record<
     accent: 'blue',
   },
   links: { to: '/links', icon: Link2, group: 'operaciones', accent: 'blue' },
-  workspace_users: {
-    to: '/admin/users',
+  google_workspace: {
+    to: WORKSPACE_PATH,
     icon: Users,
     group: 'operaciones',
     accent: 'violet',
@@ -111,14 +116,14 @@ export const moduleMeta: Record<
     group: 'contenido',
     accent: 'violet',
   },
-  newsletters: {
-    to: '/admin/newsletters',
+  email_hub: {
+    to: EMAIL_HUB_PATH,
     icon: Newspaper,
     group: 'crms',
     accent: 'blue',
   },
   malichimp: {
-    to: '/admin/malichimp',
+    to: MALICHIMP_PATH,
     icon: Database,
     group: 'crms',
     accent: 'emerald',
@@ -142,7 +147,7 @@ export const moduleMeta: Record<
     accent: 'emerald',
   },
   mailing: {
-    to: '/admin/newsletters',
+    to: EMAIL_HUB_PATH,
     icon: Mail,
     group: 'crms',
     accent: 'blue',

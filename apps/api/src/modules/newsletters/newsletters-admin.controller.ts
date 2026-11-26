@@ -19,7 +19,7 @@ import {
 import { NewslettersService } from './newsletters.service';
 
 @Controller('newsletters')
-@RequireModule(AppModule.newsletters)
+@RequireModule(AppModule.email_hub)
 export class NewslettersAdminController {
   constructor(private readonly newsletters: NewslettersService) {}
 

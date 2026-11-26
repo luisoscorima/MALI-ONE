@@ -29,6 +29,7 @@ import { IconActionButton } from '@/components/icon-action-button';
 import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api } from '@/lib/api';
+import { workspaceNewsletterEditHref } from '@/lib/email-admin-routes';
 import {
   Badge,
   Button,
@@ -333,7 +334,17 @@ function OrgUnitMultiSelect({
   );
 }
 
-export function WorkspaceInternalCampaigns() {
+type WorkspaceInternalCampaignsProps = {
+  openCampaignId: string | null;
+  openNew: boolean;
+  onDeepLinkConsumed: () => void;
+};
+
+export function WorkspaceInternalCampaigns({
+  openCampaignId,
+  openNew,
+  onDeepLinkConsumed,
+}: WorkspaceInternalCampaignsProps) {
   const toast = useToast();
   const confirm = useConfirm();
   const [audience, setAudience] = useState<InternalAudienceDto | null>(null);
@@ -462,7 +473,7 @@ export function WorkspaceInternalCampaigns() {
           ? undefined
           : 'No hay destinatarios con estos filtros',
     from: !senders.length
-      ? 'Agrega remitentes del catálogo de comunicaciones internas (Boletines → Remitentes, scope IC)'
+      ? 'Agrega un remitente de Comunicaciones internas en Campañas y boletines → Remitentes'
       : !maliPeEmailPattern.test(fromEmail)
         ? 'Elige un remitente @mali.pe'
         : !maliPeEmailPattern.test(replyTo.trim())
@@ -482,15 +493,16 @@ export function WorkspaceInternalCampaigns() {
 
   const campaignReady =
     stepReady.to && stepReady.from && stepReady.content && stepReady.send;
+  const defaultFromEmail = senders[0]?.email || '';
 
-  function resetForm() {
+  const resetForm = useCallback(() => {
     setFormStep('to');
     setIncludePaths([]);
     setExcludePaths([]);
     setActiveDays(30);
     setPreview(null);
     setRecipientQuery('');
-    setFromEmail(senders[0]?.email || '');
+    setFromEmail(defaultFromEmail);
     setFromName(DEFAULT_FROM_NAME);
     setReplyTo(DEFAULT_REPLY_TO);
     setShowAdvancedSender(false);
@@ -503,12 +515,12 @@ export function WorkspaceInternalCampaigns() {
     setScheduleMode('now');
     setScheduledAt('');
     setBusy(false);
-  }
+  }, [defaultFromEmail]);
 
-  function openCampaign() {
+  const openCampaign = useCallback(() => {
     resetForm();
     setOpen(true);
-  }
+  }, [resetForm]);
 
   function selectNewsletter(id: string) {
     setNewsletterId(id);
@@ -565,7 +577,7 @@ export function WorkspaceInternalCampaigns() {
     }
   }
 
-  async function hydrateDraftCampaign(detail: InternalCampaignDetailDto) {
+  const hydrateDraftCampaign = useCallback(async (detail: InternalCampaignDetailDto) => {
     setDraftCampaignId(detail.id);
     setAttachedNewsletter(detail.newsletter);
     setDraftNewsletterId(detail.newsletter.status === 'draft' ? detail.newsletterId : null);
@@ -595,7 +607,40 @@ export function WorkspaceInternalCampaigns() {
     } finally {
       setPreviewBusy(false);
     }
-  }
+  }, [activeDays, toast]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!openCampaignId) {
+      if (openNew) {
+        openCampaign();
+        onDeepLinkConsumed();
+      }
+      return;
+    }
+
+    let cancelled = false;
+    async function openLinkedCampaign(id: string) {
+      try {
+        // The registry can link to campaigns older than the most recent list page.
+        const detail = await api.getInternalCampaign(id);
+        if (cancelled) return;
+        if (detail.status === 'draft') void hydrateDraftCampaign(detail);
+        else setCampaignPreview(detail);
+      } catch (reason) {
+        if (!cancelled) {
+          toast.error(reason instanceof Error ? reason.message : 'No se pudo abrir la campaña');
+        }
+      } finally {
+        if (!cancelled) onDeepLinkConsumed();
+      }
+    }
+
+    void openLinkedCampaign(openCampaignId);
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrateDraftCampaign, loading, onDeepLinkConsumed, openCampaign, openCampaignId, openNew, toast]);
 
   async function continueDraft(campaignId: string) {
     setOpeningDraftId(campaignId);
@@ -1190,7 +1235,7 @@ export function WorkspaceInternalCampaigns() {
                     <span className="font-medium">{selectedNewsletter.title}</span>
                     <Button type="button" size="sm" variant="outline" asChild>
                       <a
-                        href={`/admin/users?tab=contenido&edit=${encodeURIComponent(selectedNewsletter.id)}`}
+                        href={workspaceNewsletterEditHref(selectedNewsletter.id)}
                         target="_blank"
                         rel="noreferrer"
                       >

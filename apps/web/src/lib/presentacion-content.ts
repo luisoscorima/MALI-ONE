@@ -967,8 +967,8 @@ export const presentacionGroups: PresentacionGroup[] = [
         replaces: [logos.bitly, logos.walink, logos.qrcodemonkey],
       },
       {
-        id: 'workspace_users',
-        title: 'Usuarios Workspace y Auth Google',
+        id: 'google_workspace',
+        title: 'Google Workspace y Auth Google',
         description:
           'Control centralizado y seguro de usuarios: se hereda la seguridad de Google y el acceso es solo para cuentas @mali.pe, con módulos asignables por persona.',
         accent: 'violet',
@@ -1015,8 +1015,8 @@ export const presentacionGroups: PresentacionGroup[] = [
       'Sustituye el uso costoso de Mailchimp como CRM, editor de boletines y mailing, y centraliza contactos con MALI WhatsApp.',
     modules: [
       {
-        id: 'newsletters',
-        title: 'Boletines',
+        id: 'email_hub',
+        title: 'Campañas y boletines',
         description:
           'Editor y URLs públicas de boletines desde MALI ONE, sin depender de Mailchimp para crear y publicar piezas de comunicación.',
         accent: 'blue',

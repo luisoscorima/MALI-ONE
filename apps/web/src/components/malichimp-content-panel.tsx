@@ -117,7 +117,7 @@ export function MalichimpContentPanel({
           <p className="text-sm text-muted-foreground">
             Catálogo de correos de MALICHIMP. Crea y edita piezas aquí; al armar una campaña se
             copia una versión editable. Los remitentes del módulo están en la pestaña Remitentes;
-            el hub Campañas y Boletines ve el inventario global.
+            el hub Campañas y boletines ve el inventario global.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

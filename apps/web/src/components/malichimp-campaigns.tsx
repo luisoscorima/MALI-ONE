@@ -47,6 +47,10 @@ import { useToast } from '@/contexts/toast-context';
 import { useConfirm } from '@/hooks/use-confirm';
 import { api, ApiRequestError } from '@/lib/api';
 import {
+  malichimpImportXlsxHref,
+  malichimpNewsletterEditHref,
+} from '@/lib/email-admin-routes';
+import {
   Badge,
   Button,
   Checkbox,
@@ -163,7 +167,7 @@ function clearPasteSession() {
 }
 
 function openMalichimpAudienceImport() {
-  const url = `${window.location.origin}/admin/malichimp?tab=audience&import=xlsx`;
+  const url = `${window.location.origin}${malichimpImportXlsxHref()}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
@@ -945,25 +949,37 @@ export function MalichimpCampaigns({
     return () => window.clearInterval(timer);
   }, [load]);
   useEffect(() => {
-    if (openNew) {
-      openCampaign();
-      onDeepLinkConsumed?.(['new']);
+    if (!openCampaignId) {
+      if (openNew) {
+        openCampaign();
+        onDeepLinkConsumed?.(['new']);
+      }
       return;
     }
-    if (openCampaignId && !loading && !error) {
-      const target = campaigns.find((row) => row.id === openCampaignId);
-      onDeepLinkConsumed?.(['campaign']);
-      if (target?.status === 'draft') {
-        void continueDraft(openCampaignId);
-      } else if (target) {
-        void openCampaignPreview(openCampaignId);
-      } else {
-        toast.error('No se encontró la campaña');
+    if (loading) return;
+
+    let cancelled = false;
+    async function openLinkedCampaign(id: string) {
+      try {
+        const detail = await api.getMalichimpCampaign(id);
+        if (cancelled) return;
+        if (detail.status === 'draft') void hydrateDraftCampaign(detail);
+        else setCampaignPreview(detail);
+      } catch (reason) {
+        if (!cancelled) {
+          toast.error(reason instanceof Error ? reason.message : 'No se pudo abrir la campaña');
+        }
+      } finally {
+        if (!cancelled) onDeepLinkConsumed?.(['campaign', 'new']);
       }
     }
-    // Intentionally only when deep-link flags change after load.
+
+    void openLinkedCampaign(openCampaignId);
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deep-link one-shot
-  }, [loading, error, openNew, openCampaignId]);
+  }, [loading, openNew, openCampaignId]);
   useEffect(() => {
     if (audienceMode === 'emails') return;
     if (!preview) {
@@ -2549,7 +2565,7 @@ function audienceSelectionPayload() {
                     <span className="font-medium">{selectedNewsletter.title}</span>
                     <Button type="button" size="sm" variant="outline" asChild>
                       <a
-                        href={`/admin/malichimp?tab=content&edit=${encodeURIComponent(selectedNewsletter.id)}`}
+                        href={malichimpNewsletterEditHref(selectedNewsletter.id)}
                         target="_blank"
                         rel="noreferrer"
                       >

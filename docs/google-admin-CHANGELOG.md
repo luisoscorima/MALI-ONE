@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Ruta canónica `/admin/workspace` (aliases `/admin/users`, `/admin/comunicacion-interna`). Pestañas `directory` / `newsletters` / `campaigns`.
+- Permiso `AppModule.workspace_users` → `google_workspace`. El [procedimiento de reversión](./newsletters-CHANGELOG.md#unreleased) cubre los dos permisos renombrados y el despliegue coordinado.
 - Migración: `boletin-prueba-ti` → biblioteca `internal_communications`.
 - Biblioteca propia `internal_communications` (pestaña Contenido); campañas ya no usan `shared` published.
 - Remitentes de campaña filtrados a `scope=internal_communications`.

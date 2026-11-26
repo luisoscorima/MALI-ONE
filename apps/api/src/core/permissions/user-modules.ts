@@ -2,7 +2,7 @@ import { AppModule, User, UserRole } from '@prisma/client';
 
 export const ALL_APP_MODULES: AppModule[] = [
   AppModule.links,
-  AppModule.workspace_users,
+  AppModule.google_workspace,
   AppModule.s3_manager,
   AppModule.password_vault,
   AppModule.widget_educacion,
@@ -11,7 +11,7 @@ export const ALL_APP_MODULES: AppModule[] = [
   AppModule.widget_pam,
   AppModule.screen_cast,
   AppModule.bsale_reports,
-  AppModule.newsletters,
+  AppModule.email_hub,
   AppModule.malichimp,
   AppModule.landings,
   AppModule.crm_pam,

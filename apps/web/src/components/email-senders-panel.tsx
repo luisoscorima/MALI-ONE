@@ -3,6 +3,7 @@ import { Loader2, Mail, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { EmailSenderDto, EmailSenderScope } from '@mali-one/shared';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
+import { CATALOG_LABEL } from '@/lib/email-admin-routes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,9 +41,9 @@ const df = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' });
 const senderPattern = /^[^@\s]+@mali\.pe$/i;
 
 const SCOPE_LABELS: Record<EmailSenderScope, string> = {
-  shared: 'newsletters',
-  malichimp: 'malichimp',
-  internal_communications: 'users',
+  shared: CATALOG_LABEL.shared,
+  malichimp: CATALOG_LABEL.malichimp,
+  internal_communications: CATALOG_LABEL.internal_communications,
 };
 
 type Props = {
@@ -91,7 +92,7 @@ export function EmailSendersPanel({
       return 'Catálogo de remitentes de MALICHIMP. Solo este módulo puede usarlos en campañas.';
     }
     if (hubMode) {
-      return 'Remitentes de newsletters, malichimp y users.';
+      return 'Remitentes de Institucional, MALICHIMP y Comunicaciones internas.';
     }
     return 'Correos @mali.pe disponibles para campañas.';
   }, [hubMode, scope]);
@@ -177,7 +178,7 @@ export function EmailSendersPanel({
           <TableHeader>
             <TableRow>
               <TableHead>Correo</TableHead>
-              {showScopeColumn ? <TableHead>Módulo</TableHead> : null}
+              {showScopeColumn ? <TableHead>Catálogo</TableHead> : null}
               <TableHead>Creado por</TableHead>
               <TableHead>Agregado</TableHead>
               <TableHead className="w-28 text-right">Acciones</TableHead>
@@ -196,7 +197,7 @@ export function EmailSendersPanel({
                   </TableCell>
                   {showScopeColumn ? (
                     <TableCell>
-                      <Badge variant="outline" className="font-mono font-normal">
+                      <Badge variant="outline">
                         {SCOPE_LABELS[sender.scope] ?? sender.scope}
                       </Badge>
                     </TableCell>
@@ -266,7 +267,7 @@ export function EmailSendersPanel({
           <div className="space-y-3">
             {hubMode && !editing ? (
               <div className="space-y-2">
-                <Label>Catálogo / módulo</Label>
+                <Label>Catálogo</Label>
                 <Select
                   value={createScope}
                   onValueChange={(v) => setCreateScope(v as EmailSenderScope)}

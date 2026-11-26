@@ -18,7 +18,7 @@ export type UserRole = 'admin' | 'operator';
 
 export type AppModule =
   | 'links'
-  | 'workspace_users'
+  | 'google_workspace'
   | 's3_manager'
   | 'password_vault'
   | 'widget_educacion'
@@ -28,7 +28,7 @@ export type AppModule =
   | 'screen_cast'
   | 'bsale_reports'
   | 'mailing'
-  | 'newsletters'
+  | 'email_hub'
   | 'malichimp'
   | 'landings'
   | 'crm_pam'

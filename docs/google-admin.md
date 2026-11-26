@@ -9,28 +9,29 @@ CRUD de cuentas `@mali.pe` vía Google Admin SDK (Directory API) con Domain-Wide
 ## Cómo funciona
 
 1. API autentica con SA JSON e impersona `GOOGLE_ADMIN_IMPERSONATE`.
-2. Operadores con `workspace_users` listan, crean, editan, resetean password y cierran sesiones.
-3. En **Campañas internas** el flujo es el mismo patrón que MALICHIMP: OU (include/exclude), actividad (1–90 días), remitente del catálogo `internal_communications`, boletín del catálogo del módulo (`?tab=contenido`), asunto, y enviar ahora o programar. También hay miniatura en fila, duplicar y continuar borradores.
+2. Operadores con `google_workspace` listan, crean, editan, resetean password y cierran sesiones.
+3. En **Campañas internas** el flujo es el mismo patrón que MALICHIMP: OU (include/exclude), actividad (1–90 días), remitente del catálogo `internal_communications`, boletín del catálogo del módulo (`?tab=newsletters`), asunto, y enviar ahora o programar. También hay miniatura en fila, duplicar y continuar borradores.
 
 ## Código
 
 - `apps/api/src/modules/google-admin/`
-- `apps/api/src/modules/internal-communications/` — API de campañas internas (`RequireModule(workspace_users)`)
+- `apps/api/src/modules/internal-communications/` — API de campañas internas (`RequireModule(google_workspace)`)
 - Web: `admin-users-page.tsx`, `workspace-internal-campaigns.tsx`
 
 ## UI
 
-| `/admin/users` | Directorio Workspace |
-| `/admin/users?tab=campanas` | Campañas internas |
-| `/admin/users?tab=contenido` | Catálogo de boletines del módulo |
-| `/admin/comunicacion-interna` | Redirect legacy → `?tab=campanas` |
+| `/admin/workspace` | Directorio Workspace |
+| `/admin/workspace?tab=campaigns` | Campañas internas |
+| `/admin/workspace?tab=newsletters` | Catálogo de boletines del módulo |
+| `/admin/comunicacion-interna` | Redirect legacy → `/admin/workspace?tab=campaigns` |
+| `/admin/users` | Redirect legacy → `/admin/workspace` |
 
 ## API
 
 Prefijo `/api/admin/users` — list, get, create, patch, reset-password, sign-out, delete, generate-password.
 Health: `GET /api/health/google-admin`.
 
-Campañas internas (`/api/internal-communications`, permiso `workspace_users`):
+Campañas internas (`/api/internal-communications`, permiso `google_workspace`):
 
 - `GET /audience?activeDays=`
 - `POST /audience/preview` — `{ orgUnitPaths?, excludeOrgUnitPaths?, activeDays? }`
@@ -58,7 +59,7 @@ GOOGLE_ADMIN_IMPERSONATE=admin@mali.pe
 
 ## Permisos
 
-Módulo: `workspace_users`
+Módulo: `google_workspace`
 
 ## Relacionados
 

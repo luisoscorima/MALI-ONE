@@ -9,7 +9,13 @@ import { AccentThemeUserSync } from '@/components/accent-theme-user-sync';
 import { ColorSchemeProvider } from '@/components/color-scheme-provider';
 import { AppLayout } from '@/components/app-layout';
 import { AuthGuard, ModuleGuard, SuperAdminGuard } from '@/components/auth-guard';
+import { LegacyEmailAdminRedirect } from '@/components/legacy-email-admin-redirect';
 import { PageLoading } from '@/components/feedback';
+import {
+  EMAIL_HUB_PATH,
+  MALICHIMP_PATH,
+  WORKSPACE_PATH,
+} from '@/lib/email-admin-routes';
 import { lazyPage } from '@/lib/lazy-page';
 
 const LoginPage = lazyPage(() => import('@/pages/login-page'), 'LoginPage');
@@ -172,8 +178,15 @@ function AuthenticatedApp() {
                     <Route element={<ModuleGuard module="links" />}>
                       <Route path="links" element={<LinksPage />} />
                     </Route>
-                    <Route element={<ModuleGuard module="workspace_users" />}>
-                      <Route path="admin/users" element={<AdminUsersPage />} />
+                    <Route element={<ModuleGuard module="google_workspace" />}>
+                      <Route
+                        path={WORKSPACE_PATH.replace(/^\//, '')}
+                        element={<AdminUsersPage />}
+                      />
+                      <Route
+                        path="admin/users"
+                        element={<LegacyEmailAdminRedirect />}
+                      />
                     </Route>
                     <Route element={<ModuleGuard module="s3_manager" />}>
                       <Route path="admin/s3" element={<S3ManagerPage />} />
@@ -257,23 +270,25 @@ function AuthenticatedApp() {
                     <Route element={<ModuleGuard module="bsale_reports" />}>
                       <Route path="bsale/kardex" element={<BsaleKardexPage />} />
                     </Route>
-                    <Route element={<ModuleGuard module="newsletters" />}>
+                    <Route element={<ModuleGuard module="email_hub" />}>
+                      <Route
+                        path={EMAIL_HUB_PATH.replace(/^\//, '')}
+                        element={<NewslettersPage />}
+                      />
                       <Route
                         path="admin/newsletters"
-                        element={<NewslettersPage />}
+                        element={<LegacyEmailAdminRedirect />}
                       />
                     </Route>
                     <Route element={<ModuleGuard module="malichimp" />}>
                       <Route
-                        path="admin/malichimp"
+                        path={MALICHIMP_PATH.replace(/^\//, '')}
                         element={<MalichimpPage />}
                       />
                     </Route>
                     <Route
                       path="admin/comunicacion-interna"
-                      element={
-                        <Navigate to="/admin/users?tab=campanas" replace />
-                      }
+                      element={<LegacyEmailAdminRedirect />}
                     />
                     <Route element={<ModuleGuard module="landings" />}>
                       <Route
@@ -298,7 +313,7 @@ function AuthenticatedApp() {
                     </Route>
                     <Route
                       path="admin/mailing"
-                      element={<Navigate to="/admin/newsletters" replace />}
+                      element={<LegacyEmailAdminRedirect />}
                     />
                     <Route element={<SuperAdminGuard />}>
                       <Route

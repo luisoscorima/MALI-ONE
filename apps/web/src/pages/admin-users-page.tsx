@@ -20,6 +20,12 @@ import { WorkspaceIcContentEditor } from '@/components/workspace-ic-content-edit
 import { WorkspaceIcContentPanel } from '@/components/workspace-ic-content-panel';
 import { WorkspaceInternalCampaigns } from '@/components/workspace-internal-campaigns';
 import { api } from '@/lib/api';
+import {
+  WORKSPACE_DEFAULT_TAB,
+  canonicalEmailAdminSearch,
+  resolveWorkspaceTab,
+  type WorkspaceTab,
+} from '@/lib/email-admin-routes';
 import { formatDate } from '@/lib/format-bytes';
 import { googleAdminUserSecurityUrl } from '@/lib/google-admin-console';
 import { useToast } from '@/contexts/toast-context';
@@ -80,13 +86,24 @@ export function AdminUsersPage() {
   const toast = useToast();
   const confirm = useConfirm();
   const [searchParams, setSearchParams] = useSearchParams();
-  const tabParam = searchParams.get('tab');
-  const tab =
-    tabParam === 'campanas'
-      ? 'campanas'
-      : tabParam === 'contenido'
-        ? 'contenido'
-        : 'directorio';
+  const tab = resolveWorkspaceTab(searchParams.get('tab'));
+  const openCampaignId = tab === 'campaigns' ? searchParams.get('campaign') : null;
+  const openNewCampaign = tab === 'campaigns' && searchParams.get('new') === '1';
+
+  useEffect(() => {
+    // Campaign links canonicalize the tab as part of consuming the action.
+    if (openCampaignId || openNewCampaign) return;
+    const next = canonicalEmailAdminSearch(searchParams, tab, WORKSPACE_DEFAULT_TAB);
+    if (next) setSearchParams(next, { replace: true });
+  }, [openCampaignId, openNewCampaign, searchParams, setSearchParams, tab]);
+
+  const consumeCampaignLink = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', 'campaigns');
+    next.delete('campaign');
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [users, setUsers] = useState<GoogleWorkspaceUser[]>([]);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -448,7 +465,7 @@ export function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Usuarios Workspace"
+        title="Google Workspace"
         description="Directorio Google Workspace y campañas internas por unidad organizativa."
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -463,7 +480,7 @@ export function AdminUsersPage() {
                 Google Admin sin conexión
               </Badge>
             )}
-            {tab === 'directorio' ? (
+            {tab === 'directory' ? (
               <Button
                 onClick={() => {
                   setEditingUser(null);
@@ -480,33 +497,32 @@ export function AdminUsersPage() {
       <Tabs
         value={tab}
         onValueChange={(value) => {
+          const nextTab = value as WorkspaceTab;
           const next = new URLSearchParams(searchParams);
-          if (value === 'campanas') next.set('tab', 'campanas');
-          else if (value === 'contenido') next.set('tab', 'contenido');
-          else next.delete('tab');
-          if (value !== 'contenido') {
-            next.delete('edit');
-            next.delete('new');
-          }
+          if (nextTab === WORKSPACE_DEFAULT_TAB) next.delete('tab');
+          else next.set('tab', nextTab);
+          if (nextTab !== 'newsletters') next.delete('edit');
+          if (nextTab !== 'campaigns') next.delete('campaign');
+          next.delete('new');
           setSearchParams(next, { replace: true });
         }}
       >
         <TabsList>
-          <TabsTrigger value="directorio">
+          <TabsTrigger value="directory">
             <Users className="size-4" aria-hidden />
             Directorio
           </TabsTrigger>
-          <TabsTrigger value="contenido">
+          <TabsTrigger value="newsletters">
             <Newspaper className="size-4" aria-hidden />
             Boletines
           </TabsTrigger>
-          <TabsTrigger value="campanas">
+          <TabsTrigger value="campaigns">
             <Send className="size-4" aria-hidden />
             Campañas internas
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="contenido" className="mt-6">
+        <TabsContent value="newsletters" className="mt-6">
           {searchParams.get('new') === '1' ? (
             <WorkspaceIcContentEditor
               mode="create"
@@ -514,13 +530,13 @@ export function AdminUsersPage() {
                 const next = new URLSearchParams(searchParams);
                 next.delete('new');
                 next.delete('edit');
-                next.set('tab', 'contenido');
+                next.set('tab', 'newsletters');
                 setSearchParams(next, { replace: true });
               }}
               onCreated={(id) => {
                 const next = new URLSearchParams(searchParams);
                 next.delete('new');
-                next.set('tab', 'contenido');
+                next.set('tab', 'newsletters');
                 next.set('edit', id);
                 setSearchParams(next, { replace: true });
               }}
@@ -533,7 +549,7 @@ export function AdminUsersPage() {
                 const next = new URLSearchParams(searchParams);
                 next.delete('edit');
                 next.delete('new');
-                next.set('tab', 'contenido');
+                next.set('tab', 'newsletters');
                 setSearchParams(next, { replace: true });
               }}
             />
@@ -541,14 +557,14 @@ export function AdminUsersPage() {
             <WorkspaceIcContentPanel
               onNewContent={() => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'contenido');
+                next.set('tab', 'newsletters');
                 next.set('new', '1');
                 next.delete('edit');
                 setSearchParams(next, { replace: true });
               }}
               onEditContent={(contentId) => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'contenido');
+                next.set('tab', 'newsletters');
                 next.set('edit', contentId);
                 next.delete('new');
                 setSearchParams(next, { replace: true });
@@ -557,11 +573,15 @@ export function AdminUsersPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="campanas" className="mt-6">
-          <WorkspaceInternalCampaigns />
+        <TabsContent value="campaigns" className="mt-6">
+          <WorkspaceInternalCampaigns
+            openCampaignId={openCampaignId}
+            openNew={openNewCampaign}
+            onDeepLinkConsumed={consumeCampaignLink}
+          />
         </TabsContent>
 
-        <TabsContent value="directorio" className="mt-6 space-y-6">
+        <TabsContent value="directory" className="mt-6 space-y-6">
       {error && (
         <AlertBanner onDismiss={() => setError('')}>{error}</AlertBanner>
       )}

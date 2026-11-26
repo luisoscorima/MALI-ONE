@@ -316,21 +316,47 @@ function showEffectiveTypography(editor: Editor, container: HTMLElement) {
 
         const select = field.querySelector<HTMLSelectElement>('select');
         if (!select) continue;
-        select.querySelector('option[data-mali-effective-font]')?.remove();
-        // Prefer the authored stack when present; otherwise show the computed/effective one.
-        const target = directStyle || control?.getValue({ noDefault: true });
-        const display = own && typeof target === 'string' && target ? target : value;
-        const normalizedDisplay = normalizeFontFamily(display);
-        const matched = [...select.options].find(
-          (option) => normalizeFontFamily(option.value) === normalizedDisplay,
+        // GrapesJS writes this exact string back onto the <select>. A catalog
+        // option that only matches after ignoring quotes or spaces cannot stay
+        // selected: the style manager restores the raw value and the control looks empty.
+        const modelValue = control?.getFullValue(undefined, { skipImportant: true });
+        const exact =
+          (typeof modelValue === 'string' && modelValue) ||
+          (typeof directStyle === 'string' ? directStyle : '');
+        const options = [...select.options];
+        const extra = options.find((option) => 'maliEffectiveFont' in option.dataset);
+
+        const holdExact = (fontValue: string) => {
+          const catalog = options.find((option) => option !== extra && option.value === fontValue);
+          if (catalog) {
+            select.value = fontValue;
+            extra?.remove();
+            return;
+          }
+          const holder = extra ?? new Option(fontValue, fontValue);
+          holder.value = fontValue;
+          holder.text = fontValue;
+          holder.dataset.maliEffectiveFont = '';
+          if (!holder.isConnected) select.add(holder);
+          select.value = fontValue;
+        };
+
+        if (exact) {
+          holdExact(exact);
+          continue;
+        }
+
+        const normalizedValue = normalizeFontFamily(value);
+        const matched = options.find(
+          (option) => option !== extra && normalizeFontFamily(option.value) === normalizedValue,
         );
         if (matched) {
           select.value = matched.value;
+          extra?.remove();
+        } else if (value) {
+          holdExact(value);
         } else {
-          const option = new Option(display, display);
-          option.dataset.maliEffectiveFont = '';
-          select.add(option);
-          select.value = display;
+          extra?.remove();
         }
       }
     });

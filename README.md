@@ -13,7 +13,7 @@ La documentación vive en [`docs/`](docs/README.md): un archivo `<modulo>.md` (q
 - **Enlaces y QR** (`/links`) — [links](docs/links.md)
 - Gestor S3 (super admin) — [s3-manager](docs/s3-manager.md)
 - Widgets embebidos y PAM — [widgets](docs/widgets.md), [pam](docs/pam.md)
-- **Boletines** (`/admin/newsletters`) — [newsletters](docs/newsletters.md)
+- **Campañas y boletines** (`/admin/email`) — [newsletters](docs/newsletters.md)
 - **CRM PAM** (`/admin/crm-pam`) — [crm-pam](docs/crm-pam.md)
 - Leads / CRM Educación — [crm-educacion](docs/crm-educacion.md)
 - Transmisión a pantallas — [screen-cast](docs/screen-cast.md)
@@ -279,13 +279,13 @@ El email en `BOOTSTRAP_ADMIN_EMAIL` (ej. `loscorima@mali.pe`) es el **único sup
 | Módulo | Ruta | Descripción |
 |--------|------|-------------|
 | `links` | `/links` | Enlaces cortos, QR personalizable, carga masiva, estadísticas y subida de archivos |
-| `workspace_users` | `/admin/users` | Gestión de cuentas Google Workspace |
+| `google_workspace` | `/admin/workspace` | Gestión de cuentas Google Workspace |
 | `s3_manager` | `/admin/s3` | Explorador de buckets y archivos en AWS |
 | `widget_educacion` | `/admin/widgets/educacion` | Mapa, selector, calendario, popup, aliados y formulario Conversemos (leads) |
 | `widget_biblioteca` | `/admin/widgets/biblioteca` | Configurador carrusel Koha (biblioteca.mali.pe) |
 | `widget_museo` | `/admin/widgets/museo` | Popup e interfaz embebible (mali.pe/es) |
 | `widget_pam` | `/admin/widget-pam` | Vitrina PAM: planes y beneficios (pagos en CRM PAM) |
-| `newsletters` | `/admin/newsletters` | Boletines HTML (bloques), URL pública compartible |
+| `email_hub` | `/admin/email` | Campañas y boletines HTML (bloques), URL pública compartible |
 | `crm_pam` | `/admin/crm-pam` | Contactos WhatsApp + ledger pagos MP + envío SES |
 | `screen_cast` | `/admin/screen-cast` | Playlists y monitores para tótems y quioscos |
 | `bsale_reports` | `/bsale/kardex` | Kardex consolidado Bsale |

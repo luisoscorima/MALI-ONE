@@ -11,8 +11,8 @@ export const APP_MODULES: {
     description: 'Acortar URLs, generar QR y subir archivos.',
   },
   {
-    id: 'workspace_users',
-    label: 'Usuarios Workspace',
+    id: 'google_workspace',
+    label: 'Google Workspace',
     description:
       'Directorio Google Workspace y campañas internas por unidad organizativa.',
   },
@@ -57,8 +57,8 @@ export const APP_MODULES: {
     description: 'Kardex consolidado de stock por almacén y período.',
   },
   {
-    id: 'newsletters',
-    label: 'Boletines',
+    id: 'email_hub',
+    label: 'Campañas y boletines',
     description:
       'Editor visual de boletines, URL pública y catálogo de remitentes @mali.pe.',
   },

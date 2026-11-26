@@ -31,6 +31,12 @@ import { PageHeader } from '@/components/page-header';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/contexts/toast-context';
 import { api } from '@/lib/api';
+import {
+  MALICHIMP_DEFAULT_TAB,
+  canonicalEmailAdminSearch,
+  resolveMalichimpTab,
+  type MalichimpTab,
+} from '@/lib/email-admin-routes';
 import { MalichimpCampaigns } from '@/components/malichimp-campaigns';
 import { MalichimpContentEditor } from '@/components/malichimp-content-editor';
 import { MalichimpContentPanel } from '@/components/malichimp-content-panel';
@@ -121,14 +127,10 @@ export function MalichimpPage() {
   const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const section =
-    tabParam === 'campaigns' ||
-    tabParam === 'content' ||
-    tabParam === 'remitentes'
-      ? tabParam
-      : 'audience';
+  const section = resolveMalichimpTab(tabParam);
   const showingAudience = section === 'audience';
-  const showingSenders = section === 'remitentes';
+  const showingSenders = section === 'senders';
+
   const [stats, setStats] = useState<MalichimpStatsDto | null>(null);
   const [groups, setGroups] = useState<MalichimpGroupDto[]>([]);
   const [tags, setTags] = useState<MalichimpTagDto[]>([]);
@@ -329,12 +331,14 @@ export function MalichimpPage() {
   }
 
   useEffect(() => {
-    if (section !== 'audience' || searchParams.get('import') !== 'xlsx') return;
-    openImport();
-    const next = new URLSearchParams(searchParams);
-    next.delete('import');
-    setSearchParams(next, { replace: true });
-    // Consume the import deep link once.
+    let next = canonicalEmailAdminSearch(searchParams, section, MALICHIMP_DEFAULT_TAB);
+    if (section === 'audience' && searchParams.get('import') === 'xlsx') {
+      openImport();
+      next ??= new URLSearchParams(searchParams);
+      next.delete('import');
+    }
+    if (next) setSearchParams(next, { replace: true });
+    // React to URL changes when consuming the import deep link.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, searchParams, setSearchParams]);
 
@@ -491,15 +495,14 @@ export function MalichimpPage() {
       <Tabs
         value={section}
         onValueChange={(value) => {
+          const tab = value as MalichimpTab;
           const next = new URLSearchParams(searchParams);
-          if (value === 'audience') next.delete('tab');
-          else next.set('tab', value);
+          if (tab === MALICHIMP_DEFAULT_TAB) next.delete('tab');
+          else next.set('tab', tab);
           // Deep-link params are tab-specific.
-          if (value !== 'content') next.delete('edit');
-          if (value !== 'campaigns') next.delete('campaign');
-          if (value !== 'content' && value !== 'campaigns') next.delete('new');
-          if (value === 'content') next.delete('campaign');
-          if (value === 'campaigns') next.delete('edit');
+          if (tab !== 'newsletters') next.delete('edit');
+          if (tab !== 'campaigns') next.delete('campaign');
+          if (tab !== 'newsletters' && tab !== 'campaigns') next.delete('new');
           setSearchParams(next, { replace: true });
         }}
         className="gap-4"
@@ -507,8 +510,8 @@ export function MalichimpPage() {
         <TabsList aria-label="Secciones de MALICHIMP">
           <TabsTrigger value="audience"><Users aria-hidden="true" /> Audiencia</TabsTrigger>
           <TabsTrigger value="campaigns"><Send aria-hidden="true" /> Campañas</TabsTrigger>
-          <TabsTrigger value="content"><Newspaper aria-hidden="true" /> Boletines</TabsTrigger>
-          <TabsTrigger value="remitentes"><Mail aria-hidden="true" /> Remitentes</TabsTrigger>
+          <TabsTrigger value="newsletters"><Newspaper aria-hidden="true" /> Boletines</TabsTrigger>
+          <TabsTrigger value="senders"><Mail aria-hidden="true" /> Remitentes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="audience">
@@ -655,7 +658,7 @@ export function MalichimpPage() {
           />
         </TabsContent>
 
-        <TabsContent value="content">
+        <TabsContent value="newsletters">
           {searchParams.get('new') === '1' ? (
             <MalichimpContentEditor
               mode="create"
@@ -663,13 +666,13 @@ export function MalichimpPage() {
                 const next = new URLSearchParams(searchParams);
                 next.delete('new');
                 next.delete('edit');
-                next.set('tab', 'content');
+                next.set('tab', 'newsletters');
                 setSearchParams(next, { replace: true });
               }}
               onCreated={(id) => {
                 const next = new URLSearchParams(searchParams);
                 next.delete('new');
-                next.set('tab', 'content');
+                next.set('tab', 'newsletters');
                 next.set('edit', id);
                 setSearchParams(next, { replace: true });
               }}
@@ -682,7 +685,7 @@ export function MalichimpPage() {
                 const next = new URLSearchParams(searchParams);
                 next.delete('edit');
                 next.delete('new');
-                next.set('tab', 'content');
+                next.set('tab', 'newsletters');
                 setSearchParams(next, { replace: true });
               }}
             />
@@ -690,7 +693,7 @@ export function MalichimpPage() {
             <MalichimpContentPanel
               onNewContent={() => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'content');
+                next.set('tab', 'newsletters');
                 next.set('new', '1');
                 next.delete('edit');
                 next.delete('campaign');
@@ -698,7 +701,7 @@ export function MalichimpPage() {
               }}
               onEditContent={(contentId) => {
                 const next = new URLSearchParams(searchParams);
-                next.set('tab', 'content');
+                next.set('tab', 'newsletters');
                 next.set('edit', contentId);
                 next.delete('new');
                 setSearchParams(next, { replace: true });
@@ -707,7 +710,7 @@ export function MalichimpPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="remitentes">
+        <TabsContent value="senders">
           {sendersError ? <AlertBanner variant="error">{sendersError}</AlertBanner> : null}
           {senders ? (
             <EmailSendersPanel scope="malichimp" senders={senders} onChange={setSenders} />

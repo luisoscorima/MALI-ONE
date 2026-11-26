@@ -22,6 +22,11 @@ import {
   Database,
 } from 'lucide-react';
 import type { AppModule, AuthUser } from '@mali-one/shared';
+import {
+  EMAIL_HUB_PATH,
+  MALICHIMP_PATH,
+  WORKSPACE_PATH,
+} from '@/lib/email-admin-routes';
 import { hasModule } from '@/lib/user-modules';
 
 export type AppNavItem = {
@@ -57,10 +62,10 @@ export const appNavSections: AppNavSection[] = [
     items: [
       { to: '/links', label: 'Enlaces y QR', icon: Link2, module: 'links' },
       {
-        to: '/admin/users',
-        label: 'Usuarios Workspace',
+        to: WORKSPACE_PATH,
+        label: 'Google Workspace',
         icon: Users,
-        module: 'workspace_users',
+        module: 'google_workspace',
       },
       {
         to: '/admin/s3',
@@ -109,13 +114,13 @@ export const appNavSections: AppNavSection[] = [
     label: 'CRMs',
     items: [
       {
-        to: '/admin/newsletters',
-        label: 'Campañas y Boletines',
+        to: EMAIL_HUB_PATH,
+        label: 'Campañas y boletines',
         icon: Newspaper,
-        module: 'newsletters',
+        module: 'email_hub',
       },
       {
-        to: '/admin/malichimp',
+        to: MALICHIMP_PATH,
         label: 'MALICHIMP',
         icon: Database,
         module: 'malichimp',

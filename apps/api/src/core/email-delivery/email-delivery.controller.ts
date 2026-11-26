@@ -58,20 +58,20 @@ export class EmailDeliveryController {
   }
 
   @Post('senders')
-  @RequireModule(AppModule.newsletters)
+  @RequireModule(AppModule.email_hub)
   createSender(@Req() req: Request, @Body() body: SaveEmailSenderDto) {
     const scope = body.scope ?? NewsletterScope.shared;
     return this.senders.create(body.email, scope, (req.user as User).id);
   }
 
   @Patch('senders/:id')
-  @RequireModule(AppModule.newsletters)
+  @RequireModule(AppModule.email_hub)
   updateSender(@Param('id') id: string, @Body() body: SaveEmailSenderDto) {
     return this.senders.update(id, body.email);
   }
 
   @Delete('senders/:id')
-  @RequireModule(AppModule.newsletters)
+  @RequireModule(AppModule.email_hub)
   removeSender(@Param('id') id: string) {
     return this.senders.remove(id);
   }
