@@ -82,6 +82,7 @@ WHATSAPP_CRM_SERVICE_TOKEN=
 ## Relacionados
 
 - [crm-educacion.md](./crm-educacion.md), [pam.md](./pam.md), [landings.md](./landings.md), [catalog-educacion.md](./catalog-educacion.md)
+- Plan pendiente: [clic a WhatsApp con ref en el mapa de sedes](./widgets/mapa-whatsapp-ref-plan.md)
 
 ## Embeds, shortcodes y fuentes
 
