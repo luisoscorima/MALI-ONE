@@ -5,6 +5,7 @@ import {
   buildTags,
   cleanImportedText,
   decodeCsvBuffer,
+  isBasicEmail,
   mapMailchimpRecord,
   normalizeEmail,
   parseCsvText,
@@ -23,9 +24,20 @@ test('parsea CSV con comas, comillas y saltos de línea', () => {
 test('normaliza email y conserva la hora local de Lima', () => {
   assert.equal(normalizeEmail('  Persona@Ejemplo.COM '), 'persona@ejemplo.com');
   assert.equal(
+    normalizeEmail('\u2060Anie.agqf@icloud.com\u200B\uFEFF'),
+    'anie.agqf@icloud.com',
+  );
+  assert.equal(
     parseMailchimpDate('2026-11-06 09:30:00')?.toISOString(),
     '2026-11-06T14:30:00.000Z',
   );
+});
+
+test('rechaza correos con caracteres de control o invisibles', () => {
+  assert.equal(isBasicEmail('ana@mali.pe'), true);
+  assert.equal(isBasicEmail('\u2060ana@mali.pe'), false);
+  assert.equal(isBasicEmail('ana\u0007@mali.pe'), false);
+  assert.equal(isBasicEmail('ana@mali.pe\u00A0'), false);
 });
 
 test('mapea campos, etiquetas y una baja como supresión', () => {

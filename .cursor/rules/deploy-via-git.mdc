@@ -18,9 +18,16 @@ Esos atajos generan checksums rotos, P3008/P3009, drift con git y estados irrepr
 
 1. Cambios (código + migraciones) en local.
 2. `commit` + `push` al remoto.
-3. En el servidor: `git pull` (o el flujo de deploy del repo).
-4. `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build` (o el comando de compose documentado).
-5. Dejar que el entrypoint de la API ejecute `prisma migrate deploy` al arrancar.
+3. En el servidor, este es el comando de despliegue (sin nombres de servicio):
+
+```bash
+cd ~/MALI-ONE
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+No limitar el `up` a `api` o `web`. En producción el API corre con `PROCESS_ROLE=http` y el envío de campañas, crons y jobs viven en `api-worker`. Un `up` solo de `api web` deja ese contenedor abajo y las campañas se quedan en cola.
+
+4. Dejar que el entrypoint de la API ejecute `prisma migrate deploy` al arrancar.
 
 ## Datos / hotfixes
 

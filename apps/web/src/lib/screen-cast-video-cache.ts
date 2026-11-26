@@ -11,9 +11,8 @@ const QUIET_CHECK_MS = 2_000;
 /** Range resumes inside one download attempt before the queue backs off. */
 const RESUME_RETRIES = 3;
 const RESUME_DELAY_MS = 3_000;
-/** Past this many failures the player may stream the file instead. */
-const MAX_DOWNLOAD_ATTEMPTS = 3;
-const RETRY_BACKOFF_MS = [8_000, 30_000, 90_000];
+/** Transient failures keep retrying slowly; only an unsupported URL streams. */
+const RETRY_BACKOFF_MS = [8_000, 30_000, 90_000, 5 * 60_000];
 /** Breathing room for the socket between files. */
 const BETWEEN_FILES_MS = 400;
 const IDLE_POLL_MS = 5_000;
@@ -228,6 +227,43 @@ async function storeBlob(proxyUrl: string, blob: Blob): Promise<void> {
   }
 }
 
+function useReadyBlob(src: string, entry: CacheEntry, blob: Blob): string {
+  if (entry.objectUrl) return entry.objectUrl;
+  const objectUrl = URL.createObjectURL(blob);
+  entry.objectUrl = objectUrl;
+  entry.totalBytes = blob.size;
+  entry.receivedBytes = blob.size;
+  entry.attempts = 0;
+  entry.nextAttemptAt = 0;
+  setState(src, entry, 'ready');
+  return objectUrl;
+}
+
+/**
+ * Rebuild blob: URLs from persistent CacheStorage without touching the
+ * network. Run this before rendering a cached playlist so a video-only list
+ * cannot fall through to S3 during an offline reboot.
+ */
+export async function restoreCachedVideoBlobUrls(
+  candidates: Iterable<string>,
+): Promise<string[]> {
+  const restored: string[] = [];
+  for (const src of new Set(candidates)) {
+    const entry = getEntry(src);
+    if (entry.objectUrl) {
+      restored.push(src);
+      continue;
+    }
+    // A live download owns this entry. Do not race it or read a partial file.
+    if (inflight.has(src)) continue;
+    const blob = await cachedBlob(screenCastMediaProxyUrl(src));
+    if (!blob) continue;
+    useReadyBlob(src, entry, blob);
+    restored.push(src);
+  }
+  return restored;
+}
+
 /** Total size out of `Content-Range: bytes 100-999/1000`. */
 function totalFromContentRange(header: string | null): number {
   if (!header) return 0;
@@ -396,21 +432,13 @@ export async function ensureVideoBlobUrl(src: string): Promise<string | null> {
     if (!blob) {
       entry.attempts += 1;
       entry.nextAttemptAt = Date.now() + backoffFor(entry.attempts);
-      setState(
-        src,
-        entry,
-        entry.attempts >= MAX_DOWNLOAD_ATTEMPTS ? 'unavailable' : 'pending',
-      );
+      // Proxyable media failures are normally connectivity. Keep retrying with
+      // capped backoff instead of forcing streaming for the page lifetime.
+      setState(src, entry, 'pending');
       return null;
     }
 
-    const objectUrl = URL.createObjectURL(blob);
-    entry.objectUrl = objectUrl;
-    entry.totalBytes = blob.size;
-    entry.receivedBytes = blob.size;
-    entry.attempts = 0;
-    setState(src, entry, 'ready');
-    return objectUrl;
+    return useReadyBlob(src, entry, blob);
   })().finally(() => {
     inflight.delete(src);
   });
@@ -420,6 +448,11 @@ export async function ensureVideoBlobUrl(src: string): Promise<string | null> {
 }
 
 function shouldAttempt(src: string): boolean {
+  // Do not hammer the API while the device already knows it is offline. The
+  // online event resets exhausted entries and the queue resumes by itself.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
   const entry = entries.get(src);
   if (!entry) return true;
   if (entry.state === 'ready' || entry.state === 'downloading') return false;
@@ -481,11 +514,7 @@ export async function invalidateVideoBlob(src: string): Promise<void> {
     entry.receivedBytes = 0;
     entry.attempts += 1;
     entry.nextAttemptAt = Date.now() + backoffFor(entry.attempts);
-    setState(
-      src,
-      entry,
-      entry.attempts >= MAX_DOWNLOAD_ATTEMPTS ? 'unavailable' : 'pending',
-    );
+    setState(src, entry, 'pending');
   }
   const cache = await openMediaCache();
   if (!cache) return;

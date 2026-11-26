@@ -17,9 +17,12 @@ import {
 } from '@mali-one/shared';
 import { api } from '@/lib/api';
 import {
+  cacheScreenCastConfig,
   cacheScreenCastPlaylist,
   isCorsCacheableMediaUrl,
+  readCachedScreenCastConfig,
   registerScreenCastServiceWorker,
+  screenCastOfflineMediaUrl,
 } from '@/lib/screen-cast-offline';
 import {
   screenCastBuildId,
@@ -64,6 +67,7 @@ import {
   isVideoStreamOnly,
   readyVideoUrls,
   releaseUnusedVideoBlobs,
+  restoreCachedVideoBlobUrls,
   retryVideoDownload,
   startVideoPreloadLoop,
   videoCacheStats,
@@ -94,6 +98,10 @@ const STUCK_SYNC_POLL_MS = 5_000;
 const JOIN_ACK_TIMEOUT_MS = 5_000;
 const JOIN_RETRY_MAX = 2;
 const JOIN_RETRY_DELAY_MS = 1_500;
+/** Upper bound before boot falls back to a cached config on a LAN-only link. */
+const CONFIG_NETWORK_TIMEOUT_MS = 5_000;
+/** Repairs a manually stopped socket if a TV misses the browser `online` event. */
+const SOCKET_RECOVERY_POLL_MS = 60_000;
 
 /** Soft image→image blend; stays inside the new slide's clock slot. */
 const IMAGE_CROSSFADE_MS = 450;
@@ -206,6 +214,9 @@ function connectScreenCastSocket(screenKey: string): Socket {
     timeout: 45000,
     // Tizen fires beforeunload spuriously and would drop a healthy socket.
     closeOnBeforeunload: false,
+    // The `online` listener starts it later. This avoids an immediate failed
+    // handshake (and Socket.IO retry loop) when a kiosk boots without WAN.
+    autoConnect: navigator.onLine !== false,
     auth: { screenKey },
   });
 }
@@ -397,14 +408,14 @@ export function ScreenCastPlayerPage() {
    * Backdrop for a held video slot. Right after a boot nothing has been shown
    * yet, so fall back to the nearest still before this slot instead of leaving
    * the panel black.
-   */
+  */
   const holdFrameFor = useCallback((slotIndex: number): string | null => {
     if (lastStillUrlRef.current) return lastStillUrlRef.current;
     const items = itemsRef.current;
     for (let back = 1; back <= items.length; back++) {
       const entry = items[(slotIndex - back + items.length * 2) % items.length];
       if (entry?.mediaType === 'image' || entry?.mediaType === 'gif') {
-        return entry.mediaUrl;
+        return screenCastOfflineMediaUrl(entry.mediaUrl);
       }
     }
     return null;
@@ -548,6 +559,7 @@ export function ScreenCastPlayerPage() {
       // No local copy will ever land (not proxyable, or the download keeps
       // failing): streaming is the only way this clip is ever seen.
       if (isVideoStreamOnly(item.mediaUrl)) {
+        if (navigator.onLine === false) return null;
         return { url: item.mediaUrl, local: false };
       }
       // Holding needs something to hold on. A playlist without a single still
@@ -695,10 +707,54 @@ export function ScreenCastPlayerPage() {
     if (!screenKey) {
       throw new Error('Falta el parámetro id en la URL');
     }
-    const data = await api.getScreenCastPublicConfig(screenKey);
-    pendingConfigRef.current = data;
-    return data;
-  }, [screenKey]);
+    const cached = await readCachedScreenCastConfig(screenKey);
+    const restoreLocalVideos = async (data: ScreenCastPublicConfigDto) => {
+      if (isPreview) return;
+      await restoreCachedVideoBlobUrls(
+        data.items
+          .filter((item) => item.mediaType === 'video')
+          .map((item) => item.mediaUrl),
+      );
+    };
+    // navigator.onLine=false is authoritative enough to avoid a request that
+    // can only fail. When it is true we still try the API because some TVs do
+    // not update the flag reliably; any failure falls back to the local copy.
+    if (navigator.onLine === false && cached) {
+      await restoreLocalVideos(cached);
+      pendingConfigRef.current = cached;
+      return cached;
+    }
+    try {
+      const controller =
+        typeof AbortController === 'undefined' ? null : new AbortController();
+      let timeout = 0;
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeout = window.setTimeout(() => {
+            controller?.abort();
+            reject(new Error('Tiempo de espera agotado'));
+          }, CONFIG_NETWORK_TIMEOUT_MS);
+        });
+        const data = await Promise.race([
+          api.getScreenCastPublicConfig(screenKey, controller?.signal),
+          timeoutPromise,
+        ]);
+        await restoreLocalVideos(data);
+        pendingConfigRef.current = data;
+        void cacheScreenCastConfig(screenKey, data);
+        return data;
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    } catch (error) {
+      if (cached) {
+        await restoreLocalVideos(cached);
+        pendingConfigRef.current = cached;
+        return cached;
+      }
+      throw error;
+    }
+  }, [isPreview, screenKey]);
 
   /**
    * Re-enter the wall timeline from a known group clock. Never invents a solo
@@ -780,7 +836,11 @@ export function ScreenCastPlayerPage() {
     async (item: ScreenCastPublicItemDto | undefined) => {
       if (!item) return;
       if (item.mediaType !== 'video') {
-        await warmupItem(item, MEASURE_TIMEOUT_MS, null);
+        await warmupItem(
+          { ...item, mediaUrl: screenCastOfflineMediaUrl(item.mediaUrl) },
+          MEASURE_TIMEOUT_MS,
+          null,
+        );
         return;
       }
       const resolved = resolveVideoPlayback(item);
@@ -1030,6 +1090,8 @@ export function ScreenCastPlayerPage() {
   }, []);
 
   useEffect(() => {
+    // Never make cached playback wait for the worker's network update check.
+    // Explicit CacheStorage reads make both operations safe in parallel.
     void registerScreenCastServiceWorker();
     void loadConfigImmediate();
   }, [loadConfigImmediate]);
@@ -1250,7 +1312,9 @@ export function ScreenCastPlayerPage() {
     });
 
     socket.on('disconnect', () => {
-      socketHandlersRef.current.kioskToast('Sin conexión', 'warn');
+      if (navigator.onLine !== false) {
+        socketHandlersRef.current.kioskToast('Sin conexión', 'warn');
+      }
       socketHandlersRef.current.onSocketDisconnect();
     });
 
@@ -1302,28 +1366,29 @@ export function ScreenCastPlayerPage() {
         'heartbeat',
         { screenKey, localUrls: socketHandlersRef.current.localUrlsForReport() },
         (ack: JoinAck) => {
-        socketHandlersRef.current.applyClockOffset(ack?.serverNow, sentAt);
-        socketHandlersRef.current.applyPlayableUrls(ack?.playableUrls);
-        if (ack?.clock?.epochMs) {
-          joinClockRef.current = ack.clock;
-          if (waitingGoRef.current || syncingRef.current) {
-            void socketHandlersRef.current.recoverWithSharedClock(
-              ack.clock,
-              ack.playableUrls,
-              ack.serverNow,
-            );
-            return;
+          socketHandlersRef.current.applyClockOffset(ack?.serverNow, sentAt);
+          socketHandlersRef.current.applyPlayableUrls(ack?.playableUrls);
+          if (ack?.clock?.epochMs) {
+            joinClockRef.current = ack.clock;
+            if (waitingGoRef.current || syncingRef.current) {
+              void socketHandlersRef.current.recoverWithSharedClock(
+                ack.clock,
+                ack.playableUrls,
+                ack.serverNow,
+              );
+              return;
+            }
+            epochMsRef.current = ack.clock.epochMs;
+            if (ack.clock.durationsMs?.length) {
+              durationsRef.current = resolveDurations(
+                itemsRef.current,
+                ack.clock.durationsMs,
+                localDurationsRef.current,
+              );
+            }
           }
-          epochMsRef.current = ack.clock.epochMs;
-          if (ack.clock.durationsMs?.length) {
-            durationsRef.current = resolveDurations(
-              itemsRef.current,
-              ack.clock.durationsMs,
-              localDurationsRef.current,
-            );
-          }
-        }
-      });
+        },
+      );
     };
 
     sendHeartbeat();
@@ -1445,7 +1510,7 @@ export function ScreenCastPlayerPage() {
     ) {
       const pre = new Image();
       preloadRef.current = pre;
-      pre.src = nextItem.mediaUrl;
+      pre.src = screenCastOfflineMediaUrl(nextItem.mediaUrl);
     }
 
     const epoch = epochMsRef.current;
@@ -1601,12 +1666,16 @@ export function ScreenCastPlayerPage() {
           );
         }
         if (isLocal && reason === 'stall') {
-          // A local file that dies mid-playback is truncated or corrupt: drop
-          // it so the queue fetches a clean copy.
+          // Decoder stalls can be transient on Tizen. Preserve the only local
+          // copy while disconnected; with a live API it is safe to replace it.
           destroyVideo(video);
           videoUrlRef.current = null;
-          void invalidateVideoBlob(item.mediaUrl);
-          kioskToast('Copia local ilegible — se descarga de nuevo', 'warn');
+          if (socketRef.current?.connected) {
+            void invalidateVideoBlob(item.mediaUrl);
+            kioskToast('Copia local ilegible — se descarga de nuevo', 'warn');
+          } else {
+            kioskToast('Video local pausado — se reintentará', 'warn');
+          }
         } else if (!isLocal) {
           kioskToast('Video sin datos — se omite este pase', 'warn');
         }
@@ -1756,7 +1825,7 @@ export function ScreenCastPlayerPage() {
     videoPlaybackActiveRef.current = false;
     setHold(false);
     pauseVideoQuiet(videoRef.current);
-    lastStillUrlRef.current = item.mediaUrl;
+    lastStillUrlRef.current = screenCastOfflineMediaUrl(item.mediaUrl);
     stillEntryOffsetMsRef.current = slotOffsetMs;
     stillShownAtPerfRef.current = performance.now();
 
@@ -1898,7 +1967,12 @@ export function ScreenCastPlayerPage() {
 
   useEffect(() => {
     if (isPreview) return;
-    const onOffline = () => kioskToast('Sin red', 'warn');
+    const onOffline = () => {
+      kioskToast('Sin red — usando contenido local', 'warn');
+      // Socket.IO otherwise keeps opening handshakes against an unreachable
+      // API. Playback keeps its last shared clock and reconnects on `online`.
+      socketRef.current?.disconnect();
+    };
     const onOnline = () => {
       kioskToast('Red restablecida', 'ok');
       // Downloads that exhausted their retries deserve a fresh chance.
@@ -1917,9 +1991,21 @@ export function ScreenCastPlayerPage() {
     };
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
+    const recoveryPoll = window.setInterval(() => {
+      const socket = socketRef.current;
+      if (
+        navigator.onLine !== false &&
+        socket &&
+        !socket.connected &&
+        !socket.active
+      ) {
+        socket.connect();
+      }
+    }, SOCKET_RECOVERY_POLL_MS);
     return () => {
       window.removeEventListener('offline', onOffline);
       window.removeEventListener('online', onOnline);
+      window.clearInterval(recoveryPoll);
     };
   }, [isPreview, kioskToast, recoverWithSharedClock]);
 
@@ -1940,8 +2026,10 @@ export function ScreenCastPlayerPage() {
     !!current &&
     !holdUi &&
     (current.mediaType === 'image' || current.mediaType === 'gif');
-  const imageUsesCors =
-    !!current && isCorsCacheableMediaUrl(current.mediaUrl);
+  const currentImageUrl = current
+    ? screenCastOfflineMediaUrl(current.mediaUrl)
+    : '';
+  const imageUsesCors = !!current && isCorsCacheableMediaUrl(currentImageUrl);
   const isVideoItem =
     !!current && current.mediaType === 'video' && !error && !config?.empty;
   /** The element is only on screen when a clip is actually running. */
@@ -1968,9 +2056,11 @@ export function ScreenCastPlayerPage() {
     }
 
     const next: StillSlide = {
-      mediaUrl: current.mediaUrl,
+      mediaUrl: screenCastOfflineMediaUrl(current.mediaUrl),
       slideKey: `${current.mediaUrl}-${index}`,
-      useCors: isCorsCacheableMediaUrl(current.mediaUrl),
+      useCors: isCorsCacheableMediaUrl(
+        screenCastOfflineMediaUrl(current.mediaUrl),
+      ),
       kenVariant: index % 4,
     };
     const outgoing = prevStillRef.current;
@@ -2149,7 +2239,7 @@ export function ScreenCastPlayerPage() {
         {showImage && current && (
           <img
             key={`front-${current.mediaUrl}-${index}`}
-            src={current.mediaUrl}
+            src={currentImageUrl}
             alt=""
             className={
               kenBurnsAnim

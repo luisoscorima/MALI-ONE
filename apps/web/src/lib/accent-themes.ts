@@ -238,7 +238,8 @@ function applyThemedFavicon(palette: MaliGlassPalette) {
         link.removeAttribute('sizes');
         link.href = href;
       });
-    });
+    })
+    .catch(() => undefined);
 }
 
 /** Colores decorativos del fondo del login (esmeralda, violeta, azul). */

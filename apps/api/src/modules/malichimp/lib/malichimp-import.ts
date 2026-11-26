@@ -176,12 +176,16 @@ export function decodeCsvBuffer(buffer: Buffer): string {
   }
 }
 
+// Spreadsheet/CSV cells may carry invisible format chars (U+2060, U+200B, U+FEFF…) that
+// trim() keeps and SES rejects as "control or whitespace".
+const INVISIBLE_FORMAT_CHARS = /\p{Cf}/gu;
+
 export function normalizeEmail(value: string | undefined): string {
-  return String(value ?? '').trim().toLowerCase();
+  return String(value ?? '').replace(INVISIBLE_FORMAT_CHARS, '').trim().toLowerCase();
 }
 
 export function isBasicEmail(value: string): boolean {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value);
+  return /^[^@\s\p{C}]+@[^@\s\p{C}]+\.[^@\s\p{C}]+$/u.test(value);
 }
 
 export function normalizeTagName(value: string): string {

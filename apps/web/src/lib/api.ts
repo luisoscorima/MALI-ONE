@@ -2009,9 +2009,10 @@ export const api = {
       { method: 'POST' },
     ),
 
-  getScreenCastPublicConfig: (screenKey: string) =>
+  getScreenCastPublicConfig: (screenKey: string, signal?: AbortSignal) =>
     request<import('@mali-one/shared').ScreenCastPublicConfigDto>(
       `/api/screen-cast/screens/${encodeURIComponent(screenKey)}/config`,
+      { signal },
     ),
 
   listScreenCastS3Buckets: () =>

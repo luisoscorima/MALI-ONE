@@ -4,6 +4,32 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Caché offline unificada (`config/media v7`) y fallback de `/screen-cast?id=…`
+  al shell local sin que el query string impida arrancar.
+- Los despliegues del Service Worker ya no eliminan la caché persistente de
+  videos completos (`screen-cast-video-v1`).
+- Sin red declarada por el navegador, el player usa config local y pausa los
+  handshakes WebSocket/descargas hasta el evento `online`, sin alterar el reloj
+  ni la lógica de sincronización.
+- Al arrancar se reconstruyen primero los `blob:` de videos persistidos; una
+  playlist solo de video no intenta S3 antes de revisar su copia local.
+- Las descargas cacheables ya no se degradan permanentemente a streaming tras
+  fallas transitorias: reintentan con backoff de hasta 5 minutos.
+- El auto-update conserva siempre el último shell arrancable y un stall de
+  decoder sin API no elimina la única copia local del video.
+- Imágenes/GIF de S3 se reproducen y cachean mediante el proxy same-origin; las
+  firmas S3 guardadas que expiran a los 7 días ya no rompen la pantalla. Las
+  respuestas legacy opacas se descartan y se rellenan de nuevo desde el proxy.
+- Shell y config abandonan la red a los 4–5 segundos y usan caché cuando una TV
+  sigue marcando `online` dentro de una LAN sin salida. Los assets con hash usan
+  cache-first y `/screen-cast?id=…` prefiere su entrada exacta antes del fallback.
+- El arranque local ya no espera el registro/actualización del Service Worker y
+  un sondeo espaciado recupera el socket si el televisor pierde el evento online.
+- Cada build fuerza la instalación del worker, refresca el shell canónico y
+  precarga sus JS/CSS con hash; las entradas exactas de builds viejos se limpian
+  solo después de guardar correctamente el nuevo shell.
+- El favicon dinámico forma parte del shell offline y su actualización maneja
+  cortes de red sin dejar rechazos `Failed to fetch` en la consola.
 - Las pestañas Configuración / Vista previa quedan en la URL (`?tab=preview`).
 - Catch-up con still en vez de overlay negro (riesgo bajo).
 - Re-anclar sync en borde de loop / fin de clip.

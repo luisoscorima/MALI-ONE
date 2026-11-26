@@ -25,8 +25,11 @@ pnpm dev:web   # :5173
 
 ## Despliegue Docker + NPM
 
+Comando de despliegue en el servidor. No limitar el `up` a `api` o `web`: el proceso `api-worker` envía campañas y corre los jobs.
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+cd ~/MALI-ONE
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 - Contenedor `mali-one-web` en red `nginx-proxy-manager_default`.

@@ -77,6 +77,8 @@ pnpm dev:web   # terminal 2
 
 ## Despliegue en EC2 con Docker
 
+Primera vez, en el servidor:
+
 ```bash
 cp .env.example .env
 # Configura producción (ver sección NPM)
@@ -85,8 +87,13 @@ mkdir -p secrets
 # Copia tu JSON de GCP con nombre fijo (o ajusta GOOGLE_SERVICE_ACCOUNT_JSON_PATH):
 cp /ruta/a/tu-service-account.json secrets/google-sa.json
 chmod 600 secrets/google-sa.json
+```
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+Cada despliegue (incluye `api-worker`; no limitar el `up` a `api` o `web`):
+
+```bash
+cd ~/MALI-ONE
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
 El contenedor `mali-one-web` se une a la red **`nginx-proxy-manager_default`**. NPM debe apuntar por nombre de contenedor, no por puerto del host.

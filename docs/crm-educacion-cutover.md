@@ -48,6 +48,11 @@ Canal Prospectia escribe `EducacionOpportunity` en ONE sin poner `COMMERCIAL_AUT
 No `cp`/`scp` ni migrate manual en prod. Flujo:
 
 1. Commit + push de código (UI Anura, webhook, bandeja, migración Prisma).
-2. En servidor: `git pull`.
-3. `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build`.
-4. Entrypoint API ejecuta `prisma migrate deploy` (incluye hub comercial / Anura).
+2. En el servidor:
+
+```bash
+cd ~/MALI-ONE
+git pull && docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+3. Entrypoint API ejecuta `prisma migrate deploy` (incluye hub comercial / Anura).
