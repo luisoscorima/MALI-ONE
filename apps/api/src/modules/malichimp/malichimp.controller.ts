@@ -101,12 +101,12 @@ export class MalichimpController {
     return this.malichimp.listTestRecipients(q);
   }
 
-  @Get('newsletters/library')
-  libraryNewsletters() {
+  @Get('newsletters/catalog')
+  catalogNewsletters() {
     return this.malichimp.listPublishedNewsletters();
   }
 
-  /** @deprecated prefer newsletters/library — kept for short transition */
+  /** @deprecated prefer newsletters/catalog — kept for short transition */
   @Get('newsletters')
   newsletters() {
     return this.malichimp.listPublishedNewsletters();
@@ -114,12 +114,12 @@ export class MalichimpController {
 
   @Get('content')
   listContent() {
-    return this.malichimp.listLibraryContent();
+    return this.malichimp.listCatalogContent();
   }
 
   @Post('content')
   createContent(@Req() req: { user: User }, @Body() body: CreateMalichimpContentDto) {
-    return this.malichimp.createLibraryContent(req.user.id, body);
+    return this.malichimp.createCatalogContent(req.user.id, body);
   }
 
   @Get('content/:id/view')
@@ -154,12 +154,12 @@ export class MalichimpController {
 
   @Post('content/:id/duplicate')
   duplicateContent(@Req() req: { user: User }, @Param('id') id: string) {
-    return this.malichimp.duplicateLibraryContent(req.user.id, id);
+    return this.malichimp.duplicateCatalogContent(req.user.id, id);
   }
 
   @Delete('content/:id')
   deleteContent(@Param('id') id: string) {
-    return this.malichimp.deleteLibraryContent(id);
+    return this.malichimp.deleteCatalogContent(id);
   }
 
   @Get('campaigns')

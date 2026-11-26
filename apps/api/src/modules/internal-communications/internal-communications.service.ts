@@ -18,7 +18,7 @@ import { UpdateNewsletterDto } from '../newsletters/dto/newsletter.dto';
 import { NewslettersService } from '../newsletters/newsletters.service';
 import {
   contentRevisionOf,
-  moduleLibraryListWhere,
+  moduleCatalogListWhere,
 } from '../newsletters/newsletter-working-copy';
 import {
   CreateInternalCampaignDto,
@@ -29,7 +29,7 @@ import { CreateInternalCommunicationsContentDto } from './dto/internal-communica
 
 const AUDIENCE_AREA = 'internal_workspace';
 const IC_SCOPE = NewsletterScope.internal_communications;
-const IC_LIBRARY_WHERE = moduleLibraryListWhere(IC_SCOPE);
+const IC_CATALOG_WHERE = moduleCatalogListWhere(IC_SCOPE);
 const DEFAULT_REPLY_TO = 'tecnologia@mali.pe';
 const DEFAULT_FROM_NAME = 'MALI - Campañas internas';
 const MALI_PE_EMAIL = /^[^@\s]+@mali\.pe$/i;
@@ -148,8 +148,8 @@ export class InternalCommunicationsService {
     return this.newslettersService.listCampaignContentBases(IC_SCOPE);
   }
 
-  listLibraryContent() {
-    return this.newslettersService.listModuleLibrary(IC_SCOPE).then((rows) =>
+  listCatalogContent() {
+    return this.newslettersService.listModuleCatalog(IC_SCOPE).then((rows) =>
       rows.map((row) => ({
         id: row.id,
         title: row.title,
@@ -165,11 +165,11 @@ export class InternalCommunicationsService {
   }
 
   async getContent(id: string) {
-    return this.newslettersService.getModuleLibrary(id, IC_SCOPE);
+    return this.newslettersService.getModuleCatalog(id, IC_SCOPE);
   }
 
-  createLibraryContent(userId: string, dto: CreateInternalCommunicationsContentDto) {
-    return this.newslettersService.createModuleLibrary(userId, IC_SCOPE, {
+  createCatalogContent(userId: string, dto: CreateInternalCommunicationsContentDto) {
+    return this.newslettersService.createModuleCatalog(userId, IC_SCOPE, {
       title: dto.title,
       subject: dto.subject,
       htmlBody: dto.htmlBody,
@@ -179,7 +179,7 @@ export class InternalCommunicationsService {
   }
 
   async updateContent(id: string, dto: UpdateNewsletterDto & { contentRevision?: string }) {
-    const row = await this.newslettersService.updateModuleLibrary(id, IC_SCOPE, dto);
+    const row = await this.newslettersService.updateModuleCatalog(id, IC_SCOPE, dto);
     return {
       ...row,
       contentRevisionToken: contentRevisionOf(row),
@@ -187,12 +187,12 @@ export class InternalCommunicationsService {
     };
   }
 
-  duplicateLibraryContent(userId: string, id: string) {
-    return this.newslettersService.duplicateModuleLibrary(userId, id, IC_SCOPE);
+  duplicateCatalogContent(userId: string, id: string) {
+    return this.newslettersService.duplicateModuleCatalog(userId, id, IC_SCOPE);
   }
 
-  deleteLibraryContent(id: string) {
-    return this.newslettersService.removeModuleLibrary(id, IC_SCOPE);
+  deleteCatalogContent(id: string) {
+    return this.newslettersService.removeModuleCatalog(id, IC_SCOPE);
   }
 
   async getContentBrowserView(id: string) {
@@ -221,7 +221,7 @@ export class InternalCommunicationsService {
     const title = dto.title.trim();
     const subject = (dto.subject?.trim() || title).slice(0, 200);
     try {
-      const created = await this.newslettersService.createModuleLibrary(userId, IC_SCOPE, {
+      const created = await this.newslettersService.createModuleCatalog(userId, IC_SCOPE, {
         title,
         subject,
         htmlBody: NEW_NEWSLETTER_PLACEHOLDER_HTML,
@@ -281,7 +281,7 @@ export class InternalCommunicationsService {
       throw new BadRequestException('El boletín borrador no coincide con el contenido seleccionado');
     }
     const newsletter = await this.prisma.newsletter.findFirst({
-      where: { id: dto.newsletterId, ...IC_LIBRARY_WHERE },
+      where: { id: dto.newsletterId, ...IC_CATALOG_WHERE },
       select: {
         id: true,
         slug: true,
@@ -296,7 +296,7 @@ export class InternalCommunicationsService {
       throw new BadRequestException(
         canUseAttachedDraft
           ? 'El contenido borrador ya no está disponible'
-          : 'Selecciona un contenido de la biblioteca de comunicaciones internas',
+          : 'Selecciona un boletín del catálogo de comunicaciones internas',
       );
     }
 

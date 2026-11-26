@@ -16,7 +16,7 @@ import { MalichimpService } from './malichimp.service';
 
 const databaseUrl = process.env.MALICHIMP_TEST_DATABASE_URL;
 
-test('MALICHIMP library CRUD keeps brand and stays isolated from shared', {
+test('MALICHIMP catalog CRUD keeps brand and stays isolated from shared', {
   skip: databaseUrl ? false : 'MALICHIMP_TEST_DATABASE_URL no configurada',
 }, async () => {
   process.env.DATABASE_URL = databaseUrl;
@@ -66,14 +66,14 @@ test('MALICHIMP library CRUD keeps brand and stays isolated from shared', {
         htmlBody: '<p>Shared</p>',
         status: NewsletterStatus.published,
         scope: NewsletterScope.shared,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         brand: NewsletterBrand.museo,
         createdById: user.id,
       },
     });
     sharedId = shared.id;
 
-    const created = await service.createLibraryContent(user.id, {
+    const created = await service.createCatalogContent(user.id, {
       title: 'Pieza MALICHIMP',
       subject: 'Asunto MALICHIMP',
       htmlBody: '<p>Hola</p>',
@@ -81,10 +81,10 @@ test('MALICHIMP library CRUD keeps brand and stays isolated from shared', {
     });
     contentId = created.id;
     assert.equal(created.scope, NewsletterScope.malichimp);
-    assert.equal(created.kind, NewsletterKind.library);
+    assert.equal(created.kind, NewsletterKind.catalog);
     assert.equal(created.brand, NewsletterBrand.cursos_arte);
 
-    const listed = await service.listLibraryContent();
+    const listed = await service.listCatalogContent();
     assert.ok(listed.some((row) => row.id === contentId));
     assert.ok(!listed.some((row) => row.id === sharedId));
     const listedRow = listed.find((row) => row.id === contentId);
@@ -120,11 +120,11 @@ test('MALICHIMP library CRUD keeps brand and stays isolated from shared', {
       },
     );
 
-    const duplicated = await service.duplicateLibraryContent(user.id, contentId);
+    const duplicated = await service.duplicateCatalogContent(user.id, contentId);
     duplicatedId = duplicated.id;
     assert.equal(duplicated.brand, NewsletterBrand.extension_profesional);
     assert.equal(duplicated.scope, NewsletterScope.malichimp);
-    assert.equal(duplicated.kind, NewsletterKind.library);
+    assert.equal(duplicated.kind, NewsletterKind.catalog);
     assert.match(duplicated.title, /copia/i);
 
     const bases = await service.listPublishedNewsletters();
@@ -155,7 +155,7 @@ test('MALICHIMP library CRUD keeps brand and stays isolated from shared', {
   }
 });
 
-test('campaign create forks from MALICHIMP library brand', {
+test('campaign create forks from MALICHIMP catalog brand', {
   skip: databaseUrl ? false : 'MALICHIMP_TEST_DATABASE_URL no configurada',
 }, async () => {
   process.env.DATABASE_URL = databaseUrl;
@@ -210,7 +210,7 @@ test('campaign create forks from MALICHIMP library brand', {
     );
     senderId = sender.id;
 
-    const content = await service.createLibraryContent(user.id, {
+    const content = await service.createCatalogContent(user.id, {
       title: 'Base con marca',
       subject: 'Asunto base',
       htmlBody: '<p>Base</p>',

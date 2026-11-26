@@ -88,7 +88,7 @@ export function MalichimpContentPanel({
       title: `¿Eliminar “${row.title}”?`,
       description: row.usedInCampaigns
         ? 'Este boletín ya se usó en campañas y no se puede eliminar.'
-        : 'Se eliminará de la biblioteca MALICHIMP.',
+        : 'Se eliminará del catálogo de MALICHIMP.',
       confirmLabel: 'Eliminar',
       variant: 'destructive',
     });
@@ -115,7 +115,7 @@ export function MalichimpContentPanel({
         <div>
           <h2 className="text-base font-medium">Boletines</h2>
           <p className="text-sm text-muted-foreground">
-            Biblioteca de correos de MALICHIMP. Crea y edita piezas aquí; al armar una campaña se
+            Catálogo de correos de MALICHIMP. Crea y edita piezas aquí; al armar una campaña se
             copia una versión editable. Los remitentes del módulo están en la pestaña Remitentes;
             el hub Campañas y Boletines ve el inventario global.
           </p>

@@ -4,7 +4,7 @@
 
 ## Qué es
 
-Hub global de correo: biblioteca org (`shared`), visibilidad de plantillas de módulo, registro de campañas (solo lectura) y catálogo de remitentes por scope. El editor org publica HTML en `/n/{slug}`. Las campañas se **operan** en cada módulo de audiencia (MALICHIMP, Usuarios Workspace).
+Hub global de correo: catálogo de boletines (`shared`), visibilidad de piezas de módulo, registro de campañas (solo lectura) y catálogo de remitentes por scope. El editor org publica HTML en `/n/{slug}`. Las campañas se **operan** en cada módulo de audiencia (MALICHIMP, Usuarios Workspace).
 
 ## Glosario
 
@@ -17,11 +17,11 @@ Hub global de correo: biblioteca org (`shared`), visibilidad de plantillas de m�
 
 ## Cómo funciona
 
-1. **Hub → Boletines:** lista `kind=library` de todos los scopes. Crear/editar/publicar/duplicar/eliminar solo aplica a `shared`. Piezas de módulo se abren con deep link al módulo dueño.
+1. **Hub → Boletines:** lista `kind=catalog` de todos los scopes. Crear/editar/publicar/duplicar/eliminar solo aplica a `shared`. Piezas de módulo se abren con deep link al módulo dueño.
 2. **Hub → Campañas:** registro readonly de `EmailCampaign` + enlace al asistente del módulo.
 3. **Hub → Remitentes:** CRUD de todos los scopes (badge de módulo).
-4. Cada módulo tiene su biblioteca (`scope` + `kind=library`) y elige **solo** esa biblioteca al crear campañas. Fork exclusivo `campaign_working_copy`.
-5. `/n/{slug}` solo sirve `shared` + `library` + `published`.
+4. Cada módulo tiene su catálogo (`scope` + `kind=catalog`) y elige **solo** ese catálogo al crear campañas. Fork exclusivo `campaign_working_copy`.
+5. `/n/{slug}` solo sirve `shared` + `catalog` + `published`.
 6. Personalización `{{first_name}}` y tracking viven en `core/email-delivery` al enviar.
 
 ## UI
@@ -32,8 +32,8 @@ Hub global de correo: biblioteca org (`shared`), visibilidad de plantillas de m�
 | `/admin/newsletters?tab=campanas` | Registro de campañas |
 | `/admin/newsletters?tab=remitentes` | Remitentes globales |
 | `/n/:slug` | Público shared published |
-| MALICHIMP → Contenido / Remitentes | Biblioteca y CRUD remitentes `malichimp` |
-| Usuarios → Contenido | Biblioteca `internal_communications` |
+| MALICHIMP → Boletines / Remitentes | Catálogo y CRUD remitentes `malichimp` |
+| Usuarios → Boletines | Catálogo `internal_communications` |
 
 ## API
 

@@ -79,7 +79,7 @@ test('crea una campaña desde MALICHIMP con audiencia y contenido congelados', {
         htmlBody: '<p>Contenido original</p>',
         status: NewsletterStatus.draft,
         scope: NewsletterScope.malichimp,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         createdById: user.id,
       },
     });

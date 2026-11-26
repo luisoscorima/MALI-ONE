@@ -2,28 +2,28 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { NewsletterKind, NewsletterScope, NewsletterStatus } from '@prisma/client';
 import {
-  buildModuleLibraryCreateData,
+  buildModuleCatalogCreateData,
   contentRevisionOf,
-  libraryListWhere,
-  moduleLibraryListWhere,
-  publishedLibraryWhere,
+  catalogListWhere,
+  moduleCatalogListWhere,
+  publishedCatalogWhere,
   scopeForAudienceArea,
   workingCopyListWhere,
 } from './newsletter-working-copy';
 
-test('library and public listings never include working copies', () => {
-  assert.deepEqual(libraryListWhere(), {
+test('catalog and public listings never include working copies', () => {
+  assert.deepEqual(catalogListWhere(), {
     scope: NewsletterScope.shared,
-    kind: NewsletterKind.library,
+    kind: NewsletterKind.catalog,
   });
-  assert.deepEqual(publishedLibraryWhere(), {
+  assert.deepEqual(publishedCatalogWhere(), {
     scope: NewsletterScope.shared,
-    kind: NewsletterKind.library,
+    kind: NewsletterKind.catalog,
     status: NewsletterStatus.published,
   });
-  assert.deepEqual(moduleLibraryListWhere(NewsletterScope.malichimp), {
+  assert.deepEqual(moduleCatalogListWhere(NewsletterScope.malichimp), {
     scope: NewsletterScope.malichimp,
-    kind: NewsletterKind.library,
+    kind: NewsletterKind.catalog,
   });
   assert.deepEqual(workingCopyListWhere(NewsletterScope.malichimp), {
     scope: NewsletterScope.malichimp,
@@ -54,8 +54,8 @@ test('scopeForAudienceArea maps IC and MALICHIMP areas', () => {
   assert.equal(scopeForAudienceArea('other'), null);
 });
 
-test('buildModuleLibraryCreateData stores brand and malichimp library shape', () => {
-  const data = buildModuleLibraryCreateData({
+test('buildModuleCatalogCreateData stores brand and malichimp catalog shape', () => {
+  const data = buildModuleCatalogCreateData({
     userId: 'user-1',
     scope: NewsletterScope.malichimp,
     title: 'Pieza',
@@ -64,8 +64,8 @@ test('buildModuleLibraryCreateData stores brand and malichimp library shape', ()
     brand: 'museo',
   });
   assert.equal(data.scope, NewsletterScope.malichimp);
-  assert.equal(data.kind, NewsletterKind.library);
+  assert.equal(data.kind, NewsletterKind.catalog);
   assert.equal(data.brand, 'museo');
   assert.equal(data.status, NewsletterStatus.draft);
-  assert.match(String(data.slug), /lib-/);
+  assert.match(String(data.slug), /cat-/);
 });

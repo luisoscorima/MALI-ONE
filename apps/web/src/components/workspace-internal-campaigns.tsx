@@ -538,7 +538,7 @@ export function WorkspaceInternalCampaigns() {
       setNewsletterId(created.id);
       setSubject((current) => current.trim() || created.subject);
       setName((current) => current.trim() || created.title);
-      toast.success('Borrador creado en la biblioteca de boletines');
+      toast.success('Borrador creado en el catálogo de boletines');
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : 'No se pudo crear el boletín');
     } finally {
@@ -790,7 +790,7 @@ export function WorkspaceInternalCampaigns() {
 
       {!newsletters.length ? (
         <AlertBanner variant="info">
-          No hay boletines en la biblioteca de comunicaciones internas. Créalo en la pestaña Boletines.
+          No hay boletines en el catálogo de comunicaciones internas. Créalo en la pestaña Boletines.
         </AlertBanner>
       ) : null}
 
@@ -1180,13 +1180,13 @@ export function WorkspaceInternalCampaigns() {
                 <div className="space-y-1">
                   <h3 className="text-base font-medium">Contenido</h3>
                   <p className="text-sm text-muted-foreground">
-                    Elige un boletín de la biblioteca de comunicaciones internas o crea un borrador
+                    Elige un boletín del catálogo de comunicaciones internas o crea un borrador
                     nuevo.
                   </p>
                 </div>
                 {draftNewsletterId && selectedNewsletter?.id === draftNewsletterId ? (
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                    <Badge variant="secondary">Borrador en biblioteca</Badge>
+                    <Badge variant="secondary">Borrador en el catálogo</Badge>
                     <span className="font-medium">{selectedNewsletter.title}</span>
                     <Button type="button" size="sm" variant="outline" asChild>
                       <a
@@ -1217,7 +1217,7 @@ export function WorkspaceInternalCampaigns() {
                   <div className="space-y-3">
                     <NewsletterSearchSelect
                       id="internal-newsletter"
-                      label="Contenido de biblioteca"
+                      label="Boletín del catálogo"
                       newsletters={selectableNewsletters}
                       value={newsletterId}
                       onChange={selectNewsletter}

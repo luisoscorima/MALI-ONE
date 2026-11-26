@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- El catálogo de boletines MALICHIMP reemplaza el nombre «biblioteca» en UI, API (`GET /api/malichimp/newsletters/catalog`) y `NewsletterKind.catalog`.
+
 ### Fixed
 
 - La lista pegada conserva la selección al buscar o paginar. Editar la lista invalida la revisión y los suprimidos quedan fuera del flujo de importación XLSX.

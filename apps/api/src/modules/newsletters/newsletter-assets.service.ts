@@ -41,8 +41,8 @@ function toJpegFileName(originalName: string): string {
 }
 
 function sanitizeScope(raw: string | undefined): string {
-  const cleaned = (typeof raw === 'string' ? raw : 'library').replace(/[^a-zA-Z0-9._-]/g, '_');
-  return cleaned.slice(0, 80) || 'library';
+  const cleaned = (typeof raw === 'string' ? raw : 'catalog').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return cleaned.slice(0, 80) || 'catalog';
 }
 
 @Injectable()

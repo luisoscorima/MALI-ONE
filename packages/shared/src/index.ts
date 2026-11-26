@@ -352,8 +352,8 @@ export interface MalichimpCampaignDetailDto {
   /** Exclusive working copy for draft edit/preview/snapshot. */
   workingNewsletterId?: string | null;
   newsletterTitle: string;
-  /** Library piece this campaign was sent from. */
-  libraryTitle: string;
+  /** Catalog piece this campaign was sent from. */
+  catalogTitle: string;
   /** Chosen group or tag names, or the recipient count when there is neither. */
   audienceLabel: string;
   /** Up to five recipients. Real sends when they exist; otherwise the email list. */
@@ -1604,14 +1604,14 @@ export interface NewsletterDto {
   /** Optional brand selects header + footer chrome. */
   brand?: NewsletterBrand | null;
   status: NewsletterStatus;
-  /** Present on campaign content pickers (shared vs malichimp library). */
+  /** Present on campaign content pickers (shared vs malichimp catalog). */
   scope?: 'shared' | 'malichimp' | 'internal_communications';
   createdAt: string;
   updatedAt: string;
   publicUrl?: string;
 }
 
-/** Hub / library tables — metadata only (no htmlBody / designJson). */
+/** Hub / catalog tables — metadata only (no htmlBody / designJson). */
 export interface NewsletterListItemDto {
   id: string;
   slug: string;

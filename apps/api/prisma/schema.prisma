@@ -1030,9 +1030,9 @@ enum NewsletterScope {
   internal_communications
 }
 
-/// Library piece vs exclusive campaign working copy.
+/// Catalog piece vs exclusive campaign working copy.
 enum NewsletterKind {
-  library
+  catalog
   campaign_working_copy
 }
 
@@ -1120,8 +1120,8 @@ model Newsletter {
   brand       NewsletterBrand?
   status      NewsletterStatus @default(draft)
   scope       NewsletterScope  @default(shared)
-  kind        NewsletterKind   @default(library)
-  /// Library piece this working copy was forked from (optional).
+  kind        NewsletterKind   @default(catalog)
+  /// Catalog piece this working copy was forked from (optional).
   sourceNewsletterId String?
   sourceNewsletter   Newsletter?  @relation("NewsletterSource", fields: [sourceNewsletterId], references: [id], onDelete: SetNull)
   derivedNewsletters Newsletter[] @relation("NewsletterSource")
@@ -1131,8 +1131,8 @@ model Newsletter {
   createdBy   User             @relation(fields: [createdById], references: [id])
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  /// Campaigns that treat this row as library base (audit / provenance).
-  campaigns   EmailCampaign[]  @relation("CampaignLibraryNewsletter")
+  /// Campaigns that treat this row as catalog base (audit / provenance).
+  campaigns   EmailCampaign[]  @relation("CampaignCatalogNewsletter")
   /// At most one campaign may own this row as exclusive working copy.
   workingForCampaign EmailCampaign? @relation("CampaignWorkingNewsletter")
 
@@ -1170,9 +1170,9 @@ model LandingPage {
 
 model EmailCampaign {
   id                      String              @id @default(cuid())
-  /// Library base (provenance). Never edited from audience modules as send source.
+  /// Catalog base (provenance). Never edited from audience modules as send source.
   newsletterId            String
-  newsletter              Newsletter          @relation("CampaignLibraryNewsletter", fields: [newsletterId], references: [id], onDelete: Restrict)
+  newsletter              Newsletter          @relation("CampaignCatalogNewsletter", fields: [newsletterId], references: [id], onDelete: Restrict)
   /// Exclusive working copy for draft edit/preview/test/snapshot. Unique across campaigns.
   workingNewsletterId     String?             @unique
   workingNewsletter       Newsletter?         @relation("CampaignWorkingNewsletter", fields: [workingNewsletterId], references: [id], onDelete: Restrict)

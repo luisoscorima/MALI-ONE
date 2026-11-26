@@ -89,7 +89,7 @@ export function WorkspaceIcContentPanel({
       title: `¿Eliminar “${row.title}”?`,
       description: row.usedInCampaigns
         ? 'Este boletín ya se usó en campañas y no se puede eliminar.'
-        : 'Se eliminará de la biblioteca de campañas internas.',
+        : 'Se eliminará del catálogo de campañas internas.',
       confirmLabel: 'Eliminar',
       variant: 'destructive',
     });
@@ -116,7 +116,7 @@ export function WorkspaceIcContentPanel({
         <div>
           <h2 className="text-base font-medium">Boletines</h2>
           <p className="text-sm text-muted-foreground">
-            Biblioteca exclusiva de comunicaciones internas. Al crear una campaña se genera una copia
+            Catálogo de comunicaciones internas. Al crear una campaña se genera una copia
             de trabajo a partir de estas piezas.
           </p>
         </div>

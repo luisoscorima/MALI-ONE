@@ -112,7 +112,7 @@ type NewsletterEditorProps = {
   initialDesignJson?: string | null;
   initialHtml?: string | null;
   brand?: NewsletterBrand | null;
-  /** S3 key scope under newsletters/{scope}/… (content id, slug, or library). */
+  /** S3 key scope under newsletters/{scope}/… (content id, slug, or catalog). */
   assetScope?: string;
   /** When true (default), show the URL field for the selected button/link. */
   editLinks?: boolean;
@@ -761,7 +761,7 @@ export const NewsletterEditor = forwardRef<
     initialDesignJson,
     initialHtml,
     brand = null,
-    assetScope = 'library',
+    assetScope = 'catalog',
     editLinks = true,
     className,
   },

@@ -135,7 +135,7 @@ export function MalichimpContentEditor({
         editorRef,
         async (file) => {
           try {
-            return (await api.uploadNewsletterAsset(file, contentId ?? 'library')).url;
+            return (await api.uploadNewsletterAsset(file, contentId ?? 'catalog')).url;
           } catch (uploadError) {
             const message = uploadError instanceof ApiRequestError && uploadError.status === 413
               ? 'La imagen supera el límite de carga.'
@@ -238,7 +238,7 @@ export function MalichimpContentEditor({
           <p className="text-sm text-muted-foreground">
             {campaignName
               ? `Boletín de la campaña: ${campaignName}`
-              : 'Boletín de la biblioteca MALICHIMP.'}
+              : 'Boletín del catálogo de MALICHIMP.'}
           </p>
           {backToCampaignHref ? (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -356,7 +356,7 @@ export function MalichimpContentEditor({
           brand={brand}
           initialDesignJson={initialDesignJson}
           initialHtml={initialHtml}
-          assetScope={contentId ?? 'library'}
+          assetScope={contentId ?? 'catalog'}
           disabled={saving}
           onInsertSuccess={(label) => toast.success(`Se insertó «${label}»`)}
           onInsertError={() => toast.error('No se pudo insertar la variable')}

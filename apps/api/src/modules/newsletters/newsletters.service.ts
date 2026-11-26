@@ -20,14 +20,14 @@ import {
 } from './dto/newsletter.dto';
 import {
   WorkingCopyScope,
-  buildModuleLibraryCreateData,
+  buildModuleCatalogCreateData,
   buildWorkingCopyCreateData,
   contentRevisionOf,
   duplicateLabel,
-  duplicateNewsletterSlug as makeLibraryCopySlug,
-  libraryListWhere,
-  moduleLibraryListWhere,
-  publishedLibraryWhere,
+  duplicateNewsletterSlug as makeCatalogCopySlug,
+  catalogListWhere,
+  moduleCatalogListWhere,
+  publishedCatalogWhere,
   workingCopyListWhere,
 } from './newsletter-working-copy';
 
@@ -45,13 +45,13 @@ export class NewslettersService {
   }
 
   /**
-   * Hub Campañas y Boletines: library metadata only (no htmlBody/designJson).
+   * Hub Campañas y Boletines: catalog metadata only (no htmlBody/designJson).
    * Editor loads full content via get(id).
    */
   async list(options?: { page?: number; pageSize?: number }) {
     const page = Math.max(1, options?.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, options?.pageSize ?? 50));
-    const where = { kind: NewsletterKind.library } as const;
+    const where = { kind: NewsletterKind.catalog } as const;
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.newsletter.findMany({
@@ -132,10 +132,10 @@ export class NewslettersService {
     });
   }
 
-  /** Published shared library bases for campaign wizards (read-only). */
+  /** Published shared catalog bases for campaign wizards (read-only). */
   listPublished() {
     return this.prisma.newsletter.findMany({
-      where: publishedLibraryWhere(),
+      where: publishedCatalogWhere(),
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
@@ -154,13 +154,13 @@ export class NewslettersService {
   }
 
   /**
-   * Module library pieces (e.g. MALICHIMP Contenido).
+   * Module catalog pieces (e.g. MALICHIMP Contenido).
    * Still includes bodies so contentRevisionOf() and campaign pickers stay correct;
    * hub list() above is the slim metadata endpoint.
    */
-  listModuleLibrary(scope: WorkingCopyScope) {
+  listModuleCatalog(scope: WorkingCopyScope) {
     return this.prisma.newsletter.findMany({
-      where: moduleLibraryListWhere(scope),
+      where: moduleCatalogListWhere(scope),
       orderBy: { updatedAt: 'desc' },
       include: {
         _count: { select: { campaigns: true } },
@@ -169,10 +169,10 @@ export class NewslettersService {
     });
   }
 
-  /** Campaign content picker: only the module's own library. */
+  /** Campaign content picker: only the module's own catalog. */
   listCampaignContentBases(scope: WorkingCopyScope) {
     return this.prisma.newsletter.findMany({
-      where: moduleLibraryListWhere(scope),
+      where: moduleCatalogListWhere(scope),
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
@@ -209,9 +209,9 @@ export class NewslettersService {
     });
   }
 
-  async getModuleLibrary(id: string, scope: WorkingCopyScope) {
+  async getModuleCatalog(id: string, scope: WorkingCopyScope) {
     const row = await this.prisma.newsletter.findFirst({
-      where: { id, ...moduleLibraryListWhere(scope) },
+      where: { id, ...moduleCatalogListWhere(scope) },
       include: {
         _count: { select: { campaigns: true } },
         createdBy: { select: { email: true, name: true } },
@@ -225,7 +225,7 @@ export class NewslettersService {
     };
   }
 
-  async createModuleLibrary(
+  async createModuleCatalog(
     userId: string,
     scope: WorkingCopyScope,
     dto: {
@@ -237,7 +237,7 @@ export class NewslettersService {
     },
   ) {
     return this.prisma.newsletter.create({
-      data: buildModuleLibraryCreateData({
+      data: buildModuleCatalogCreateData({
         userId,
         scope,
         title: dto.title.trim(),
@@ -250,14 +250,14 @@ export class NewslettersService {
     });
   }
 
-  async updateModuleLibrary(
+  async updateModuleCatalog(
     id: string,
     scope: WorkingCopyScope,
     dto: UpdateNewsletterDto & { contentRevision?: string },
   ) {
     return this.prisma.$transaction(async (tx) => {
       const current = await tx.newsletter.findFirst({
-        where: { id, ...moduleLibraryListWhere(scope) },
+        where: { id, ...moduleCatalogListWhere(scope) },
       });
       if (!current) throw new NotFoundException('Contenido no encontrado');
       this.assertContentRevision(current, dto.contentRevision, {
@@ -293,9 +293,9 @@ export class NewslettersService {
     });
   }
 
-  async removeModuleLibrary(id: string, scope: WorkingCopyScope) {
+  async removeModuleCatalog(id: string, scope: WorkingCopyScope) {
     const row = await this.prisma.newsletter.findFirst({
-      where: { id, ...moduleLibraryListWhere(scope) },
+      where: { id, ...moduleCatalogListWhere(scope) },
       include: { _count: { select: { campaigns: true } } },
     });
     if (!row) throw new NotFoundException('Contenido no encontrado');
@@ -308,14 +308,14 @@ export class NewslettersService {
     return { ok: true as const };
   }
 
-  async duplicateModuleLibrary(
+  async duplicateModuleCatalog(
     userId: string,
     id: string,
     scope: WorkingCopyScope,
   ) {
-    const source = await this.getModuleLibrary(id, scope);
+    const source = await this.getModuleCatalog(id, scope);
     return this.prisma.newsletter.create({
-      data: buildModuleLibraryCreateData({
+      data: buildModuleCatalogCreateData({
         userId,
         scope,
         title: duplicateLabel(source.title, 200),
@@ -330,7 +330,7 @@ export class NewslettersService {
 
   async get(id: string) {
     const row = await this.prisma.newsletter.findFirst({
-      where: { id, kind: NewsletterKind.library },
+      where: { id, kind: NewsletterKind.catalog },
       include: {
         createdBy: { select: { email: true, name: true } },
       },
@@ -351,7 +351,7 @@ export class NewslettersService {
     const row = await this.prisma.newsletter.findFirst({
       where: {
         slug,
-        ...publishedLibraryWhere(),
+        ...publishedCatalogWhere(),
       },
     });
     if (!row) throw new NotFoundException('Boletín no publicado');
@@ -397,7 +397,7 @@ export class NewslettersService {
                 : (dto.brand as NewsletterBrand),
           status: (dto.status as NewsletterStatus) ?? NewsletterStatus.draft,
           scope: NewsletterScope.shared,
-          kind: NewsletterKind.library,
+          kind: NewsletterKind.catalog,
           contentRevision: 1,
           createdById: userId,
         },
@@ -516,7 +516,7 @@ export class NewslettersService {
   }
 
   /**
-   * Snapshot payload from the exclusive working copy (never from library base).
+   * Snapshot payload from the exclusive working copy (never from catalog base).
    */
   async snapshotFromWorkingCopy(workingNewsletterId: string) {
     const row = await this.prisma.newsletter.findUnique({
@@ -605,13 +605,13 @@ export class NewslettersService {
 
   async duplicate(userId: string, id: string) {
     const source = await this.prisma.newsletter.findFirst({
-      where: { id, ...libraryListWhere() },
+      where: { id, ...catalogListWhere() },
     });
     if (!source) throw new NotFoundException('Boletín no encontrado');
 
     return this.prisma.newsletter.create({
       data: {
-        slug: makeLibraryCopySlug(source.slug, 'copia'),
+        slug: makeCatalogCopySlug(source.slug, 'copia'),
         title: duplicateLabel(source.title, 200),
         subject: source.subject.slice(0, 200),
         htmlBody: source.htmlBody,
@@ -619,7 +619,7 @@ export class NewslettersService {
         brand: source.brand,
         status: NewsletterStatus.draft,
         scope: NewsletterScope.shared,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         contentRevision: 1,
         createdById: userId,
       },
@@ -628,7 +628,7 @@ export class NewslettersService {
 
   async remove(id: string) {
     const newsletter = await this.prisma.newsletter.findFirst({
-      where: { id, ...libraryListWhere() },
+      where: { id, ...catalogListWhere() },
       include: { _count: { select: { campaigns: true } } },
     });
     if (!newsletter) throw new NotFoundException('Boletín no encontrado');

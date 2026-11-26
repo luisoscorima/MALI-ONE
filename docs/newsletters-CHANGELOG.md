@@ -4,6 +4,7 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- El catálogo de piezas reutilizables se llama catálogo en UI y código (`NewsletterKind.catalog`; antes `library`). Koha (`widget_biblioteca`) no cambia.
 - Migración de piezas sembradas: boletines operativos MALI → `scope=malichimp`; `boletin-prueba-ti` → `internal_communications` (dejan de ser solo “Org / Boletines”).
 - Hub **Campañas y Boletines**: listado multi-scope de libraries, pestaña registro de campañas (readonly), remitentes con `scope` y badge de módulo.
 - `EmailSender.scope` + unique `(scope, email)`; catálogos malichimp / internal_communications / shared.

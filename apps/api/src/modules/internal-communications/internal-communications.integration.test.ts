@@ -81,7 +81,7 @@ test('IC create/duplicate keeps exclusive working copy after Newsletter fork mod
         htmlBody: '<p>Contenido IC</p>',
         status: NewsletterStatus.draft,
         scope: NewsletterScope.internal_communications,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         createdById: user.id,
       },
     });
@@ -140,7 +140,7 @@ test('IC create/duplicate keeps exclusive working copy after Newsletter fork mod
       where: {
         id: dupRow.workingNewsletterId!,
         scope: NewsletterScope.shared,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         status: NewsletterStatus.published,
       },
     });

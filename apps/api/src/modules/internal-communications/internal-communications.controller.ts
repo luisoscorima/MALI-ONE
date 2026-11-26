@@ -69,7 +69,7 @@ export class InternalCommunicationsController {
 
   @Get('content')
   listContent() {
-    return this.communications.listLibraryContent();
+    return this.communications.listCatalogContent();
   }
 
   @Post('content')
@@ -77,7 +77,7 @@ export class InternalCommunicationsController {
     @Req() req: { user: User },
     @Body() body: CreateInternalCommunicationsContentDto,
   ) {
-    return this.communications.createLibraryContent(req.user.id, body);
+    return this.communications.createCatalogContent(req.user.id, body);
   }
 
   @Get('content/:id/view')
@@ -113,12 +113,12 @@ export class InternalCommunicationsController {
 
   @Post('content/:id/duplicate')
   duplicateContent(@Req() req: { user: User }, @Param('id') id: string) {
-    return this.communications.duplicateLibraryContent(req.user.id, id);
+    return this.communications.duplicateCatalogContent(req.user.id, id);
   }
 
   @Delete('content/:id')
   deleteContent(@Param('id') id: string) {
-    return this.communications.deleteLibraryContent(id);
+    return this.communications.deleteCatalogContent(id);
   }
 
   @Get('campaigns')

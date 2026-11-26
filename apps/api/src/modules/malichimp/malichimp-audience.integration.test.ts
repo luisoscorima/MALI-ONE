@@ -184,7 +184,7 @@ test('audience tags: unión OR, exclusiones prevalecen, DTO sin mode=groups, leg
         htmlBody: '<p>Hola</p>',
         status: NewsletterStatus.draft,
         scope: NewsletterScope.malichimp,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         createdById: user.id,
       },
     });
@@ -406,7 +406,7 @@ test('duplicate emails mode: conserva contactos elegibles; no inventa notFound/i
         htmlBody: '<p>Base</p>',
         status: NewsletterStatus.draft,
         scope: NewsletterScope.malichimp,
-        kind: NewsletterKind.library,
+        kind: NewsletterKind.catalog,
         createdById: user.id,
       },
     });

@@ -40,9 +40,9 @@ const df = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' });
 const senderPattern = /^[^@\s]+@mali\.pe$/i;
 
 const SCOPE_LABELS: Record<EmailSenderScope, string> = {
-  shared: 'Boletines (org)',
-  malichimp: 'MALICHIMP',
-  internal_communications: 'Campañas internas',
+  shared: 'newsletters',
+  malichimp: 'malichimp',
+  internal_communications: 'users',
 };
 
 type Props = {
@@ -91,7 +91,7 @@ export function EmailSendersPanel({
       return 'Catálogo de remitentes de MALICHIMP. Solo este módulo puede usarlos en campañas.';
     }
     if (hubMode) {
-      return 'Hub global: administra remitentes de Boletines (org), MALICHIMP y Campañas internas.';
+      return 'Remitentes de newsletters, malichimp y users.';
     }
     return 'Correos @mali.pe disponibles para campañas.';
   }, [hubMode, scope]);
@@ -196,7 +196,7 @@ export function EmailSendersPanel({
                   </TableCell>
                   {showScopeColumn ? (
                     <TableCell>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="font-mono font-normal">
                         {SCOPE_LABELS[sender.scope] ?? sender.scope}
                       </Badge>
                     </TableCell>

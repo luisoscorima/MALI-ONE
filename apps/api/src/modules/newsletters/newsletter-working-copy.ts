@@ -38,27 +38,27 @@ export function contentRevisionOf(row: {
     .slice(0, 32);
 }
 
-export function libraryListWhere(): Prisma.NewsletterWhereInput {
+export function catalogListWhere(): Prisma.NewsletterWhereInput {
   return {
     scope: Scope.shared,
-    kind: Kind.library,
+    kind: Kind.catalog,
   };
 }
 
-export function publishedLibraryWhere(): Prisma.NewsletterWhereInput {
+export function publishedCatalogWhere(): Prisma.NewsletterWhereInput {
   return {
-    ...libraryListWhere(),
+    ...catalogListWhere(),
     status: NewsletterStatus.published,
   };
 }
 
-/** Module-scoped library (e.g. MALICHIMP Contenido), not shared Boletines. */
-export function moduleLibraryListWhere(
+/** Module-scoped catalog (e.g. MALICHIMP Contenido), not shared Boletines. */
+export function moduleCatalogListWhere(
   scope: WorkingCopyScope,
 ): Prisma.NewsletterWhereInput {
   return {
     scope,
-    kind: Kind.library,
+    kind: Kind.catalog,
   };
 }
 
@@ -71,7 +71,7 @@ export function workingCopyListWhere(
   };
 }
 
-export function buildModuleLibraryCreateData(input: {
+export function buildModuleCatalogCreateData(input: {
   userId: string;
   scope: WorkingCopyScope;
   title: string;
@@ -83,7 +83,7 @@ export function buildModuleLibraryCreateData(input: {
 }): Prisma.NewsletterCreateInput {
   const slugBase = input.slugBase?.trim() || input.title || 'contenido';
   return {
-    slug: duplicateNewsletterSlug(slugBase, 'lib'),
+    slug: duplicateNewsletterSlug(slugBase, 'cat'),
     title: input.title.slice(0, 200),
     subject: input.subject.slice(0, 200),
     htmlBody: input.htmlBody,
@@ -91,7 +91,7 @@ export function buildModuleLibraryCreateData(input: {
     brand: input.brand ?? null,
     status: NewsletterStatus.draft,
     scope: input.scope,
-    kind: Kind.library as NewsletterKind,
+    kind: Kind.catalog as NewsletterKind,
     contentRevision: 1,
     createdBy: { connect: { id: input.userId } },
   };

@@ -540,7 +540,7 @@ export const api = {
 
   listMalichimpNewsletters: (signal?: AbortSignal) =>
     request<import('@mali-one/shared').NewsletterDto[]>(
-      '/api/malichimp/newsletters/library',
+      '/api/malichimp/newsletters/catalog',
       { signal },
     ),
 

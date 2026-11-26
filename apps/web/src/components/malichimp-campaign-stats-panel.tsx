@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type {
   MalichimpCampaignSendEvent,
   MalichimpCampaignSendsPageDto,
@@ -70,6 +70,8 @@ const SEND_STATUS_META: Record<
 interface MalichimpCampaignStatsPanelProps {
   campaignId: string;
   campaignName: string;
+  /** When opened from a recipient count, scroll the recipient list into view. */
+  focusRecipients?: boolean;
   loadStats?: (
     campaignId: string,
     days: number,
@@ -80,6 +82,7 @@ interface MalichimpCampaignStatsPanelProps {
 export function MalichimpCampaignStatsPanel({
   campaignId,
   campaignName,
+  focusRecipients = false,
   loadStats = api.getMalichimpCampaignStats,
 }: MalichimpCampaignStatsPanelProps) {
   const [days, setDays] = useState(30);
@@ -94,7 +97,13 @@ export function MalichimpCampaignStatsPanel({
   const [sends, setSends] = useState<MalichimpCampaignSendsPageDto | null>(null);
   const [sendsLoading, setSendsLoading] = useState(false);
   const [sendsError, setSendsError] = useState('');
+  const recipientsRef = useRef<HTMLDivElement>(null);
   const supportsScope = loadStats === api.getMalichimpCampaignStats;
+
+  useEffect(() => {
+    if (!focusRecipients || loading) return;
+    recipientsRef.current?.scrollIntoView({ block: 'start' });
+  }, [focusRecipients, loading, campaignId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(sendsQuery.trim()), 300);
@@ -247,6 +256,7 @@ export function MalichimpCampaignStatsPanel({
         <Kpi
           label="Entregados"
           value={nf.format(stats.delivered)}
+          hint={pf.format(stats.sent > 0 ? stats.delivered / stats.sent : 0)}
           active={event === 'delivered'}
           onClick={() => setEvent('delivered')}
         />
@@ -324,6 +334,7 @@ export function MalichimpCampaignStatsPanel({
       </Card>
 
       {supportsScope ? (
+        <div ref={recipientsRef}>
         <Card className="space-y-3 p-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -435,6 +446,7 @@ export function MalichimpCampaignStatsPanel({
             />
           ) : null}
         </Card>
+        </div>
       ) : null}
     </div>
   );

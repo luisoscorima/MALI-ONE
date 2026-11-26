@@ -609,9 +609,9 @@ export function MalichimpCampaigns({
   const [testLoading, setTestLoading] = useState(false);
   const [testSelected, setTestSelected] = useState<string[]>([]);
   const [newsletters, setNewsletters] = useState<NewsletterDto[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [libraryError, setLibraryError] = useState('');
-  const [libraryRetry, setLibraryRetry] = useState(0);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [catalogRetry, setCatalogRetry] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const listRequest = useRef<AbortController | null>(null);
@@ -633,6 +633,7 @@ export function MalichimpCampaigns({
   const [summaryError, setSummaryError] = useState('');
   const summaryRequest = useRef(0);
   const [statsCampaign, setStatsCampaign] = useState<MalichimpCampaignDto | null>(null);
+  const [statsFocusRecipients, setStatsFocusRecipients] = useState(false);
   const [previewCampaignId, setPreviewCampaignId] = useState<string | null>(null);
   const [refreshingContent, setRefreshingContent] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -902,23 +903,23 @@ export function MalichimpCampaigns({
     setReplyTo((current) => current || defaultSenderEmail);
   }, [open, draftCampaignId, defaultSenderEmail]);
 
-  const needsLibrary = open && formStep === 'content' && !draftCampaignId;
+  const needsCatalog = open && formStep === 'content' && !draftCampaignId;
   useEffect(() => {
-    if (!needsLibrary) return;
+    if (!needsCatalog) return;
     const request = new AbortController();
-    setLibraryLoading(true);
-    setLibraryError('');
+    setCatalogLoading(true);
+    setCatalogError('');
     void api.listMalichimpNewsletters(request.signal).then((next) => {
       if (!request.signal.aborted) setNewsletters(next);
     }).catch((reason: unknown) => {
       if (!request.signal.aborted) {
-        setLibraryError(reason instanceof Error ? reason.message : 'No se pudo cargar la biblioteca MALICHIMP');
+        setCatalogError(reason instanceof Error ? reason.message : 'No se pudo cargar el catálogo de MALICHIMP');
       }
     }).finally(() => {
-      if (!request.signal.aborted) setLibraryLoading(false);
+      if (!request.signal.aborted) setCatalogLoading(false);
     });
     return () => request.abort();
-  }, [needsLibrary, libraryRetry]);
+  }, [needsCatalog, catalogRetry]);
   useEffect(() => {
     if (!open) return;
     try {
@@ -1149,8 +1150,8 @@ export function MalichimpCampaigns({
     const next = CAMPAIGN_STEPS[stepIndex + 1];
     if (next) {
       if (next.id === 'content' && !draftCampaignId) {
-        setLibraryLoading(true);
-        setLibraryError('');
+        setCatalogLoading(true);
+        setCatalogError('');
       }
       setFormStep(next.id);
       if (next.id === 'send') void reviewFinalAudience();
@@ -1381,6 +1382,13 @@ export function MalichimpCampaigns({
       await load();
       setCancellingId(null);
     }
+  }
+
+  function openCampaignRecipients(campaignId: string) {
+    const campaign = campaigns.find((item) => item.id === campaignId);
+    if (!campaign) return;
+    setStatsFocusRecipients(true);
+    setStatsCampaign(campaign);
   }
 
   function closeCampaignSummary() {
@@ -1890,8 +1898,23 @@ function audienceSelectionPayload() {
             </TableHeader>
             <TableBody>
               {campaigns.map((campaign) => (
-                <TableRow key={campaign.id}>
-                  <TableCell className="align-middle">
+                <TableRow
+                  key={campaign.id}
+                  className="cursor-pointer"
+                  tabIndex={0}
+                  onClick={() => void openCampaignSummary(campaign.id)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      void openCampaignSummary(campaign.id);
+                    }
+                  }}
+                >
+                  <TableCell
+                    className="align-middle"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <Checkbox
                       aria-label={`Seleccionar ${campaign.name}`}
                       checked={selectedCampaignIds.has(campaign.id)}
@@ -1909,7 +1932,10 @@ function audienceSelectionPayload() {
                     <button
                       type="button"
                       className="relative block h-16 w-[5.5rem] overflow-hidden rounded-md border bg-white shadow-sm transition-opacity hover:opacity-90"
-                      onClick={() => void openCampaignPreview(campaign.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void openCampaignPreview(campaign.id);
+                      }}
                       aria-label={`Vista previa de ${campaign.name}`}
                       title="Abrir vista previa"
                       disabled={previewCampaignId === campaign.id}
@@ -1931,13 +1957,7 @@ function audienceSelectionPayload() {
                     </button>
                   </TableCell>
                   <TableCell className="min-w-64">
-                    <button
-                      type="button"
-                      className="text-left font-medium text-primary underline-offset-2 hover:underline focus-visible:underline"
-                      onClick={() => void openCampaignSummary(campaign.id)}
-                    >
-                      {campaign.name}
-                    </button>
+                    <p className="font-medium">{campaign.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {campaign.name.trim() === campaign.newsletterTitle.trim()
                         ? df.format(new Date(campaign.createdAt))
@@ -1981,7 +2001,10 @@ function audienceSelectionPayload() {
                         : 0,
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell
+                    className="text-right"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
                       {campaign.scheduledAt && ['scheduled', 'queued'].includes(campaign.status) ? (
                         <IconActionButton
@@ -1994,7 +2017,10 @@ function audienceSelectionPayload() {
                       ) : null}
                       <IconActionButton
                         label="Estadísticas"
-                        onClick={() => setStatsCampaign(campaign)}
+                        onClick={() => {
+                          setStatsFocusRecipients(false);
+                          setStatsCampaign(campaign);
+                        }}
                       >
                         <BarChart3 className="size-4" />
                       </IconActionButton>
@@ -2546,12 +2572,12 @@ function audienceSelectionPayload() {
                       Actualizar
                     </Button>
                   </div>
-                ) : libraryLoading ? (
-                  <p role="status" className="text-sm text-muted-foreground">Cargando biblioteca MALICHIMP…</p>
-                ) : libraryError ? (
+                ) : catalogLoading ? (
+                  <p role="status" className="text-sm text-muted-foreground">Cargando catálogo de MALICHIMP…</p>
+                ) : catalogError ? (
                   <AlertBanner variant="error">
-                    <p>{libraryError}</p>
-                    <Button type="button" variant="outline" className="mt-2" onClick={() => setLibraryRetry((value) => value + 1)}>
+                    <p>{catalogError}</p>
+                    <Button type="button" variant="outline" className="mt-2" onClick={() => setCatalogRetry((value) => value + 1)}>
                       Reintentar
                     </Button>
                   </AlertBanner>
@@ -2559,7 +2585,7 @@ function audienceSelectionPayload() {
                   <div className="space-y-3">
                     <NewsletterSearchSelect
                       id="malichimp-newsletter"
-                      label="Biblioteca MALICHIMP"
+                      label="Catálogo de MALICHIMP"
                       newsletters={selectableNewsletters}
                       value={newsletterId}
                       onChange={selectNewsletter}
@@ -2917,22 +2943,21 @@ function audienceSelectionPayload() {
                 </section>
                 <section className="space-y-1">
                   <h3 className="text-sm font-medium">Para</h3>
-                  <p className="text-sm">{campaignSummary.audienceLabel || 'Sin audiencia registrada'}</p>
-                  {/^\d+ destinatarios?$/.test(campaignSummary.audienceLabel) ? null : (
-                    <p className="text-sm text-muted-foreground">
-                      {nf.format(campaignSummary.totalRecipients)}{' '}
-                      {campaignSummary.totalRecipients === 1 ? 'destinatario' : 'destinatarios'}
-                    </p>
-                  )}
-                  {campaignSummary.recipientSample.length ? (
-                    <ul className="space-y-0.5 text-xs text-muted-foreground">
-                      {campaignSummary.recipientSample.map((recipient) => (
-                        <li className="break-all" key={recipient.email}>
-                          {recipient.name ? `${recipient.name} · ${recipient.email}` : recipient.email}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+                  <button
+                    type="button"
+                    className="-mx-2 cursor-pointer space-y-1 rounded-md px-2 py-1.5 text-left hover:bg-muted/60"
+                    onClick={() => openCampaignRecipients(campaignSummary.id)}
+                  >
+                    <span className="block text-sm">
+                      {campaignSummary.audienceLabel || 'Sin audiencia registrada'}
+                    </span>
+                    {/^\d+ destinatarios?$/.test(campaignSummary.audienceLabel) ? null : (
+                      <span className="block text-sm text-muted-foreground">
+                        {nf.format(campaignSummary.totalRecipients)}{' '}
+                        {campaignSummary.totalRecipients === 1 ? 'destinatario' : 'destinatarios'}
+                      </span>
+                    )}
+                  </button>
                 </section>
                 <section className="space-y-2">
                   <h3 className="text-sm font-medium">Contenido</h3>
@@ -2942,9 +2967,12 @@ function audienceSelectionPayload() {
                   </p>
                   <p className="text-sm">
                     <span className="text-muted-foreground">Boletín:</span>{' '}
-                    {campaignSummary.libraryTitle || campaignSummary.newsletterTitle}
+                    {campaignSummary.catalogTitle || campaignSummary.newsletterTitle}
                   </p>
-                  <div className="relative h-72 overflow-hidden rounded-md border bg-white">
+                  <div
+                    className="relative h-80 overflow-hidden rounded-md border bg-white"
+                    style={{ containerType: 'inline-size' }}
+                  >
                     {campaignSummary.previewHtml ? (
                       <iframe
                         title={`Vista previa de ${campaignSummary.name}`}
@@ -2952,8 +2980,13 @@ function audienceSelectionPayload() {
                         sandbox=""
                         referrerPolicy="no-referrer"
                         tabIndex={-1}
-                        className="pointer-events-none absolute left-0 top-0 origin-top-left border-0"
-                        style={{ width: 640, height: 900, transform: 'scale(0.45)' }}
+                        className="pointer-events-none absolute top-0 left-0 border-0"
+                        style={{
+                          width: 640,
+                          height: 900,
+                          transform: 'scale(calc(100cqw / 640px))',
+                          transformOrigin: 'top left',
+                        }}
                       />
                     ) : (
                       <p className="flex h-full items-center justify-center px-3 text-center text-xs text-muted-foreground">
@@ -3031,7 +3064,10 @@ function audienceSelectionPayload() {
       <Dialog
         open={Boolean(statsCampaign)}
         onOpenChange={(openDialog) => {
-          if (!openDialog) setStatsCampaign(null);
+          if (!openDialog) {
+            setStatsCampaign(null);
+            setStatsFocusRecipients(false);
+          }
         }}
       >
         <DialogContent className="flex max-h-[min(90vh,900px)] w-[min(calc(100vw-2rem),48rem)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none">
@@ -3053,6 +3089,7 @@ function audienceSelectionPayload() {
                 <MalichimpCampaignStatsPanel
                   campaignId={statsCampaign.id}
                   campaignName={statsCampaign.name}
+                  focusRecipients={statsFocusRecipients}
                 />
               </Suspense>
             ) : null}

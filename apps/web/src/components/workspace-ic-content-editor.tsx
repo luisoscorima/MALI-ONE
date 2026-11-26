@@ -111,7 +111,7 @@ export function WorkspaceIcContentEditor({
         editorRef,
         async (file) => {
           try {
-            return (await api.uploadNewsletterAsset(file, contentId ?? 'library')).url;
+            return (await api.uploadNewsletterAsset(file, contentId ?? 'catalog')).url;
           } catch (uploadError) {
             const message = uploadError instanceof ApiRequestError && uploadError.status === 413
               ? 'La imagen supera el límite de carga.'
@@ -193,7 +193,7 @@ export function WorkspaceIcContentEditor({
             {mode === 'create' ? 'Nuevo boletín' : 'Editar boletín'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Biblioteca de boletines de campañas internas.
+            Catálogo de boletines de campañas internas.
           </p>
         </div>
         <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving}>
@@ -282,7 +282,7 @@ export function WorkspaceIcContentEditor({
         brand={brand}
         initialDesignJson={initialDesignJson}
         initialHtml={initialHtml}
-        assetScope={contentId ?? 'library'}
+        assetScope={contentId ?? 'catalog'}
         disabled={saving}
         onInsertSuccess={(label) => toast.success(`Se insertó «${label}»`)}
         onInsertError={() => toast.error('No se pudo insertar la variable')}

@@ -76,9 +76,9 @@ export function NewslettersPage() {
     tabParam === 'remitentes' || tabParam === 'campanas' ? tabParam : 'boletines';
 
   const SCOPE_LABEL: Record<string, string> = {
-    shared: 'Org / Boletines',
-    malichimp: 'MALICHIMP',
-    internal_communications: 'Campañas internas',
+    shared: 'newsletters',
+    malichimp: 'malichimp',
+    internal_communications: 'users',
   };
 
   const [loading, setLoading] = useState(true);
@@ -219,7 +219,7 @@ export function NewslettersPage() {
         editorRef,
         async (file) => {
           try {
-            return (await api.uploadNewsletterAsset(file, slug.trim() || editingId || 'library')).url;
+            return (await api.uploadNewsletterAsset(file, slug.trim() || editingId || 'catalog')).url;
           } catch (uploadError) {
             const message = uploadError instanceof ApiRequestError && uploadError.status === 413
               ? 'La imagen supera el límite de carga.'
@@ -320,12 +320,12 @@ export function NewslettersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Campañas y Boletines"
-        description="Hub global: biblioteca org, registro de campañas y remitentes por módulo. Las campañas se operan en MALICHIMP o Usuarios Workspace."
+        description="Boletines, campañas y remitentes. El módulo es la ruta: newsletters, malichimp o users."
         actions={
           mode === 'closed' && section === 'boletines' ? (
             <Button type="button" onClick={openCreate}>
               <Plus className="mr-1 size-4" />
-              Nuevo boletín org
+              Nuevo boletín
             </Button>
           ) : mode !== 'closed' ? (
             <div className="flex flex-wrap gap-2">
@@ -397,7 +397,7 @@ export function NewslettersPage() {
                   <TableHeader>
                   <TableRow>
                     <TableHead className="w-[280px] max-w-[280px]">Título</TableHead>
-                    <TableHead className="w-[120px]">Módulo</TableHead>
+                    <TableHead className="w-[130px]">Módulo</TableHead>
                     <TableHead className="w-[180px] max-w-[180px]">Slug</TableHead>
                     <TableHead className="w-[120px]">Marca</TableHead>
                     <TableHead className="w-[150px]">Estado</TableHead>
@@ -423,7 +423,7 @@ export function NewslettersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
+                        <Badge variant="outline" className="font-mono font-normal">
                           {SCOPE_LABEL[n.scope ?? 'shared'] ?? n.scope}
                         </Badge>
                       </TableCell>
@@ -457,7 +457,9 @@ export function NewslettersPage() {
                           </span>
                         </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Biblioteca módulo</span>
+                          <span className="font-mono text-sm text-muted-foreground">
+                            {SCOPE_LABEL[n.scope ?? 'shared'] ?? n.scope}
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="space-x-1 text-right">
@@ -622,7 +624,7 @@ export function NewslettersPage() {
             brand={brand}
             initialDesignJson={initialDesignJson}
             initialHtml={initialHtml}
-            assetScope={slug.trim() || editingId || 'library'}
+            assetScope={slug.trim() || editingId || 'catalog'}
             disabled={saving}
             onInsertSuccess={(label, tag) =>
               toast.success(`Se insertó «${label}» (${tag}) en el boletín`)

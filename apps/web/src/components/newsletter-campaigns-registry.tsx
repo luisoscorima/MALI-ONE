@@ -20,9 +20,9 @@ const df = new Intl.DateTimeFormat('es-PE', {
 });
 
 const AREA_LABEL: Record<string, string> = {
-  malichimp: 'MALICHIMP',
-  internal_workspace: 'Campañas internas',
-  pam: 'Legacy PAM',
+  malichimp: 'malichimp',
+  internal_workspace: 'users',
+  pam: 'pam',
 };
 
 function deepLinkFor(audienceArea: string, campaignId: string): string | null {
@@ -72,7 +72,7 @@ export function NewsletterCampaignsRegistry() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Vista de solo lectura. Para editar o enviar, abre la campaña en su módulo.
+        Vista de solo lectura. Para editar o enviar, ábrela en MALICHIMP o en Usuarios Workspace.
       </p>
       <TableShell>
         <Table>
@@ -98,7 +98,7 @@ export function NewsletterCampaignsRegistry() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="font-mono font-normal">
                       {AREA_LABEL[row.audienceArea] ?? row.audienceArea}
                     </Badge>
                   </TableCell>
