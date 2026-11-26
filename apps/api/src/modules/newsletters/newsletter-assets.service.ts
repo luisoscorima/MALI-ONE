@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NewsletterAssetUploadResultDto } from '@mali-one/shared';
-import sharp from 'sharp';
+import { optimizeEmailImage, type EmailImage } from '../../core/email-delivery/email-image';
 import { S3Service } from '../../core/s3/s3.service';
 
 const ALLOWED_MIME = new Set([
@@ -17,15 +17,6 @@ const ALLOWED_MIME = new Set([
   'image/webp',
 ]);
 
-const OPTIMIZE_TO_JPEG = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
-
-/** Max edge for email HTML (banners ~600px wide; headroom for retina). */
-const MAX_EDGE = 1600;
-const JPEG_QUALITY = 85;
 export const NEWSLETTER_ASSET_MAX_BYTES = 40 * 1024 * 1024;
 
 type UploadedFile = {
@@ -92,52 +83,22 @@ export class NewsletterAssetsService {
     }
 
     const originalBytes = file.size;
-    let uploadBuffer = file.buffer;
-    let uploadMime = mime;
-    let uploadName = originalName;
-    let width: number | null = null;
-    let height: number | null = null;
-
-    if (OPTIMIZE_TO_JPEG.has(mime)) {
-      try {
-        // Flatten alpha onto white before JPEG (email-friendly; avoids black holes).
-        uploadBuffer = await sharp(file.buffer)
-          .rotate()
-          .resize({
-            width: MAX_EDGE,
-            height: MAX_EDGE,
-            fit: 'inside',
-            withoutEnlargement: true,
-          })
-          .flatten({ background: { r: 255, g: 255, b: 255 } })
-          .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
-          .toBuffer();
-        const outMeta = await sharp(uploadBuffer).metadata();
-        width = outMeta.width ?? null;
-        height = outMeta.height ?? null;
-        uploadMime = 'image/jpeg';
-        uploadName = toJpegFileName(originalName);
-      } catch {
-        throw new BadRequestException(
-          'No se pudo procesar la imagen. Prueba otro JPG/PNG/WebP.',
-        );
-      }
-    } else {
-      try {
-        const meta = await sharp(file.buffer, { animated: true }).metadata();
-        if (meta.format !== 'gif') throw new Error('Invalid GIF format');
-        width = meta.width ?? null;
-        height = meta.height ?? null;
-      } catch {
-        throw new BadRequestException('El archivo no es un GIF válido.');
-      }
+    const isGif = mime === 'image/gif';
+    let image: EmailImage;
+    try {
+      image = await optimizeEmailImage(file.buffer, mime);
+    } catch {
+      throw new BadRequestException(
+        isGif ? 'El archivo no es un GIF válido.' : 'No se pudo procesar la imagen. Prueba otro JPG/PNG/WebP.',
+      );
     }
+    const uploadName = isGif ? originalName : toJpegFileName(originalName);
 
     const scope = sanitizeScope(scopeRaw);
     const key = this.s3.buildNewsletterAssetKey(scope, uploadName);
     let url: string;
     try {
-      url = await this.s3.uploadFile(key, uploadBuffer, uploadMime);
+      url = await this.s3.uploadFile(key, image.buffer, image.mimeType);
     } catch (error) {
       const code = error instanceof Error ? error.name : 'unknown';
       this.logger.warn(`No se pudo escribir una imagen de boletín en S3 (${code})`);
@@ -156,11 +117,11 @@ export class NewsletterAssetsService {
       url,
       key,
       fileName: uploadName,
-      mimeType: uploadMime,
-      width,
-      height,
+      mimeType: image.mimeType,
+      width: image.width,
+      height: image.height,
       originalBytes,
-      optimizedBytes: uploadBuffer.length,
+      optimizedBytes: image.buffer.length,
     };
   }
 }

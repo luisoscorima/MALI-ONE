@@ -27,6 +27,54 @@ test('injects shared click/open tracking and an audience-owned unsubscribe link'
   assert.match(html, /https:\/\/mali\.example\/mail\/unsubscribe\/send-token/);
 });
 
+test('places the open pixel before the content so clipped messages still track opens', () => {
+  const html = trackingService().inject(
+    '<html><body><p>Contenido</p></body></html>',
+    'send-token',
+    undefined,
+    'https://mali.example/mail/view/send-token',
+  );
+  assert.match(
+    html,
+    /<body>\s*<div data-mali-view-in-browser[\s\S]*?<\/div><img src="https:\/\/mali\.example\/mail\/o\/send-token\.gif"[^>]*><p>Contenido/,
+  );
+});
+
+test('a click marks a sent message as opened when the pixel never loaded', async () => {
+  const updates: Array<Record<string, unknown>> = [];
+  const campaignUpdates: Array<Record<string, unknown>> = [];
+  const tx = {
+    emailEvent: { create: async () => ({}) },
+    emailSend: {
+      updateMany: async ({ data }: { data: Record<string, unknown> }) => {
+        updates.push(data);
+        return { count: 1 };
+      },
+    },
+    emailCampaign: {
+      update: async ({ data }: { data: Record<string, unknown> }) => {
+        campaignUpdates.push(data);
+        return {};
+      },
+    },
+  };
+  const prisma = {
+    emailSend: {
+      findUnique: async () => ({ id: 's1', campaignId: 'c1', status: 'sent' }),
+    },
+    $transaction: async (fn: (client: typeof tx) => Promise<void>) => fn(tx),
+  } as unknown as PrismaService;
+
+  await trackingService(prisma).recordClick('tok', 'https://mali.pe/x');
+
+  assert.ok(updates.some((data) => 'clickedAt' in data));
+  assert.ok(updates.some((data) => 'openedAt' in data));
+  assert.deepEqual(campaignUpdates, [
+    { clickCount: { increment: 1 } },
+    { openCount: { increment: 1 } },
+  ]);
+});
+
 test('preserves the exact query and fragment of tracked HTML button URLs', () => {
   const html = trackingService().inject(
     '<a href="https://mali.pe/agenda?utm_source=email&amp;utm_campaign=arte&#38;id=2&#x26;v=a%26b#entradas">Entradas</a>',

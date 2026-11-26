@@ -65,28 +65,27 @@ export class EmailTrackingService {
     }
 
     // After link rewriting so the view URL stays a direct (untracked) public URL.
-    if (mode === 'email' && options.viewInBrowserUrl) {
-      const viewBlock = `<div data-mali-view-in-browser style="margin:0 auto 16px;max-width:640px;padding:12px 16px;text-align:center;font:12px/1.5 Arial,sans-serif;color:#6b7280"><a href="${escapeAttribute(options.viewInBrowserUrl)}" style="color:#4b5563;text-decoration:underline">Ver este correo en el navegador</a></div>`;
+    if (mode === 'email') {
+      const viewBlock = options.viewInBrowserUrl
+        ? `<div data-mali-view-in-browser style="margin:0 auto 16px;max-width:640px;padding:12px 16px;text-align:center;font:12px/1.5 Arial,sans-serif;color:#6b7280"><a href="${escapeAttribute(options.viewInBrowserUrl)}" style="color:#4b5563;text-decoration:underline">Ver este correo en el navegador</a></div>`
+        : '';
+      // Top of the body: Gmail clips long messages and never loads what follows the cut.
+      const pixel = `<img src="${this.publicUrl(`mail/o/${options.openToken}.gif`)}" width="1" height="1" alt="" style="display:none" />`;
       if (/<body\b[^>]*>/i.test(out)) {
-        out = out.replace(/<body\b[^>]*>/i, (open) => `${open}${viewBlock}`);
+        out = out.replace(/<body\b[^>]*>/i, (open) => `${open}${viewBlock}${pixel}`);
       } else {
-        out = `${viewBlock}${out}`;
+        out = `${viewBlock}${pixel}${out}`;
       }
     }
 
     const unsubscribe = options.unsubscribeUrl
       ? `<div style="margin:32px auto 0;max-width:640px;padding:16px;text-align:center;font:12px/1.5 Arial,sans-serif;color:#6b7280">Recibes este correo porque formas parte de la audiencia de comunicaciones del MALI. <a href="${escapeAttribute(options.unsubscribeUrl)}" style="color:#4b5563;text-decoration:underline">Cancelar suscripción</a>.</div>`
       : '';
-    const pixel =
-      mode === 'email'
-        ? `<img src="${this.publicUrl(`mail/o/${options.openToken}.gif`)}" width="1" height="1" alt="" style="display:none" />`
-        : '';
-    const additions = `${unsubscribe}${pixel}`;
 
     if (/<\/body>/i.test(out)) {
-      return out.replace(/<\/body>/i, `${additions}</body>`);
+      return out.replace(/<\/body>/i, `${unsubscribe}</body>`);
     }
-    return `${out}${additions}`;
+    return `${out}${unsubscribe}`;
   }
 
   /** Outbound email: tracking + optional view-in-browser + unsubscribe. */
@@ -200,6 +199,19 @@ export class EmailTrackingService {
           where: { id: send.campaignId },
           data: { clickCount: { increment: 1 } },
         });
+      }
+      // A click proves an open the pixel missed (images blocked or message clipped).
+      if (send.status === EmailSendStatus.sent) {
+        const opened = await tx.emailSend.updateMany({
+          where: { id: send.id, openedAt: null },
+          data: { openedAt: new Date() },
+        });
+        if (opened.count) {
+          await tx.emailCampaign.update({
+            where: { id: send.campaignId },
+            data: { openCount: { increment: 1 } },
+          });
+        }
       }
     });
     return { tracked: true, url: target };

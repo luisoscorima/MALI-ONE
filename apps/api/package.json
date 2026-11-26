@@ -28,7 +28,7 @@
     "test:malichimp-content:integration": "node --import tsx --test src/modules/malichimp/malichimp-content.integration.test.ts",
     "test:newsletter-working-copies": "node --import tsx --test src/modules/newsletters/newsletter-working-copy.test.ts",
     "test:internal-comms:integration": "node --import tsx --test src/modules/internal-communications/internal-communications.integration.test.ts",
-    "test:ses-events": "node --import tsx --test src/core/email-delivery/ses-event.test.ts src/core/email-delivery/email-tracking.test.ts src/core/email-delivery/email-merge-tags.test.ts",
+    "test:ses-events": "node --import tsx --test src/core/email-delivery/ses-event.test.ts src/core/email-delivery/email-tracking.test.ts src/core/email-delivery/email-merge-tags.test.ts src/core/email-delivery/email-inline-images.service.test.ts src/core/email-delivery/email-delivery.service.test.ts",
     "test:ses-events:integration": "node --import tsx --test src/core/email-delivery/ses-event-processor.integration.test.ts"
   },
   "dependencies": {

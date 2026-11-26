@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { optionalAwsCredentials } from '../aws/aws-client-options';
+import { EmailInlineImagesService } from './email-inline-images.service';
 
 export type HtmlEmailMessage = {
   to: string;
@@ -26,7 +27,10 @@ export class EmailDeliveryService {
   private readonly configurationSet: string;
   readonly region: string;
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly inlineImages?: EmailInlineImagesService,
+  ) {
     this.region = this.config.get<string>('AWS_SES_REGION') ||
       this.config.get<string>('AWS_REGION') || 'us-east-1';
     const credentials = optionalAwsCredentials(this.config, 'AWS_SES');
@@ -65,6 +69,8 @@ export class EmailDeliveryService {
     if (!this.client) throw new Error('Motor SES no configurado');
     const fromEmail = message.fromEmail?.trim() || this.defaultFromEmail;
     const fromName = message.fromName?.trim() || this.defaultFromName;
+    // Failing here keeps the send pending so the queue retries instead of delivering broken images.
+    const html = this.inlineImages ? await this.inlineImages.externalize(message.html) : message.html;
     const tags = Object.entries(message.tags ?? {}).map(([Name, Value]) => ({
       Name,
       Value,
@@ -78,7 +84,7 @@ export class EmailDeliveryService {
         ReplyToAddresses: message.replyTo ? [message.replyTo.trim()] : undefined,
         Message: {
           Subject: { Data: message.subject, Charset: 'UTF-8' },
-          Body: { Html: { Data: message.html, Charset: 'UTF-8' } },
+          Body: { Html: { Data: html, Charset: 'UTF-8' } },
         },
       }),
     );

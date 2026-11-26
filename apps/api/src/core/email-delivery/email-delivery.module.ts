@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { S3Module } from '../s3/s3.module';
 import { EmailDeliveryService } from './email-delivery.service';
+import { EmailInlineImagesService } from './email-inline-images.service';
 import { SesEventConsumerService } from './ses-event-consumer.service';
 import { SesEventProcessorService } from './ses-event-processor.service';
 import { EmailDeliveryController } from './email-delivery.controller';
@@ -11,9 +13,11 @@ import { GmailReplySyncService } from './gmail-reply-sync.service';
 
 @Global()
 @Module({
+  imports: [S3Module],
   controllers: [EmailDeliveryController, EmailTrackingController],
   providers: [
     EmailDeliveryService,
+    EmailInlineImagesService,
     EmailSenderService,
     EmailTrackingService,
     EmailCampaignDispatcherService,
