@@ -4,6 +4,10 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Fix pantalla negra con internet: los assets del shell (`/assets/*`, JS/CSS)
+  siguen cache-first en hit, pero en miss ya no abortan a los 4 s con un 504
+  vacío. El chunk lazy del player no está en el preload del HTML y ese timeout
+  dejaba el kiosk en negro pese a tener red.
 - Caché offline unificada (`config/media v7`) y fallback de `/screen-cast?id=…`
   al shell local sin que el query string impida arrancar.
 - Los despliegues del Service Worker ya no eliminan la caché persistente de
@@ -22,7 +26,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
   respuestas legacy opacas se descartan y se rellenan de nuevo desde el proxy.
 - Shell y config abandonan la red a los 4–5 segundos y usan caché cuando una TV
   sigue marcando `online` dentro de una LAN sin salida. Los assets con hash usan
-  cache-first y `/screen-cast?id=…` prefiere su entrada exacta antes del fallback.
+  cache-first en hit (miss espera la red) y `/screen-cast?id=…` prefiere su
+  entrada exacta antes del fallback.
 - El arranque local ya no espera el registro/actualización del Service Worker y
   un sondeo espaciado recupera el socket si el televisor pierde el evento online.
 - Cada build fuerza la instalación del worker, refresca el shell canónico y

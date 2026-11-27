@@ -115,9 +115,10 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('.js') ||
     url.pathname.endsWith('.css')
   ) {
-    // Vite assets are content-hashed. Waiting on the WAN before reading an
-    // already cached bundle can leave a kiosk black behind a captive/LAN-only
-    // connection, where navigator.onLine remains true.
+    // Cache hit avoids waiting on a dead WAN (navigator.onLine can stay true
+    // on captive/LAN-only links). A miss must not abort after a few seconds:
+    // lazy chunks like the player are not in the shell HTML preload list, and
+    // a 504 empty body leaves the kiosk on a black screen despite internet.
     event.respondWith(cacheFirstSafe(request, SHELL_CACHE));
     return;
   }
@@ -228,8 +229,10 @@ async function cacheFirstSafe(request, cacheName) {
   const cached = await cache.match(request);
   if (cached) return cached;
 
+  // Miss path: wait for the network. Short timeouts belong to network-first
+  // config/shell fetches that still have a cached fallback.
   try {
-    const fresh = await fetchWithTimeout(request, NETWORK_TIMEOUT_MS);
+    const fresh = await fetch(request);
     if (fresh?.ok) {
       try {
         await cache.put(request, fresh.clone());
