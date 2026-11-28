@@ -4,6 +4,22 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- Aislamiento online/offline del shell: el Service Worker solo interviene en
+  assets inmutables con hash dentro de `/assets/`; un miss usa el `fetch` nativo
+  sin timeout offline. Antes de reutilizar o guardar JS/CSS valida el MIME para
+  impedir que un fallback HTML quede cacheado como chunk y deje la TV en negro.
+  La navegación online también conserva el `fetch` nativo y la config deja de
+  ser interceptada por el worker (el player ya gestiona su fallback explícito).
+  El build declara y precarga el chunk lazy del player para que el modo offline
+  no dependa de haberlo descargado antes. La caché de shell sube a v8 para
+  purgar posibles entradas contaminadas, migrando de v7 únicamente respuestas
+  cuyo tipo sea válido para no perder el último shell cuando la red se corte.
+  Un shell nuevo solo reemplaza al anterior cuando todo su manifest quedó
+  cacheado; si el build no encuentra el chunk del player falla explícitamente.
+  Con shell validado, una WAN colgada usa fallback a los 5 s sin abortar la
+  solicitud de red ni aplicar ese límite a los chunks JavaScript. Las
+  navegaciones online no escriben shells por query: solo la instalación atómica
+  puede promover el shell canónico usado offline.
 - Fix pantalla negra con internet: los assets del shell (`/assets/*`, JS/CSS)
   siguen cache-first en hit, pero en miss ya no abortan a los 4 s con un 504
   vacío. El chunk lazy del player no está en el preload del HTML y ese timeout
