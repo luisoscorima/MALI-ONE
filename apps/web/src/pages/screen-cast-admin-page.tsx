@@ -375,14 +375,8 @@ function PlaylistPreviewStack({
   );
 }
 
-function LivePlaylistBadge({
-  monitors,
-}: {
-  monitors: ScreenCastPlaylistMonitorRefDto[];
-}) {
-  const live = monitors.filter((m) => m.online);
-  if (live.length === 0) return null;
-  const names = live.map((m) => m.name).join(', ');
+function LivePlaylistBadge({ monitorNames }: { monitorNames: string[] }) {
+  if (monitorNames.length === 0) return null;
 
   return (
     <Tooltip>
@@ -393,7 +387,7 @@ function LivePlaylistBadge({
         </Badge>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-xs">
-        En pantalla: {names}
+        En pantalla: {monitorNames.join(', ')}
       </TooltipContent>
     </Tooltip>
   );
@@ -1224,6 +1218,14 @@ export function ScreenCastAdminPage() {
                 <TableBody>
                   {playlists.map((p) => {
                     const assigned = p.monitors ?? [];
+                    const liveMonitorNames = monitors
+                      .filter(
+                        (monitor) =>
+                          monitor.online &&
+                          (monitor.scheduleActive?.playlistId ?? monitor.playlistId) ===
+                            p.id,
+                      )
+                      .map((monitor) => monitor.name);
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">
@@ -1236,7 +1238,7 @@ export function ScreenCastAdminPage() {
                               {p.name}
                             </button>
                             {p.activo ? (
-                              <LivePlaylistBadge monitors={assigned} />
+                              <LivePlaylistBadge monitorNames={liveMonitorNames} />
                             ) : null}
                           </div>
                         </TableCell>

@@ -4,6 +4,8 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- El indicador `Live` de playlists usa la programación vigente del monitor
+  conectado. Al terminar la programación, vuelve a la playlist predeterminada.
 - `/screen-cast` carga su propio HTML y bundle con los mismos enlaces de
   monitores. Si el arranque falla, el HTML muestra una opción para recargar.
   Un error de caché permite seguir cargando desde la red. El Service Worker

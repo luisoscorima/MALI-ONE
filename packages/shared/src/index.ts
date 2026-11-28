@@ -934,7 +934,7 @@ export interface ScreenCastPlaylistDto {
   /** First items for list thumbnails (mediaUrl + mediaType only). */
   previewItems?: ScreenCastPlaylistPreviewDto[];
   monitorCount?: number;
-  /** Assigned monitors (for avatar stack / Live badge). */
+  /** Monitors assigned to this playlist by default (for the avatar stack). */
   monitors?: ScreenCastPlaylistMonitorRefDto[];
 }
 
