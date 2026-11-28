@@ -6,6 +6,14 @@ import { screenCastVersionPlugin } from './vite/screen-cast-version-plugin';
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), screenCastVersionPlugin()],
+  build: {
+    rollupOptions: {
+      input: {
+        app: path.resolve(__dirname, 'index.html'),
+        kiosk: path.resolve(__dirname, 'screen-cast.html'),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

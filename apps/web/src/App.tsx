@@ -48,10 +48,6 @@ const ScreenCastAdminPage = lazyPage(
   () => import('@/pages/screen-cast-admin-page'),
   'ScreenCastAdminPage',
 );
-const ScreenCastPlayerPage = lazyPage(
-  () => import('@/pages/screen-cast-player-page'),
-  'ScreenCastPlayerPage',
-);
 const WidgetBibliotecaCarruselPage = lazyPage(
   () => import('@/pages/widget-biblioteca-carrusel-page'),
   'WidgetBibliotecaCarruselPage',
@@ -342,7 +338,6 @@ export function App() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes — outside AuthProvider to avoid /api/auth/me 401 */}
-              <Route path="/screen-cast" element={<ScreenCastPlayerPage />} />
               <Route path="/presentacion" element={<PresentacionPage />} />
               <Route path="/presentacion/" element={<PresentacionPage />} />
               <Route path="*" element={<AuthenticatedApp />} />

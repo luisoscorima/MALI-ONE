@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Pantallas MALI</title>
+    <style>
+      body { margin: 0; background: #000; color: #fff; font: 18px Arial, sans-serif; }
+      .screen-cast-boot { position: fixed; inset: 0; display: grid; place-content: center; gap: 12px; padding: 24px; text-align: center; }
+      .screen-cast-boot a { color: inherit; text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="screen-cast-boot">
+        <span role="status">Iniciando la pantalla…</span>
+        <a href="">Recargar el reproductor</a>
+      </div>
+    </div>
+    <script type="module" src="/src/screen-cast-main.tsx"></script>
+  </body>
+</html>

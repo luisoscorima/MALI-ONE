@@ -8,7 +8,12 @@ const SHELL_CACHE = 'screen-cast-shell-v8';
 // Never delete this cache during a shell/service-worker update.
 const VIDEO_CACHE = 'screen-cast-video-v1';
 const ASSET_MANIFEST_URL = '/screen-cast-assets.json';
+const SHELL_URL = '/screen-cast';
 const SHELL_FALLBACK_DELAY_MS = 5000;
+
+function isScreenCastShellPath(pathname) {
+  return pathname === SHELL_URL || pathname === `${SHELL_URL}/`;
+}
 
 function isOfflineCacheableMediaUrl(urlString) {
   try {
@@ -43,10 +48,14 @@ function isVideoMediaRequest(url, request) {
 self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
-      const cache = await caches.open(SHELL_CACHE);
-      await migrateValidLegacyShellEntries(cache);
-      await refreshShellCache(cache);
-      self.skipWaiting();
+      try {
+        const cache = await caches.open(SHELL_CACHE);
+        await migrateValidLegacyShellEntries(cache);
+        await refreshShellCache(cache);
+      } catch {
+        // A storage error must not leave an older worker in control online.
+      }
+      await self.skipWaiting();
     })(),
   );
 });
@@ -60,12 +69,16 @@ self.addEventListener('activate', (event) => {
         SHELL_CACHE,
         VIDEO_CACHE,
       ]);
-      const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key) => key.startsWith('screen-cast-') && !keep.has(key))
-          .map((key) => caches.delete(key)),
-      );
+      try {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter((key) => key.startsWith('screen-cast-') && !keep.has(key))
+            .map((key) => caches.delete(key)),
+        );
+      } catch {
+        // Cleanup is best-effort and must not block taking control.
+      }
       await self.clients.claim();
     })(),
   );
@@ -84,13 +97,13 @@ async function migrateValidLegacyShellEntries(targetCache) {
         const url = new URL(request.url);
         if (
           url.origin !== self.location.origin ||
-          (url.pathname !== '/screen-cast' && !isImmutableViteAssetUrl(url))
+          (!isScreenCastShellPath(url.pathname) && !isImmutableViteAssetUrl(url))
         ) {
           continue;
         }
         const response = await legacy.match(request);
         const isCanonicalShell =
-          url.pathname === '/screen-cast' && url.search === '';
+          url.pathname === SHELL_URL && url.search === '';
         if (
           (isCanonicalShell || isImmutableViteAssetUrl(url)) &&
           response &&
@@ -119,27 +132,16 @@ self.addEventListener('fetch', (event) => {
     // Images/GIFs use the same-origin proxy so expired S3 signatures cannot
     // break a kiosk that is filling or reading its cache.
     if (!isVideoMediaRequest(url, request)) {
-      event.respondWith(mediaCacheFirstSafe(request, MEDIA_CACHE));
+      respondWithCacheUpdate(event, mediaCacheFirstSafe(request, MEDIA_CACHE));
     }
     return;
   }
 
   if (
     url.origin === self.location.origin &&
-    url.pathname === '/screen-cast'
+    isScreenCastShellPath(url.pathname)
   ) {
-    event.respondWith(
-      shellNetworkFirstSafe(
-        request,
-        SHELL_CACHE,
-        {
-          // The kiosk URL includes ?id=..., while install caches the shared
-          // /screen-cast shell. Query params must not defeat offline boot.
-          ignoreSearchOnFallback: true,
-        },
-        event,
-      ),
-    );
+    event.respondWith(shellNetworkFirstSafe(request, event));
     return;
   }
 
@@ -147,14 +149,14 @@ self.addEventListener('fetch', (event) => {
     // Only immutable, content-hashed Vite assets are allowed to take the cache
     // path. On a miss the normal network request is returned without an
     // offline timeout, so the online player keeps native browser semantics.
-    event.respondWith(shellAssetCacheFirstSafe(request, SHELL_CACHE));
+    respondWithCacheUpdate(event, shellAssetCacheFirstSafe(request));
     return;
   }
 
   if (url.origin !== self.location.origin) {
     if (!isOfflineCacheableMediaUrl(request.url)) return;
     if (isVideoMediaRequest(url, request)) return;
-    event.respondWith(mediaCacheFirstSafe(request, MEDIA_CACHE));
+    respondWithCacheUpdate(event, mediaCacheFirstSafe(request, MEDIA_CACHE));
   }
 });
 
@@ -162,8 +164,8 @@ async function refreshShellCache(cache) {
   let freshShell = null;
   const assetUrls = new Set();
   try {
-    const response = await fetch('/screen-cast', { cache: 'no-store' });
-    if (isValidShellResponse('/screen-cast', response)) {
+    const response = await fetch(SHELL_URL, { cache: 'no-store' });
+    if (isValidShellResponse(SHELL_URL, response)) {
       freshShell = response;
     }
   } catch {
@@ -198,14 +200,14 @@ async function refreshShellCache(cache) {
   );
   if (cached.some((success) => !success)) return;
 
-  await cache.put('/screen-cast', freshShell.clone());
+  await cache.put(SHELL_URL, freshShell.clone());
   // A complete new build is safer than exact query entries left by an older
   // build. Exact entries will be recreated on the next online navigation.
   const keys = await cache.keys();
   await Promise.all(
     keys.map((request) => {
       const url = new URL(request.url);
-      return url.pathname === '/screen-cast' && url.search
+      return isScreenCastShellPath(url.pathname) && url.search
         ? cache.delete(request)
         : undefined;
     }),
@@ -260,7 +262,7 @@ function isValidShellResponse(requestOrUrl, response) {
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
   const path = requestUrl.pathname.toLowerCase();
 
-  if (path === '/screen-cast' || path === '/index.html') {
+  if (isScreenCastShellPath(path) || path === '/index.html') {
     return contentType.includes('text/html');
   }
   if (path.endsWith('.js') || path.endsWith('.mjs')) {
@@ -294,7 +296,23 @@ async function cacheShellAsset(cache, requestOrUrl) {
   return false;
 }
 
-async function shellNetworkFirstSafe(request, cacheName, options = {}, event) {
+async function readShellFallback(request) {
+  try {
+    const cache = await caches.open(SHELL_CACHE);
+    const candidates = [request, SHELL_URL];
+    for (const key of candidates) {
+      const cached = await cache.match(key);
+      if (cached && isValidShellResponse(key, cached)) return cached;
+    }
+    const legacy = await cache.match(request, { ignoreSearch: true });
+    if (legacy && isValidShellResponse(request, legacy)) return legacy;
+  } catch {
+    // CacheStorage is optional. A storage error must not fail navigation.
+  }
+  return null;
+}
+
+async function shellNetworkFirstSafe(request, event) {
   // Start the native request immediately. A timeout below never aborts it.
   const freshPromise = fetch(request);
   try {
@@ -304,111 +322,117 @@ async function shellNetworkFirstSafe(request, cacheName, options = {}, event) {
   } catch {
     // Some older WebViews do not allow extending a FetchEvent lifetime here.
   }
-  const cache = await caches.open(cacheName);
-
-  // Prefer the exact URL. `ignoreSearch` is only a compatibility fallback for
-  // installs that have the canonical /screen-cast entry alone.
-  let fallback = await cache.match(request);
-  if (fallback && !isValidShellResponse(request, fallback)) {
-    await cache.delete(request);
-    fallback = null;
-  }
-  if (!fallback && options.ignoreSearchOnFallback === true) {
-    fallback = await cache.match(request, { ignoreSearch: true });
-    if (fallback && !isValidShellResponse(request, fallback)) fallback = null;
-  }
-
-  const networkTask = (async () => {
-    try {
-      const fresh = await freshPromise;
-      // The install transaction owns the offline shell. Online navigations are
-      // returned untouched and never create a query-specific, partially
-      // precached shell entry.
-      return fresh;
-    } catch {
-      if (fallback) return fallback;
-      return new Response(JSON.stringify({ message: 'Sin contenido local' }), {
+  const fallbackTask = readShellFallback(request);
+  const networkTask = freshPromise.catch(async () => {
+    const fallback = await fallbackTask;
+    return fallback ?? new Response(
+      JSON.stringify({ message: 'Sin contenido local' }),
+      {
         status: 503,
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         },
-      });
-    }
-  })();
-
-  // With no validated fallback, never cut off a slow but working first load.
-  if (!fallback) return networkTask;
+      },
+    );
+  });
 
   // A dead/captive WAN may use the validated shell. This timer only chooses the
   // response; it never aborts the native request or any JavaScript asset.
   let timer;
-  const delayedFallback = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(fallback), SHELL_FALLBACK_DELAY_MS);
+  let completed = false;
+  const delayedFallback = fallbackTask.then((fallback) => {
+    if (!fallback || completed) return networkTask;
+    return new Promise((resolve) => {
+      timer = setTimeout(() => resolve(fallback), SHELL_FALLBACK_DELAY_MS);
+    });
   });
   try {
     return await Promise.race([networkTask, delayedFallback]);
   } finally {
+    completed = true;
     clearTimeout(timer);
   }
 }
 
-async function shellAssetCacheFirstSafe(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) {
-    if (isValidShellResponse(request, cached)) return cached;
-    await cache.delete(request);
+function respondWithCacheUpdate(event, result) {
+  event.respondWith(result.then(({ response }) => response));
+  event.waitUntil(result.then(({ cacheUpdate }) => cacheUpdate));
+}
+
+async function writeCachedResponse(cache, request, response) {
+  try {
+    await cache?.put(request, response.clone());
+  } catch {
+    // Cache write failures never prevent the browser using the live response.
+  }
+}
+
+async function shellAssetCacheFirstSafe(request) {
+  let cache;
+  try {
+    cache = await caches.open(SHELL_CACHE);
+    const cached = await cache.match(request);
+    if (cached && isValidShellResponse(request, cached)) {
+      return { response: cached };
+    }
+  } catch {
+    // A denied or failed CacheStorage read must still try the network.
   }
 
   // Miss path is deliberately the native request: no AbortController, race,
   // or offline timeout may turn a working but slow online connection black.
   try {
     const fresh = await fetch(request);
-    if (isValidShellResponse(request, fresh)) {
-      try {
-        await cache.put(request, fresh.clone());
-      } catch {
-        // ignore quota/write errors; the live response is still usable
-      }
-    }
-    return fresh;
+    const cacheUpdate = isValidShellResponse(request, fresh)
+      ? writeCachedResponse(cache, request, fresh)
+      : undefined;
+    return { response: fresh, cacheUpdate };
   } catch {
-    return new Response('', {
-      status: 504,
-      statusText: 'Asset unavailable',
-    });
+    return {
+      response: new Response('', {
+        status: 504,
+        statusText: 'Asset unavailable',
+      }),
+    };
   }
 }
 
 async function mediaCacheFirstSafe(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  if (cached) {
+  let cache;
+  try {
+    cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
     // Older versions copied opaque direct-S3 responses under the same-origin
     // proxy key. Such a response cannot satisfy a CORS <img> request and, if
     // returned cache-first forever, prevents the proxy from repairing it.
-    if (cached.type !== 'opaque' && cached.status !== 0) return cached;
-    await cache.delete(request);
+    if (cached && cached.type !== 'opaque' && cached.status !== 0) {
+      return { response: cached };
+    }
+  } catch {
+    // A denied or failed CacheStorage read must still try the network.
   }
 
   try {
     const fresh = await fetch(request, { credentials: 'omit' });
-    if (fresh.ok || fresh.type === 'opaque') {
-      try {
-        await cache.put(request, fresh.clone());
-      } catch {
-        // ignore
-      }
-    }
-    return fresh;
+    const cacheUpdate = fresh.ok || fresh.type === 'opaque'
+      ? writeCachedResponse(cache, request, fresh)
+      : undefined;
+    return { response: fresh, cacheUpdate };
   } catch {
-    const byUrl = await cache.match(request.url);
-    if (byUrl) return byUrl;
-
-    return new Response('', {
-      status: 504,
-      statusText: 'Media unavailable',
-    });
+    try {
+      const byUrl = await cache?.match(request.url);
+      if (byUrl && byUrl.type !== 'opaque' && byUrl.status !== 0) {
+        return { response: byUrl };
+      }
+    } catch {
+      // Preserve the explicit offline response when CacheStorage also fails.
+    }
+    return {
+      response: new Response('', {
+        status: 504,
+        statusText: 'Media unavailable',
+      }),
+    };
   }
 }

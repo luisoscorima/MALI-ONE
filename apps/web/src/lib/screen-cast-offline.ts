@@ -5,16 +5,6 @@ const SW_URL = '/screen-cast-sw.js';
 const CONFIG_CACHE = 'screen-cast-config-v7';
 const MEDIA_CACHE = 'screen-cast-media-v7';
 
-function serviceWorkerUrl(): string {
-  const buildId =
-    typeof __SCREEN_CAST_BUILD_ID__ === 'string'
-      ? __SCREEN_CAST_BUILD_ID__
-      : 'dev';
-  return buildId === 'dev'
-    ? SW_URL
-    : `${SW_URL}?build=${encodeURIComponent(buildId)}`;
-}
-
 function configUrl(screenKey: string): string {
   return `/api/screen-cast/screens/${encodeURIComponent(screenKey)}/config`;
 }
@@ -74,14 +64,12 @@ export function screenCastOfflineMediaUrl(url: string): string {
 export async function registerScreenCastServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    // The build query changes on every deploy, forcing install to refresh the
-    // canonical HTML and its hashed JS/CSS even when this source file did not.
-    const reg = await navigator.serviceWorker.register(serviceWorkerUrl(), {
+    // A stable URL prevents tabs on different builds alternating registrations.
+    // The build stamp changes the worker bytes and triggers a new installation.
+    await navigator.serviceWorker.register(SW_URL, {
       scope: '/screen-cast',
+      updateViaCache: 'none',
     });
-    if (navigator.onLine !== false) {
-      void reg.update().catch(() => undefined);
-    }
     // CacheStorage can otherwise be evicted under storage pressure. Browsers
     // that do not expose persistent storage simply keep their normal policy.
     void navigator.storage?.persist?.().catch(() => false);

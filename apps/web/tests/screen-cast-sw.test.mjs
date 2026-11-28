@@ -63,7 +63,8 @@ function createHarness(fetchImpl, options = {}) {
     caches: {
       async open(name) {
         if (!namedCaches.has(name)) namedCaches.set(name, new MemoryCache());
-        return namedCaches.get(name);
+        const cache = namedCaches.get(name);
+        return options.openCache ? options.openCache(cache) : cache;
       },
       async keys() {
         return [...namedCaches.keys()];
@@ -75,7 +76,7 @@ function createHarness(fetchImpl, options = {}) {
     self: {
       location: { origin: ORIGIN },
       clients: { claim: async () => undefined },
-      skipWaiting: async () => undefined,
+      skipWaiting: options.skipWaiting ?? (async () => undefined),
       addEventListener(type, listener) {
         listeners.set(type, listener);
       },
@@ -144,6 +145,57 @@ test('an uncached online chunk uses native fetch without an offline timeout', as
   assert.equal(calls.length, 1);
   assert.equal(calls[0].length, 1);
   assert.ok(calls[0][0] instanceof Request);
+});
+
+test('an online chunk loads even when CacheStorage denies access', async () => {
+  const harness = createHarness(
+    () => Promise.resolve(javascriptResponse('live script')),
+    {
+      openCache() {
+        throw new Error('CacheStorage unavailable');
+      },
+    },
+  );
+
+  const response = await harness.dispatchFetch('/assets/player-AbCd1234.js');
+  assert.equal(await response.text(), 'live script');
+});
+
+test(
+  'an online chunk does not wait for a pending CacheStorage write',
+  { timeout: 1000 },
+  async () => {
+    const harness = createHarness(
+      () => Promise.resolve(javascriptResponse('live script')),
+      {
+        openCache(cache) {
+          cache.put = () => new Promise(() => {});
+          return cache;
+        },
+      },
+    );
+
+    const response = await harness.dispatchFetch('/assets/player-AbCd1234.js');
+    assert.equal(await response.text(), 'live script');
+  },
+);
+
+test('online proxied images load even when CacheStorage denies access', async () => {
+  const harness = createHarness(
+    () => Promise.resolve(
+      new Response('image', { headers: { 'Content-Type': 'image/jpeg' } }),
+    ),
+    {
+      openCache() {
+        throw new Error('CacheStorage unavailable');
+      },
+    },
+  );
+
+  const response = await harness.dispatchFetch(
+    '/api/screen-cast/media?src=image.jpg',
+  );
+  assert.equal(await response.text(), 'image');
 });
 
 test('a valid immutable chunk is served cache-first without touching the network', async () => {
@@ -248,6 +300,41 @@ test('failed shell navigation falls back to the validated canonical shell', asyn
   assert.match(await response.text(), /offline/);
 });
 
+test('the trailing-slash player also falls back to the canonical shell', async () => {
+  const harness = createHarness(() => Promise.reject(new TypeError('offline')));
+  await harness.cache().put(
+    '/screen-cast',
+    new Response('<!doctype html><main>offline</main>', {
+      headers: { 'Content-Type': 'text/html' },
+    }),
+  );
+
+  const response = await harness.dispatchFetch('/screen-cast/?id=tv-1');
+  assert.match(await response.text(), /offline/);
+});
+
+test(
+  'online navigation does not wait for a pending CacheStorage read',
+  { timeout: 1000 },
+  async () => {
+    const harness = createHarness(
+      () => Promise.resolve(
+        new Response('<!doctype html><main>live</main>', {
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+      {
+        openCache() {
+          return new Promise(() => {});
+        },
+      },
+    );
+
+    const response = await harness.dispatchFetch('/screen-cast?id=tv-1');
+    assert.match(await response.text(), /live/);
+  },
+);
+
 test('a captive WAN falls back after the shell delay without aborting fetch', async () => {
   let fetchCalls = 0;
   const pendingNetwork = new Promise(() => {});
@@ -326,6 +413,24 @@ test('activation purges the potentially contaminated v7 shell only', async () =>
     'screen-cast-shell-v8',
     'screen-cast-video-v1',
   ]);
+});
+
+test('a denied shell cache does not leave the old worker in control', async () => {
+  let skippedWaiting = false;
+  const harness = createHarness(
+    () => { throw new Error('unexpected fetch'); },
+    {
+      openCache() {
+        throw new Error('CacheStorage unavailable');
+      },
+      async skipWaiting() {
+        skippedWaiting = true;
+      },
+    },
+  );
+
+  await harness.install();
+  assert.equal(skippedWaiting, true);
 });
 
 test('installation precaches the lazy player chunk declared by the build', async () => {

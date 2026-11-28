@@ -1,30 +1,25 @@
 const VERSION_URL = '/screen-cast-version.json';
 const CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const INITIAL_DELAY_MS = 60_000;
-const MAX_DEFER_MS = 3 * 60 * 1000;
+const DEFER_MS = 3 * 60 * 1000;
+const ATTEMPT_KEY = 'screen-cast-update-attempt';
+const MAX_ATTEMPTS = 2;
 
 type UpdateOptions = {
   /** Defer reload while a video is playing (returns true if mid-playback). */
   isVideoPlaying?: () => boolean;
 };
 
-let reloadScheduled = false;
-let deferTimer: number | null = null;
-
-function currentBuildId(): string {
+/** Build actually running on the screen ºw^~)Þt tells stale bundles apart. */
+export function screenCastBuildId(): string {
   return typeof __SCREEN_CAST_BUILD_ID__ === 'string'
     ? __SCREEN_CAST_BUILD_ID__
     : 'dev';
 }
 
-/** Build actually running on the screen â€” tells stale bundles apart. */
-export function screenCastBuildId(): string {
-  return currentBuildId();
-}
-
 async function fetchRemoteBuildId(): Promise<string | null> {
   try {
-    const res = await fetch(`${VERSION_URL}?_${Date.now()}`, {
+    const res = await fetch(VERSION_URL, {
       cache: 'no-store',
       credentials: 'same-origin',
     });
@@ -36,114 +31,75 @@ async function fetchRemoteBuildId(): Promise<string | null> {
   }
 }
 
-function clearDeferTimer() {
-  if (deferTimer !== null) {
-    window.clearTimeout(deferTimer);
-    deferTimer = null;
-  }
-}
-
-const ATTEMPT_KEY = 'screen-cast-update-attempt';
-const MAX_ATTEMPTS = 2;
-
-/** Give up after a couple of attempts instead of reloading forever. */
-function updateAttempts(target: string): number {
+function claimReloadAttempt(target: string): boolean {
   try {
     const raw = sessionStorage.getItem(ATTEMPT_KEY);
-    const parsed = raw ? (JSON.parse(raw) as { target?: string; count?: number }) : null;
-    return parsed?.target === target ? parsed.count ?? 0 : 0;
+    const previous = raw
+      ? (JSON.parse(raw) as { target?: string; count?: number })
+      : null;
+    const attempts = previous?.target === target ? previous.count ?? 0 : 0;
+    if (attempts >= MAX_ATTEMPTS) return false;
+    sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify({ target, count: attempts + 1 }));
+    return true;
   } catch {
-    return 0;
+    // Without storage, an offline shell could reload indefinitely.
+    return false;
   }
 }
 
-function recordUpdateAttempt(target: string, count: number) {
-  try {
-    sessionStorage.setItem(ATTEMPT_KEY, JSON.stringify({ target, count }));
-  } catch {
-    // private mode / quota â€” worst case we retry once more
-  }
-}
-
-function reloadForUpdate() {
-  if (reloadScheduled) return;
-  reloadScheduled = true;
-  clearDeferTimer();
-  // Never delete the last bootable shell before navigating. A reachable build
-  // refreshes it during worker install; otherwise navigation falls back to it.
-  window.location.reload();
-}
-
-function scheduleReload(options: UpdateOptions) {
-  if (reloadScheduled) return;
-
-  const playing = options.isVideoPlaying?.() ?? false;
-  if (!playing) {
-    reloadForUpdate();
-    return;
-  }
-
-  if (deferTimer !== null) return;
-  deferTimer = window.setTimeout(() => {
-    deferTimer = null;
-    scheduleReload(options);
-  }, MAX_DEFER_MS);
-}
-
-async function checkForUpdate(options: UpdateOptions) {
-  if (reloadScheduled || currentBuildId() === 'dev') return;
-
-  const remoteBuildId = await fetchRemoteBuildId();
-  if (!remoteBuildId || remoteBuildId === 'dev' || remoteBuildId === currentBuildId()) {
-    return;
-  }
-
-  const attempts = updateAttempts(remoteBuildId);
-  if (attempts >= MAX_ATTEMPTS) return;
-  recordUpdateAttempt(remoteBuildId, attempts + 1);
-
-  scheduleReload(options);
-}
-
-function watchServiceWorkerUpdates(options: UpdateOptions) {
-  if (!('serviceWorker' in navigator)) return;
-
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    reloadForUpdate();
-  });
-
-  void navigator.serviceWorker.ready.then((reg) => {
-    reg.addEventListener('updatefound', () => {
-      const worker = reg.installing;
-      if (!worker) return;
-      worker.addEventListener('statechange', () => {
-        if (worker.state !== 'installed') return;
-        if (!navigator.serviceWorker.controller) return;
-        scheduleReload(options);
-      });
-    });
-  });
-}
-
-/** Poll deploy version + listen for SW updates; reload kiosk players automatically. */
+/** Poll the deployed version and reload only when the player is outdated. */
 export function startScreenCastAutoUpdate(options: UpdateOptions = {}) {
-  if (currentBuildId() === 'dev') return;
+  const current = screenCastBuildId();
+  if (current === 'dev') return;
 
-  watchServiceWorkerUpdates(options);
+  let stopped = false;
+  let checking = false;
+  let reloadScheduled = false;
+  let deferTimer: number | undefined;
+
+  const checkVersion = async () => {
+    if (stopped || checking || reloadScheduled || navigator.onLine === false) return;
+
+    checking = true;
+    const remote = await fetchRemoteBuildId();
+    checking = false;
+    if (stopped || !remote || remote === 'dev' || remote === current) return;
+
+    reloadScheduled = true;
+    const reload = () => {
+      if (options.isVideoPlaying?.()) {
+        deferTimer = window.setTimeout(reload, DEFER_MS);
+        return;
+      }
+      if (claimReloadAttempt(remote)) window.location.reload();
+    };
+    reload();
+  };
 
   const runCheck = () => {
     if (navigator.onLine === false) return;
-    void checkForUpdate(options);
+    void checkVersion();
     void navigator.serviceWorker
       ?.getRegistration('/screen-cast')
       .then((reg) => reg?.update())
       .catch(() => undefined);
   };
-
-  window.setTimeout(runCheck, INITIAL_DELAY_MS);
-  window.setInterval(runCheck, CHECK_INTERVAL_MS);
-
-  document.addEventListener('visibilitychange', () => {
+  const onVisible = () => {
     if (document.visibilityState === 'visible') runCheck();
-  });
+  };
+
+  // First install and repeat activation can happen on the current build.
+  navigator.serviceWorker?.addEventListener('controllerchange', checkVersion);
+  document.addEventListener('visibilitychange', onVisible);
+  const initial = window.setTimeout(runCheck, INITIAL_DELAY_MS);
+  const interval = window.setInterval(runCheck, CHECK_INTERVAL_MS);
+
+  return () => {
+    stopped = true;
+    window.clearTimeout(initial);
+    window.clearInterval(interval);
+    window.clearTimeout(deferTimer);
+    navigator.serviceWorker?.removeEventListener('controllerchange', checkVersion);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
 }

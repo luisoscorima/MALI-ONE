@@ -7,7 +7,6 @@ import {
   type CSSProperties,
   type SyntheticEvent,
 } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { io, type Socket } from 'socket.io-client';
 import {
   isScreenCastPortrait,
@@ -282,7 +281,7 @@ type JoinAck = {
 };
 
 export function ScreenCastPlayerPage() {
-  const [params] = useSearchParams();
+  const params = new URLSearchParams(window.location.search);
   const screenKey = (params.get('id') ?? '').trim().toLowerCase();
   const isPreview = params.get('preview') === '1';
   const isDebug = params.get('debug') === '1';
@@ -1098,7 +1097,7 @@ export function ScreenCastPlayerPage() {
 
   useEffect(() => {
     if (isPreview) return;
-    startScreenCastAutoUpdate({
+    return startScreenCastAutoUpdate({
       isVideoPlaying: () => {
         const video = videoRef.current;
         return !!video && !video.paused && !video.ended;

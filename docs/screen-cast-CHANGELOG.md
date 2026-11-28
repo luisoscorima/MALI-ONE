@@ -4,6 +4,11 @@ Formato: entradas en orden inverso (lo más reciente arriba). Cada mejora del m�
 
 ## [Unreleased]
 
+- `/screen-cast` carga su propio HTML y bundle con los mismos enlaces de
+  monitores. Si el arranque falla, el HTML muestra una opción para recargar.
+  Un error de caché permite seguir cargando desde la red. El Service Worker
+  mantiene una URL de registro estable y el reproductor solo se recarga
+  automáticamente cuando confirma que hay otra versión desplegada.
 - Aislamiento online/offline del shell: el Service Worker solo interviene en
   assets inmutables con hash dentro de `/assets/`; un miss usa el `fetch` nativo
   sin timeout offline. Antes de reutilizar o guardar JS/CSS valida el MIME para
